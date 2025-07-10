@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -58,8 +57,8 @@ interface DocumentFormProps {
 export const DocumentForm = ({ document, trigger }: DocumentFormProps) => {
   const [open, setOpen] = useState(false);
   const { createDocument, updateDocument, isCreating, isUpdating } = useDocuments();
-  const { templates } = useTemplates();
-  const { plans } = usePlans();
+  const { data: templates } = useTemplates();
+  const { data: plans } = usePlans();
 
   const form = useForm<DocumentFormData>({
     resolver: zodResolver(documentSchema),
