@@ -14,16 +14,495 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          id: string
+          new_values: Json | null
+          old_values: Json | null
+          record_id: string | null
+          table_name: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          record_id?: string | null
+          table_name: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          record_id?: string | null
+          table_name?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clients: {
+        Row: {
+          address: string | null
+          birth_date: string | null
+          created_at: string | null
+          dni: string | null
+          email: string
+          first_name: string
+          id: string
+          last_name: string
+          phone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          birth_date?: string | null
+          created_at?: string | null
+          dni?: string | null
+          email: string
+          first_name: string
+          id?: string
+          last_name: string
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          birth_date?: string | null
+          created_at?: string | null
+          dni?: string | null
+          email?: string
+          first_name?: string
+          id?: string
+          last_name?: string
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      companies: {
+        Row: {
+          active: boolean | null
+          address: string | null
+          created_at: string | null
+          email: string | null
+          id: string
+          logo_url: string | null
+          name: string
+          phone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          address?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          logo_url?: string | null
+          name: string
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          address?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          logo_url?: string | null
+          name?: string
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      documents: {
+        Row: {
+          content: string | null
+          created_at: string | null
+          document_type: string | null
+          file_url: string | null
+          id: string
+          is_required: boolean | null
+          name: string
+          order_index: number | null
+          plan_id: string | null
+          sale_id: string | null
+          template_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string | null
+          document_type?: string | null
+          file_url?: string | null
+          id?: string
+          is_required?: boolean | null
+          name: string
+          order_index?: number | null
+          plan_id?: string | null
+          sale_id?: string | null
+          template_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          content?: string | null
+          created_at?: string | null
+          document_type?: string | null
+          file_url?: string | null
+          id?: string
+          is_required?: boolean | null
+          name?: string
+          order_index?: number | null
+          plan_id?: string | null
+          sale_id?: string | null
+          template_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plans: {
+        Row: {
+          active: boolean | null
+          company_id: string | null
+          coverage_details: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          price: number
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          company_id?: string | null
+          coverage_details?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          price: number
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          company_id?: string | null
+          coverage_details?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          price?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plans_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plans_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          active: boolean | null
+          avatar_url: string | null
+          company_id: string | null
+          created_at: string | null
+          email: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          phone: string | null
+          role: Database["public"]["Enums"]["user_role"]
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          avatar_url?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          email: string
+          first_name?: string | null
+          id: string
+          last_name?: string | null
+          phone?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          avatar_url?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          email?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          phone?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales: {
+        Row: {
+          client_id: string | null
+          company_id: string | null
+          created_at: string | null
+          id: string
+          notes: string | null
+          plan_id: string | null
+          sale_date: string | null
+          salesperson_id: string | null
+          signature_expires_at: string | null
+          signature_token: string | null
+          status: Database["public"]["Enums"]["sale_status"] | null
+          total_amount: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          plan_id?: string | null
+          sale_date?: string | null
+          salesperson_id?: string | null
+          signature_expires_at?: string | null
+          signature_token?: string | null
+          status?: Database["public"]["Enums"]["sale_status"] | null
+          total_amount?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          plan_id?: string | null
+          sale_date?: string | null
+          salesperson_id?: string | null
+          signature_expires_at?: string | null
+          signature_token?: string | null
+          status?: Database["public"]["Enums"]["sale_status"] | null
+          total_amount?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_salesperson_id_fkey"
+            columns: ["salesperson_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signatures: {
+        Row: {
+          document_id: string | null
+          id: string
+          ip_address: unknown | null
+          sale_id: string | null
+          signature_data: string | null
+          signed_at: string | null
+          status: Database["public"]["Enums"]["document_status"] | null
+          user_agent: string | null
+        }
+        Insert: {
+          document_id?: string | null
+          id?: string
+          ip_address?: unknown | null
+          sale_id?: string | null
+          signature_data?: string | null
+          signed_at?: string | null
+          status?: Database["public"]["Enums"]["document_status"] | null
+          user_agent?: string | null
+        }
+        Update: {
+          document_id?: string | null
+          id?: string
+          ip_address?: unknown | null
+          sale_id?: string | null
+          signature_data?: string | null
+          signed_at?: string | null
+          status?: Database["public"]["Enums"]["document_status"] | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signatures_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signatures_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      templates: {
+        Row: {
+          active: boolean | null
+          company_id: string | null
+          content: Json
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_global: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          company_id?: string | null
+          content?: Json
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_global?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          company_id?: string | null
+          content?: Json
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_global?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_company: {
+        Args: { user_id: string }
+        Returns: string
+      }
+      get_user_role: {
+        Args: { user_id: string }
+        Returns: Database["public"]["Enums"]["user_role"]
+      }
     }
     Enums: {
-      [_ in never]: never
+      document_status: "pendiente" | "firmado" | "vencido"
+      sale_status:
+        | "borrador"
+        | "enviado"
+        | "firmado"
+        | "completado"
+        | "cancelado"
+      user_role: "super_admin" | "admin" | "gestor" | "vendedor"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +629,16 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      document_status: ["pendiente", "firmado", "vencido"],
+      sale_status: [
+        "borrador",
+        "enviado",
+        "firmado",
+        "completado",
+        "cancelado",
+      ],
+      user_role: ["super_admin", "admin", "gestor", "vendedor"],
+    },
   },
 } as const
