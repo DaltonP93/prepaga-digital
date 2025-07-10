@@ -1,5 +1,6 @@
 
 import { Layout } from "@/components/Layout";
+import { ClientsList } from "@/components/ClientsList";
 
 const Sales = () => {
   return (
@@ -7,9 +8,7 @@ const Sales = () => {
       title="Gestión de Ventas" 
       description="Proceso de ventas y seguimiento"
     >
-      <div className="space-y-6">
-        <p>Página de ventas en desarrollo...</p>
-      </div>
+      <ClientsList />
     </Layout>
   );
 };
