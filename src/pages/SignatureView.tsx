@@ -1,15 +1,98 @@
 
-import { useParams } from "react-router-dom";
+import { useParams, Navigate } from "react-router-dom";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, PenTool, Download, CheckCircle } from "lucide-react";
+import { FileText, PenTool, Download, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { SignatureCanvas } from "@/components/SignatureCanvas";
+import { useSignatureByToken, useCreateSignature, useCompleteSignature } from "@/hooks/useSignature";
+import { toast } from "sonner";
 
 const SignatureView = () => {
-  const { token } = useParams();
+  const { token } = useParams<{ token: string }>();
+  const [currentDocumentIndex, setCurrentDocumentIndex] = useState(0);
+  const [signedDocuments, setSignedDocuments] = useState<Set<string>>(new Set());
+  const [showSignatureCanvas, setShowSignatureCanvas] = useState(false);
+
+  const { data: saleData, isLoading, error } = useSignatureByToken(token || '');
+  const createSignature = useCreateSignature();
+  const completeSignature = useCompleteSignature();
+
+  if (!token) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Clock className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p>Cargando documentos...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !saleData) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-md mx-auto">
+          <CardContent className="pt-6 text-center">
+            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Enlace No Válido</h2>
+            <p className="text-muted-foreground">
+              Este enlace de firma ha expirado o no es válido.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const { clients: client, plans: plan, documents } = saleData;
+  const currentDocument = documents?.[currentDocumentIndex];
+  const allDocumentsSigned = documents?.every(doc => signedDocuments.has(doc.id));
+
+  const handleSignDocument = async (signatureData: string) => {
+    if (!currentDocument) return;
+
+    try {
+      await createSignature.mutateAsync({
+        saleId: saleData.id,
+        documentId: currentDocument.id,
+        signatureData,
+      });
+
+      setSignedDocuments(prev => new Set([...prev, currentDocument.id]));
+      setShowSignatureCanvas(false);
+
+      // Check if this was the last document
+      if (currentDocumentIndex < (documents?.length || 0) - 1) {
+        setCurrentDocumentIndex(currentDocumentIndex + 1);
+        toast.success("Documento firmado. Continúe con el siguiente.");
+      } else {
+        // All documents signed, complete the process
+        await completeSignature.mutateAsync(saleData.id);
+        toast.success("¡Todos los documentos han sido firmados!");
+      }
+    } catch (error) {
+      console.error('Error signing document:', error);
+    }
+  };
+
+  const getDocumentIcon = (docType?: string) => {
+    const baseClass = "h-5 w-5";
+    switch (docType) {
+      case 'contract': return <FileText className={`${baseClass} text-blue-600`} />;
+      case 'form': return <FileText className={`${baseClass} text-green-600`} />;
+      case 'receipt': return <FileText className={`${baseClass} text-purple-600`} />;
+      default: return <FileText className={`${baseClass} text-orange-600`} />;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background p-4">
-      <div className="max-w-md mx-auto space-y-6">
+      <div className="max-w-2xl mx-auto space-y-6">
         {/* Header */}
         <Card>
           <CardHeader className="text-center">
@@ -20,9 +103,31 @@ const SignatureView = () => {
             </div>
             <CardTitle>Firma Digital</CardTitle>
             <CardDescription>
-              Revisa y firma los documentos de tu póliza de seguro médico
+              {client?.first_name} {client?.last_name} - Plan: {plan?.name}
             </CardDescription>
           </CardHeader>
+        </Card>
+
+        {/* Progress */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm font-medium">
+                Progreso: {signedDocuments.size} de {documents?.length || 0} documentos firmados
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {Math.round(((signedDocuments.size) / (documents?.length || 1)) * 100)}%
+              </span>
+            </div>
+            <div className="w-full bg-secondary rounded-full h-2">
+              <div 
+                className="bg-primary h-2 rounded-full transition-all duration-300"
+                style={{ 
+                  width: `${((signedDocuments.size) / (documents?.length || 1)) * 100}%` 
+                }}
+              />
+            </div>
+          </CardContent>
         </Card>
 
         {/* Documents List */}
@@ -31,79 +136,101 @@ const SignatureView = () => {
             <CardTitle className="text-lg">Documentos para Firmar</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div className="flex items-center space-x-3">
-                <FileText className="h-5 w-5 text-blue-600" />
-                <div>
-                  <p className="font-medium">Solicitud de Incorporación</p>
-                  <p className="text-sm text-muted-foreground">Datos personales y contacto</p>
+            {documents?.map((document, index) => (
+              <div 
+                key={document.id}
+                className={`flex items-center justify-between p-3 border rounded-lg transition-all ${
+                  index === currentDocumentIndex 
+                    ? 'border-primary bg-primary/5' 
+                    : 'border-border'
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  {getDocumentIcon(document.document_type)}
+                  <div>
+                    <p className="font-medium">{document.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {document.document_type === 'form' && 'Datos personales y contacto'}
+                      {document.document_type === 'contract' && 'Términos y condiciones'}
+                      {document.document_type === 'receipt' && 'Comprobante de pago'}
+                      {!document.document_type && 'Documento de verificación'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {signedDocuments.has(document.id) ? (
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  ) : index === currentDocumentIndex ? (
+                    <span className="text-sm font-medium text-primary">Actual</span>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">Pendiente</span>
+                  )}
                 </div>
               </div>
-              <Button size="sm" variant="outline">
-                Ver
-              </Button>
-            </div>
-
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div className="flex items-center space-x-3">
-                <FileText className="h-5 w-5 text-green-600" />
-                <div>
-                  <p className="font-medium">Contrato de Servicios</p>
-                  <p className="text-sm text-muted-foreground">Términos y condiciones</p>
-                </div>
-              </div>
-              <CheckCircle className="h-5 w-5 text-green-600" />
-            </div>
-
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div className="flex items-center space-x-3">
-                <FileText className="h-5 w-5 text-orange-600" />
-                <div>
-                  <p className="font-medium">Confirmación de Datos</p>
-                  <p className="text-sm text-muted-foreground">Verificación de información</p>
-                </div>
-              </div>
-              <Button size="sm" variant="outline">
-                Ver
-              </Button>
-            </div>
-
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div className="flex items-center space-x-3">
-                <FileText className="h-5 w-5 text-purple-600" />
-                <div>
-                  <p className="font-medium">Recibo de Pago Inicial</p>
-                  <p className="text-sm text-muted-foreground">Comprobante de pago</p>
-                </div>
-              </div>
-              <Button size="sm" variant="outline">
-                Ver
-              </Button>
-            </div>
+            ))}
           </CardContent>
         </Card>
 
-        {/* Action Buttons */}
-        <div className="space-y-3">
-          <Button className="w-full" size="lg">
-            <PenTool className="mr-2 h-4 w-4" />
-            Continuar con Firma
-          </Button>
-          
-          <Button variant="outline" className="w-full">
-            <Download className="mr-2 h-4 w-4" />
-            Descargar Documentos
-          </Button>
-        </div>
+        {/* Current Document Details */}
+        {currentDocument && !signedDocuments.has(currentDocument.id) && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Documento Actual: {currentDocument.name}</CardTitle>
+              <CardDescription>
+                Por favor revise el contenido y firme este documento
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {currentDocument.content && (
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm whitespace-pre-wrap">{currentDocument.content}</p>
+                </div>
+              )}
+              
+              {!showSignatureCanvas ? (
+                <Button 
+                  className="w-full" 
+                  onClick={() => setShowSignatureCanvas(true)}
+                  disabled={createSignature.isPending}
+                >
+                  <PenTool className="mr-2 h-4 w-4" />
+                  Firmar Documento
+                </Button>
+              ) : (
+                <SignatureCanvas 
+                  onSign={handleSignDocument}
+                  disabled={createSignature.isPending}
+                />
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Completion Message */}
+        {allDocumentsSigned && (
+          <Card>
+            <CardContent className="pt-6 text-center">
+              <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold mb-2">¡Proceso Completado!</h3>
+              <p className="text-muted-foreground mb-4">
+                Todos los documentos han sido firmados exitosamente.
+              </p>
+              <Button variant="outline" className="w-full">
+                <Download className="mr-2 h-4 w-4" />
+                Descargar Documentos Firmados
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Footer */}
         <Card>
           <CardContent className="pt-6 text-center">
             <p className="text-sm text-muted-foreground">
-              Token de sesión: {token}
+              Token de sesión: {token?.slice(0, 8)}...
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Esta sesión expira en 24 horas
+              Esta sesión expira el {new Date(saleData.signature_expires_at || '').toLocaleString()}
             </p>
           </CardContent>
         </Card>
