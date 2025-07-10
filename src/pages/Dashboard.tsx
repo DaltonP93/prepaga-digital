@@ -1,195 +1,176 @@
 
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, FileText, TrendingUp, Clock, CheckCircle } from "lucide-react";
-
-const stats = [
-  {
-    title: "Empresas Activas",
-    value: "24",
-    description: "Total de empresas registradas",
-    icon: Building2,
-    trend: "+2 este mes"
-  },
-  {
-    title: "Usuarios",
-    value: "156",
-    description: "Usuarios en el sistema",
-    icon: Users,
-    trend: "+12 este mes"
-  },
-  {
-    title: "Documentos Firmados",
-    value: "1,234",
-    description: "Total de firmas procesadas",
-    icon: FileText,
-    trend: "+89 esta semana"
-  },
-  {
-    title: "Ventas del Mes",
-    value: "$45,230",
-    description: "Ingresos generados",
-    icon: TrendingUp,
-    trend: "+15% vs mes anterior"
-  }
-];
-
-const recentActivity = [
-  {
-    id: 1,
-    action: "Nueva empresa registrada",
-    company: "MediCorp SA",
-    time: "Hace 2 horas",
-    status: "success"
-  },
-  {
-    id: 2,
-    action: "Documento firmado",
-    company: "Salud Plus",
-    time: "Hace 4 horas",
-    status: "info"
-  },
-  {
-    id: 3,
-    action: "Plan actualizado",
-    company: "VidaSana",
-    time: "Hace 6 horas",
-    status: "warning"
-  }
-];
+import { Badge } from "@/components/ui/badge";
+import { Users, Building2, ShoppingCart, DollarSign, TrendingUp, FileText } from "lucide-react";
+import { useDashboardStats } from "@/hooks/useDashboard";
+import { useAuthContext } from "@/components/AuthProvider";
 
 const Dashboard = () => {
+  const { data: stats, isLoading } = useDashboardStats();
+  const { profile } = useAuthContext();
+
+  if (isLoading) {
+    return (
+      <Layout title="Dashboard" description="Panel de control principal">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case 'completado': return 'default';
+      case 'firmado': return 'secondary';
+      case 'enviado': return 'outline';
+      case 'cancelado': return 'destructive';
+      default: return 'outline';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'borrador': return 'Borrador';
+      case 'enviado': return 'Enviado';
+      case 'firmado': return 'Firmado';
+      case 'completado': return 'Completado';
+      case 'cancelado': return 'Cancelado';
+      default: return status;
+    }
+  };
+
   return (
-    <Layout 
-      title="Dashboard Principal" 
-      description="Resumen general del sistema de seguros médicos"
-    >
+    <Layout title="Dashboard" description="Panel de control principal">
       <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">
+            Bienvenido, {profile?.first_name} {profile?.last_name}
+          </h2>
+          <p className="text-muted-foreground">
+            Aquí tienes un resumen de tu actividad
+          </p>
+        </div>
+
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat) => (
-            <Card key={stat.title}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  {stat.title}
-                </CardTitle>
-                <stat.icon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <p className="text-xs text-muted-foreground">
-                  {stat.description}
-                </p>
-                <p className="text-xs text-green-600 mt-1">
-                  {stat.trend}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-          {/* Recent Activity */}
-          <Card className="col-span-4">
-            <CardHeader>
-              <CardTitle>Actividad Reciente</CardTitle>
-              <CardDescription>
-                Últimas acciones en el sistema
-              </CardDescription>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Usuarios</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="space-y-4">
-              {recentActivity.map((activity) => (
-                <div key={activity.id} className="flex items-center space-x-4">
-                  <div className="flex h-2 w-2 rounded-full bg-blue-600" />
-                  <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium leading-none">
-                      {activity.action}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {activity.company}
-                    </p>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {activity.time}
-                  </div>
-                </div>
-              ))}
+            <CardContent>
+              <div className="text-2xl font-bold">{stats?.usersCount || 0}</div>
+              <p className="text-xs text-muted-foreground">
+                Usuarios registrados en el sistema
+              </p>
             </CardContent>
           </Card>
 
-          {/* Quick Actions */}
-          <Card className="col-span-3">
-            <CardHeader>
-              <CardTitle>Acciones Rápidas</CardTitle>
-              <CardDescription>
-                Funciones más utilizadas
-              </CardDescription>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Empresas</CardTitle>
+              <Building2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-4 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
-                <Users className="h-8 w-8 text-blue-600" />
-                <div>
-                  <p className="text-sm font-medium">Crear Usuario</p>
-                  <p className="text-xs text-muted-foreground">Agregar nuevo usuario al sistema</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-4 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
-                <FileText className="h-8 w-8 text-green-600" />
-                <div>
-                  <p className="text-sm font-medium">Nuevo Template</p>
-                  <p className="text-xs text-muted-foreground">Crear plantilla de documento</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-4 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
-                <TrendingUp className="h-8 w-8 text-purple-600" />
-                <div>
-                  <p className="text-sm font-medium">Ver Reportes</p>
-                  <p className="text-xs text-muted-foreground">Análisis y estadísticas</p>
-                </div>
-              </div>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats?.companiesCount || 0}</div>
+              <p className="text-xs text-muted-foreground">
+                Empresas registradas
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Ventas</CardTitle>
+              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats?.totalSales || 0}</div>
+              <p className="text-xs text-muted-foreground">
+                Ventas totales registradas
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">${stats?.totalRevenue || 0}</div>
+              <p className="text-xs text-muted-foreground">
+                Ingresos acumulados
+              </p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Status Overview */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Recent Sales */}
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Documentos Pendientes</CardTitle>
+            <CardHeader>
+              <CardTitle>Ventas Recientes</CardTitle>
+              <CardDescription>
+                Las últimas 5 ventas registradas
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center space-x-2">
-                <Clock className="h-4 w-4 text-yellow-600" />
-                <span className="text-2xl font-bold">23</span>
-                <span className="text-sm text-muted-foreground">esperando firma</span>
+              <div className="space-y-3">
+                {stats?.recentSales.map((sale) => (
+                  <div key={sale.id} className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">
+                        {sale.clients ? `${sale.clients.first_name} ${sale.clients.last_name}` : 'Sin cliente'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {sale.plans?.name || 'Sin plan'}
+                      </p>
+                    </div>
+                    <div className="text-right space-y-1">
+                      <p className="text-sm font-medium">${sale.total_amount || 0}</p>
+                      <Badge variant={getStatusBadgeVariant(sale.status || 'borrador')} className="text-xs">
+                        {getStatusLabel(sale.status || 'borrador')}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+                {(!stats?.recentSales || stats.recentSales.length === 0) && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No hay ventas recientes
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
 
+          {/* Sales by Status */}
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Firmados Hoy</CardTitle>
+            <CardHeader>
+              <CardTitle>Ventas por Estado</CardTitle>
+              <CardDescription>
+                Distribución de ventas según su estado
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <span className="text-2xl font-bold">47</span>
-                <span className="text-sm text-muted-foreground">completados</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Tasa de Conversión</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center space-x-2">
-                <TrendingUp className="h-4 w-4 text-blue-600" />
-                <span className="text-2xl font-bold">87%</span>
-                <span className="text-sm text-muted-foreground">este mes</span>
+              <div className="space-y-3">
+                {Object.entries(stats?.salesByStatus || {}).map(([status, count]) => (
+                  <div key={status} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Badge variant={getStatusBadgeVariant(status)}>
+                        {getStatusLabel(status)}
+                      </Badge>
+                    </div>
+                    <span className="text-sm font-medium">{count}</span>
+                  </div>
+                ))}
+                {Object.keys(stats?.salesByStatus || {}).length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No hay datos de ventas
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>

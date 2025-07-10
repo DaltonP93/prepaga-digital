@@ -5,8 +5,6 @@ import { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
-type ProfileInsert = Database['public']['Tables']['profiles']['Insert'];
-type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];
 
 export const useUsers = () => {
   return useQuery({
@@ -31,31 +29,20 @@ export const useCreateUser = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (userData: { email: string; password: string; first_name: string; last_name: string; role: string; company_id?: string }) => {
-      // First create the auth user
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: userData.email,
-        password: userData.password,
-        user_metadata: {
-          first_name: userData.first_name,
-          last_name: userData.last_name,
-        },
+    mutationFn: async (userData: { 
+      email: string; 
+      password: string; 
+      first_name: string; 
+      last_name: string; 
+      role: string; 
+      company_id?: string 
+    }) => {
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: userData
       });
 
-      if (authError) throw authError;
-
-      // Then update the profile with additional data
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          role: userData.role as any,
-          company_id: userData.company_id,
-        })
-        .eq('id', authData.user.id);
-
-      if (profileError) throw profileError;
-
-      return authData.user;
+      if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -65,6 +52,7 @@ export const useCreateUser = () => {
       });
     },
     onError: (error: any) => {
+      console.error('Create user error:', error);
       toast({
         title: "Error",
         description: error.message || "No se pudo crear el usuario.",
@@ -79,7 +67,7 @@ export const useUpdateUser = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, ...updates }: ProfileUpdate & { id: string }) => {
+    mutationFn: async ({ id, ...updates }: Partial<Profile> & { id: string }) => {
       const { data, error } = await supabase
         .from('profiles')
         .update(updates)
@@ -101,6 +89,37 @@ export const useUpdateUser = () => {
       toast({
         title: "Error",
         description: error.message || "No se pudo actualizar el usuario.",
+        variant: "destructive",
+      });
+    },
+  });
+};
+
+export const useDeleteUser = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ active: false })
+        .eq('id', userId);
+
+      if (error) throw error;
+      return userId;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast({
+        title: "Usuario desactivado",
+        description: "El usuario ha sido desactivado exitosamente.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo desactivar el usuario.",
         variant: "destructive",
       });
     },
