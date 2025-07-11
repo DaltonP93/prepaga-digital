@@ -96,27 +96,32 @@ export const SignatureCanvas = ({ onSign, disabled = false }: SignatureCanvasPro
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const touch = e.touches[0];
-    const mouseEvent = new MouseEvent('mousedown', {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    const mouseEvent = {
       clientX: touch.clientX,
       clientY: touch.clientY
-    });
-    canvasRef.current?.dispatchEvent(mouseEvent);
+    } as React.MouseEvent<HTMLCanvasElement>;
+    startDrawing(mouseEvent);
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const touch = e.touches[0];
-    const mouseEvent = new MouseEvent('mousemove', {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    const mouseEvent = {
       clientX: touch.clientX,
       clientY: touch.clientY
-    });
-    canvasRef.current?.dispatchEvent(mouseEvent);
+    } as React.MouseEvent<HTMLCanvasElement>;
+    draw(mouseEvent);
   };
 
   const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
     e.preventDefault();
-    const mouseEvent = new MouseEvent('mouseup', {});
-    canvasRef.current?.dispatchEvent(mouseEvent);
+    stopDrawing();
   };
 
   return (

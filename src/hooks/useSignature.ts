@@ -4,9 +4,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Database } from '@/integrations/supabase/types';
 
-type Sale = Database['public']['Tables']['sales']['Row'];
-type Document = Database['public']['Tables']['documents']['Row'];
-type SignatureInsert = Database['public']['Tables']['signatures']['Insert'];
+type Sale = Database['public']['Tables']['sales']['Row'] & {
+  clients: Database['public']['Tables']['clients']['Row'] | null;
+  plans: Database['public']['Tables']['plans']['Row'] | null;
+  profiles: Database['public']['Tables']['profiles']['Row'] | null;
+  documents: Database['public']['Tables']['documents']['Row'][];
+};
 
 export const useSignatureByToken = (token: string) => {
   return useQuery({
@@ -18,8 +21,9 @@ export const useSignatureByToken = (token: string) => {
         .from('sales')
         .select(`
           *,
-          clients:client_id(first_name, last_name, email, phone),
-          plans:plan_id(name, price, description),
+          clients:client_id(first_name, last_name, email, phone, dni),
+          plans:plan_id(name, price, description, coverage_details),
+          profiles:salesperson_id(first_name, last_name, email),
           documents:documents(*)
         `)
         .eq('signature_token', token)
@@ -27,7 +31,7 @@ export const useSignatureByToken = (token: string) => {
         .single();
 
       if (error) throw error;
-      return sale;
+      return sale as Sale;
     },
     enabled: !!token,
   });
