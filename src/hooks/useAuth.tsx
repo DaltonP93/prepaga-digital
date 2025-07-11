@@ -10,6 +10,8 @@ interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
+  isAuthenticated: boolean;
+  isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   signUp: (email: string, password: string, userData: { first_name: string; last_name: string }) => Promise<void>;
@@ -92,6 +94,8 @@ export const useAuth = (): AuthContextType => {
     user,
     profile,
     loading,
+    isAuthenticated: !!user,
+    isLoading: loading,
     signIn,
     signOut,
     signUp,

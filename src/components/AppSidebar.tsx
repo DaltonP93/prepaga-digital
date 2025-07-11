@@ -1,3 +1,5 @@
+
+import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -5,20 +7,34 @@ import {
   Settings,
   User,
   ShoppingBag,
-  Template,
+  FileImage,
 } from "lucide-react";
+
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarHeader,
+} from "@/components/ui/sidebar";
 
 import { MainNavItem } from "@/types";
 
 interface AppSidebarProps {
-  isSuperAdmin: boolean;
+  isSuperAdmin?: boolean;
 }
 
-export function AppSidebar({ isSuperAdmin }: AppSidebarProps) {
+export function AppSidebar({ isSuperAdmin = false }: AppSidebarProps) {
+  const location = useLocation();
+  
   const menuItems: MainNavItem[] = [
     {
       title: "Dashboard",
-      url: "/dashboard",
+      url: "/",
       icon: LayoutDashboard,
     },
     {
@@ -39,7 +55,7 @@ export function AppSidebar({ isSuperAdmin }: AppSidebarProps) {
     {
       title: "Templates",
       url: "/templates",
-      icon: Template,
+      icon: FileImage,
     },
     {
       title: "Mi Perfil",
@@ -57,17 +73,31 @@ export function AppSidebar({ isSuperAdmin }: AppSidebarProps) {
   }
 
   return (
-    <div className="flex flex-col space-y-1">
-      {menuItems.map((item) => (
-        <a
-          key={item.title}
-          href={item.url}
-          className="flex items-center space-x-2 rounded-md p-2 hover:bg-secondary hover:text-accent-foreground"
-        >
-          <item.icon className="h-4 w-4" />
-          <span>{item.title}</span>
-        </a>
-      ))}
-    </div>
+    <Sidebar>
+      <SidebarHeader>
+        <div className="px-2 py-4">
+          <h2 className="text-lg font-semibold">Seguro Digital</h2>
+        </div>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Navegación</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {menuItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild isActive={location.pathname === item.url}>
+                    <Link to={item.url}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+    </Sidebar>
   );
 }

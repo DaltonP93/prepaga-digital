@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 interface UploadProgress {
   progress: number;
@@ -15,7 +15,6 @@ export const useFileUpload = () => {
     isUploading: false,
     error: null,
   });
-  const { toast } = useToast();
 
   const uploadFile = async (
     file: File,
@@ -37,10 +36,15 @@ export const useFileUpload = () => {
 
       if (error) throw error;
 
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
       // Track file upload in database
       const { error: dbError } = await supabase
         .from('file_uploads')
         .insert({
+          user_id: user.id,
           file_name: file.name,
           file_size: file.size,
           mime_type: file.type,
@@ -59,19 +63,12 @@ export const useFileUpload = () => {
         .from(bucket)
         .getPublicUrl(data.path);
 
-      toast({
-        title: "Archivo subido",
-        description: "El archivo se ha subido exitosamente.",
-      });
+      toast.success('Archivo subido exitosamente');
 
       return urlData.publicUrl;
     } catch (error: any) {
       setUploadState({ progress: 0, isUploading: false, error: error.message });
-      toast({
-        title: "Error",
-        description: error.message || "Error al subir el archivo.",
-        variant: "destructive",
-      });
+      toast.error(error.message || 'Error al subir el archivo');
       return null;
     }
   };
@@ -81,18 +78,10 @@ export const useFileUpload = () => {
       const { error } = await supabase.storage.from(bucket).remove([path]);
       if (error) throw error;
 
-      toast({
-        title: "Archivo eliminado",
-        description: "El archivo se ha eliminado exitosamente.",
-      });
-
+      toast.success('Archivo eliminado exitosamente');
       return true;
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Error al eliminar el archivo.",
-        variant: "destructive",
-      });
+      toast.error(error.message || 'Error al eliminar el archivo');
       return false;
     }
   };
