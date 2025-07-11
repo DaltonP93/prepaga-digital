@@ -1,4 +1,5 @@
 
+import { useState } from "react";
 import { Layout } from "@/components/Layout";
 import { DocumentForm } from "@/components/DocumentForm";
 import { useDocuments } from "@/hooks/useDocuments";
@@ -19,11 +20,18 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, FileText, ExternalLink } from "lucide-react";
+import { Trash2, FileText, ExternalLink, Download, Eye } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { SearchAndFilters, FilterOptions } from "@/components/SearchAndFilters";
+import { TemplateVariables } from "@/components/TemplateVariables";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { generatePDFContent, downloadPDF } from "@/lib/pdfGenerator";
+import { interpolateTemplate, createTemplateContext } from "@/lib/templateEngine";
 
 const Documents = () => {
   const { documents, isLoading, deleteDocument } = useDocuments();
+  const [filters, setFilters] = useState<FilterOptions>({ search: '' });
+  const [showVariables, setShowVariables] = useState(false);
 
   if (isLoading) {
     return (
@@ -38,6 +46,68 @@ const Documents = () => {
     );
   }
 
+  const filteredDocuments = documents?.filter(doc => {
+    if (filters.search && !doc.name.toLowerCase().includes(filters.search.toLowerCase())) {
+      return false;
+    }
+    return true;
+  }) || [];
+
+  const handlePreviewDocument = (document: any) => {
+    if (document.sale) {
+      const context = createTemplateContext(
+        document.sale.clients,
+        document.sale.plans,
+        document.sale.companies,
+        document.sale
+      );
+      const processedContent = interpolateTemplate(document.content || '', context);
+      
+      const newWindow = window.open('', '_blank');
+      if (newWindow) {
+        newWindow.document.write(`
+          <html>
+            <head><title>Vista previa: ${document.name}</title></head>
+            <body style="font-family: Arial, sans-serif; padding: 20px; line-height: 1.6;">
+              <h1>${document.name}</h1>
+              <hr>
+              ${processedContent.replace(/\n/g, '<br>')}
+            </body>
+          </html>
+        `);
+        newWindow.document.close();
+      }
+    }
+  };
+
+  const handleDownloadPDF = async (document: any) => {
+    if (document.sale) {
+      const context = createTemplateContext(
+        document.sale.clients,
+        document.sale.plans,
+        document.sale.companies,
+        document.sale
+      );
+      
+      const pdfData = {
+        content: interpolateTemplate(document.content || '', context),
+        signatures: [], // Add signatures if available
+        client: document.sale.clients,
+        plan: document.sale.plans,
+        company: document.sale.companies,
+      };
+      
+      const htmlContent = generatePDFContent(pdfData);
+      await downloadPDF(htmlContent, `${document.name}.pdf`);
+    }
+  };
+
+  const statusOptions = [
+    { value: 'draft', label: 'Borrador' },
+    { value: 'active', label: 'Activo' },
+    { value: 'archived', label: 'Archivado' },
+  ];
+
   return (
     <Layout 
       title="Gestión de Documentos" 
@@ -51,20 +121,47 @@ const Documents = () => {
               Gestiona los documentos del sistema
             </p>
           </div>
-          <DocumentForm />
+          <div className="flex gap-2">
+            <Dialog open={showVariables} onOpenChange={setShowVariables}>
+              <DialogTrigger asChild>
+                <Button variant="outline">Variables</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Variables de Template</DialogTitle>
+                  <DialogDescription>
+                    Variables disponibles para usar en tus documentos
+                  </DialogDescription>
+                </DialogHeader>
+                <TemplateVariables />
+              </DialogContent>
+            </Dialog>
+            <DocumentForm />
+          </div>
         </div>
+
+        <SearchAndFilters
+          filters={filters}
+          onFiltersChange={setFilters}
+          statusOptions={statusOptions}
+          showExport={true}
+          onExport={() => {
+            // Export functionality can be implemented here
+            console.log('Exporting documents...');
+          }}
+        />
 
         <Card>
           <CardHeader>
             <CardTitle>Lista de Documentos</CardTitle>
             <CardDescription>
-              Documentos disponibles en el sistema
+              {filteredDocuments.length} documento{filteredDocuments.length !== 1 ? 's' : ''} encontrado{filteredDocuments.length !== 1 ? 's' : ''}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {!documents || documents.length === 0 ? (
+            {!filteredDocuments || filteredDocuments.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-muted-foreground">No hay documentos creados</p>
+                <p className="text-muted-foreground">No hay documentos que coincidan con los filtros</p>
                 <DocumentForm trigger={
                   <Button className="mt-4">Crear primer documento</Button>
                 } />
@@ -84,7 +181,7 @@ const Documents = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {documents.map((document) => (
+                  {filteredDocuments.map((document) => (
                     <TableRow key={document.id}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
@@ -126,6 +223,26 @@ const Documents = () => {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
+                          {document.content && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handlePreviewDocument(document)}
+                                title="Vista previa"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDownloadPDF(document)}
+                                title="Descargar PDF"
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
                           <DocumentForm document={document} />
                           <AlertDialog>
                             <AlertDialogTrigger asChild>

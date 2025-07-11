@@ -197,6 +197,45 @@ export type Database = {
           },
         ]
       }
+      file_uploads: {
+        Row: {
+          bucket_name: string
+          created_at: string | null
+          file_name: string
+          file_path: string
+          file_size: number
+          id: string
+          mime_type: string
+          updated_at: string | null
+          upload_status: string | null
+          user_id: string
+        }
+        Insert: {
+          bucket_name: string
+          created_at?: string | null
+          file_name: string
+          file_path: string
+          file_size: number
+          id?: string
+          mime_type: string
+          updated_at?: string | null
+          upload_status?: string | null
+          user_id: string
+        }
+        Update: {
+          bucket_name?: string
+          created_at?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number
+          id?: string
+          mime_type?: string
+          updated_at?: string | null
+          upload_status?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       plans: {
         Row: {
           active: boolean | null
@@ -313,6 +352,7 @@ export type Database = {
           salesperson_id: string | null
           signature_expires_at: string | null
           signature_token: string | null
+          signed_document_url: string | null
           status: Database["public"]["Enums"]["sale_status"] | null
           total_amount: number | null
           updated_at: string | null
@@ -328,6 +368,7 @@ export type Database = {
           salesperson_id?: string | null
           signature_expires_at?: string | null
           signature_token?: string | null
+          signed_document_url?: string | null
           status?: Database["public"]["Enums"]["sale_status"] | null
           total_amount?: number | null
           updated_at?: string | null
@@ -343,6 +384,7 @@ export type Database = {
           salesperson_id?: string | null
           signature_expires_at?: string | null
           signature_token?: string | null
+          signed_document_url?: string | null
           status?: Database["public"]["Enums"]["sale_status"] | null
           total_amount?: number | null
           updated_at?: string | null

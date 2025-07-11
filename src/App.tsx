@@ -1,64 +1,100 @@
-
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import { AuthProvider } from "@/components/AuthProvider";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
-import Dashboard from "./pages/Dashboard";
-import Companies from "./pages/Companies";
-import Users from "./pages/Users";
-import Plans from "./pages/Plans";
-import Templates from "./pages/Templates";
-import Documents from "./pages/Documents";
+import {
+  createBrowserRouter,
+  RouterProvider,
+  Navigate,
+} from "react-router-dom";
+import { useAuth } from "./hooks/useAuth";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Home from "./pages/Home";
+import Clients from "./pages/Clients";
 import Sales from "./pages/Sales";
+import Documents from "./pages/Documents";
+import Templates from "./pages/Templates";
 import SignatureView from "./pages/SignatureView";
-import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+// Add the Profile import
+import Profile from "@/pages/Profile";
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/signature/:token" element={<SignatureView />} />
-            <Route path="/*" element={
-              <ProtectedRoute>
-                <SidebarProvider>
-                  <div className="min-h-screen flex w-full">
-                    <Routes>
-                      <Route path="/" element={<Dashboard />} />
-                      <Route path="/companies" element={
-                        <ProtectedRoute requiredRole={['super_admin', 'admin']}>
-                          <Companies />
-                        </ProtectedRoute>
-                      } />
-                      <Route path="/users" element={
-                        <ProtectedRoute requiredRole={['super_admin', 'admin']}>
-                          <Users />
-                        </ProtectedRoute>
-                      } />
-                      <Route path="/plans" element={<Plans />} />
-                      <Route path="/templates" element={<Templates />} />
-                      <Route path="/documents" element={<Documents />} />
-                      <Route path="/sales" element={<Sales />} />
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
-                  </div>
-                </SidebarProvider>
-              </ProtectedRoute>
-            } />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-);
+const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <div>Cargando...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
+
+  return children;
+};
+
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: (
+      <ProtectedRoute>
+        <Home />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/login",
+    element: <Login />,
+  },
+  {
+    path: "/register",
+    element: <Register />,
+  },
+  {
+    path: "/clients",
+    element: (
+      <ProtectedRoute>
+        <Clients />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/sales",
+    element: (
+      <ProtectedRoute>
+        <Sales />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/documents",
+    element: (
+      <ProtectedRoute>
+        <Documents />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/templates",
+    element: (
+      <ProtectedRoute>
+        <Templates />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/signature/:token",
+    element: <SignatureView />,
+  },
+  {
+    path: "/profile",
+    element: (
+      <ProtectedRoute>
+        <Profile />
+      </ProtectedRoute>
+    ),
+  },
+]);
+
+function App() {
+  return <RouterProvider router={router} />;
+}
 
 export default App;

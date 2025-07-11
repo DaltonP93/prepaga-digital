@@ -5,11 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Pencil, Link, Eye, FileText } from "lucide-react";
+import { Plus, Pencil, Link, Eye, FileText, Download } from "lucide-react";
 import { SaleForm } from "@/components/SaleForm";
 import { useSales, useGenerateSignatureLink } from "@/hooks/useSales";
 import { Database } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
+import { SearchAndFilters, FilterOptions } from "@/components/SearchAndFilters";
+import { generatePDFContent, downloadPDF } from "@/lib/pdfGenerator";
 
 type Sale = Database['public']['Tables']['sales']['Row'] & {
   clients?: { first_name: string; last_name: string; email: string; phone: string };
@@ -21,6 +23,7 @@ type Sale = Database['public']['Tables']['sales']['Row'] & {
 const Sales = () => {
   const [showSaleForm, setShowSaleForm] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
+  const [filters, setFilters] = useState<FilterOptions>({ search: '' });
   const { data: sales = [], isLoading } = useSales();
   const generateSignatureLink = useGenerateSignatureLink();
   const { toast } = useToast();
@@ -67,9 +70,103 @@ const Sales = () => {
     }
   };
 
+  const handleDownloadContract = async (sale: Sale) => {
+    if (!sale.clients || !sale.plans || !sale.companies) {
+      toast({
+        title: "Error",
+        description: "Faltan datos para generar el contrato.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const pdfData = {
+      content: `
+        CONTRATO DE SERVICIO
+
+        Por el presente documento, ${sale.companies.name} (en adelante "LA EMPRESA") 
+        y ${sale.clients.first_name} ${sale.clients.last_name} (en adelante "EL CLIENTE") 
+        acuerdan los siguientes términos:
+
+        1. OBJETO DEL CONTRATO
+        La empresa se compromete a brindar los servicios del plan "${sale.plans.name}" 
+        por un valor de $${sale.plans.price}.
+
+        2. VIGENCIA
+        El presente contrato entra en vigencia a partir de la fecha de firma.
+
+        3. CONDICIONES
+        - Plan contratado: ${sale.plans.name}
+        - Precio: $${sale.plans.price}
+        - Cliente: ${sale.clients.first_name} ${sale.clients.last_name}
+        - Email: ${sale.clients.email}
+        ${sale.clients.phone ? `- Teléfono: ${sale.clients.phone}` : ''}
+
+        4. FIRMAS
+        Este documento ha sido firmado digitalmente por ambas partes.
+      `,
+      signatures: [], // Add actual signatures if available
+      client: sale.clients,
+      plan: sale.plans,
+      company: sale.companies,
+    };
+
+    const htmlContent = generatePDFContent(pdfData);
+    await downloadPDF(htmlContent, `Contrato-${sale.clients.first_name}-${sale.clients.last_name}.pdf`);
+  };
+
   const handleCloseForm = () => {
     setShowSaleForm(false);
     setEditingSale(null);
+  };
+
+  const filteredSales = sales.filter(sale => {
+    if (filters.search) {
+      const searchTerm = filters.search.toLowerCase();
+      const clientName = sale.clients ? `${sale.clients.first_name} ${sale.clients.last_name}`.toLowerCase() : '';
+      const planName = sale.plans?.name?.toLowerCase() || '';
+      const companyName = sale.companies?.name?.toLowerCase() || '';
+      
+      if (!clientName.includes(searchTerm) && !planName.includes(searchTerm) && !companyName.includes(searchTerm)) {
+        return false;
+      }
+    }
+    
+    if (filters.status && sale.status !== filters.status) {
+      return false;
+    }
+    
+    return true;
+  });
+
+  const statusOptions = [
+    { value: 'borrador', label: 'Borrador' },
+    { value: 'enviado', label: 'Enviado' },
+    { value: 'firmado', label: 'Firmado' },
+    { value: 'completado', label: 'Completado' },
+    { value: 'cancelado', label: 'Cancelado' },
+  ];
+
+  const handleExport = () => {
+    const csvContent = [
+      ['Cliente', 'Plan', 'Monto', 'Estado', 'Vendedor', 'Fecha'].join(','),
+      ...filteredSales.map(sale => [
+        sale.clients ? `${sale.clients.first_name} ${sale.clients.last_name}` : 'Sin cliente',
+        sale.plans?.name || 'Sin plan',
+        sale.total_amount || 0,
+        getStatusLabel(sale.status || 'borrador'),
+        sale.salesperson ? `${sale.salesperson.first_name} ${sale.salesperson.last_name}` : 'Sin vendedor',
+        sale.sale_date ? new Date(sale.sale_date).toLocaleDateString() : '-'
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ventas-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   if (isLoading) {
@@ -101,11 +198,19 @@ const Sales = () => {
           </Button>
         </div>
 
+        <SearchAndFilters
+          filters={filters}
+          onFiltersChange={setFilters}
+          statusOptions={statusOptions}
+          showExport={true}
+          onExport={handleExport}
+        />
+
         <Card>
           <CardHeader>
             <CardTitle>Lista de Ventas</CardTitle>
             <CardDescription>
-              {sales.length} venta{sales.length !== 1 ? 's' : ''} registrada{sales.length !== 1 ? 's' : ''}
+              {filteredSales.length} venta{filteredSales.length !== 1 ? 's' : ''} encontrada{filteredSales.length !== 1 ? 's' : ''}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -122,7 +227,7 @@ const Sales = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sales.map((sale) => (
+                {filteredSales.map((sale) => (
                   <TableRow key={sale.id}>
                     <TableCell className="font-medium">
                       {sale.clients ? `${sale.clients.first_name} ${sale.clients.last_name}` : 'Sin cliente'}
@@ -154,6 +259,15 @@ const Sales = () => {
                           <Pencil className="h-4 w-4" />
                         </Button>
                         
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDownloadContract(sale)}
+                          title="Descargar contrato"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                        
                         {sale.status === 'borrador' && (
                           <Button
                             variant="outline"
@@ -181,9 +295,11 @@ const Sales = () => {
               </TableBody>
             </Table>
 
-            {sales.length === 0 && (
+            {filteredSales.length === 0 && (
               <div className="text-center py-8">
-                <p className="text-muted-foreground">No hay ventas registradas</p>
+                <p className="text-muted-foreground">
+                  {filters.search || filters.status ? 'No se encontraron ventas que coincidan con los filtros' : 'No hay ventas registradas'}
+                </p>
               </div>
             )}
           </CardContent>

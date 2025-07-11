@@ -7,6 +7,7 @@ import { FileText, PenTool, Download, CheckCircle, Clock, AlertCircle } from "lu
 import { SignatureCanvas } from "@/components/SignatureCanvas";
 import { useSignatureByToken, useCreateSignature, useCompleteSignature } from "@/hooks/useSignature";
 import { toast } from "sonner";
+import { generatePDFContent, downloadPDF } from "@/lib/pdfGenerator";
 
 const SignatureView = () => {
   const { token } = useParams<{ token: string }>();
@@ -78,6 +79,27 @@ const SignatureView = () => {
     } catch (error) {
       console.error('Error signing document:', error);
     }
+  };
+
+  const handleDownloadSignedDocuments = async () => {
+    if (!client || !plan || !saleData.companies) return;
+
+    const signatures = Array.from(signedDocuments).map(docId => ({
+      signature_data: 'data:image/png;base64,signature_placeholder', // In real app, get actual signature
+      signed_at: new Date().toISOString(),
+      document_id: docId,
+    }));
+
+    const pdfData = {
+      content: documents?.map(doc => doc.content).join('\n\n') || '',
+      signatures,
+      client,
+      plan,
+      company: saleData.companies,
+    };
+
+    const htmlContent = generatePDFContent(pdfData);
+    await downloadPDF(htmlContent, `Documentos-Firmados-${client.first_name}-${client.last_name}.pdf`);
   };
 
   const getDocumentIcon = (docType?: string) => {
@@ -215,7 +237,11 @@ const SignatureView = () => {
               <p className="text-muted-foreground mb-4">
                 Todos los documentos han sido firmados exitosamente.
               </p>
-              <Button variant="outline" className="w-full">
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={handleDownloadSignedDocuments}
+              >
                 <Download className="mr-2 h-4 w-4" />
                 Descargar Documentos Firmados
               </Button>
