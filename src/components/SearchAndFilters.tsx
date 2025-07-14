@@ -157,12 +157,12 @@ export const SearchAndFilters = ({
               {statusOptions.length > 0 && (
                 <div>
                   <label className="text-sm font-medium mb-2 block">Estado</label>
-                  <Select value={filters.status || ''} onValueChange={(value) => updateFilter('status', value || undefined)}>
+                  <Select value={filters.status || '__all__'} onValueChange={(value) => updateFilter('status', value === '__all__' ? undefined : value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Todos los estados" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todos los estados</SelectItem>
+                      <SelectItem value="__all__">Todos los estados</SelectItem>
                       {statusOptions.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
@@ -177,12 +177,12 @@ export const SearchAndFilters = ({
               {companyOptions.length > 0 && (
                 <div>
                   <label className="text-sm font-medium mb-2 block">Empresa</label>
-                  <Select value={filters.company || ''} onValueChange={(value) => updateFilter('company', value || undefined)}>
+                  <Select value={filters.company || '__all__'} onValueChange={(value) => updateFilter('company', value === '__all__' ? undefined : value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Todas las empresas" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todas las empresas</SelectItem>
+                      <SelectItem value="__all__">Todas las empresas</SelectItem>
                       {companyOptions.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
@@ -197,12 +197,12 @@ export const SearchAndFilters = ({
               {planOptions.length > 0 && (
                 <div>
                   <label className="text-sm font-medium mb-2 block">Plan</label>
-                  <Select value={filters.plan || ''} onValueChange={(value) => updateFilter('plan', value || undefined)}>
+                  <Select value={filters.plan || '__all__'} onValueChange={(value) => updateFilter('plan', value === '__all__' ? undefined : value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Todos los planes" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todos los planes</SelectItem>
+                      <SelectItem value="__all__">Todos los planes</SelectItem>
                       {planOptions.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}

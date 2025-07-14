@@ -2,40 +2,51 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 type Plan = Database['public']['Tables']['plans']['Row'];
 type PlanInsert = Database['public']['Tables']['plans']['Insert'];
 type PlanUpdate = Database['public']['Tables']['plans']['Update'];
 
+interface PlanWithCompany extends Plan {
+  companies?: {
+    id: string;
+    name: string;
+  } | null;
+}
+
 export const usePlans = () => {
   return useQuery({
     queryKey: ['plans'],
-    queryFn: async () => {
+    queryFn: async (): Promise<PlanWithCompany[]> => {
       const { data, error } = await supabase
         .from('plans')
         .select(`
           *,
-          companies:company_id(name),
-          profiles:created_by(first_name, last_name)
+          companies:company_id(id, name)
         `)
+        .eq('active', true)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return data;
+      if (error) {
+        console.error('Error fetching plans:', error);
+        throw error;
+      }
+      return data || [];
     },
+    retry: 1,
+    refetchOnWindowFocus: false,
   });
 };
 
 export const useCreatePlan = () => {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (planData: PlanInsert) => {
+    mutationFn: async (plan: PlanInsert) => {
       const { data, error } = await supabase
         .from('plans')
-        .insert(planData)
+        .insert(plan)
         .select()
         .single();
 
@@ -44,23 +55,16 @@ export const useCreatePlan = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['plans'] });
-      toast({
-        title: "Plan creado",
-        description: "El plan ha sido creado exitosamente.",
-      });
+      toast.success('Plan creado exitosamente');
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "No se pudo crear el plan.",
-        variant: "destructive",
-      });
+      console.error('Error creating plan:', error);
+      toast.error('Error al crear plan: ' + error.message);
     },
   });
 };
 
 export const useUpdatePlan = () => {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -77,47 +81,34 @@ export const useUpdatePlan = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['plans'] });
-      toast({
-        title: "Plan actualizado",
-        description: "Los cambios han sido guardados exitosamente.",
-      });
+      toast.success('Plan actualizado exitosamente');
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "No se pudo actualizar el plan.",
-        variant: "destructive",
-      });
+      console.error('Error updating plan:', error);
+      toast.error('Error al actualizar plan: ' + error.message);
     },
   });
 };
 
 export const useDeletePlan = () => {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('plans')
-        .delete()
+        .update({ active: false })
         .eq('id', id);
 
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['plans'] });
-      toast({
-        title: "Plan eliminado",
-        description: "El plan ha sido eliminado exitosamente.",
-      });
+      toast.success('Plan desactivado exitosamente');
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "No se pudo eliminar el plan.",
-        variant: "destructive",
-      });
+      console.error('Error deactivating plan:', error);
+      toast.error('Error al desactivar plan: ' + error.message);
     },
   });
 };

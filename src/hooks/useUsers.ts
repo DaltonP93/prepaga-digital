@@ -2,72 +2,47 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
+type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];
+
+interface UserWithCompany extends Profile {
+  companies?: {
+    id: string;
+    name: string;
+  } | null;
+}
 
 export const useUsers = () => {
   return useQuery({
     queryKey: ['users'],
-    queryFn: async () => {
+    queryFn: async (): Promise<UserWithCompany[]> => {
       const { data, error } = await supabase
         .from('profiles')
         .select(`
           *,
-          companies:company_id(name)
+          companies:company_id(id, name)
         `)
+        .eq('active', true)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return data;
+      if (error) {
+        console.error('Error fetching users:', error);
+        throw error;
+      }
+      return data || [];
     },
-  });
-};
-
-export const useCreateUser = () => {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (userData: { 
-      email: string; 
-      password: string; 
-      first_name: string; 
-      last_name: string; 
-      role: string; 
-      company_id?: string 
-    }) => {
-      const { data, error } = await supabase.functions.invoke('create-user', {
-        body: userData
-      });
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast({
-        title: "Usuario creado",
-        description: "El usuario ha sido creado exitosamente.",
-      });
-    },
-    onError: (error: any) => {
-      console.error('Create user error:', error);
-      toast({
-        title: "Error",
-        description: error.message || "No se pudo crear el usuario.",
-        variant: "destructive",
-      });
-    },
+    retry: 1,
+    refetchOnWindowFocus: false,
   });
 };
 
 export const useUpdateUser = () => {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<Profile> & { id: string }) => {
+    mutationFn: async ({ id, ...updates }: ProfileUpdate & { id: string }) => {
       const { data, error } = await supabase
         .from('profiles')
         .update(updates)
@@ -80,48 +55,61 @@ export const useUpdateUser = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast({
-        title: "Usuario actualizado",
-        description: "Los cambios han sido guardados exitosamente.",
-      });
+      toast.success('Usuario actualizado exitosamente');
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "No se pudo actualizar el usuario.",
-        variant: "destructive",
-      });
+      console.error('Error updating user:', error);
+      toast.error('Error al actualizar usuario: ' + error.message);
     },
   });
 };
 
 export const useDeleteUser = () => {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (userId: string) => {
+    mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('profiles')
         .update({ active: false })
-        .eq('id', userId);
+        .eq('id', id);
 
       if (error) throw error;
-      return userId;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast({
-        title: "Usuario desactivado",
-        description: "El usuario ha sido desactivado exitosamente.",
-      });
+      toast.success('Usuario desactivado exitosamente');
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "No se pudo desactivar el usuario.",
-        variant: "destructive",
-      });
+      console.error('Error deactivating user:', error);
+      toast.error('Error al desactivar usuario: ' + error.message);
+    },
+  });
+};
+
+export const useCreateUser = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (userData: {
+      email: string;
+      password: string;
+      first_name: string;
+      last_name: string;
+      role: Database['public']['Enums']['user_role'];
+      company_id?: string;
+    }) => {
+      // This would need to be handled via Supabase Auth admin functions
+      // For now, we'll just throw an error indicating this needs backend implementation
+      throw new Error('La creación de usuarios requiere implementación backend con funciones admin de Supabase');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success('Usuario creado exitosamente');
+    },
+    onError: (error: any) => {
+      console.error('Error creating user:', error);
+      toast.error('Error al crear usuario: ' + error.message);
     },
   });
 };

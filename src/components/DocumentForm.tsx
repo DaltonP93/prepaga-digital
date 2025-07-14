@@ -176,7 +176,7 @@ export const DocumentForm = ({ document, trigger }: DocumentFormProps) => {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">Sin template</SelectItem>
+                        <SelectItem value="__none__">Sin template</SelectItem>
                         {templates?.map((template) => (
                           <SelectItem key={template.id} value={template.id}>
                             {template.name}
@@ -202,7 +202,7 @@ export const DocumentForm = ({ document, trigger }: DocumentFormProps) => {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">Todos los planes</SelectItem>
+                        <SelectItem value="__all__">Todos los planes</SelectItem>
                         {plans?.map((plan) => (
                           <SelectItem key={plan.id} value={plan.id}>
                             {plan.name}
