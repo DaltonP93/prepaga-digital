@@ -8,6 +8,9 @@ import {
   User,
   ShoppingBag,
   FileImage,
+  Building2,
+  CreditCard,
+  UserCog,
 } from "lucide-react";
 
 import {
@@ -48,6 +51,11 @@ export function AppSidebar({ isSuperAdmin = false }: AppSidebarProps) {
       icon: Users,
     },
     {
+      title: "Planes",
+      url: "/plans",
+      icon: CreditCard,
+    },
+    {
       title: "Documentos",
       url: "/documents",
       icon: FileText,
@@ -64,12 +72,20 @@ export function AppSidebar({ isSuperAdmin = false }: AppSidebarProps) {
     },
   ];
 
+  // Admin specific items
   if (isSuperAdmin) {
-    menuItems.push({
-      title: "Configuración",
-      url: "/settings",
-      icon: Settings,
-    });
+    menuItems.push(
+      {
+        title: "Usuarios",
+        url: "/users",
+        icon: UserCog,
+      },
+      {
+        title: "Empresas",
+        url: "/companies",
+        icon: Building2,
+      }
+    );
   }
 
   return (

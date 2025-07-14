@@ -6,13 +6,16 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Toaster } from '@/components/ui/sonner';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
-import Home from '@/pages/Home';
+import Dashboard from '@/pages/Dashboard';
 import Clients from '@/pages/Clients';
 import Sales from '@/pages/Sales';
 import Documents from '@/pages/Documents';
 import Templates from '@/pages/Templates';
 import SignatureView from '@/pages/SignatureView';
 import Profile from '@/pages/Profile';
+import Users from '@/pages/Users';
+import Plans from '@/pages/Plans';
+import Companies from '@/pages/Companies';
 
 const queryClient = new QueryClient();
 
@@ -27,10 +30,15 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/signature/:token" element={<SignatureView />} />
             
-            {/* Protected routes */}
+            {/* Protected routes - Dashboard as main route */}
             <Route path="/" element={
               <ProtectedRoute>
-                <Home />
+                <Dashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <Dashboard />
               </ProtectedRoute>
             } />
             <Route path="/clients" element={
@@ -51,6 +59,21 @@ function App() {
             <Route path="/templates" element={
               <ProtectedRoute>
                 <Templates />
+              </ProtectedRoute>
+            } />
+            <Route path="/users" element={
+              <ProtectedRoute>
+                <Users />
+              </ProtectedRoute>
+            } />
+            <Route path="/plans" element={
+              <ProtectedRoute>
+                <Plans />
+              </ProtectedRoute>
+            } />
+            <Route path="/companies" element={
+              <ProtectedRoute>
+                <Companies />
               </ProtectedRoute>
             } />
             <Route path="/profile" element={

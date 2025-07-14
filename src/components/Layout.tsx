@@ -4,6 +4,7 @@ import { AppSidebar } from "./AppSidebar";
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { useAuthContext } from '@/components/AuthProvider';
+import { Loader2 } from "lucide-react";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -12,7 +13,16 @@ interface LayoutProps {
 }
 
 export function Layout({ children, title, description }: LayoutProps) {
-  const { profile } = useAuthContext();
+  const { profile, loading } = useAuthContext();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
   const isSuperAdmin = profile?.role === 'super_admin';
 
   return (
