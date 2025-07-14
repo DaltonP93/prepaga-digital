@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -11,6 +10,7 @@ import { useCreateUser, useUpdateUser } from "@/hooks/useUsers";
 import { Database } from "@/integrations/supabase/types";
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
+type UserRole = Database['public']['Enums']['user_role'];
 
 interface UserFormProps {
   open: boolean;
@@ -52,7 +52,7 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
           id: user.id,
           first_name: data.first_name,
           last_name: data.last_name,
-          role: data.role as any,
+          role: data.role as UserRole,
           company_id: data.company_id,
           phone: data.phone,
         });
@@ -65,7 +65,7 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
           password: data.password,
           first_name: data.first_name,
           last_name: data.last_name,
-          role: data.role,
+          role: data.role as UserRole,
           company_id: data.company_id,
         });
       }
