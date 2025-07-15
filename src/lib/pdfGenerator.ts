@@ -24,10 +24,15 @@ export interface PDFDocument {
     email?: string;
     phone?: string;
   };
+  questionnaire_responses?: Record<string, {
+    question: string;
+    answer: string;
+    question_type: string;
+  }>;
 }
 
 export const generatePDFContent = (document: PDFDocument): string => {
-  const { client, plan, company, signatures } = document;
+  const { client, plan, company, signatures, questionnaire_responses } = document;
   
   return `
 <!DOCTYPE html>
@@ -41,6 +46,10 @@ export const generatePDFContent = (document: PDFDocument): string => {
         .company-info { margin-bottom: 30px; }
         .client-info { background: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 5px; }
         .plan-info { background: #e3f2fd; padding: 20px; margin: 20px 0; border-radius: 5px; }
+        .questionnaire-section { background: #f9f9f9; padding: 20px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #2196F3; }
+        .questionnaire-item { margin-bottom: 15px; padding: 10px; background: white; border-radius: 3px; }
+        .question { font-weight: bold; color: #333; margin-bottom: 5px; }
+        .answer { color: #666; padding-left: 10px; }
         .signature-section { border: 1px solid #ddd; padding: 20px; margin: 20px 0; border-radius: 5px; }
         .signature-image { max-width: 200px; border: 1px solid #ccc; }
         .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #666; }
@@ -80,6 +89,25 @@ export const generatePDFContent = (document: PDFDocument): string => {
             ${plan.description ? `<tr><td><strong>Descripción</strong></td><td>${plan.description}</td></tr>` : ''}
         </table>
     </div>
+
+    ${questionnaire_responses && Object.keys(questionnaire_responses).length > 0 ? `
+    <div class="questionnaire-section">
+        <h2>Cuestionario de Declaración Jurada</h2>
+        <p style="margin-bottom: 20px; font-style: italic;">Las siguientes respuestas fueron proporcionadas por el cliente como parte del proceso de contratación:</p>
+        ${Object.entries(questionnaire_responses).map(([questionId, data]) => `
+            <div class="questionnaire-item">
+                <div class="question">${data.question}</div>
+                <div class="answer">
+                    ${data.question_type === 'select_multiple' && Array.isArray(data.answer) 
+                      ? data.answer.join(', ') 
+                      : data.answer === 'yes' ? 'Sí' 
+                      : data.answer === 'no' ? 'No' 
+                      : data.answer}
+                </div>
+            </div>
+        `).join('')}
+    </div>
+    ` : ''}
 
     <div class="content">
         <h2>Contenido del Documento</h2>

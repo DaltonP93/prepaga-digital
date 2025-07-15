@@ -26,7 +26,32 @@ export const useSignatureFlow = () => {
         signatureData: signatureData,
       });
 
-      // 2. Generar PDF con firma
+      // 2. Obtener respuestas del cuestionario si existe template
+      let questionnaireResponses = {};
+      if (saleData.template_id) {
+        const { data: responses, error: responsesError } = await supabase
+          .from('template_responses')
+          .select(`
+            question_id,
+            response_value,
+            template_questions!inner(question_text, question_type)
+          `)
+          .eq('template_id', saleData.template_id)
+          .eq('client_id', saleData.client_id);
+
+        if (!responsesError && responses) {
+          questionnaireResponses = responses.reduce((acc, response) => {
+            acc[response.question_id] = {
+              question: response.template_questions.question_text,
+              answer: response.response_value,
+              question_type: response.template_questions.question_type
+            };
+            return acc;
+          }, {} as Record<string, any>);
+        }
+      }
+
+      // 3. Generar PDF con firma y respuestas del cuestionario
       const pdfData = {
         content: saleData.documents?.[0]?.content || '',
         signatures: [{
@@ -37,11 +62,12 @@ export const useSignatureFlow = () => {
         client: saleData.clients,
         plan: saleData.plans,
         company: { name: 'Mi Empresa' }, // TODO: Get from company data
+        questionnaire_responses: questionnaireResponses,
       };
 
       const htmlContent = generatePDFContent(pdfData);
       
-      // 3. Generar PDF usando edge function
+      // 4. Generar PDF usando edge function
       const { data: pdfBlob, error: pdfError } = await supabase.functions.invoke('generate-pdf', {
         body: {
           htmlContent,
@@ -51,7 +77,7 @@ export const useSignatureFlow = () => {
 
       if (pdfError) throw pdfError;
 
-      // 4. Subir PDF a Storage
+      // 5. Subir PDF a Storage
       const fileName = `contracts/${saleData.id}-signed.pdf`;
       const { error: uploadError } = await supabase.storage
         .from('documents')
@@ -62,7 +88,7 @@ export const useSignatureFlow = () => {
 
       if (uploadError) throw uploadError;
 
-      // 5. Actualizar venta con URL del documento firmado
+      // 6. Actualizar venta con URL del documento firmado
       const { error: updateError } = await supabase
         .from('sales')
         .update({
@@ -73,12 +99,12 @@ export const useSignatureFlow = () => {
 
       if (updateError) throw updateError;
 
-      // 6. Completar el proceso de firma
+      // 7. Completar el proceso de firma
       await completeSignature.mutateAsync(saleData.id);
 
       toast({
         title: "Proceso completado",
-        description: "El documento ha sido firmado y guardado exitosamente.",
+        description: "El documento ha sido firmado y guardado exitosamente con las respuestas del cuestionario incluidas.",
       });
 
       return { success: true, documentUrl: fileName };

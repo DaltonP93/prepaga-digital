@@ -22,6 +22,7 @@ interface DynamicQuestionnaireProps {
   templateId: string;
   clientId: string;
   saleId?: string;
+  signatureToken?: string;
   onComplete?: (responses: Record<string, any>) => void;
   readOnly?: boolean;
 }
@@ -30,6 +31,7 @@ export const DynamicQuestionnaire = ({
   templateId, 
   clientId, 
   saleId, 
+  signatureToken,
   onComplete, 
   readOnly = false 
 }: DynamicQuestionnaireProps) => {
@@ -116,7 +118,13 @@ export const DynamicQuestionnaire = ({
       if (error) throw error;
 
       toast.success("Cuestionario completado exitosamente");
-      onComplete?.(responses);
+      
+      // Redirect to signature page if we have the token
+      if (signatureToken) {
+        window.location.href = `/signature/${signatureToken}`;
+      } else {
+        onComplete?.(responses);
+      }
     } catch (error: any) {
       console.error("Error saving responses:", error);
       toast.error(error.message || "Error al guardar las respuestas");

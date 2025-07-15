@@ -21,7 +21,7 @@ export const useSales = () => {
           plans:plan_id(name, price),
           salesperson:salesperson_id(first_name, last_name, email),
           companies:company_id(name),
-          templates:template_id(name, question_count:template_questions(count))
+          templates:template_id(name, description)
         `)
         .order('created_at', { ascending: false });
 
@@ -102,36 +102,56 @@ export const useGenerateQuestionnaireLink = () => {
 
   return useMutation({
     mutationFn: async (saleId: string) => {
-      const token = crypto.randomUUID();
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7); // Expires in 7 days
-
-      const { data, error } = await supabase
+      // First get the sale to check if it has a template
+      const { data: sale, error: saleError } = await supabase
         .from('sales')
-        .update({
-          signature_token: token,
-          signature_expires_at: expiresAt.toISOString(),
-          status: 'enviado'
-        })
-        .eq('id', saleId)
         .select(`
           *,
-          clients:client_id(first_name, last_name, email, phone),
+          clients:client_id(first_name, last_name, email),
           templates:template_id(name)
         `)
+        .eq('id', saleId)
         .single();
 
-      if (error) throw error;
+      if (saleError) throw saleError;
+      
+      if (!sale.template_id) {
+        throw new Error('Esta venta no tiene un cuestionario asociado. Asigne un template primero.');
+      }
+
+      // Generate or reuse existing token
+      let token = sale.signature_token;
+      let expiresAt = sale.signature_expires_at;
+
+      if (!token || new Date(expiresAt) < new Date()) {
+        token = crypto.randomUUID();
+        expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7); // Expires in 7 days
+
+        const { error: updateError } = await supabase
+          .from('sales')
+          .update({
+            signature_token: token,
+            signature_expires_at: expiresAt.toISOString(),
+            status: 'enviado'
+          })
+          .eq('id', saleId);
+
+        if (updateError) throw updateError;
+      }
       
       const questionnaireUrl = `${window.location.origin}/questionnaire/${token}`;
       
-      return { sale: data, questionnaireUrl };
+      // Copy to clipboard
+      await navigator.clipboard.writeText(questionnaireUrl);
+      
+      return { sale, questionnaireUrl, token };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       toast({
         title: "Enlace del cuestionario generado",
-        description: "El enlace ha sido copiado al portapapeles.",
+        description: "El enlace ha sido copiado al portapapeles y está listo para enviar al cliente.",
       });
     },
     onError: (error: any) => {

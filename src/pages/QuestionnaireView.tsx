@@ -1,3 +1,4 @@
+
 import { useParams, useSearchParams } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { DynamicQuestionnaire } from "@/components/DynamicQuestionnaire";
@@ -8,37 +9,37 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 
 const QuestionnaireView = () => {
-  const { templateId } = useParams<{ templateId: string }>();
+  const { token } = useParams<{ token: string }>();
   const [searchParams] = useSearchParams();
   const clientId = searchParams.get("client_id");
   const saleId = searchParams.get("sale_id");
-  const signature_token = searchParams.get("signature_token");
 
-  const { templates } = useTemplates();
-  const template = templates?.find(t => t.id === templateId);
-
-  // Fetch sale and client data for public access
+  // Fetch sale data using token instead of separate params
   const { data: saleData, isLoading: loadingSale } = useQuery({
-    queryKey: ["public-sale", saleId, signature_token],
+    queryKey: ["public-sale-questionnaire", token],
     queryFn: async () => {
-      if (!saleId || !signature_token) return null;
+      if (!token) return null;
       
       const { data, error } = await supabase
         .from("sales")
         .select(`
           *,
           clients(*),
-          plans(*)
+          plans(*),
+          templates(*)
         `)
-        .eq("id", saleId)
-        .eq("signature_token", signature_token)
+        .eq("signature_token", token)
+        .gt("signature_expires_at", new Date().toISOString())
         .single();
 
       if (error) throw error;
       return data;
     },
-    enabled: !!saleId && !!signature_token,
+    enabled: !!token,
   });
+
+  const { templates } = useTemplates();
+  const template = saleData?.templates || templates?.find(t => t.id === saleData?.template_id);
 
   if (loadingSale) {
     return (
@@ -50,7 +51,7 @@ const QuestionnaireView = () => {
     );
   }
 
-  if (!template || !clientId) {
+  if (!template || !saleData?.clients?.id || !saleData?.template_id) {
     return (
       <Layout title="Cuestionario no encontrado" description="">
         <div className="flex justify-center py-8">
@@ -69,8 +70,8 @@ const QuestionnaireView = () => {
     );
   }
 
-  const client = saleData?.clients;
-  const plan = saleData?.plans;
+  const client = saleData.clients;
+  const plan = saleData.plans;
 
   return (
     <Layout 
@@ -117,12 +118,13 @@ const QuestionnaireView = () => {
 
         {/* Questionnaire */}
         <DynamicQuestionnaire
-          templateId={templateId}
-          clientId={clientId}
-          saleId={saleId}
+          templateId={saleData.template_id}
+          clientId={saleData.clients.id}
+          saleId={saleData.id}
+          signatureToken={token}
           onComplete={() => {
-            // Redirect to success page or show success message
-            window.location.href = `/signature/${saleId}?signature_token=${signature_token}`;
+            // This will be called if no signatureToken is provided
+            console.log("Cuestionario completado");
           }}
         />
       </div>
