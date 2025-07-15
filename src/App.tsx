@@ -1,4 +1,5 @@
 
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/components/AuthProvider';
@@ -16,8 +17,17 @@ import Profile from '@/pages/Profile';
 import Users from '@/pages/Users';
 import Plans from '@/pages/Plans';
 import Companies from '@/pages/Companies';
+import QuestionnaireView from '@/pages/QuestionnaireView';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    },
+  },
+});
 
 function App() {
   return (
@@ -29,6 +39,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/signature/:token" element={<SignatureView />} />
+            <Route path="/questionnaire/:token" element={<QuestionnaireView />} />
             
             {/* Protected routes - Dashboard as main route */}
             <Route path="/" element={
