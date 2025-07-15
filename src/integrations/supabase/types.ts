@@ -354,6 +354,7 @@ export type Database = {
           signature_token: string | null
           signed_document_url: string | null
           status: Database["public"]["Enums"]["sale_status"] | null
+          template_id: string | null
           total_amount: number | null
           updated_at: string | null
         }
@@ -370,6 +371,7 @@ export type Database = {
           signature_token?: string | null
           signed_document_url?: string | null
           status?: Database["public"]["Enums"]["sale_status"] | null
+          template_id?: string | null
           total_amount?: number | null
           updated_at?: string | null
         }
@@ -386,6 +388,7 @@ export type Database = {
           signature_token?: string | null
           signed_document_url?: string | null
           status?: Database["public"]["Enums"]["sale_status"] | null
+          template_id?: string | null
           total_amount?: number | null
           updated_at?: string | null
         }
@@ -416,6 +419,13 @@ export type Database = {
             columns: ["salesperson_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
             referencedColumns: ["id"]
           },
         ]
