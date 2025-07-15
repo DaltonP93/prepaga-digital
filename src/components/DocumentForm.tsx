@@ -229,7 +229,6 @@ export const DocumentForm = ({ document, trigger }: DocumentFormProps) => {
               />
             </div>
 
-            {/* File Upload Section */}
             <div className="space-y-2">
               <FormLabel>Archivo del Documento</FormLabel>
               <FileUpload
