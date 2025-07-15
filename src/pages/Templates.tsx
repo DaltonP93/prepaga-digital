@@ -76,6 +76,7 @@ const Templates = () => {
                     <TableHead>Nombre</TableHead>
                     <TableHead>Descripción</TableHead>
                     <TableHead>Tipo</TableHead>
+                    <TableHead>Preguntas</TableHead>
                     <TableHead>Empresa</TableHead>
                     <TableHead>Creado por</TableHead>
                     <TableHead>Estado</TableHead>
@@ -106,15 +107,21 @@ const Templates = () => {
                           )}
                         </Badge>
                       </TableCell>
-                      <TableCell>
-                        {template.company?.name || "Global"}
-                      </TableCell>
-                      <TableCell>
-                        {template.creator ? 
-                          `${template.creator.first_name} ${template.creator.last_name}` : 
-                          "Sistema"
-                        }
-                      </TableCell>
+                       <TableCell>
+                         <Badge variant="outline">
+                           {/* TODO: Add question count here */}
+                           0 preguntas
+                         </Badge>
+                       </TableCell>
+                       <TableCell>
+                         {template.company?.name || "Global"}
+                       </TableCell>
+                       <TableCell>
+                         {template.creator ? 
+                           `${template.creator.first_name} ${template.creator.last_name}` : 
+                           "Sistema"
+                         }
+                       </TableCell>
                       <TableCell>
                         <Badge variant={template.active ? "default" : "secondary"}>
                           {template.active ? "Activo" : "Inactivo"}

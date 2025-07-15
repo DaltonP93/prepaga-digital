@@ -468,6 +468,150 @@ export type Database = {
           },
         ]
       }
+      template_question_options: {
+        Row: {
+          created_at: string
+          id: string
+          option_text: string
+          option_value: string
+          order_index: number
+          question_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          option_text: string
+          option_value: string
+          order_index?: number
+          question_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          option_text?: string
+          option_value?: string
+          order_index?: number
+          question_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_question_options_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "template_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      template_questions: {
+        Row: {
+          conditional_logic: Json | null
+          created_at: string
+          id: string
+          is_active: boolean
+          is_required: boolean
+          order_index: number
+          question_text: string
+          question_type: string
+          template_id: string
+          updated_at: string
+        }
+        Insert: {
+          conditional_logic?: Json | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          order_index?: number
+          question_text: string
+          question_type: string
+          template_id: string
+          updated_at?: string
+        }
+        Update: {
+          conditional_logic?: Json | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          order_index?: number
+          question_text?: string
+          question_type?: string
+          template_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_questions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      template_responses: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          question_id: string
+          response_value: string
+          sale_id: string | null
+          template_id: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          question_id: string
+          response_value: string
+          sale_id?: string | null
+          template_id: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          question_id?: string
+          response_value?: string
+          sale_id?: string | null
+          template_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_responses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_responses_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "template_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_responses_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_responses_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       templates: {
         Row: {
           active: boolean | null

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,8 @@ import {
   FormDescription,
 } from "@/components/ui/form";
 import { useTemplates } from "@/hooks/useTemplates";
+import { QuestionBuilder } from "@/components/QuestionBuilder";
+import { QuestionnairePreview } from "@/components/QuestionnairePreview";
 import { Plus, Edit } from "lucide-react";
 import { Tables } from "@/integrations/supabase/types";
 
@@ -105,103 +108,123 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
       <DialogTrigger asChild>
         {trigger || defaultTrigger}
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle>
             {template ? "Editar Template" : "Crear Nuevo Template"}
           </DialogTitle>
         </DialogHeader>
         
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nombre</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="Nombre del template" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+        <Tabs defaultValue="info" className="h-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="info">Información Básica</TabsTrigger>
+            <TabsTrigger value="questions" disabled={!template}>Preguntas</TabsTrigger>
+            <TabsTrigger value="preview" disabled={!template}>Vista Previa</TabsTrigger>
+          </TabsList>
 
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Descripción</FormLabel>
-                  <FormControl>
-                    <Textarea {...field} placeholder="Descripción del template" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
+            <TabsContent value="info" className="space-y-4 mt-4">
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nombre</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Nombre del template" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-            <FormField
-              control={form.control}
-              name="is_global"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                  <div className="space-y-0.5">
-                    <FormLabel className="text-base">Template Global</FormLabel>
-                    <FormDescription>
-                      Los templates globales están disponibles para todas las empresas
-                    </FormDescription>
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Descripción</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} placeholder="Descripción del template" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="is_global"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">Template Global</FormLabel>
+                          <FormDescription>
+                            Los templates globales están disponibles para todas las empresas
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="content"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Contenido (JSON)</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            {...field} 
+                            placeholder='{"variables": [], "sections": []}'
+                            className="min-h-32 font-mono text-sm"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Define el contenido del template en formato JSON. 
+                          Ejemplo: {`{"title": "{{cliente.nombre}}", "content": "Bienvenido {{cliente.nombre}}"}`}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setOpen(false)}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={isCreating || isUpdating}
+                    >
+                      {template ? "Actualizar" : "Crear"}
+                    </Button>
                   </div>
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+                </form>
+              </Form>
+            </TabsContent>
 
-            <FormField
-              control={form.control}
-              name="content"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Contenido (JSON)</FormLabel>
-                  <FormControl>
-                    <Textarea 
-                      {...field} 
-                      placeholder='{"variables": [], "sections": []}'
-                      className="min-h-32 font-mono text-sm"
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Define el contenido del template en formato JSON. 
-                    Ejemplo: {`{"title": "{{cliente.nombre}}", "content": "Bienvenido {{cliente.nombre}}"}`}
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <TabsContent value="questions" className="mt-4">
+              {template && <QuestionBuilder templateId={template.id} />}
+            </TabsContent>
 
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOpen(false)}
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                disabled={isCreating || isUpdating}
-              >
-                {template ? "Actualizar" : "Crear"}
-              </Button>
-            </div>
-          </form>
-        </Form>
+            <TabsContent value="preview" className="mt-4">
+              {template && <QuestionnairePreview templateId={template.id} />}
+            </TabsContent>
+          </div>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

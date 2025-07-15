@@ -37,13 +37,15 @@ export interface TemplateContext {
     actual: string;
     vencimiento?: string;
   };
+  respuestas: Record<string, any>;
 }
 
 export const createTemplateContext = (
   client: any,
   plan: any,
   company: any,
-  sale: any
+  sale: any,
+  responses?: Record<string, any>
 ): TemplateContext => {
   return {
     cliente: {
@@ -77,6 +79,7 @@ export const createTemplateContext = (
       actual: new Date().toLocaleDateString(),
       vencimiento: sale?.signature_expires_at ? new Date(sale.signature_expires_at).toLocaleDateString() : '',
     },
+    respuestas: responses || {},
   };
 };
 
@@ -104,6 +107,7 @@ export const interpolateTemplate = (template: string, context: TemplateContext):
   replaceNestedVariables(context.empresa, 'empresa');
   replaceNestedVariables(context.venta, 'venta');
   replaceNestedVariables(context.fecha, 'fecha');
+  replaceNestedVariables(context.respuestas, 'respuestas');
 
   // Handle special formatting for currency
   result = result.replace(/\{\{precio_formateado\}\}/g, `$${context.plan.precio.toLocaleString()}`);
@@ -137,5 +141,38 @@ export const getAvailableVariables = (): string[] => {
     '{{fecha.vencimiento}}',
     '{{precio_formateado}}',
     '{{total_formateado}}',
+    '{{respuestas.[pregunta_id]}}',
   ];
+};
+
+// Helper function to generate document content with questionnaire responses
+export const generateDocumentWithResponses = (
+  template: any,
+  context: TemplateContext,
+  responses: Record<string, any>
+): string => {
+  // Create enhanced context with responses
+  const enhancedContext = {
+    ...context,
+    respuestas: responses,
+  };
+
+  // If template has questionnaire content, generate it
+  if (template.content && template.content.questionnaire) {
+    let questionnaireContent = '\n\n--- CUESTIONARIO DE DECLARACIÓN JURADA ---\n\n';
+    
+    Object.entries(responses).forEach(([questionId, answer]) => {
+      const questionText = template.content.questionnaire[questionId]?.text || `Pregunta ${questionId}`;
+      questionnaireContent += `${questionText}\nRespuesta: ${answer}\n\n`;
+    });
+
+    // Add questionnaire content to template
+    if (typeof template.content === 'string') {
+      template.content += questionnaireContent;
+    } else if (template.content && typeof template.content === 'object') {
+      template.content.questionnaire_responses = questionnaireContent;
+    }
+  }
+
+  return interpolateTemplate(JSON.stringify(template.content), enhancedContext);
 };
