@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useCreateClient, useUpdateClient } from "@/hooks/useClients";
 import { Database } from "@/integrations/supabase/types";
@@ -24,6 +25,8 @@ interface ClientFormData {
   dni?: string;
   birth_date?: string;
   address?: string;
+  neighborhood?: string;
+  marital_status?: string;
 }
 
 export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
@@ -31,7 +34,7 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
   const updateClient = useUpdateClient();
   const isEditing = !!client;
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<ClientFormData>({
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<ClientFormData>({
     defaultValues: {
       first_name: client?.first_name || "",
       last_name: client?.last_name || "",
@@ -40,18 +43,29 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
       dni: client?.dni || "",
       birth_date: client?.birth_date || "",
       address: client?.address || "",
+      neighborhood: (client as any)?.neighborhood || "",
+      marital_status: (client as any)?.marital_status || "",
     }
   });
 
   const onSubmit = async (data: ClientFormData) => {
     try {
+      // Convert special values back to null
+      const maritalStatus = data.marital_status === "__none__" ? null : data.marital_status;
+      
+      const finalData = {
+        ...data,
+        marital_status: maritalStatus,
+        neighborhood: data.neighborhood || null,
+      };
+
       if (isEditing && client) {
         await updateClient.mutateAsync({
           id: client.id,
-          ...data,
+          ...finalData,
         });
       } else {
-        await createClient.mutateAsync(data);
+        await createClient.mutateAsync(finalData);
       }
       onOpenChange(false);
       reset();
@@ -131,6 +145,37 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
               type="date"
               {...register("birth_date")}
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="neighborhood">Barrio</Label>
+              <Input
+                id="neighborhood"
+                {...register("neighborhood")}
+                placeholder="Barrio o vecindario"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="marital_status">Estado Civil</Label>
+              <Select 
+                value={watch("marital_status") || ""} 
+                onValueChange={(value) => setValue("marital_status", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar estado civil" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">No especificar</SelectItem>
+                  <SelectItem value="soltero">Soltero/a</SelectItem>
+                  <SelectItem value="casado">Casado/a</SelectItem>
+                  <SelectItem value="divorciado">Divorciado/a</SelectItem>
+                  <SelectItem value="viudo">Viudo/a</SelectItem>
+                  <SelectItem value="union_libre">Unión libre</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="space-y-2">

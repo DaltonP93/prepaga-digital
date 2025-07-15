@@ -82,42 +82,52 @@ export const DocumentForm = ({ document, trigger }: DocumentFormProps) => {
     form.setValue("file_url", url);
   };
 
-  const onSubmit = (data: DocumentFormData) => {
-    const finalData = {
-      ...data,
-      file_url: uploadedFileUrl || data.file_url || null,
-    };
+  const onSubmit = async (data: DocumentFormData) => {
+    try {
+      // Convert special values back to null
+      const templateId = data.template_id === "__none__" ? null : data.template_id;
+      const planId = data.plan_id === "__all__" ? null : data.plan_id;
+      
+      const finalData = {
+        ...data,
+        file_url: uploadedFileUrl || data.file_url || null,
+        template_id: templateId,
+        plan_id: planId,
+      };
 
-    if (document) {
-      updateDocument({
-        id: document.id,
-        updates: {
+      if (document) {
+        await updateDocument({
+          id: document.id,
+          updates: {
+            name: finalData.name,
+            document_type: finalData.document_type || null,
+            content: finalData.content || null,
+            file_url: finalData.file_url,
+            template_id: finalData.template_id,
+            plan_id: finalData.plan_id,
+            is_required: finalData.is_required,
+            order_index: finalData.order_index,
+          },
+        });
+      } else {
+        await createDocument({
           name: finalData.name,
           document_type: finalData.document_type || null,
           content: finalData.content || null,
           file_url: finalData.file_url,
-          template_id: finalData.template_id || null,
-          plan_id: finalData.plan_id || null,
+          template_id: finalData.template_id,
+          plan_id: finalData.plan_id,
           is_required: finalData.is_required,
           order_index: finalData.order_index,
-        },
-      });
-    } else {
-      createDocument({
-        name: finalData.name,
-        document_type: finalData.document_type || null,
-        content: finalData.content || null,
-        file_url: finalData.file_url,
-        template_id: finalData.template_id || null,
-        plan_id: finalData.plan_id || null,
-        is_required: finalData.is_required,
-        order_index: finalData.order_index,
-      });
+        });
+      }
+      
+      setOpen(false);
+      setUploadedFileUrl(null);
+      form.reset();
+    } catch (error) {
+      console.error("Error saving document:", error);
     }
-    
-    setOpen(false);
-    setUploadedFileUrl(null);
-    form.reset();
   };
 
   const defaultTrigger = document ? (
@@ -237,9 +247,9 @@ export const DocumentForm = ({ document, trigger }: DocumentFormProps) => {
                 maxSize={10}
                 onUploadComplete={handleFileUploadComplete}
               />
-              {(uploadedFileUrl || form.getValues("file_url")) && (
+              {uploadedFileUrl && (
                 <p className="text-sm text-green-600">
-                  ✓ Archivo cargado: {uploadedFileUrl || form.getValues("file_url")}
+                  ✓ Archivo subido correctamente
                 </p>
               )}
             </div>
