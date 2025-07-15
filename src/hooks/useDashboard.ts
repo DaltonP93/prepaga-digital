@@ -49,13 +49,14 @@ export const useDashboardStats = () => {
         const signedDocuments = signaturesData?.filter(sig => sig.status === 'firmado').length || 0;
         const pendingSignatures = signaturesData?.filter(sig => sig.status === 'pendiente').length || 0;
 
-        // Get recent sales with relationships
+        // Get recent sales with relationships - Fixed to include companies
         const { data: recentSales, error: recentSalesError } = await supabase
           .from('sales')
           .select(`
             *,
             clients:client_id(first_name, last_name),
-            plans:plan_id(name)
+            plans:plan_id(name),
+            companies:company_id(name)
           `)
           .order('created_at', { ascending: false })
           .limit(5);

@@ -222,7 +222,7 @@ const Dashboard = () => {
                     </div>
                     <div className="text-right">
                       <p className="font-medium">${sale.total_amount?.toLocaleString('es-PY') || 0}</p>
-                      <Badge variant={sale.status === 'completada' ? 'default' : 'secondary'}>
+                      <Badge variant={sale.status === 'completado' ? 'default' : 'secondary'}>
                         {sale.status}
                       </Badge>
                     </div>
