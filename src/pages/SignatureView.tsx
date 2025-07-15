@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -7,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { SignatureCanvas } from '@/components/SignatureCanvas';
 import { useSignatureByToken } from '@/hooks/useSignature';
 import { useSignatureFlow } from '@/hooks/useSignatureFlow';
+import { supabase } from '@/integrations/supabase/client';
 import { FileText, User, Building, Calendar, DollarSign, Download } from 'lucide-react';
 
 const SignatureView = () => {

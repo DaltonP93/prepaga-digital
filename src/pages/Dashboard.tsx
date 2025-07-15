@@ -3,12 +3,12 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, Users, FileText, Clock } from "lucide-react";
-import { useDashboard } from "@/hooks/useDashboard";
+import { useDashboardStats } from "@/hooks/useDashboard";
 
 import { TestDataManager } from '@/components/TestDataManager';
 
 const Dashboard = () => {
-  const { data: stats, isLoading } = useDashboard();
+  const { data: stats, isLoading } = useDashboardStats();
 
   if (isLoading) {
     return (
