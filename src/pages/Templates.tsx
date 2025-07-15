@@ -109,8 +109,7 @@ const Templates = () => {
                       </TableCell>
                        <TableCell>
                          <Badge variant="outline">
-                           {/* TODO: Add question count here */}
-                           0 preguntas
+                           {template.question_count || 0} pregunta{template.question_count !== 1 ? 's' : ''}
                          </Badge>
                        </TableCell>
                        <TableCell>

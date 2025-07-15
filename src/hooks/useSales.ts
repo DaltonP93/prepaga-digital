@@ -20,7 +20,8 @@ export const useSales = () => {
           clients:client_id(first_name, last_name, email, phone),
           plans:plan_id(name, price),
           salesperson:salesperson_id(first_name, last_name, email),
-          companies:company_id(name)
+          companies:company_id(name),
+          templates:template_id(name, question_count:template_questions(count))
         `)
         .order('created_at', { ascending: false });
 
@@ -89,6 +90,54 @@ export const useUpdateSale = () => {
       toast({
         title: "Error",
         description: error.message || "No se pudo actualizar la venta.",
+        variant: "destructive",
+      });
+    },
+  });
+};
+
+export const useGenerateQuestionnaireLink = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (saleId: string) => {
+      const token = crypto.randomUUID();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7); // Expires in 7 days
+
+      const { data, error } = await supabase
+        .from('sales')
+        .update({
+          signature_token: token,
+          signature_expires_at: expiresAt.toISOString(),
+          status: 'enviado'
+        })
+        .eq('id', saleId)
+        .select(`
+          *,
+          clients:client_id(first_name, last_name, email, phone),
+          templates:template_id(name)
+        `)
+        .single();
+
+      if (error) throw error;
+      
+      const questionnaireUrl = `${window.location.origin}/questionnaire/${token}`;
+      
+      return { sale: data, questionnaireUrl };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      toast({
+        title: "Enlace del cuestionario generado",
+        description: "El enlace ha sido copiado al portapapeles.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo generar el enlace del cuestionario.",
         variant: "destructive",
       });
     },

@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
@@ -21,7 +20,11 @@ export const useTemplates = () => {
         .select(`
           *,
           company:companies(name),
-          creator:profiles!templates_created_by_fkey(first_name, last_name)
+          creator:profiles!templates_created_by_fkey(first_name, last_name),
+          template_questions(
+            id,
+            is_active
+          )
         `)
         .order("created_at", { ascending: false });
 
@@ -30,8 +33,14 @@ export const useTemplates = () => {
         throw error;
       }
 
-      console.log("Templates fetched:", data);
-      return data;
+      // Add question count to each template
+      const templatesWithQuestionCount = data?.map(template => ({
+        ...template,
+        question_count: template.template_questions?.filter(q => q.is_active).length || 0
+      })) || [];
+
+      console.log("Templates fetched:", templatesWithQuestionCount);
+      return templatesWithQuestionCount;
     },
   });
 

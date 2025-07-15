@@ -1,13 +1,12 @@
-
 import { useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Pencil, Link, Eye, FileText, Download } from "lucide-react";
+import { Plus, Pencil, Link, Eye, FileText, Download, MessageSquare } from "lucide-react";
 import { SaleForm } from "@/components/SaleForm";
-import { useSales, useGenerateSignatureLink } from "@/hooks/useSales";
+import { useSales, useGenerateSignatureLink, useGenerateQuestionnaireLink } from "@/hooks/useSales";
 import { Database } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
 import { SearchAndFilters, FilterOptions } from "@/components/SearchAndFilters";
@@ -18,6 +17,7 @@ type Sale = Database['public']['Tables']['sales']['Row'] & {
   plans?: { name: string; price: number };
   salesperson?: { first_name: string; last_name: string };
   companies?: { name: string };
+  templates?: { name: string };
 };
 
 const Sales = () => {
@@ -26,6 +26,7 @@ const Sales = () => {
   const [filters, setFilters] = useState<FilterOptions>({ search: '' });
   const { data: sales = [], isLoading } = useSales();
   const generateSignatureLink = useGenerateSignatureLink();
+  const generateQuestionnaireLink = useGenerateQuestionnaireLink();
   const { toast } = useToast();
 
   const getStatusBadgeVariant = (status: string) => {
@@ -52,6 +53,22 @@ const Sales = () => {
   const handleEditSale = (sale: Sale) => {
     setEditingSale(sale);
     setShowSaleForm(true);
+  };
+
+  const handleGenerateQuestionnaireLink = async (sale: Sale) => {
+    try {
+      const result = await generateQuestionnaireLink.mutateAsync(sale.id);
+      
+      // Copy to clipboard
+      await navigator.clipboard.writeText(result.questionnaireUrl);
+      
+      toast({
+        title: "Enlace del cuestionario generado",
+        description: "El enlace ha sido copiado al portapapeles.",
+      });
+    } catch (error) {
+      console.error('Error generating questionnaire link:', error);
+    }
   };
 
   const handleGenerateSignatureLink = async (sale: Sale) => {
@@ -219,6 +236,7 @@ const Sales = () => {
                 <TableRow>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Plan</TableHead>
+                  <TableHead>Template</TableHead>
                   <TableHead>Monto</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Vendedor</TableHead>
@@ -234,6 +252,13 @@ const Sales = () => {
                     </TableCell>
                     <TableCell>
                       {sale.plans?.name || 'Sin plan'}
+                    </TableCell>
+                    <TableCell>
+                      {sale.templates?.name ? (
+                        <Badge variant="outline">{sale.templates.name}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">Sin template</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       ${sale.total_amount || 0}
@@ -267,8 +292,20 @@ const Sales = () => {
                         >
                           <Download className="h-4 w-4" />
                         </Button>
+
+                        {sale.status === 'borrador' && sale.template_id && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleGenerateQuestionnaireLink(sale)}
+                            disabled={generateQuestionnaireLink.isPending}
+                            title="Enviar cuestionario"
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                          </Button>
+                        )}
                         
-                        {sale.status === 'borrador' && (
+                        {sale.status === 'borrador' && !sale.template_id && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -283,7 +320,12 @@ const Sales = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => window.open(`/signature/${sale.signature_token}`, '_blank')}
+                            onClick={() => window.open(
+                              sale.template_id 
+                                ? `/questionnaire/${sale.signature_token}`
+                                : `/signature/${sale.signature_token}`, 
+                              '_blank'
+                            )}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>

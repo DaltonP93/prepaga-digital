@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { useClients } from "@/hooks/useClients";
 import { usePlans } from "@/hooks/usePlans";
+import { useTemplates } from "@/hooks/useTemplates";
 import { useCreateSale, useUpdateSale } from "@/hooks/useSales";
 import { useAuthContext } from "@/components/AuthProvider";
 import { Database } from "@/integrations/supabase/types";
@@ -24,6 +25,7 @@ interface SaleFormProps {
 interface SaleFormData {
   client_id: string;
   plan_id: string;
+  template_id?: string;
   total_amount: number;
   notes?: string;
 }
@@ -31,6 +33,7 @@ interface SaleFormData {
 export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
   const { data: clients = [] } = useClients();
   const { data: plans = [] } = usePlans();
+  const { templates = [] } = useTemplates();
   const { profile } = useAuthContext();
   const createSale = useCreateSale();
   const updateSale = useUpdateSale();
@@ -40,6 +43,7 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
     defaultValues: {
       client_id: sale?.client_id || "",
       plan_id: sale?.plan_id || "",
+      template_id: sale?.template_id || "",
       total_amount: sale?.total_amount || 0,
       notes: sale?.notes || "",
     }
@@ -124,6 +128,26 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
             {errors.plan_id && (
               <span className="text-sm text-red-500">El plan es requerido</span>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Template (Opcional)</Label>
+            <Select value={watch("template_id")} onValueChange={(value) => setValue("template_id", value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar template para cuestionario" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Sin template</SelectItem>
+                {templates.map((template) => (
+                  <SelectItem key={template.id} value={template.id}>
+                    {template.name} ({template.question_count || 0} preguntas)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-gray-500">
+              Si seleccionas un template, se enviará un cuestionario antes de la firma
+            </p>
           </div>
 
           <div className="space-y-2">
