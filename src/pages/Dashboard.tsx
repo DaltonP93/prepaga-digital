@@ -1,3 +1,4 @@
+
 import { useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -8,13 +9,26 @@ import { useDashboardStats } from "@/hooks/useDashboard";
 import { TestDataManager } from '@/components/TestDataManager';
 
 const Dashboard = () => {
-  const { data: stats, isLoading } = useDashboardStats();
+  const { data: stats, isLoading, error } = useDashboardStats();
 
   if (isLoading) {
     return (
       <Layout title="Dashboard" description="Resumen de tu actividad">
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error) {
+    return (
+      <Layout title="Dashboard" description="Resumen de tu actividad">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <p className="text-red-600 mb-4">Error al cargar las estadísticas</p>
+            <p className="text-sm text-gray-500">Por favor, intenta recargar la página</p>
+          </div>
         </div>
       </Layout>
     );
@@ -92,42 +106,48 @@ const Dashboard = () => {
               <CardTitle>Ventas Recientes</CardTitle>
             </CardHeader>
             <CardContent className="pl-2">
-              <div className="text-center text-muted-foreground py-8">
-                Gráfico de ventas recientes
-              </div>
+              {stats?.recentSales && stats.recentSales.length > 0 ? (
+                <div className="space-y-4">
+                  {stats.recentSales.map((sale) => (
+                    <div key={sale.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <p className="font-medium">
+                          {sale.clients?.first_name} {sale.clients?.last_name}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {sale.plans?.name} - €{sale.total_amount}
+                        </p>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {new Date(sale.created_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center text-muted-foreground py-8">
+                  No hay ventas recientes. Usa el TestDataManager para crear datos de prueba.
+                </div>
+              )}
             </CardContent>
           </Card>
 
           <div className="col-span-3 space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Actividad Reciente</CardTitle>
+                <CardTitle>Estado de Ventas</CardTitle>
                 <CardDescription>
-                  Últimas acciones en el sistema
+                  Distribución por estado
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-8">
-                  <div className="flex items-center">
-                    <div className="ml-4 space-y-1">
-                      <p className="text-sm font-medium leading-none">
-                        Nueva venta creada
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        hace 2 horas
-                      </p>
+                <div className="space-y-2">
+                  {stats?.salesByStatus && Object.entries(stats.salesByStatus).map(([status, count]) => (
+                    <div key={status} className="flex justify-between items-center">
+                      <span className="text-sm capitalize">{status}</span>
+                      <span className="font-medium">{count}</span>
                     </div>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="ml-4 space-y-1">
-                      <p className="text-sm font-medium leading-none">
-                        Documento firmado
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        hace 1 día
-                      </p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
