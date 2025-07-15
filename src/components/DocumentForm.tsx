@@ -258,7 +258,7 @@ export const DocumentForm = ({ document, trigger }: DocumentFormProps) => {
                     />
                   </FormControl>
                   <FormDescription>
-                    Usa variables como {"{"}{"{"}{"}"}cliente.nombre{"}"}{"}"}}, {"{"}{"{"}{"}"}plan.precio{"}"}{"}"}}, etc.
+                    Usa variables como: {{cliente.nombre}}, {{plan.precio}}, etc.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
