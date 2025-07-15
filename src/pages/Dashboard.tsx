@@ -1,18 +1,18 @@
-
+import { useEffect } from "react";
 import { Layout } from "@/components/Layout";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Users, Building2, ShoppingCart, DollarSign, TrendingUp, FileText } from "lucide-react";
-import { useDashboardStats } from "@/hooks/useDashboard";
-import { useAuthContext } from "@/components/AuthProvider";
+import { DollarSign, Users, FileText, Clock } from "lucide-react";
+import { useDashboard } from "@/hooks/useDashboard";
+
+import { TestDataManager } from '@/components/TestDataManager';
 
 const Dashboard = () => {
-  const { data: stats, isLoading } = useDashboardStats();
-  const { profile } = useAuthContext();
+  const { data: stats, isLoading } = useDashboard();
 
   if (isLoading) {
     return (
-      <Layout title="Dashboard" description="Panel de control principal">
+      <Layout title="Dashboard" description="Resumen de tu actividad">
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
         </div>
@@ -20,160 +20,120 @@ const Dashboard = () => {
     );
   }
 
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case 'completado': return 'default';
-      case 'firmado': return 'secondary';
-      case 'enviado': return 'outline';
-      case 'cancelado': return 'destructive';
-      default: return 'outline';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'borrador': return 'Borrador';
-      case 'enviado': return 'Enviado';
-      case 'firmado': return 'Firmado';
-      case 'completado': return 'Completado';
-      case 'cancelado': return 'Cancelado';
-      default: return status;
-    }
-  };
-
   return (
-    <Layout title="Dashboard" description="Panel de control principal">
+    <Layout title="Dashboard" description="Resumen de tu actividad">
       <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">
-            Bienvenido, {profile?.first_name} {profile?.last_name}
-          </h2>
-          <p className="text-muted-foreground">
-            Aquí tienes un resumen de tu actividad
-          </p>
-        </div>
-
-        {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Usuarios</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats?.usersCount || 0}</div>
-              <p className="text-xs text-muted-foreground">
-                Usuarios registrados en el sistema
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Empresas</CardTitle>
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats?.companiesCount || 0}</div>
-              <p className="text-xs text-muted-foreground">
-                Empresas registradas
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Ventas</CardTitle>
-              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">
+                Total Ventas
+              </CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats?.totalSales || 0}</div>
               <p className="text-xs text-muted-foreground">
-                Ventas totales registradas
+                +{stats?.salesGrowth || 0}% desde el mes pasado
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">
+                Clientes
+              </CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${stats?.totalRevenue || 0}</div>
+              <div className="text-2xl font-bold">{stats?.totalClients || 0}</div>
               <p className="text-xs text-muted-foreground">
-                Ingresos acumulados
+                +{stats?.clientsGrowth || 0}% desde el mes pasado
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Documentos Firmados
+              </CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats?.signedDocuments || 0}</div>
+              <p className="text-xs text-muted-foreground">
+                +{stats?.documentsGrowth || 0}% desde el mes pasado
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Pendientes de Firma
+              </CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats?.pendingSignatures || 0}</div>
+              <p className="text-xs text-muted-foreground">
+                Requieren atención
               </p>
             </CardContent>
           </Card>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          {/* Recent Sales */}
-          <Card>
+        {/* Charts and additional content */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+          <Card className="col-span-4">
             <CardHeader>
               <CardTitle>Ventas Recientes</CardTitle>
-              <CardDescription>
-                Las últimas 5 ventas registradas
-              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {stats?.recentSales.map((sale) => (
-                  <div key={sale.id} className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">
-                        {sale.clients ? `${sale.clients.first_name} ${sale.clients.last_name}` : 'Sin cliente'}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {sale.plans?.name || 'Sin plan'}
-                      </p>
-                    </div>
-                    <div className="text-right space-y-1">
-                      <p className="text-sm font-medium">${sale.total_amount || 0}</p>
-                      <Badge variant={getStatusBadgeVariant(sale.status || 'borrador')} className="text-xs">
-                        {getStatusLabel(sale.status || 'borrador')}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-                {(!stats?.recentSales || stats.recentSales.length === 0) && (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    No hay ventas recientes
-                  </p>
-                )}
+            <CardContent className="pl-2">
+              <div className="text-center text-muted-foreground py-8">
+                Gráfico de ventas recientes
               </div>
             </CardContent>
           </Card>
 
-          {/* Sales by Status */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Ventas por Estado</CardTitle>
-              <CardDescription>
-                Distribución de ventas según su estado
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {Object.entries(stats?.salesByStatus || {}).map(([status, count]) => (
-                  <div key={status} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Badge variant={getStatusBadgeVariant(status)}>
-                        {getStatusLabel(status)}
-                      </Badge>
+          <div className="col-span-3 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Actividad Reciente</CardTitle>
+                <CardDescription>
+                  Últimas acciones en el sistema
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-8">
+                  <div className="flex items-center">
+                    <div className="ml-4 space-y-1">
+                      <p className="text-sm font-medium leading-none">
+                        Nueva venta creada
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        hace 2 horas
+                      </p>
                     </div>
-                    <span className="text-sm font-medium">{count}</span>
                   </div>
-                ))}
-                {Object.keys(stats?.salesByStatus || {}).length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    No hay datos de ventas
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  <div className="flex items-center">
+                    <div className="ml-4 space-y-1">
+                      <p className="text-sm font-medium leading-none">
+                        Documento firmado
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        hace 1 día
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <TestDataManager />
+          </div>
         </div>
       </div>
     </Layout>

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
+import { useNotifications } from '@/hooks/useNotifications';
 
 type Sale = Database['public']['Tables']['sales']['Row'];
 type SaleInsert = Database['public']['Tables']['sales']['Insert'];
@@ -18,7 +19,7 @@ export const useSales = () => {
           *,
           clients:client_id(first_name, last_name, email, phone),
           plans:plan_id(name, price),
-          salesperson:salesperson_id(first_name, last_name),
+          salesperson:salesperson_id(first_name, last_name, email),
           companies:company_id(name)
         `)
         .order('created_at', { ascending: false });
@@ -97,6 +98,7 @@ export const useUpdateSale = () => {
 export const useGenerateSignatureLink = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { sendSignatureNotification } = useNotifications();
 
   return useMutation({
     mutationFn: async (saleId: string) => {
@@ -112,19 +114,28 @@ export const useGenerateSignatureLink = () => {
           status: 'enviado'
         })
         .eq('id', saleId)
-        .select()
+        .select(`
+          *,
+          clients:client_id(first_name, last_name, email, phone),
+          plans:plan_id(name, price),
+          profiles:salesperson_id(first_name, last_name, email)
+        `)
         .single();
 
       if (error) throw error;
       
       const signatureUrl = `${window.location.origin}/signature/${token}`;
+      
+      // Enviar notificación por email
+      await sendSignatureNotification(data, signatureUrl);
+      
       return { sale: data, signatureUrl };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       toast({
-        title: "Enlace generado",
-        description: "El enlace de firma ha sido generado exitosamente.",
+        title: "Enlace generado y enviado",
+        description: "El enlace de firma ha sido generado y enviado por email al cliente.",
       });
     },
     onError: (error: any) => {

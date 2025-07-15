@@ -2,14 +2,15 @@
 import { useRef, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { RotateCcw, Check } from 'lucide-react';
+import { RotateCcw, Check, Loader2 } from 'lucide-react';
 
 interface SignatureCanvasProps {
   onSign: (signature: string) => void;
   disabled?: boolean;
+  isProcessing?: boolean;
 }
 
-export const SignatureCanvas = ({ onSign, disabled = false }: SignatureCanvasProps) => {
+export const SignatureCanvas = ({ onSign, disabled = false, isProcessing = false }: SignatureCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
@@ -34,7 +35,7 @@ export const SignatureCanvas = ({ onSign, disabled = false }: SignatureCanvasPro
   }, []);
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (disabled) return;
+    if (disabled || isProcessing) return;
     
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -52,7 +53,7 @@ export const SignatureCanvas = ({ onSign, disabled = false }: SignatureCanvasPro
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || disabled) return;
+    if (!isDrawing || disabled || isProcessing) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -129,14 +130,16 @@ export const SignatureCanvas = ({ onSign, disabled = false }: SignatureCanvasPro
       <CardHeader>
         <CardTitle className="text-lg">Firma Digital</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Dibuje su firma en el área de abajo
+          {isProcessing ? 'Procesando firma...' : 'Dibuje su firma en el área de abajo'}
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50">
           <canvas
             ref={canvasRef}
-            className="w-full h-32 bg-white border rounded cursor-crosshair"
+            className={`w-full h-32 bg-white border rounded ${
+              disabled || isProcessing ? 'cursor-not-allowed opacity-50' : 'cursor-crosshair'
+            }`}
             onMouseDown={startDrawing}
             onMouseMove={draw}
             onMouseUp={stopDrawing}
@@ -153,7 +156,7 @@ export const SignatureCanvas = ({ onSign, disabled = false }: SignatureCanvasPro
             type="button"
             variant="outline"
             onClick={clearSignature}
-            disabled={disabled || !hasSignature}
+            disabled={disabled || !hasSignature || isProcessing}
           >
             <RotateCcw className="h-4 w-4 mr-2" />
             Limpiar
@@ -161,10 +164,14 @@ export const SignatureCanvas = ({ onSign, disabled = false }: SignatureCanvasPro
 
           <Button
             onClick={saveSignature}
-            disabled={disabled || !hasSignature}
+            disabled={disabled || !hasSignature || isProcessing}
           >
-            <Check className="h-4 w-4 mr-2" />
-            Confirmar Firma
+            {isProcessing ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Check className="h-4 w-4 mr-2" />
+            )}
+            {isProcessing ? 'Procesando...' : 'Confirmar Firma'}
           </Button>
         </div>
       </CardContent>

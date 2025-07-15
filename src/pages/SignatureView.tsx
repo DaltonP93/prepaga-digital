@@ -1,34 +1,51 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SignatureCanvas } from '@/components/SignatureCanvas';
-import { useSignatureByToken, useCreateSignature, useCompleteSignature } from '@/hooks/useSignature';
-import { FileText, User, Building, Calendar, DollarSign } from 'lucide-react';
+import { useSignatureByToken } from '@/hooks/useSignature';
+import { useSignatureFlow } from '@/hooks/useSignatureFlow';
+import { FileText, User, Building, Calendar, DollarSign, Download } from 'lucide-react';
 
 const SignatureView = () => {
   const { token } = useParams<{ token: string }>();
-  const [signatureData, setSignatureData] = useState<string>('');
+  const [signatureCompleted, setSignatureCompleted] = useState(false);
   
   const { data: sale, isLoading, error } = useSignatureByToken(token || '');
-  const createSignature = useCreateSignature();
-  const completeSignature = useCompleteSignature();
+  const { processSignature, isProcessing } = useSignatureFlow();
 
   const handleSignature = async (signature: string) => {
     if (!sale?.documents?.[0]) return;
     
-    try {
-      await createSignature.mutateAsync({
-        saleId: sale.id,
-        documentId: sale.documents[0].id,
-        signatureData: signature,
-      });
+    const result = await processSignature(sale, signature, sale.documents[0].id);
+    
+    if (result.success) {
+      setSignatureCompleted(true);
+    }
+  };
 
-      await completeSignature.mutateAsync(sale.id);
+  const downloadSignedDocument = async () => {
+    if (!sale?.signed_document_url) return;
+    
+    try {
+      const { data, error } = await supabase.storage
+        .from('documents')
+        .download(sale.signed_document_url);
+      
+      if (error) throw error;
+      
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Contrato-${sale.clients?.first_name}-${sale.clients?.last_name}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Error saving signature:', error);
+      console.error('Error downloading document:', error);
     }
   };
 
@@ -57,7 +74,7 @@ const SignatureView = () => {
   }
 
   const isExpired = new Date(sale.signature_expires_at) < new Date();
-  const isSigned = sale.status === 'firmado';
+  const isSigned = sale.status === 'firmado' || signatureCompleted;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -181,7 +198,8 @@ const SignatureView = () => {
               <CardContent>
                 <SignatureCanvas 
                   onSign={handleSignature}
-                  disabled={createSignature.isPending}
+                  disabled={isProcessing}
+                  isProcessing={isProcessing}
                 />
               </CardContent>
             </Card>
@@ -196,9 +214,15 @@ const SignatureView = () => {
                   </svg>
                 </div>
                 <h3 className="text-lg font-semibold mb-2">¡Documento Firmado!</h3>
-                <p className="text-muted-foreground">
-                  El documento ha sido firmado exitosamente. Recibirá una copia por email.
+                <p className="text-muted-foreground mb-4">
+                  El documento ha sido firmado exitosamente. Puede descargar una copia firmada.
                 </p>
+                {sale.signed_document_url && (
+                  <Button onClick={downloadSignedDocument}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Descargar Documento Firmado
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}
