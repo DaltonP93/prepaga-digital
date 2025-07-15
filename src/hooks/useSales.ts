@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
@@ -121,18 +120,19 @@ export const useGenerateQuestionnaireLink = () => {
 
       // Generate or reuse existing token
       let token = sale.signature_token;
-      let expiresAt = sale.signature_expires_at;
+      let expiresAtString = sale.signature_expires_at;
 
-      if (!token || new Date(expiresAt) < new Date()) {
+      if (!token || !expiresAtString || new Date(expiresAtString) < new Date()) {
         token = crypto.randomUUID();
-        expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 7); // Expires in 7 days
+        const expiresAtDate = new Date();
+        expiresAtDate.setDate(expiresAtDate.getDate() + 7); // Expires in 7 days
+        expiresAtString = expiresAtDate.toISOString();
 
         const { error: updateError } = await supabase
           .from('sales')
           .update({
             signature_token: token,
-            signature_expires_at: expiresAt.toISOString(),
+            signature_expires_at: expiresAtString,
             status: 'enviado'
           })
           .eq('id', saleId);
