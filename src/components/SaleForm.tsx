@@ -43,7 +43,7 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
     defaultValues: {
       client_id: sale?.client_id || "",
       plan_id: sale?.plan_id || "",
-      template_id: sale?.template_id || "",
+      template_id: sale?.template_id || "no-template",
       total_amount: sale?.total_amount || 0,
       notes: sale?.notes || "",
     }
@@ -53,14 +53,19 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
 
   const onSubmit = async (data: SaleFormData) => {
     try {
+      // Convert "no-template" back to undefined/null for database
+      const templateId = data.template_id === "no-template" ? null : data.template_id;
+      
       if (isEditing && sale) {
         await updateSale.mutateAsync({
           id: sale.id,
           ...data,
+          template_id: templateId,
         });
       } else {
         await createSale.mutateAsync({
           ...data,
+          template_id: templateId,
           company_id: profile?.company_id,
           salesperson_id: profile?.id,
           status: 'borrador',
@@ -80,6 +85,11 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
     if (plan) {
       setValue("total_amount", Number(plan.price));
     }
+  };
+
+  // Handle template change with proper value conversion
+  const handleTemplateChange = (value: string) => {
+    setValue("template_id", value);
   };
 
   return (
@@ -132,12 +142,12 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
 
           <div className="space-y-2">
             <Label>Template (Opcional)</Label>
-            <Select value={watch("template_id")} onValueChange={(value) => setValue("template_id", value)}>
+            <Select value={watch("template_id")} onValueChange={handleTemplateChange}>
               <SelectTrigger>
                 <SelectValue placeholder="Seleccionar template para cuestionario" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Sin template</SelectItem>
+                <SelectItem value="no-template">Sin template</SelectItem>
                 {templates.map((template) => (
                   <SelectItem key={template.id} value={template.id}>
                     {template.name} ({template.question_count || 0} preguntas)
