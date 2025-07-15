@@ -99,9 +99,22 @@ export const useCreateUser = () => {
       role: Database['public']['Enums']['user_role'];
       company_id?: string;
     }) => {
-      // This would need to be handled via Supabase Auth admin functions
-      // For now, we'll just throw an error indicating this needs backend implementation
-      throw new Error('La creación de usuarios requiere implementación backend con funciones admin de Supabase');
+      console.log('Creating user via edge function:', userData);
+      
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: userData
+      });
+
+      if (error) {
+        console.error('Edge function error:', error);
+        throw error;
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || 'Error creating user');
+      }
+
+      return data.user;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });

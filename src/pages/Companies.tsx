@@ -4,32 +4,26 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Plus, Search, Building2, Users, FileText, MoreHorizontal } from "lucide-react";
+import { Plus, Search, Building2, Users, FileText } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { useCompanies, useCreateCompany } from "@/hooks/useCompanies";
+import { useCompanies } from "@/hooks/useCompanies";
 import { useAuthContext } from "@/components/AuthProvider";
+import { CompanyForm } from "@/components/CompanyForm";
+import { CompanyActions } from "@/components/CompanyActions";
 
 const Companies = () => {
   const { profile } = useAuthContext();
   const { data: companies, isLoading } = useCompanies();
-  const createCompanyMutation = useCreateCompany();
-  
-  const [newCompany, setNewCompany] = useState({
-    name: '',
-    address: '',
-    phone: '',
-    email: ''
-  });
-
-  const handleCreateCompany = async (e: React.FormEvent) => {
-    e.preventDefault();
-    createCompanyMutation.mutate(newCompany);
-    setNewCompany({ name: '', address: '', phone: '', email: '' });
-  };
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const canCreateCompany = profile?.role === 'super_admin';
+  
+  const filteredCompanies = companies?.filter(company =>
+    company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    company.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  ) || [];
 
   if (isLoading) {
     return (
@@ -52,11 +46,16 @@ const Companies = () => {
           <div className="flex items-center space-x-2">
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Buscar empresas..." className="pl-8 w-[300px]" />
+              <Input 
+                placeholder="Buscar empresas..." 
+                className="pl-8 w-[300px]"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
           </div>
           {canCreateCompany && (
-            <Button>
+            <Button onClick={() => setShowCreateForm(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Nueva Empresa
             </Button>
@@ -132,7 +131,7 @@ const Companies = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {companies?.map((company) => (
+                {filteredCompanies.map((company) => (
                   <TableRow key={company.id}>
                     <TableCell className="font-medium">
                       <div className="flex items-center space-x-2">
@@ -155,73 +154,27 @@ const Companies = () => {
                       {new Date(company.created_at || '').toLocaleDateString('es-ES')}
                     </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
+                      <CompanyActions company={company} />
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+
+            {filteredCompanies.length === 0 && (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">
+                  {searchTerm ? 'No se encontraron empresas que coincidan con la búsqueda' : 'No hay empresas registradas'}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Create Company Form - Only for Super Admins */}
-        {canCreateCompany && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Crear Nueva Empresa</CardTitle>
-              <CardDescription>Registra una nueva empresa en el sistema</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleCreateCompany} className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="company-name">Nombre de la Empresa</Label>
-                    <Input 
-                      id="company-name" 
-                      placeholder="Ej: MediCorp SA"
-                      value={newCompany.name}
-                      onChange={(e) => setNewCompany({...newCompany, name: e.target.value})}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="company-phone">Teléfono</Label>
-                    <Input 
-                      id="company-phone" 
-                      placeholder="+54 11 1234-5678"
-                      value={newCompany.phone}
-                      onChange={(e) => setNewCompany({...newCompany, phone: e.target.value})}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="company-address">Dirección</Label>
-                  <Input 
-                    id="company-address" 
-                    placeholder="Av. Corrientes 1234, CABA"
-                    value={newCompany.address}
-                    onChange={(e) => setNewCompany({...newCompany, address: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="company-email">Email</Label>
-                  <Input 
-                    id="company-email" 
-                    type="email"
-                    placeholder="info@empresa.com"
-                    value={newCompany.email}
-                    onChange={(e) => setNewCompany({...newCompany, email: e.target.value})}
-                  />
-                </div>
-                <Button type="submit" disabled={createCompanyMutation.isPending}>
-                  {createCompanyMutation.isPending ? 'Creando...' : 'Crear Empresa'}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        )}
+        <CompanyForm
+          open={showCreateForm}
+          onOpenChange={setShowCreateForm}
+        />
       </div>
     </Layout>
   );

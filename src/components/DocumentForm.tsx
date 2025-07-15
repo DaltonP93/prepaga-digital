@@ -35,6 +35,7 @@ import { useTemplates } from "@/hooks/useTemplates";
 import { usePlans } from "@/hooks/usePlans";
 import { Plus, Edit } from "lucide-react";
 import { Tables } from "@/integrations/supabase/types";
+import { FileUpload } from "@/components/FileUpload";
 
 const documentSchema = z.object({
   name: z.string().min(1, "El nombre es obligatorio"),
@@ -57,6 +58,7 @@ interface DocumentFormProps {
 
 export const DocumentForm = ({ document, trigger }: DocumentFormProps) => {
   const [open, setOpen] = useState(false);
+  const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
   const { createDocument, updateDocument, isCreating, isUpdating } = useDocuments();
   const { templates } = useTemplates();
   const { data: plans } = usePlans();
@@ -75,35 +77,46 @@ export const DocumentForm = ({ document, trigger }: DocumentFormProps) => {
     },
   });
 
+  const handleFileUploadComplete = (url: string) => {
+    setUploadedFileUrl(url);
+    form.setValue("file_url", url);
+  };
+
   const onSubmit = (data: DocumentFormData) => {
+    const finalData = {
+      ...data,
+      file_url: uploadedFileUrl || data.file_url || null,
+    };
+
     if (document) {
       updateDocument({
         id: document.id,
         updates: {
-          name: data.name,
-          document_type: data.document_type || null,
-          content: data.content || null,
-          file_url: data.file_url || null,
-          template_id: data.template_id || null,
-          plan_id: data.plan_id || null,
-          is_required: data.is_required,
-          order_index: data.order_index,
+          name: finalData.name,
+          document_type: finalData.document_type || null,
+          content: finalData.content || null,
+          file_url: finalData.file_url,
+          template_id: finalData.template_id || null,
+          plan_id: finalData.plan_id || null,
+          is_required: finalData.is_required,
+          order_index: finalData.order_index,
         },
       });
     } else {
       createDocument({
-        name: data.name,
-        document_type: data.document_type || null,
-        content: data.content || null,
-        file_url: data.file_url || null,
-        template_id: data.template_id || null,
-        plan_id: data.plan_id || null,
-        is_required: data.is_required,
-        order_index: data.order_index,
+        name: finalData.name,
+        document_type: finalData.document_type || null,
+        content: finalData.content || null,
+        file_url: finalData.file_url,
+        template_id: finalData.template_id || null,
+        plan_id: finalData.plan_id || null,
+        is_required: finalData.is_required,
+        order_index: finalData.order_index,
       });
     }
     
     setOpen(false);
+    setUploadedFileUrl(null);
     form.reset();
   };
 
@@ -123,7 +136,7 @@ export const DocumentForm = ({ document, trigger }: DocumentFormProps) => {
       <DialogTrigger asChild>
         {trigger || defaultTrigger}
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {document ? "Editar Documento" : "Crear Nuevo Documento"}
@@ -216,36 +229,38 @@ export const DocumentForm = ({ document, trigger }: DocumentFormProps) => {
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="file_url"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>URL del Archivo</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="https://..." />
-                  </FormControl>
-                  <FormDescription>
-                    URL del archivo subido en Supabase Storage o enlace externo
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
+            {/* File Upload Section */}
+            <div className="space-y-2">
+              <FormLabel>Archivo del Documento</FormLabel>
+              <FileUpload
+                bucket="documents"
+                accept=".pdf,.doc,.docx,.txt"
+                maxSize={10}
+                onUploadComplete={handleFileUploadComplete}
+              />
+              {(uploadedFileUrl || form.getValues("file_url")) && (
+                <p className="text-sm text-green-600">
+                  ✓ Archivo cargado: {uploadedFileUrl || form.getValues("file_url")}
+                </p>
               )}
-            />
+            </div>
 
             <FormField
               control={form.control}
               name="content"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Contenido</FormLabel>
+                  <FormLabel>Contenido del Template</FormLabel>
                   <FormControl>
                     <Textarea 
                       {...field} 
-                      placeholder="Contenido del documento..."
-                      className="min-h-24"
+                      placeholder="Contenido del documento con variables como {{cliente.nombre}}..."
+                      className="min-h-32"
                     />
                   </FormControl>
+                  <FormDescription>
+                    Usa variables como {{cliente.nombre}}, {{plan.precio}}, etc.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
