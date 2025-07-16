@@ -28,17 +28,17 @@ import Communications from '@/pages/Communications';
 import FileManagement from '@/pages/FileManagement';
 import Experience from '@/pages/Experience';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-      staleTime: 5 * 60 * 1000, // 5 minutes
-    },
-  },
-});
-
 function App() {
+  // Crear QueryClient dentro del componente para evitar problemas de timing
+  const queryClient = React.useMemo(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: 1,
+        refetchOnWindowFocus: false,
+        staleTime: 5 * 60 * 1000, // 5 minutes
+      },
+    },
+  }), []);
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
