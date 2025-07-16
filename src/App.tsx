@@ -26,6 +26,7 @@ import PaymentSuccess from '@/pages/PaymentSuccess';
 import PaymentCanceled from '@/pages/PaymentCanceled';
 import Communications from '@/pages/Communications';
 import FileManagement from '@/pages/FileManagement';
+import Experience from '@/pages/Experience';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -134,6 +135,11 @@ function App() {
             <Route path="/file-management" element={
               <ProtectedRoute>
                 <FileManagement />
+              </ProtectedRoute>
+            } />
+            <Route path="/experience" element={
+              <ProtectedRoute>
+                <Experience />
               </ProtectedRoute>
             } />
           </Routes>

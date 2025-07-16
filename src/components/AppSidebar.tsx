@@ -15,6 +15,7 @@ import {
   Workflow,
   BarChart3,
   MessageSquare,
+  Palette,
 } from "lucide-react";
 
 import {
@@ -83,6 +84,11 @@ export function AppSidebar({ isSuperAdmin = false }: AppSidebarProps) {
       title: "Comunicaciones",
       url: "/communications", 
       icon: MessageSquare,
+    },
+    {
+      title: "Experiencia",
+      url: "/experience", 
+      icon: Palette,
     },
     {
       title: "Mi Perfil",

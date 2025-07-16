@@ -54,18 +54,19 @@ export const useBranding = () => {
       if (error) throw error;
 
       if (data) {
+        const companyData = data as any;
         setBranding({
-          primaryColor: data.primary_color || DEFAULT_BRANDING.primaryColor,
-          secondaryColor: data.secondary_color || DEFAULT_BRANDING.secondaryColor,
-          accentColor: data.accent_color || DEFAULT_BRANDING.accentColor,
-          logoUrl: data.logo_url || DEFAULT_BRANDING.logoUrl,
-          companyName: data.name || DEFAULT_BRANDING.companyName,
-          favicon: data.favicon || DEFAULT_BRANDING.favicon,
-          customCSS: data.custom_css || DEFAULT_BRANDING.customCSS,
-          darkMode: data.dark_mode || DEFAULT_BRANDING.darkMode,
-          fontFamily: data.font_family || DEFAULT_BRANDING.fontFamily,
-          borderRadius: data.border_radius || DEFAULT_BRANDING.borderRadius,
-          shadows: data.shadows !== false
+          primaryColor: companyData.primary_color || DEFAULT_BRANDING.primaryColor,
+          secondaryColor: companyData.secondary_color || DEFAULT_BRANDING.secondaryColor,
+          accentColor: companyData.accent_color || DEFAULT_BRANDING.accentColor,
+          logoUrl: companyData.logo_url || DEFAULT_BRANDING.logoUrl,
+          companyName: companyData.name || DEFAULT_BRANDING.companyName,
+          favicon: companyData.favicon || DEFAULT_BRANDING.favicon,
+          customCSS: companyData.custom_css || DEFAULT_BRANDING.customCSS,
+          darkMode: companyData.dark_mode || DEFAULT_BRANDING.darkMode,
+          fontFamily: companyData.font_family || DEFAULT_BRANDING.fontFamily,
+          borderRadius: companyData.border_radius || DEFAULT_BRANDING.borderRadius,
+          shadows: companyData.shadows !== false
         });
       }
     } catch (error) {
