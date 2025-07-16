@@ -32,6 +32,8 @@ import {
   FormDescription,
 } from "@/components/ui/form";
 import { ContractEditor } from "@/components/ContractEditor";
+import { TipTapEditor } from "@/components/TipTapEditor";
+import { DocumentPreview } from "@/components/DocumentPreview";
 import { useTemplates } from "@/hooks/useTemplates";
 import { QuestionBuilder } from "@/components/QuestionBuilder";
 import { QuestionnairePreview } from "@/components/QuestionnairePreview";
@@ -137,7 +139,7 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
             <TabsTrigger value="info">Información</TabsTrigger>
             <TabsTrigger value="editor">Editor</TabsTrigger>
             <TabsTrigger value="questions" disabled={!template}>Preguntas</TabsTrigger>
-            <TabsTrigger value="preview" disabled={!template}>Vista Previa</TabsTrigger>
+            <TabsTrigger value="preview">Vista Previa</TabsTrigger>
           </TabsList>
 
           <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
@@ -265,7 +267,7 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
                   />
                 </div>
               ) : (
-                <ContractEditor
+                <TipTapEditor
                   content={form.watch("static_content") || ""}
                   onContentChange={(content) => form.setValue("static_content", content)}
                   dynamicFields={form.watch("dynamic_fields") || []}
@@ -279,7 +281,15 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
             </TabsContent>
 
             <TabsContent value="preview" className="mt-4">
-              {template && <QuestionnairePreview templateId={template.id} />}
+              {form.watch("template_type") === "questionnaire" ? (
+                template && <QuestionnairePreview templateId={template.id} />
+              ) : (
+                <DocumentPreview
+                  content={form.watch("static_content") || ""}
+                  dynamicFields={form.watch("dynamic_fields") || []}
+                  templateType={form.watch("template_type") || "document"}
+                />
+              )}
             </TabsContent>
           </div>
         </Tabs>
