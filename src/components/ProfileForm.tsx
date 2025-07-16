@@ -6,26 +6,36 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuthContext } from '@/components/AuthProvider';
+import { useProfile } from '@/hooks/useProfile';
+import { useProfileCompletion } from '@/hooks/useProfileCompletion';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 export const ProfileForm = () => {
   const { profile, user } = useAuthContext();
+  const { updateProfile, isUpdating } = useProfile();
+  const { isComplete } = useProfileCompletion();
+  const navigate = useNavigate();
   const [firstName, setFirstName] = useState(profile?.first_name || '');
   const [lastName, setLastName] = useState(profile?.last_name || '');
   const [phone, setPhone] = useState(profile?.phone || '');
-  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    
+    const wasIncomplete = !isComplete;
+    
+    updateProfile({
+      first_name: firstName.trim(),
+      last_name: lastName.trim(),
+      phone: phone.trim() || null,
+    });
 
-    try {
-      // Here you would update the profile in Supabase
-      toast.success('Perfil actualizado exitosamente');
-    } catch (error: any) {
-      toast.error('Error al actualizar perfil: ' + error.message);
-    } finally {
-      setLoading(false);
+    // If profile was incomplete and now might be complete, redirect to dashboard
+    if (wasIncomplete && firstName.trim() && lastName.trim()) {
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1000);
     }
   };
 
@@ -39,6 +49,11 @@ export const ProfileForm = () => {
     <Card className="w-full max-w-2xl">
       <CardHeader>
         <CardTitle>Mi Perfil</CardTitle>
+        {!isComplete && (
+          <p className="text-sm text-muted-foreground">
+            Completa tu información personal para continuar
+          </p>
+        )}
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -117,8 +132,8 @@ export const ProfileForm = () => {
             </p>
           </div>
 
-          <Button type="submit" disabled={loading}>
-            {loading ? 'Guardando...' : 'Guardar Cambios'}
+          <Button type="submit" disabled={isUpdating}>
+            {isUpdating ? 'Guardando...' : 'Guardar Cambios'}
           </Button>
         </form>
       </CardContent>

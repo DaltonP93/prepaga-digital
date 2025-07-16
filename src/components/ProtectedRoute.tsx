@@ -1,17 +1,25 @@
 
 import { useAuthContext } from '@/components/AuthProvider';
 import { LoginForm } from '@/components/LoginForm';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useProfileCompletion } from '@/hooks/useProfileCompletion';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRole?: string[];
+  requireCompleteProfile?: boolean;
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
-  requiredRole 
+  requiredRole,
+  requireCompleteProfile = false
 }) => {
   const { user, profile, loading } = useAuthContext();
+  const { isComplete } = useProfileCompletion();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -21,9 +29,21 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  if (!user || !profile) {
+  if (!user) {
     return <LoginForm />;
   }
+
+  // If no profile exists, this is a problem that needs to be handled differently
+  if (!profile) {
+    return <LoginForm />;
+  }
+
+  // Redirect to profile completion if required and profile is incomplete
+  useEffect(() => {
+    if (requireCompleteProfile && !isComplete && location.pathname !== '/profile') {
+      navigate('/profile');
+    }
+  }, [requireCompleteProfile, isComplete, location.pathname, navigate]);
 
   if (requiredRole && !requiredRole.includes(profile.role)) {
     return (

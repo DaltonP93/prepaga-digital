@@ -1,6 +1,7 @@
 
 import { Layout } from "@/components/Layout";
 import { ProfileForm } from "@/components/ProfileForm";
+import { ProfileCompletionBanner } from "@/components/ProfileCompletionBanner";
 
 const Profile = () => {
   return (
@@ -16,6 +17,7 @@ const Profile = () => {
           </p>
         </div>
 
+        <ProfileCompletionBanner />
         <ProfileForm />
       </div>
     </Layout>
