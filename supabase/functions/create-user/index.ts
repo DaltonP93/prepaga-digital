@@ -66,21 +66,27 @@ serve(async (req) => {
       })
     }
 
-    // Update the profile with additional data using the helper function
-    const { error: profileError } = await supabaseAdmin.rpc('create_user_profile', {
-      user_id: authData.user.id,
-      user_email: email,
-      first_name,
-      last_name,
-      user_role: role,
-      company_id
-    })
+    // Create profile directly using insert instead of RPC
+    const { error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .insert({
+        id: authData.user.id,
+        email: email,
+        first_name,
+        last_name,
+        role: role,
+        company_id,
+        active: true
+      })
 
     if (profileError) {
-      console.error('Error updating profile:', profileError)
+      console.error('Error creating profile:', profileError)
       // If profile creation fails, we should delete the auth user
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
-      return new Response(JSON.stringify({ error: 'Failed to create user profile' }), {
+      return new Response(JSON.stringify({ 
+        error: 'Failed to create user profile', 
+        details: profileError.message 
+      }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })

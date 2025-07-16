@@ -23,13 +23,22 @@ export const ProfileForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const wasIncomplete = !isComplete;
-    
-    updateProfile({
+    console.log('📝 Submitting profile form with data:', {
       first_name: firstName.trim(),
       last_name: lastName.trim(),
       phone: phone.trim() || null,
     });
+    
+    const wasIncomplete = !isComplete;
+    
+    // Store the data in a variable and call updateProfile
+    const profileData = {
+      first_name: firstName.trim(),
+      last_name: lastName.trim(),
+      phone: phone.trim() || null,
+    };
+    
+    updateProfile(profileData);
 
     // If profile was incomplete and now might be complete, redirect to dashboard
     if (wasIncomplete && firstName.trim() && lastName.trim()) {
