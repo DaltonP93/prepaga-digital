@@ -60,24 +60,30 @@ export const useAuth = (): AuthContextType => {
 
   const fetchProfile = async (userId: string) => {
     try {
+      console.log('🔍 Fetching profile for user:', userId);
       setLoading(true);
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
-        console.error('Error fetching profile:', error);
-        // Don't throw here to prevent blocking the auth flow
+        console.error('❌ Error fetching profile:', error);
         setProfile(null);
-      } else {
+      } else if (data) {
+        console.log('✅ Profile found:', data);
         setProfile(data);
+      } else {
+        console.warn('⚠️ No profile found for user:', userId);
+        setProfile(null);
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error('❌ Unexpected error fetching profile:', error);
       setProfile(null);
     } finally {
+      console.log('🏁 Profile fetch completed, setting loading to false');
       setLoading(false);
     }
   };
