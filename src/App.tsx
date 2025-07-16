@@ -21,6 +21,7 @@ import Companies from '@/pages/Companies';
 import QuestionnaireView from '@/pages/QuestionnaireView';
 import AuditDashboard from '@/pages/AuditDashboard';
 import SignatureWorkflow from '@/pages/SignatureWorkflow';
+import Analytics from '@/pages/Analytics';
 
 const queryClient = new QueryClient({
   defaultOptions: {

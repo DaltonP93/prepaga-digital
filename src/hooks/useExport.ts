@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 interface ExportData {
   data: any[];
   filename: string;
-  type: 'csv' | 'excel' | 'pdf' | 'json';
+  type: 'csv' | 'excel' | 'pdf' | 'json' | 'html';
   headers?: string[];
   title?: string;
   description?: string;
