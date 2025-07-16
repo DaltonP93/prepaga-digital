@@ -1,9 +1,9 @@
 import { TrendingUp, Users, DollarSign, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useDashboard } from '@/hooks/useDashboard';
+import { useDashboardStats } from '@/hooks/useDashboard';
 
 const SalesOverviewWidget = () => {
-  const { data, isLoading } = useDashboard();
+  const { data, isLoading } = useDashboardStats();
 
   if (isLoading) {
     return (
@@ -35,14 +35,14 @@ const SalesOverviewWidget = () => {
       change: "+8.1%"
     },
     {
-      title: "Documentos",
-      value: data?.totalDocuments || 0,
+      title: "Documentos Firmados",
+      value: data?.signedDocuments || 0,
       icon: FileText,
       change: "+3.2%"
     },
     {
-      title: "Ventas del Mes",
-      value: data?.monthlySales || 0,
+      title: "Ingresos Totales",
+      value: `$${(data?.totalRevenue || 0).toLocaleString()}`,
       icon: TrendingUp,
       change: "+15.3%"
     }
@@ -64,7 +64,7 @@ const SalesOverviewWidget = () => {
                   <span className="text-sm text-muted-foreground">{stat.title}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-2xl font-bold">{stat.value.toLocaleString()}</span>
+                  <span className="text-2xl font-bold">{typeof stat.value === 'string' ? stat.value : stat.value.toLocaleString()}</span>
                   <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
                     {stat.change}
                   </span>
