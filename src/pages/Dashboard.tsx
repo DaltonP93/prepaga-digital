@@ -1,6 +1,7 @@
 
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SystemStatus } from "@/components/SystemStatus";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
@@ -200,6 +201,11 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Estado del Sistema */}
+        {profile?.role === 'super_admin' && (
+          <SystemStatus />
+        )}
 
         {/* Ventas recientes */}
         {stats?.recentSales && stats.recentSales.length > 0 && (
