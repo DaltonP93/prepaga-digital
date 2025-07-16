@@ -17,9 +17,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requireCompleteProfile = false
 }) => {
   const { user, profile, loading } = useAuthContext();
-  const { isComplete } = useProfileCompletion();
   const navigate = useNavigate();
   const location = useLocation();
+  
+  // Always call useProfileCompletion to maintain consistent hook count
+  const { isComplete } = useProfileCompletion();
 
   // All hooks must be called before any early returns
   useEffect(() => {

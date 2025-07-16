@@ -9,6 +9,13 @@ export interface ProfileCompletionStatus {
 export const useProfileCompletion = (): ProfileCompletionStatus => {
   const { profile } = useAuthContext();
 
+  // Always return a consistent structure, regardless of profile state
+  const requiredFields = [
+    { key: 'first_name', label: 'Nombre' },
+    { key: 'last_name', label: 'Apellido' },
+    { key: 'email', label: 'Email' },
+  ];
+
   if (!profile) {
     return {
       isComplete: false,
@@ -16,12 +23,6 @@ export const useProfileCompletion = (): ProfileCompletionStatus => {
       completionPercentage: 0,
     };
   }
-
-  const requiredFields = [
-    { key: 'first_name', label: 'Nombre' },
-    { key: 'last_name', label: 'Apellido' },
-    { key: 'email', label: 'Email' },
-  ];
 
   const missingFields: string[] = [];
 
