@@ -1,4 +1,5 @@
 
+import React from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,14 +39,36 @@ export function PlanForm({ open, onOpenChange, plan }: PlanFormProps) {
 
   const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<PlanFormData>({
     defaultValues: {
-      name: plan?.name || "",
-      description: plan?.description || "",
-      price: plan?.price || 0,
-      coverage_details: plan?.coverage_details || "",
-      company_id: plan?.company_id || profile?.company_id || "",
-      active: plan?.active ?? true,
+      name: "",
+      description: "",
+      price: 0,
+      coverage_details: "",
+      company_id: profile?.company_id || "",
+      active: true,
     }
   });
+
+  // Reset form when plan changes (for editing)
+  React.useEffect(() => {
+    if (plan && open) {
+      setValue("name", plan.name || "");
+      setValue("description", plan.description || "");
+      setValue("price", Number(plan.price) || 0);
+      setValue("coverage_details", plan.coverage_details || "");
+      setValue("company_id", plan.company_id || profile?.company_id || "");
+      setValue("active", plan.active ?? true);
+    } else if (!plan && open) {
+      // Reset for new plan
+      reset({
+        name: "",
+        description: "",
+        price: 0,
+        coverage_details: "",
+        company_id: profile?.company_id || "",
+        active: true,
+      });
+    }
+  }, [plan, open, setValue, reset, profile?.company_id]);
 
   const onSubmit = async (data: PlanFormData) => {
     try {
@@ -98,11 +121,11 @@ export function PlanForm({ open, onOpenChange, plan }: PlanFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="price">Precio</Label>
+            <Label htmlFor="price">Precio (Gs.)</Label>
             <Input
               id="price"
               type="number"
-              step="0.01"
+              step="1"
               {...register("price", { 
                 required: "El precio es requerido",
                 min: { value: 0, message: "El precio debe ser mayor a 0" }

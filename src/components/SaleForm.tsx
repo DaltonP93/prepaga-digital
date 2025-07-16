@@ -130,7 +130,7 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
               <SelectContent>
                 {plans.map((plan) => (
                   <SelectItem key={plan.id} value={plan.id}>
-                    {plan.name} - ${plan.price}
+                    {plan.name} - {Number(plan.price).toLocaleString('es-PY')} Gs.
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -161,11 +161,11 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="total_amount">Monto Total</Label>
+            <Label htmlFor="total_amount">Monto Total (Gs.)</Label>
             <Input
               id="total_amount"
               type="number"
-              step="0.01"
+              step="1"
               {...register("total_amount", { 
                 required: "El monto es requerido",
                 min: { value: 0, message: "El monto debe ser mayor a 0" }
@@ -173,7 +173,7 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
             />
             {selectedPlan && (
               <p className="text-sm text-gray-500">
-                Precio del plan: ${selectedPlan.price}
+                Precio del plan: {Number(selectedPlan.price).toLocaleString('es-PY')} Gs.
               </p>
             )}
             {errors.total_amount && (

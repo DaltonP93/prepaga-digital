@@ -47,6 +47,8 @@ serve(async (req) => {
 
     const { email, password, first_name, last_name, role, company_id } = await req.json()
 
+    console.log('Creating user with data:', { email, first_name, last_name, role, company_id });
+
     // Create user with admin privileges
     const { data: authData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -60,7 +62,10 @@ serve(async (req) => {
 
     if (createError) {
       console.error('Error creating user:', createError)
-      return new Response(JSON.stringify({ error: createError.message }), {
+      return new Response(JSON.stringify({ 
+        error: createError.message,
+        details: createError
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
