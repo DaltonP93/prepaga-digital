@@ -106,6 +106,11 @@ function App() {
                 <SignatureWorkflow />
               </ProtectedRoute>
             } />
+            <Route path="/analytics" element={
+              <ProtectedRoute>
+                <Analytics />
+              </ProtectedRoute>
+            } />
           </Routes>
           <Toaster />
         </Router>

@@ -13,6 +13,7 @@ import {
   UserCog,
   Shield,
   Workflow,
+  BarChart3,
 } from "lucide-react";
 
 import {
@@ -71,6 +72,11 @@ export function AppSidebar({ isSuperAdmin = false }: AppSidebarProps) {
       title: "Flujo de Firmas",
       url: "/signature-workflow",
       icon: Workflow,
+    },
+    {
+      title: "Analytics",
+      url: "/analytics",
+      icon: BarChart3,
     },
     {
       title: "Mi Perfil",

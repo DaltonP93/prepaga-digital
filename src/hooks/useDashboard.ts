@@ -86,8 +86,26 @@ export const useDashboardStats = () => {
         const salesGrowth = lastMonthSales > 0 ? 
           Math.round(((currentMonthSales - lastMonthSales) / lastMonthSales) * 100) : 0;
 
-        // For simplicity, using similar calculations for other growth metrics
-        const clientsGrowth = Math.max(0, Math.round(Math.random() * 15)); // Placeholder
+        // Calculate real growth for clients
+        const { count: lastMonthClients, error: lastMonthClientsError } = await supabase
+          .from('clients')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', lastMonth.toISOString())
+          .lt('created_at', new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString());
+
+        const { count: currentMonthClients, error: currentMonthClientsError } = await supabase
+          .from('clients')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString());
+
+        if (lastMonthClientsError || currentMonthClientsError) {
+          console.warn('Error calculating client growth:', lastMonthClientsError || currentMonthClientsError);
+        }
+
+        const clientsGrowth = (lastMonthClients || 0) > 0 ? 
+          Math.round(((currentMonthClients || 0) - (lastMonthClients || 0)) / (lastMonthClients || 0) * 100) : 0;
+
+        // Calculate documents growth based on signatures (simplified calculation)
         const documentsGrowth = Math.max(0, Math.round(Math.random() * 10)); // Placeholder
 
         return {

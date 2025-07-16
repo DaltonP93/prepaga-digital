@@ -167,14 +167,15 @@ const Sales = () => {
 
   const handleExport = () => {
     const csvContent = [
-      ['Cliente', 'Plan', 'Monto', 'Estado', 'Vendedor', 'Fecha'].join(','),
+      ['Cliente', 'Plan', 'Empresa', 'Vendedor', 'Monto', 'Estado', 'Fecha'].join(','),
       ...filteredSales.map(sale => [
-        sale.clients ? `${sale.clients.first_name} ${sale.clients.last_name}` : 'Sin cliente',
-        sale.plans?.name || 'Sin plan',
+        `"${sale.clients ? `${sale.clients.first_name} ${sale.clients.last_name}` : 'Sin cliente'}"`,
+        `"${sale.plans?.name || 'Sin plan'}"`,
+        `"${sale.companies?.name || 'Sin empresa'}"`,
+        `"${sale.salesperson ? `${sale.salesperson.first_name} ${sale.salesperson.last_name}` : 'Sin vendedor'}"`,
         sale.total_amount || 0,
-        getStatusLabel(sale.status || 'borrador'),
-        sale.salesperson ? `${sale.salesperson.first_name} ${sale.salesperson.last_name}` : 'Sin vendedor',
-        sale.sale_date ? new Date(sale.sale_date).toLocaleDateString() : '-'
+        `"${getStatusLabel(sale.status || 'borrador')}"`,
+        `"${sale.sale_date ? new Date(sale.sale_date).toLocaleDateString() : '-'}"`
       ].join(','))
     ].join('\n');
 
