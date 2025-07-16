@@ -93,18 +93,12 @@ const Templates = () => {
                         {template.description || "Sin descripción"}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={template.is_global ? "default" : "secondary"}>
-                          {template.is_global ? (
-                            <>
-                              <Globe className="h-3 w-3 mr-1" />
-                              Global
-                            </>
-                          ) : (
-                            <>
-                              <Building className="h-3 w-3 mr-1" />
-                              Empresa
-                            </>
-                          )}
+                        <Badge variant="secondary">
+                          {(template as any).template_type === 'contract' && 'Contrato'}
+                          {(template as any).template_type === 'declaration' && 'Declaración Jurada'}
+                          {(template as any).template_type === 'questionnaire' && 'Cuestionario'}
+                          {(template as any).template_type === 'other' && 'Otro'}
+                          {!(template as any).template_type && 'Cuestionario'}
                         </Badge>
                       </TableCell>
                        <TableCell>

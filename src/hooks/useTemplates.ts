@@ -3,7 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
 
-type Template = Tables<"templates">;
+type Template = Tables<"templates"> & {
+  question_count?: number;
+};
 type TemplateInsert = TablesInsert<"templates">;
 type TemplateUpdate = TablesUpdate<"templates">;
 

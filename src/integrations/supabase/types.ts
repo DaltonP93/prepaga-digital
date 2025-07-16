@@ -676,6 +676,57 @@ export type Database = {
           },
         ]
       }
+      sale_templates: {
+        Row: {
+          created_at: string | null
+          document_type: string | null
+          id: string
+          order_index: number | null
+          sale_id: string
+          signed_document_url: string | null
+          status: string | null
+          template_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          document_type?: string | null
+          id?: string
+          order_index?: number | null
+          sale_id: string
+          signed_document_url?: string | null
+          status?: string | null
+          template_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          document_type?: string | null
+          id?: string
+          order_index?: number | null
+          sale_id?: string
+          signed_document_url?: string | null
+          status?: string | null
+          template_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_templates_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_templates_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales: {
         Row: {
           client_id: string | null
@@ -862,6 +913,39 @@ export type Database = {
         }
         Relationships: []
       }
+      template_placeholders: {
+        Row: {
+          created_at: string | null
+          default_value: string | null
+          id: string
+          placeholder_label: string
+          placeholder_name: string
+          placeholder_type: string | null
+          updated_at: string | null
+          validation_rules: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          default_value?: string | null
+          id?: string
+          placeholder_label: string
+          placeholder_name: string
+          placeholder_type?: string | null
+          updated_at?: string | null
+          validation_rules?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          default_value?: string | null
+          id?: string
+          placeholder_label?: string
+          placeholder_name?: string
+          placeholder_type?: string | null
+          updated_at?: string | null
+          validation_rules?: Json | null
+        }
+        Relationships: []
+      }
       template_question_options: {
         Row: {
           created_at: string
@@ -1014,10 +1098,15 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           description: string | null
+          dynamic_fields: Json | null
           id: string
           is_global: boolean | null
           name: string
+          parent_template_id: string | null
+          static_content: string | null
+          template_type: string | null
           updated_at: string | null
+          version: number | null
         }
         Insert: {
           active?: boolean | null
@@ -1026,10 +1115,15 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          dynamic_fields?: Json | null
           id?: string
           is_global?: boolean | null
           name: string
+          parent_template_id?: string | null
+          static_content?: string | null
+          template_type?: string | null
           updated_at?: string | null
+          version?: number | null
         }
         Update: {
           active?: boolean | null
@@ -1038,10 +1132,15 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          dynamic_fields?: Json | null
           id?: string
           is_global?: boolean | null
           name?: string
+          parent_template_id?: string | null
+          static_content?: string | null
+          template_type?: string | null
           updated_at?: string | null
+          version?: number | null
         }
         Relationships: [
           {
@@ -1056,6 +1155,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "templates_parent_template_id_fkey"
+            columns: ["parent_template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
             referencedColumns: ["id"]
           },
         ]

@@ -16,6 +16,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Form,
   FormControl,
   FormField,
@@ -24,6 +31,7 @@ import {
   FormMessage,
   FormDescription,
 } from "@/components/ui/form";
+import { ContractEditor } from "@/components/ContractEditor";
 import { useTemplates } from "@/hooks/useTemplates";
 import { QuestionBuilder } from "@/components/QuestionBuilder";
 import { QuestionnairePreview } from "@/components/QuestionnairePreview";
@@ -32,9 +40,12 @@ import { Plus, Edit } from "lucide-react";
 import { Tables } from "@/integrations/supabase/types";
 
 const templateSchema = z.object({
-  name: z.string().min(1, "El nombre es obligatorio"),
+  name: z.string().min(1, "El nombre es requerido"),
   description: z.string().optional(),
-  content: z.string().min(1, "El contenido es obligatorio"),
+  content: z.string().optional(),
+  template_type: z.enum(["contract", "declaration", "questionnaire", "other"]).default("questionnaire"),
+  static_content: z.string().optional(),
+  dynamic_fields: z.array(z.any()).default([]),
   is_global: z.boolean().default(false),
 });
 
@@ -55,32 +66,37 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
     defaultValues: {
       name: template?.name || "",
       description: template?.description || "",
-      content: template?.content ? JSON.stringify(template.content, null, 2) : "{}",
+      content: template?.content ? JSON.stringify(template.content, null, 2) : "",
+      template_type: (template?.template_type as any) || "questionnaire",
+      static_content: template?.static_content || "",
+      dynamic_fields: Array.isArray(template?.dynamic_fields) ? template.dynamic_fields : [],
       is_global: template?.is_global || false,
     },
   });
 
   const onSubmit = (data: TemplateFormData) => {
     try {
-      const content = JSON.parse(data.content);
+      let contentData = {};
       
+      // Si es questionnaire y hay content, parsearlo como JSON
+      if (data.template_type === "questionnaire" && data.content) {
+        contentData = JSON.parse(data.content);
+      }
+      
+      const templateData = {
+        name: data.name,
+        description: data.description,
+        template_type: data.template_type,
+        content: contentData,
+        static_content: data.static_content,
+        dynamic_fields: data.dynamic_fields,
+        is_global: data.is_global,
+      };
+
       if (template) {
-        updateTemplate({
-          id: template.id,
-          updates: {
-            name: data.name,
-            description: data.description,
-            content,
-            is_global: data.is_global,
-          },
-        });
+        updateTemplate({ id: template.id, updates: templateData });
       } else {
-        createTemplate({
-          name: data.name,
-          description: data.description,
-          content,
-          is_global: data.is_global,
-        });
+        createTemplate(templateData);
       }
       
       setOpen(false);
@@ -88,7 +104,7 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
     } catch (error) {
       form.setError("content", {
         type: "manual",
-        message: "El contenido debe ser un JSON válido",
+        message: "El contenido JSON no es válido",
       });
     }
   };
@@ -118,8 +134,8 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
         
         <Tabs defaultValue="info" className="h-full">
           <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="info">Información Básica</TabsTrigger>
-            <TabsTrigger value="visual">Editor Visual</TabsTrigger>
+            <TabsTrigger value="info">Información</TabsTrigger>
+            <TabsTrigger value="editor">Editor</TabsTrigger>
             <TabsTrigger value="questions" disabled={!template}>Preguntas</TabsTrigger>
             <TabsTrigger value="preview" disabled={!template}>Vista Previa</TabsTrigger>
           </TabsList>
@@ -142,7 +158,7 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
                     )}
                   />
 
-                  <FormField
+                   <FormField
                     control={form.control}
                     name="description"
                     render={({ field }) => (
@@ -151,6 +167,33 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
                         <FormControl>
                           <Textarea {...field} placeholder="Descripción del template" />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="template_type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tipo de Template</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecciona el tipo de template" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="contract">Contrato</SelectItem>
+                            <SelectItem value="declaration">Declaración Jurada</SelectItem>
+                            <SelectItem value="questionnaire">Cuestionario</SelectItem>
+                            <SelectItem value="other">Otro</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Define el tipo de documento que representa este template
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -177,28 +220,6 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="content"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Contenido (JSON)</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            {...field} 
-                            placeholder='{"variables": [], "sections": []}'
-                            className="min-h-32 font-mono text-sm"
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Define el contenido del template en formato JSON. 
-                          Ejemplo: {`{"title": "{{cliente.nombre}}", "content": "Bienvenido {{cliente.nombre}}"}`}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
                   <div className="flex justify-end gap-2">
                     <Button
                       type="button"
@@ -218,13 +239,39 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
               </Form>
             </TabsContent>
 
-            <TabsContent value="visual" className="mt-4 h-full">
-              <VisualTemplateEditor
-                initialContent={template?.content}
-                onSave={(content) => {
-                  form.setValue('content', JSON.stringify(content));
-                }}
-              />
+            <TabsContent value="editor" className="mt-4 h-full">
+              {form.watch("template_type") === "questionnaire" ? (
+                <div className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="content"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Contenido del Cuestionario (JSON)</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            {...field} 
+                            placeholder='{"title": "Mi Cuestionario", "questions": [...]}'
+                            rows={15}
+                            className="font-mono text-sm"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Define la estructura del cuestionario en formato JSON
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              ) : (
+                <ContractEditor
+                  content={form.watch("static_content") || ""}
+                  onContentChange={(content) => form.setValue("static_content", content)}
+                  dynamicFields={form.watch("dynamic_fields") || []}
+                  onDynamicFieldsChange={(fields) => form.setValue("dynamic_fields", fields)}
+                />
+              )}
             </TabsContent>
 
             <TabsContent value="questions" className="mt-4">
