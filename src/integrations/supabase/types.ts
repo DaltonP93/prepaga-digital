@@ -181,6 +181,42 @@ export type Database = {
         }
         Relationships: []
       }
+      dashboard_widgets: {
+        Row: {
+          created_at: string
+          id: string
+          position: number
+          settings: Json | null
+          size: string
+          updated_at: string
+          user_id: string | null
+          visible: boolean
+          widget_type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          position?: number
+          settings?: Json | null
+          size?: string
+          updated_at?: string
+          user_id?: string | null
+          visible?: boolean
+          widget_type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          position?: number
+          settings?: Json | null
+          size?: string
+          updated_at?: string
+          user_id?: string | null
+          visible?: boolean
+          widget_type?: string
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           content: string | null
@@ -284,6 +320,45 @@ export type Database = {
           updated_at?: string | null
           upload_status?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          action_url: string | null
+          created_at: string
+          id: string
+          message: string
+          metadata: Json | null
+          read: boolean
+          title: string
+          type: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          action_url?: string | null
+          created_at?: string
+          id?: string
+          message: string
+          metadata?: Json | null
+          read?: boolean
+          title: string
+          type?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          action_url?: string | null
+          created_at?: string
+          id?: string
+          message?: string
+          metadata?: Json | null
+          read?: boolean
+          title?: string
+          type?: string
+          updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }

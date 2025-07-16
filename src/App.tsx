@@ -22,6 +22,8 @@ import QuestionnaireView from '@/pages/QuestionnaireView';
 import AuditDashboard from '@/pages/AuditDashboard';
 import SignatureWorkflow from '@/pages/SignatureWorkflow';
 import Analytics from '@/pages/Analytics';
+import PaymentSuccess from '@/pages/PaymentSuccess';
+import PaymentCanceled from '@/pages/PaymentCanceled';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -110,6 +112,16 @@ function App() {
             <Route path="/analytics" element={
               <ProtectedRoute>
                 <Analytics />
+              </ProtectedRoute>
+            } />
+            <Route path="/payment-success" element={
+              <ProtectedRoute>
+                <PaymentSuccess />
+              </ProtectedRoute>
+            } />
+            <Route path="/payment-canceled" element={
+              <ProtectedRoute>
+                <PaymentCanceled />
               </ProtectedRoute>
             } />
           </Routes>
