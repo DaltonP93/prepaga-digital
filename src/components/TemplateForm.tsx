@@ -27,6 +27,7 @@ import {
 import { useTemplates } from "@/hooks/useTemplates";
 import { QuestionBuilder } from "@/components/QuestionBuilder";
 import { QuestionnairePreview } from "@/components/QuestionnairePreview";
+import { VisualTemplateEditor } from "@/components/VisualTemplateEditor";
 import { Plus, Edit } from "lucide-react";
 import { Tables } from "@/integrations/supabase/types";
 
@@ -116,8 +117,9 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
         </DialogHeader>
         
         <Tabs defaultValue="info" className="h-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="info">Información Básica</TabsTrigger>
+            <TabsTrigger value="visual">Editor Visual</TabsTrigger>
             <TabsTrigger value="questions" disabled={!template}>Preguntas</TabsTrigger>
             <TabsTrigger value="preview" disabled={!template}>Vista Previa</TabsTrigger>
           </TabsList>
@@ -214,6 +216,15 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
                   </div>
                 </form>
               </Form>
+            </TabsContent>
+
+            <TabsContent value="visual" className="mt-4 h-full">
+              <VisualTemplateEditor
+                initialContent={template?.content}
+                onSave={(content) => {
+                  form.setValue('content', JSON.stringify(content));
+                }}
+              />
             </TabsContent>
 
             <TabsContent value="questions" className="mt-4">

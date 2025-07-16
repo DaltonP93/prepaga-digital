@@ -20,6 +20,7 @@ import Plans from '@/pages/Plans';
 import Companies from '@/pages/Companies';
 import QuestionnaireView from '@/pages/QuestionnaireView';
 import AuditDashboard from '@/pages/AuditDashboard';
+import SignatureWorkflow from '@/pages/SignatureWorkflow';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -98,6 +99,11 @@ function App() {
             <Route path="/audit" element={
               <ProtectedRoute>
                 <AuditDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/signature-workflow" element={
+              <ProtectedRoute>
+                <SignatureWorkflow />
               </ProtectedRoute>
             } />
           </Routes>

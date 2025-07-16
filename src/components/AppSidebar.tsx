@@ -12,6 +12,7 @@ import {
   CreditCard,
   UserCog,
   Shield,
+  Workflow,
 } from "lucide-react";
 
 import {
@@ -65,6 +66,11 @@ export function AppSidebar({ isSuperAdmin = false }: AppSidebarProps) {
       title: "Templates",
       url: "/templates",
       icon: FileImage,
+    },
+    {
+      title: "Flujo de Firmas",
+      url: "/signature-workflow",
+      icon: Workflow,
     },
     {
       title: "Mi Perfil",
