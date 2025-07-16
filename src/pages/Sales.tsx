@@ -60,13 +60,18 @@ const Sales = () => {
     try {
       const result = await generateQuestionnaireLink.mutateAsync(sale.id);
       
-      // Copy to clipboard
-      await navigator.clipboard.writeText(result.questionnaireUrl);
-      
-      toast({
-        title: "Enlace del cuestionario generado",
-        description: "El enlace ha sido copiado al portapapeles.",
-      });
+      if (result.questionnaireUrl) {
+        // Remove any trailing '=' from the URL
+        const cleanUrl = result.questionnaireUrl.replace(/=+$/, '');
+        
+        // Copy clean URL to clipboard
+        await navigator.clipboard.writeText(cleanUrl);
+        
+        toast({
+          title: "Enlace del cuestionario generado",
+          description: "El enlace ha sido copiado al portapapeles.",
+        });
+      }
     } catch (error) {
       console.error('Error generating questionnaire link:', error);
     }

@@ -8,7 +8,7 @@ const SignatureWorkflow = () => {
         <div>
           <h1 className="text-3xl font-bold">Gestión de Flujo de Firmas</h1>
           <p className="text-muted-foreground">
-            Administra y automatiza el proceso completo de firma digital
+            Administra y automatiza el proceso completo de firma digital con múltiples canales de comunicación
           </p>
         </div>
         

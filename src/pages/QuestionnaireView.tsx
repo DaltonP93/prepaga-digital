@@ -29,7 +29,6 @@ const QuestionnaireView = () => {
           templates(*)
         `)
         .eq("signature_token", token)
-        .gt("signature_expires_at", new Date().toISOString())
         .single();
 
       if (error) throw error;
@@ -51,7 +50,10 @@ const QuestionnaireView = () => {
     );
   }
 
-  if (!template || !saleData?.clients?.id || !saleData?.template_id) {
+  // Check if token is expired
+  const isExpired = saleData?.signature_expires_at && new Date(saleData.signature_expires_at) < new Date();
+  
+  if (!template || !saleData?.clients?.id || !saleData?.template_id || isExpired) {
     return (
       <Layout title="Cuestionario no encontrado" description="">
         <div className="flex justify-center py-8">
@@ -61,7 +63,10 @@ const QuestionnaireView = () => {
             </CardHeader>
             <CardContent>
               <p className="text-center text-muted-foreground">
-                El enlace del cuestionario no es válido o ha expirado.
+                {isExpired 
+                  ? "El enlace del cuestionario ha expirado." 
+                  : "El enlace del cuestionario no es válido o ha expirado."
+                }
               </p>
             </CardContent>
           </Card>

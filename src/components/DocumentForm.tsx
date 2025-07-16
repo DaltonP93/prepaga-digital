@@ -122,9 +122,9 @@ export const DocumentForm = ({ document, trigger }: DocumentFormProps) => {
         });
       }
       
-      setOpen(false);
-      setUploadedFileUrl(null);
       form.reset();
+      setUploadedFileUrl(null);
+      setOpen(false);
     } catch (error) {
       console.error("Error saving document:", error);
     }
@@ -324,7 +324,11 @@ export const DocumentForm = ({ document, trigger }: DocumentFormProps) => {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  form.reset();
+                  setUploadedFileUrl(null);
+                  setOpen(false);
+                }}
               >
                 Cancelar
               </Button>

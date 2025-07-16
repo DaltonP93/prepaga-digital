@@ -142,9 +142,6 @@ export const useGenerateQuestionnaireLink = () => {
       
       const questionnaireUrl = `${window.location.origin}/questionnaire/${token}`;
       
-      // Copy to clipboard
-      await navigator.clipboard.writeText(questionnaireUrl);
-      
       return { sale, questionnaireUrl, token };
     },
     onSuccess: (data) => {
