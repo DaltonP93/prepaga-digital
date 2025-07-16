@@ -54,6 +54,7 @@ export const useBranding = () => {
       if (error) throw error;
 
       if (data) {
+        // Type assertion para incluir las nuevas columnas de branding
         const companyData = data as any;
         setBranding({
           primaryColor: companyData.primary_color || DEFAULT_BRANDING.primaryColor,
