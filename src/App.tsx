@@ -24,6 +24,8 @@ import SignatureWorkflow from '@/pages/SignatureWorkflow';
 import Analytics from '@/pages/Analytics';
 import PaymentSuccess from '@/pages/PaymentSuccess';
 import PaymentCanceled from '@/pages/PaymentCanceled';
+import Communications from '@/pages/Communications';
+import FileManagement from '@/pages/FileManagement';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -122,6 +124,16 @@ function App() {
             <Route path="/payment-canceled" element={
               <ProtectedRoute>
                 <PaymentCanceled />
+              </ProtectedRoute>
+            } />
+            <Route path="/communications" element={
+              <ProtectedRoute>
+                <Communications />
+              </ProtectedRoute>
+            } />
+            <Route path="/file-management" element={
+              <ProtectedRoute>
+                <FileManagement />
               </ProtectedRoute>
             } />
           </Routes>

@@ -14,6 +14,7 @@ import {
   Shield,
   Workflow,
   BarChart3,
+  MessageSquare,
 } from "lucide-react";
 
 import {
@@ -74,9 +75,14 @@ export function AppSidebar({ isSuperAdmin = false }: AppSidebarProps) {
       icon: Workflow,
     },
     {
-      title: "Analytics",
+      title: "Analytics", 
       url: "/analytics",
       icon: BarChart3,
+    },
+    {
+      title: "Comunicaciones",
+      url: "/communications", 
+      icon: MessageSquare,
     },
     {
       title: "Mi Perfil",
