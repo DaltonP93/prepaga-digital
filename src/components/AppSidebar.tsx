@@ -11,6 +11,7 @@ import {
   Building2,
   CreditCard,
   UserCog,
+  Shield,
 } from "lucide-react";
 
 import {
@@ -84,6 +85,11 @@ export function AppSidebar({ isSuperAdmin = false }: AppSidebarProps) {
         title: "Empresas",
         url: "/companies",
         icon: Building2,
+      },
+      {
+        title: "Auditoría",
+        url: "/audit",
+        icon: Shield,
       }
     );
   }

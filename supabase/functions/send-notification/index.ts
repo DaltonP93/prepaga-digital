@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -16,6 +17,11 @@ serve(async (req) => {
 
   try {
     const { type, to, data } = await req.json();
+
+    // Initialize Supabase client for audit logging
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     let subject = "";
     let html = "";
@@ -73,6 +79,25 @@ serve(async (req) => {
 
     console.log("Email sent successfully:", emailResponse);
 
+    // Log the notification in audit system
+    const { error: auditError } = await supabase.rpc('log_audit', {
+      p_table_name: 'notifications',
+      p_action: 'email_sent',
+      p_new_values: { 
+        type, 
+        to, 
+        subject,
+        email_id: emailResponse.data?.id,
+        status: 'sent'
+      },
+      p_request_path: '/functions/v1/send-notification',
+      p_request_method: 'POST'
+    });
+
+    if (auditError) {
+      console.error('Error logging notification audit:', auditError);
+    }
+
     return new Response(JSON.stringify(emailResponse), {
       status: 200,
       headers: {
@@ -82,6 +107,27 @@ serve(async (req) => {
     });
   } catch (error: any) {
     console.error("Error sending notification:", error);
+    
+    // Log the error in audit system
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+      
+      await supabase.rpc('log_audit', {
+        p_table_name: 'notifications',
+        p_action: 'email_failed',
+        p_new_values: { 
+          error: error.message,
+          status: 'failed'
+        },
+        p_request_path: '/functions/v1/send-notification',
+        p_request_method: 'POST'
+      });
+    } catch (auditError) {
+      console.error('Error logging notification failure:', auditError);
+    }
+    
     return new Response(
       JSON.stringify({ error: error.message }),
       {

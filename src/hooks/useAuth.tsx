@@ -101,6 +101,7 @@ export const useAuth = (): AuthContextType => {
       password,
       options: {
         data: userData,
+        emailRedirectTo: `${window.location.origin}/`,
       },
     });
     if (error) throw error;

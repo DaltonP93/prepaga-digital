@@ -7,6 +7,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Toaster } from '@/components/ui/sonner';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
+import ResetPassword from '@/pages/ResetPassword';
 import Dashboard from '@/pages/Dashboard';
 import Clients from '@/pages/Clients';
 import Sales from '@/pages/Sales';
@@ -18,6 +19,7 @@ import Users from '@/pages/Users';
 import Plans from '@/pages/Plans';
 import Companies from '@/pages/Companies';
 import QuestionnaireView from '@/pages/QuestionnaireView';
+import AuditDashboard from '@/pages/AuditDashboard';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -38,6 +40,7 @@ function App() {
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/signature/:token" element={<SignatureView />} />
             <Route path="/questionnaire/:token" element={<QuestionnaireView />} />
             
@@ -90,6 +93,11 @@ function App() {
             <Route path="/profile" element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            } />
+            <Route path="/audit" element={
+              <ProtectedRoute>
+                <AuditDashboard />
               </ProtectedRoute>
             } />
           </Routes>

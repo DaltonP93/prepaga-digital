@@ -19,30 +19,45 @@ export type Database = {
           action: string
           created_at: string | null
           id: string
+          ip_address: unknown | null
           new_values: Json | null
           old_values: Json | null
           record_id: string | null
+          request_method: string | null
+          request_path: string | null
+          session_id: string | null
           table_name: string
+          user_agent: string | null
           user_id: string | null
         }
         Insert: {
           action: string
           created_at?: string | null
           id?: string
+          ip_address?: unknown | null
           new_values?: Json | null
           old_values?: Json | null
           record_id?: string | null
+          request_method?: string | null
+          request_path?: string | null
+          session_id?: string | null
           table_name: string
+          user_agent?: string | null
           user_id?: string | null
         }
         Update: {
           action?: string
           created_at?: string | null
           id?: string
+          ip_address?: unknown | null
           new_values?: Json | null
           old_values?: Json | null
           record_id?: string | null
+          request_method?: string | null
+          request_path?: string | null
+          session_id?: string | null
           table_name?: string
+          user_agent?: string | null
           user_id?: string | null
         }
         Relationships: [
@@ -54,6 +69,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      auth_attempts: {
+        Row: {
+          attempted_at: string
+          email: string
+          failure_reason: string | null
+          id: string
+          ip_address: unknown | null
+          success: boolean
+          user_agent: string | null
+        }
+        Insert: {
+          attempted_at?: string
+          email: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: unknown | null
+          success: boolean
+          user_agent?: string | null
+        }
+        Update: {
+          attempted_at?: string
+          email?: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: unknown | null
+          success?: boolean
+          user_agent?: string | null
+        }
+        Relationships: []
       }
       clients: {
         Row: {
@@ -238,6 +283,33 @@ export type Database = {
           mime_type?: string
           updated_at?: string | null
           upload_status?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      password_reset_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          token: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          token: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          token?: string
+          used_at?: string | null
           user_id?: string
         }
         Relationships: []
@@ -687,6 +759,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_password_reset_token: {
+        Args: { user_email: string }
+        Returns: string
+      }
       create_user_profile: {
         Args: {
           user_id: string
@@ -705,6 +781,25 @@ export type Database = {
       get_user_role: {
         Args: { user_id: string }
         Returns: Database["public"]["Enums"]["user_role"]
+      }
+      log_audit: {
+        Args: {
+          p_table_name: string
+          p_action: string
+          p_record_id?: string
+          p_old_values?: Json
+          p_new_values?: Json
+          p_ip_address?: unknown
+          p_user_agent?: string
+          p_session_id?: string
+          p_request_path?: string
+          p_request_method?: string
+        }
+        Returns: string
+      }
+      validate_reset_token: {
+        Args: { token_param: string }
+        Returns: string
       }
     }
     Enums: {

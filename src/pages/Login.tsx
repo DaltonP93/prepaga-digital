@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthContext } from '@/components/AuthProvider';
+import { ForgotPasswordDialog } from '@/components/ForgotPasswordDialog';
 import { toast } from 'sonner';
 
 const Login = () => {
@@ -62,6 +63,15 @@ const Login = () => {
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </Button>
+            
+            <div className="text-center">
+              <ForgotPasswordDialog>
+                <Button variant="link" type="button" className="text-sm p-0 h-auto">
+                  ¿Olvidaste tu contraseña?
+                </Button>
+              </ForgotPasswordDialog>
+            </div>
+            
             <div className="text-center text-sm">
               <span className="text-muted-foreground">¿No tienes cuenta? </span>
               <Link to="/register" className="text-primary hover:underline">
