@@ -21,6 +21,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
 
+  // All hooks must be called before any early returns
+  useEffect(() => {
+    if (user && profile && requireCompleteProfile && !isComplete && location.pathname !== '/profile') {
+      navigate('/profile');
+    }
+  }, [user, profile, requireCompleteProfile, isComplete, location.pathname, navigate]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -37,13 +44,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   if (!profile) {
     return <LoginForm />;
   }
-
-  // Redirect to profile completion if required and profile is incomplete
-  useEffect(() => {
-    if (requireCompleteProfile && !isComplete && location.pathname !== '/profile') {
-      navigate('/profile');
-    }
-  }, [requireCompleteProfile, isComplete, location.pathname, navigate]);
 
   if (requiredRole && !requiredRole.includes(profile.role)) {
     return (
