@@ -141,14 +141,15 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
         
         <Form {...form}>
           <Tabs defaultValue="info" className="h-full">
-            <TabsList className="grid w-full grid-cols-7">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="info">Info</TabsTrigger>
+              <TabsTrigger 
+                value="questions" 
+                disabled={form.watch("template_type") !== "declaration"}
+              >
+                Preguntas
+              </TabsTrigger>
               <TabsTrigger value="editor">Editor</TabsTrigger>
-              <TabsTrigger value="questions" disabled={!template}>Preguntas</TabsTrigger>
-              <TabsTrigger value="workflow" disabled={!template}>Workflow</TabsTrigger>
-              <TabsTrigger value="collaboration" disabled={!template}>Colaboración</TabsTrigger>
-              <TabsTrigger value="versions" disabled={!template}>Versiones</TabsTrigger>
-              <TabsTrigger value="analytics" disabled={!template}>Analytics</TabsTrigger>
               <TabsTrigger value="preview">Preview</TabsTrigger>
             </TabsList>
 
@@ -285,23 +286,17 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
               </TabsContent>
 
               <TabsContent value="questions" className="mt-4">
-                {template && <QuestionBuilder templateId={template.id} />}
-              </TabsContent>
-
-              <TabsContent value="workflow" className="mt-4">
-                {template && <WorkflowManager templateId={template.id} />}
-              </TabsContent>
-
-              <TabsContent value="collaboration" className="mt-4">
-                {template && <CollaborationPanel templateId={template.id} />}
-              </TabsContent>
-
-              <TabsContent value="versions" className="mt-4">
-                {template && <VersionControlPanel templateId={template.id} />}
-              </TabsContent>
-
-              <TabsContent value="analytics" className="mt-4">
-                {template && <AnalyticsDashboard templateId={template.id} />}
+                {form.watch("template_type") === "declaration" && (
+                  template ? (
+                    <QuestionBuilder templateId={template.id} />
+                  ) : (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <p className="text-sm text-yellow-800">
+                        Guarda el template primero para poder agregar preguntas
+                      </p>
+                    </div>
+                  )
+                )}
               </TabsContent>
 
               <TabsContent value="preview" className="mt-4">

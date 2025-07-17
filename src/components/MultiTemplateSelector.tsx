@@ -1,139 +1,112 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, Search, Plus } from "lucide-react";
-import { useTemplates } from "@/hooks/useTemplates";
-import { Tables } from "@/integrations/supabase/types";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ChevronDown, X } from "lucide-react";
 
-type Template = Tables<"templates">;
-
-interface MultiTemplateSelectorProps {
-  onSelectionChange?: (templates: Template[]) => void;
-  trigger?: React.ReactNode;
+interface Template {
+  id: string;
+  name: string;
+  template_type?: string;
+  question_count?: number;
 }
 
-export const MultiTemplateSelector = ({
-  onSelectionChange,
-  trigger,
-}: MultiTemplateSelectorProps) => {
+interface MultiTemplateSelectorProps {
+  selectedTemplates: string[];
+  onTemplatesChange: (templates: string[]) => void;
+  templates: Template[];
+}
+
+export function MultiTemplateSelector({
+  selectedTemplates,
+  onTemplatesChange,
+  templates
+}: MultiTemplateSelectorProps) {
   const [open, setOpen] = useState(false);
-  const [selectedTemplates, setSelectedTemplates] = useState<Template[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const { templates, isLoading } = useTemplates();
 
-  const filteredTemplates = templates?.filter((template) =>
-    template.name.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
-
-  const toggleTemplate = (template: Template) => {
-    const isSelected = selectedTemplates.some((t) => t.id === template.id);
-    const newSelected = isSelected
-      ? selectedTemplates.filter((t) => t.id !== template.id)
-      : [...selectedTemplates, template];
+  const handleTemplateToggle = (templateId: string) => {
+    const newSelection = selectedTemplates.includes(templateId)
+      ? selectedTemplates.filter(id => id !== templateId)
+      : [...selectedTemplates, templateId];
     
-    setSelectedTemplates(newSelected);
-    onSelectionChange?.(newSelected);
+    onTemplatesChange(newSelection);
   };
 
-  const defaultTrigger = (
-    <Button variant="outline">
-      <Plus className="h-4 w-4 mr-2" />
-      Seleccionar Templates
-      {selectedTemplates.length > 0 && (
-        <Badge variant="secondary" className="ml-2">
-          {selectedTemplates.length}
-        </Badge>
-      )}
-    </Button>
-  );
+  const removeTemplate = (templateId: string) => {
+    onTemplatesChange(selectedTemplates.filter(id => id !== templateId));
+  };
+
+  const selectedTemplateNames = templates
+    .filter(t => selectedTemplates.includes(t.id))
+    .map(t => t.name);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || defaultTrigger}
-      </DialogTrigger>
-      
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Selector de Multiple Templates
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar templates..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-
-          <ScrollArea className="max-h-96">
-            <div className="space-y-2">
-              {isLoading ? (
-                <div className="text-center py-8">Cargando...</div>
-              ) : filteredTemplates.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No se encontraron templates
+    <div className="space-y-2">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between"
+          >
+            {selectedTemplates.length === 0
+              ? "Seleccionar templates..."
+              : `${selectedTemplates.length} template${selectedTemplates.length > 1 ? 's' : ''} seleccionado${selectedTemplates.length > 1 ? 's' : ''}`
+            }
+            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-full p-0">
+          <ScrollArea className="h-64">
+            <div className="p-4 space-y-2">
+              {templates.map((template) => (
+                <div
+                  key={template.id}
+                  className="flex items-center space-x-2 p-2 hover:bg-accent rounded-md cursor-pointer"
+                  onClick={() => handleTemplateToggle(template.id)}
+                >
+                  <Checkbox
+                    checked={selectedTemplates.includes(template.id)}
+                    onChange={() => handleTemplateToggle(template.id)}
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{template.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {template.template_type || 'Sin tipo'} • {template.question_count || 0} preguntas
+                    </p>
+                  </div>
                 </div>
-              ) : (
-                filteredTemplates.map((template) => (
-                  <Card key={template.id} className="cursor-pointer hover:shadow-md">
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-3">
-                        <Checkbox
-                          checked={selectedTemplates.some((t) => t.id === template.id)}
-                          onCheckedChange={() => toggleTemplate(template)}
-                        />
-                        <div className="flex-1">
-                          <h4 className="font-medium">{template.name}</h4>
-                          {template.description && (
-                            <p className="text-sm text-muted-foreground">
-                              {template.description}
-                            </p>
-                          )}
-                          <Badge variant="outline" className="mt-1">
-                            {template.template_type}
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
+              ))}
             </div>
           </ScrollArea>
+        </PopoverContent>
+      </Popover>
 
-          <div className="flex justify-between">
-            <p className="text-sm text-muted-foreground">
-              {selectedTemplates.length} templates seleccionados
-            </p>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setOpen(false)}>
-                Cancelar
+      {/* Selected templates badges */}
+      {selectedTemplates.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {selectedTemplateNames.map((name, index) => (
+            <Badge key={selectedTemplates[index]} variant="secondary" className="flex items-center gap-1">
+              {name}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-4 w-4 p-0 hover:bg-transparent"
+                onClick={() => removeTemplate(selectedTemplates[index])}
+              >
+                <X className="h-3 w-3" />
               </Button>
-              <Button onClick={() => setOpen(false)}>
-                Confirmar
-              </Button>
-            </div>
-          </div>
+            </Badge>
+          ))}
         </div>
-      </DialogContent>
-    </Dialog>
+      )}
+    </div>
   );
-};
+}
