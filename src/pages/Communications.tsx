@@ -1,9 +1,23 @@
+
+import { Layout } from "@/components/Layout";
 import { CommunicationManager } from "@/components/CommunicationManager";
 
 export default function Communications() {
   return (
-    <div className="container mx-auto px-4 py-8">
-      <CommunicationManager />
-    </div>
+    <Layout 
+      title="Comunicaciones" 
+      description="Gestiona las comunicaciones con clientes"
+    >
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Comunicaciones</h2>
+          <p className="text-muted-foreground">
+            Gestiona y visualiza todas las comunicaciones con clientes
+          </p>
+        </div>
+        
+        <CommunicationManager />
+      </div>
+    </Layout>
   );
 }

@@ -1,24 +1,26 @@
-
 import { useState } from 'react';
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Building2, Users, FileText } from "lucide-react";
+import { Plus, Search, Building2, Users, FileText, Palette } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useCompanies } from "@/hooks/useCompanies";
 import { useAuthContext } from "@/components/AuthProvider";
 import { CompanyForm } from "@/components/CompanyForm";
 import { CompanyActions } from "@/components/CompanyActions";
+import { CompanyBrandingForm } from "@/components/CompanyBrandingForm";
 
 const Companies = () => {
   const { profile } = useAuthContext();
   const { data: companies, isLoading } = useCompanies();
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showBrandingForm, setShowBrandingForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
   const canCreateCompany = profile?.role === 'super_admin';
+  const canManageBranding = ['admin', 'super_admin'].includes(profile?.role || '');
   
   const filteredCompanies = companies?.filter(company =>
     company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -54,13 +56,45 @@ const Companies = () => {
               />
             </div>
           </div>
-          {canCreateCompany && (
-            <Button onClick={() => setShowCreateForm(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nueva Empresa
-            </Button>
-          )}
+          <div className="flex space-x-2">
+            {canManageBranding && (
+              <Button 
+                variant="outline" 
+                onClick={() => setShowBrandingForm(true)}
+              >
+                <Palette className="mr-2 h-4 w-4" />
+                Personalizar Marca
+              </Button>
+            )}
+            {canCreateCompany && (
+              <Button onClick={() => setShowCreateForm(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Nueva Empresa
+              </Button>
+            )}
+          </div>
         </div>
+
+        {/* Branding Form */}
+        {showBrandingForm && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
+                <h3 className="text-lg font-semibold">Personalización de Marca</h3>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setShowBrandingForm(false)}
+                >
+                  ✕
+                </Button>
+              </div>
+              <div className="p-6">
+                <CompanyBrandingForm />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-4">
