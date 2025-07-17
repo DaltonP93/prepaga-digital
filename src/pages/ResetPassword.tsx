@@ -1,100 +1,208 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { usePasswordReset } from '@/hooks/usePasswordReset';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 
-const ResetPassword = () => {
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { updatePassword } = usePasswordReset();
+import { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { InfoIcon } from "lucide-react";
+import { usePasswordReset } from "@/hooks/usePasswordReset";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+
+const resetPasswordSchema = z
+  .object({
+    password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Las contraseñas no coinciden",
+    path: ["confirmPassword"],
+  });
+
+type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
+
+export default function ResetPassword() {
+  const [resetSuccess, setResetSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [validatingToken, setValidatingToken] = useState(true);
+  const { updatePassword, loading } = usePasswordReset();
+  const { toast } = useToast();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const location = useLocation();
 
+  // Verificar que el token de recuperación sea válido
   useEffect(() => {
-    // Verificar si hay una sesión válida del enlace de reset
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error('Enlace de recuperación inválido o expirado');
-        navigate('/login');
+      try {
+        // La función getSession detectará automáticamente el token en la URL
+        const { data } = await supabase.auth.getSession();
+        
+        if (!data.session) {
+          setError("El enlace de recuperación es inválido o ha expirado. Solicita uno nuevo.");
+        }
+      } catch (error: any) {
+        setError("Ocurrió un error al validar tu solicitud de recuperación.");
+      } finally {
+        setValidatingToken(false);
       }
     };
 
     checkSession();
-  }, [navigate]);
+  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (password !== confirmPassword) {
-      toast.error('Las contraseñas no coinciden');
-      return;
-    }
+  const form = useForm<ResetPasswordValues>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: {
+      password: "",
+      confirmPassword: "",
+    },
+  });
 
-    if (password.length < 6) {
-      toast.error('La contraseña debe tener al menos 6 caracteres');
-      return;
+  const onSubmit = async (values: ResetPasswordValues) => {
+    try {
+      const { success } = await updatePassword(values.password);
+      
+      if (success) {
+        setResetSuccess(true);
+        setTimeout(() => {
+          navigate("/login");
+        }, 3000);
+      }
+    } catch (error: any) {
+      setError(error.message || "No se pudo actualizar la contraseña");
     }
-
-    setLoading(true);
-    const result = await updatePassword(password);
-    
-    if (result.success) {
-      toast.success('Contraseña actualizada exitosamente. Redirigiendo...');
-      setTimeout(() => {
-        navigate('/');
-      }, 2000);
-    }
-    setLoading(false);
   };
 
+  if (validatingToken) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Verificando enlace</CardTitle>
+            <CardDescription>Estamos validando tu solicitud...</CardDescription>
+          </CardHeader>
+          <CardContent className="flex justify-center p-6">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-destructive">Error</CardTitle>
+            <CardDescription>No se pudo restablecer la contraseña</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Alert variant="destructive">
+              <InfoIcon className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          </CardContent>
+          <CardFooter>
+            <Button onClick={() => navigate("/login")} className="w-full">
+              Volver a inicio de sesión
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
+  if (resetSuccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-green-500">¡Éxito!</CardTitle>
+            <CardDescription>Tu contraseña ha sido actualizada</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Alert>
+              <InfoIcon className="h-4 w-4" />
+              <AlertTitle>Contraseña actualizada</AlertTitle>
+              <AlertDescription>
+                La contraseña se ha cambiado correctamente. Serás redirigido a la página de inicio de sesión en unos segundos.
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Nueva Contraseña</CardTitle>
-          <CardDescription>Ingresa tu nueva contraseña</CardDescription>
+        <CardHeader>
+          <CardTitle>Restablecer contraseña</CardTitle>
+          <CardDescription>Crea una nueva contraseña para tu cuenta</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="password">Nueva Contraseña</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                placeholder="Mínimo 6 caracteres"
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nueva contraseña</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="********" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Tu contraseña debe tener al menos 8 caracteres
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div>
-              <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                minLength={6}
-                placeholder="Repite la contraseña"
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirmar contraseña</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="********" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Actualizando...' : 'Actualizar Contraseña'}
-            </Button>
-          </form>
+
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Actualizando..." : "Actualizar contraseña"}
+              </Button>
+            </form>
+          </Form>
         </CardContent>
       </Card>
     </div>
   );
-};
-
-export default ResetPassword;
+}
