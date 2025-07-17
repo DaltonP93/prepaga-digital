@@ -2,13 +2,21 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface BrandingConfig {
-  login_title: string;
-  login_subtitle: string;
-  login_logo_url: string;
-  login_background_url: string;
-  primary_color: string;
-  secondary_color: string;
-  accent_color: string;
+  login_title?: string;
+  login_subtitle?: string;
+  login_logo_url?: string;
+  login_background_url?: string;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  companyName?: string;
+  logoUrl?: string;
+  favicon?: string;
+  fontFamily?: string;
+  borderRadius?: string;
+  shadows?: boolean;
+  darkMode?: boolean;
+  customCSS?: string;
 }
 
 export const useBranding = () => {
@@ -30,9 +38,9 @@ export const useBranding = () => {
             login_subtitle: data.login_subtitle || "Sistema de Firma Digital",
             login_logo_url: data.login_logo_url || "",
             login_background_url: data.login_background_url || "",
-            primary_color: data.primary_color || "#667eea",
-            secondary_color: data.secondary_color || "#764ba2",
-            accent_color: data.accent_color || "#4ade80",
+            primaryColor: data.primary_color || "#667eea",
+            secondaryColor: data.secondary_color || "#764ba2",
+            accentColor: data.accent_color || "#4ade80",
           });
         }
       } catch (error) {
@@ -64,12 +72,12 @@ export const useBranding = () => {
   const resetBranding = async () => {
     const defaultBranding: BrandingConfig = {
       login_title: "Seguro Digital",
-      login_subtitle: "Sistema de Firma Digital",
+      login_subtitle: "Sistema de Firma Digital", 
       login_logo_url: "",
       login_background_url: "",
-      primary_color: "#667eea",
-      secondary_color: "#764ba2",
-      accent_color: "#4ade80",
+      primaryColor: "#667eea",
+      secondaryColor: "#764ba2",
+      accentColor: "#4ade80",
     };
 
     try {
