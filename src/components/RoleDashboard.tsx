@@ -8,6 +8,7 @@ import { useSales } from "@/hooks/useSales";
 import { useClients } from "@/hooks/useClients";
 import { useTemplates } from "@/hooks/useTemplates";
 import { usePlans } from "@/hooks/usePlans";
+import { useCompanies } from "@/hooks/useCompanies";
 
 export function RoleDashboard() {
   const { profile } = useAuthContext();
@@ -15,6 +16,7 @@ export function RoleDashboard() {
   const { data: clients = [] } = useClients();
   const { templates = [] } = useTemplates();
   const { data: plans = [] } = usePlans();
+  const { data: companies = [] } = useCompanies();
 
   if (!profile) return null;
 
@@ -48,6 +50,9 @@ export function RoleDashboard() {
   });
 
   const monthlyAmount = monthlySales.reduce((sum, sale) => sum + (sale.total_amount || 0), 0);
+
+  // Find the user's company
+  const userCompany = companies.find(company => company.id === profile?.company_id);
 
   const getInitials = (firstName: string, lastName: string) => {
     return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
@@ -84,9 +89,9 @@ export function RoleDashboard() {
                   {userRole === 'gestor' && 'Gestor'}
                   {userRole === 'vendedor' && 'Vendedor'}
                 </Badge>
-                {profile.companies && (
+                {userCompany && (
                   <span className="text-sm text-muted-foreground">
-                    • {profile.companies.name}
+                    • {userCompany.name}
                   </span>
                 )}
               </div>
