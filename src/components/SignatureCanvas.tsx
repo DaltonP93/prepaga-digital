@@ -1,179 +1,133 @@
-
-import { useRef, useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { RotateCcw, Check, Loader2 } from 'lucide-react';
+import { useRef, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RotateCcw, Check } from "lucide-react";
 
 interface SignatureCanvasProps {
-  onSign: (signature: string) => void;
-  disabled?: boolean;
-  isProcessing?: boolean;
+  onSignatureChange?: (signatureData: string | null) => void;
+  width?: number;
+  height?: number;
 }
 
-export const SignatureCanvas = ({ onSign, disabled = false, isProcessing = false }: SignatureCanvasProps) => {
+export const SignatureCanvas = ({ 
+  onSignatureChange, 
+  width = 400, 
+  height = 200 
+}: SignatureCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [hasSignature, setHasSignature] = useState(false);
+  const [isEmpty, setIsEmpty] = useState(true);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Set up canvas
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * devicePixelRatio;
-    canvas.height = rect.height * devicePixelRatio;
-    ctx.scale(devicePixelRatio, devicePixelRatio);
-
-    ctx.strokeStyle = '#000000';
+    // Configurar el canvas
+    ctx.strokeStyle = "#000000";
     ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-  }, []);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    // Limpiar canvas
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+  }, [width, height]);
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (disabled || isProcessing) return;
-    
+    setIsDrawing(true);
+    setIsEmpty(false);
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    setIsDrawing(true);
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
     ctx.beginPath();
     ctx.moveTo(x, y);
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || disabled || isProcessing) return;
+    if (!isDrawing) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
     ctx.lineTo(x, y);
     ctx.stroke();
-    setHasSignature(true);
   };
 
   const stopDrawing = () => {
     setIsDrawing(false);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Obtener datos de la firma
+    const signatureData = canvas.toDataURL();
+    onSignatureChange?.(signatureData);
   };
 
   const clearSignature = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    setHasSignature(false);
-  };
-
-  const saveSignature = () => {
-    const canvas = canvasRef.current;
-    if (!canvas || !hasSignature) return;
-
-    const dataURL = canvas.toDataURL('image/png');
-    onSign(dataURL);
-  };
-
-  // Touch events for mobile
-  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    const touch = e.touches[0];
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    
-    const mouseEvent = {
-      clientX: touch.clientX,
-      clientY: touch.clientY
-    } as React.MouseEvent<HTMLCanvasElement>;
-    startDrawing(mouseEvent);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    const touch = e.touches[0];
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    
-    const mouseEvent = {
-      clientX: touch.clientX,
-      clientY: touch.clientY
-    } as React.MouseEvent<HTMLCanvasElement>;
-    draw(mouseEvent);
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    stopDrawing();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+    setIsEmpty(true);
+    onSignatureChange?.(null);
   };
 
   return (
-    <Card>
+    <Card className="w-fit">
       <CardHeader>
-        <CardTitle className="text-lg">Firma Digital</CardTitle>
-        <p className="text-sm text-muted-foreground">
-          {isProcessing ? 'Procesando firma...' : 'Dibuje su firma en el área de abajo'}
-        </p>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Check className="h-5 w-5" />
+          Firma Digital
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50">
+        <div className="border-2 border-dashed border-border rounded-lg p-2">
           <canvas
             ref={canvasRef}
-            className={`w-full h-32 bg-white border rounded ${
-              disabled || isProcessing ? 'cursor-not-allowed opacity-50' : 'cursor-crosshair'
-            }`}
+            width={width}
+            height={height}
+            className="border border-border rounded cursor-crosshair"
             onMouseDown={startDrawing}
             onMouseMove={draw}
             onMouseUp={stopDrawing}
             onMouseLeave={stopDrawing}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            style={{ touchAction: 'none' }}
           />
         </div>
-
-        <div className="flex gap-2 justify-between">
+        <div className="flex gap-2">
           <Button
-            type="button"
             variant="outline"
+            size="sm"
             onClick={clearSignature}
-            disabled={disabled || !hasSignature || isProcessing}
+            disabled={isEmpty}
           >
             <RotateCcw className="h-4 w-4 mr-2" />
             Limpiar
           </Button>
-
-          <Button
-            onClick={saveSignature}
-            disabled={disabled || !hasSignature || isProcessing}
-          >
-            {isProcessing ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Check className="h-4 w-4 mr-2" />
-            )}
-            {isProcessing ? 'Procesando...' : 'Confirmar Firma'}
-          </Button>
         </div>
+        <p className="text-sm text-muted-foreground">
+          Dibuja tu firma en el recuadro usando el mouse
+        </p>
       </CardContent>
     </Card>
   );
