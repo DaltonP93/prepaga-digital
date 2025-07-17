@@ -20,6 +20,7 @@ import {
   ToggleLeft,
   PenTool
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useTemplatePlaceholders } from '@/hooks/useTemplatePlaceholders';
 import { DraggablePlaceholdersSidebar } from '@/components/DraggablePlaceholdersSidebar';
 import { ImageManager } from '@/components/ImageManager';
@@ -148,8 +149,10 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       StarterKit,
       Underline,
       Image.configure({
+        inline: false,
+        allowBase64: true,
         HTMLAttributes: {
-          class: 'max-w-full h-auto rounded-lg',
+          class: 'max-w-full h-auto rounded-lg my-2',
         },
       }),
       Placeholder.configure({
@@ -266,9 +269,20 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   }, [editor]);
 
   const handleImageSelect = useCallback((url: string) => {
+    console.log('Image selection triggered:', url);
+    console.log('Editor available:', !!editor);
+    
     if (editor) {
+      // Ensure editor is focused and ready
       editor.chain().focus().setImage({ src: url }).run();
+      console.log('Image insertion command executed');
       setShowImageManager(false);
+      
+      // Add toast feedback
+      toast.success('Imagen insertada correctamente');
+    } else {
+      console.error('Editor not available for image insertion');
+      toast.error('Error: Editor no disponible');
     }
   }, [editor]);
 
