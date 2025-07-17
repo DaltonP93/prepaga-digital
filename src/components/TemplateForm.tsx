@@ -40,6 +40,11 @@ import { QuestionnairePreview } from "@/components/QuestionnairePreview";
 import { VisualTemplateEditor } from "@/components/VisualTemplateEditor";
 import { Plus, Edit } from "lucide-react";
 import { Tables } from "@/integrations/supabase/types";
+import { WorkflowManager } from "@/components/WorkflowManager";
+import { CollaborationPanel } from "@/components/CollaborationPanel";
+import { VersionControlPanel } from "@/components/VersionControlPanel";
+import { AnalyticsDashboard } from "@/components/AnalyticsDashboard";
+import { useTemplateAnalytics } from "@/hooks/useTemplateAnalytics";
 
 const templateSchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
@@ -62,6 +67,7 @@ interface TemplateFormProps {
 export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
   const [open, setOpen] = useState(false);
   const { createTemplate, updateTemplate, isCreating, isUpdating } = useTemplates();
+  const analytics = useTemplateAnalytics();
 
   const form = useForm<TemplateFormData>({
     resolver: zodResolver(templateSchema),
@@ -135,11 +141,15 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
         </DialogHeader>
         
         <Tabs defaultValue="info" className="h-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="info">Información</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-7">
+            <TabsTrigger value="info">Info</TabsTrigger>
             <TabsTrigger value="editor">Editor</TabsTrigger>
             <TabsTrigger value="questions" disabled={!template}>Preguntas</TabsTrigger>
-            <TabsTrigger value="preview">Vista Previa</TabsTrigger>
+            <TabsTrigger value="workflow" disabled={!template}>Workflow</TabsTrigger>
+            <TabsTrigger value="collaboration" disabled={!template}>Colaboración</TabsTrigger>
+            <TabsTrigger value="versions" disabled={!template}>Versiones</TabsTrigger>
+            <TabsTrigger value="analytics" disabled={!template}>Analytics</TabsTrigger>
+            <TabsTrigger value="preview">Preview</TabsTrigger>
           </TabsList>
 
           <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
@@ -278,6 +288,22 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
 
             <TabsContent value="questions" className="mt-4">
               {template && <QuestionBuilder templateId={template.id} />}
+            </TabsContent>
+
+            <TabsContent value="workflow" className="mt-4">
+              {template && <WorkflowManager templateId={template.id} />}
+            </TabsContent>
+
+            <TabsContent value="collaboration" className="mt-4">
+              {template && <CollaborationPanel templateId={template.id} />}
+            </TabsContent>
+
+            <TabsContent value="versions" className="mt-4">
+              {template && <VersionControlPanel templateId={template.id} />}
+            </TabsContent>
+
+            <TabsContent value="analytics" className="mt-4">
+              {template && <AnalyticsDashboard templateId={template.id} />}
             </TabsContent>
 
             <TabsContent value="preview" className="mt-4">
