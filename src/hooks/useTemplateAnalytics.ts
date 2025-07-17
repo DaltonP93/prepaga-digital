@@ -5,7 +5,7 @@ import { subDays, format, startOfDay, endOfDay } from "date-fns";
 export interface TemplateAnalytics {
   id: string;
   template_id: string;
-  event_type: "view" | "edit" | "pdf_generated" | "shared" | "duplicated";
+  event_type: "view" | "edit" | "pdf_generated" | "shared" | "duplicated" | "template_updated";
   user_id: string | null;
   session_id: string | null;
   metadata: Record<string, any>;
@@ -35,6 +35,25 @@ export interface AnalyticsMetrics {
     percentage: number;
   }>;
 }
+
+// Function to track events
+export const trackEvent = async (
+  eventType: TemplateAnalytics["event_type"],
+  templateId: string,
+  metadata?: Record<string, any>
+) => {
+  try {
+    await supabase
+      .from("template_analytics")
+      .insert({
+        template_id: templateId,
+        event_type: eventType,
+        metadata: metadata || {},
+      });
+  } catch (error) {
+    console.error("Error tracking event:", error);
+  }
+};
 
 export const useTemplateAnalytics = (templateId?: string, days = 30) => {
   const fromDate = subDays(new Date(), days);
@@ -153,6 +172,11 @@ export const useTemplateAnalytics = (templateId?: string, days = 30) => {
     metrics,
     isLoadingAnalytics,
     analyticsError,
+    trackEvent: (eventType: TemplateAnalytics["event_type"], metadata?: Record<string, any>) => {
+      if (templateId) {
+        return trackEvent(eventType, templateId, metadata);
+      }
+    },
   };
 };
 

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -67,7 +66,7 @@ interface TemplateFormProps {
 export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
   const [open, setOpen] = useState(false);
   const { createTemplate, updateTemplate, isCreating, isUpdating } = useTemplates();
-  const analytics = useTemplateAnalytics();
+  const { trackEvent } = useTemplateAnalytics(template?.id);
 
   const form = useForm<TemplateFormData>({
     resolver: zodResolver(templateSchema),
@@ -103,7 +102,7 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
 
       if (template) {
         updateTemplate({ id: template.id, updates: templateData });
-        analytics.trackEvent('template_updated', template.id);
+        trackEvent?.('template_updated');
       } else {
         createTemplate(templateData);
       }
