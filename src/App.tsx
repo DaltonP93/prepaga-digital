@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/components/AuthProvider";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -8,32 +8,25 @@ import Sales from "@/pages/Sales";
 import Clients from "@/pages/Clients";
 import Plans from "@/pages/Plans";
 import Templates from "@/pages/Templates";
-import TemplateEditor from "@/pages/TemplateEditor";
 import SignatureWorkflow from "@/pages/SignatureWorkflow";
-import Signature from "@/pages/Signature";
-import Questionnaire from "@/pages/Questionnaire";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
-import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
-import EmailVerification from "@/pages/EmailVerification";
-import Beneficiaries from "@/pages/Beneficiaries";
 import Documents from "@/pages/Documents";
-import Communication from "@/pages/Communication";
 import APIConfig from "@/pages/APIConfig";
+
+const queryClient = new QueryClient();
 
 function App() {
   return (
-    <QueryClient>
+    <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <Toaster />
         <Router>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/email-verification" element={<EmailVerification />} />
             <Route
               path="/"
               element={
@@ -75,28 +68,10 @@ function App() {
               }
             />
             <Route
-              path="/templates/:id"
-              element={
-                <ProtectedRoute>
-                  <TemplateEditor />
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/signature-workflow"
               element={
                 <ProtectedRoute>
                   <SignatureWorkflow />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="/signature/:token" element={<Signature />} />
-            <Route path="/questionnaire/:token" element={<Questionnaire />} />
-            <Route
-              path="/beneficiaries"
-              element={
-                <ProtectedRoute>
-                  <Beneficiaries />
                 </ProtectedRoute>
               }
             />
@@ -105,14 +80,6 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Documents />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/communication"
-              element={
-                <ProtectedRoute>
-                  <Communication />
                 </ProtectedRoute>
               }
             />
@@ -127,7 +94,7 @@ function App() {
           </Routes>
         </Router>
       </AuthProvider>
-    </QueryClient>
+    </QueryClientProvider>
   );
 }
 

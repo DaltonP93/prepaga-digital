@@ -4,26 +4,25 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useCompanySettings, useCompanyBranding } from '@/hooks/useCompanySettings';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useAuthContext } from '@/components/AuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Settings, Palette, MessageSquare } from 'lucide-react';
 
 export const AdminConfigPanel = () => {
-  const { user } = useAuthContext();
+  const { profile } = useAuthContext();
   const [activeTab, setActiveTab] = useState('general');
   
   // Obtener ID de empresa del usuario actual
-  const companyId = user?.user_metadata?.company_id;
-  const { settings, updateSettings, isUpdating } = useCompanySettings(companyId);
-  const { data: branding } = useCompanyBranding(companyId);
+  const companyId = profile?.company_id;
+  const { settings, isLoading, updateSettings } = useCompanySettings();
+  const [branding, setBranding] = useState<any>(null);
 
   const [formData, setFormData] = useState({
     // API Keys
     whatsapp_api_key: '',
     sms_api_key: '',
-    email_api_key: '',
     resend_api_key: '',
     twilio_account_sid: '',
     twilio_auth_token: '',
@@ -45,7 +44,6 @@ export const AdminConfigPanel = () => {
         ...prev,
         whatsapp_api_key: settings.whatsapp_api_key || '',
         sms_api_key: settings.sms_api_key || '',
-        email_api_key: settings.email_api_key || '',
         resend_api_key: settings.resend_api_key || '',
         twilio_account_sid: settings.twilio_account_sid || '',
         twilio_auth_token: settings.twilio_auth_token || '',
@@ -54,33 +52,49 @@ export const AdminConfigPanel = () => {
   }, [settings]);
 
   useEffect(() => {
-    if (branding) {
-      setFormData(prev => ({
-        ...prev,
-        login_title: branding.login_title || 'Seguro Digital',
-        login_subtitle: branding.login_subtitle || 'Sistema de Firma Digital',
-        login_background_url: branding.login_background_url || '',
-        login_logo_url: branding.login_logo_url || '',
-        primary_color: branding.primary_color || '#667eea',
-        secondary_color: branding.secondary_color || '#764ba2',
-        accent_color: branding.accent_color || '#4ade80',
-      }));
-    }
-  }, [branding]);
+    const fetchBranding = async () => {
+      if (!companyId) return;
+      
+      const { data } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('id', companyId)
+        .single();
+
+      if (data) {
+        setBranding(data);
+        setFormData(prev => ({
+          ...prev,
+          login_title: data.login_title || 'Seguro Digital',
+          login_subtitle: data.login_subtitle || 'Sistema de Firma Digital',
+          login_background_url: data.login_background_url || '',
+          login_logo_url: data.login_logo_url || '',
+          primary_color: data.primary_color || '#667eea',
+          secondary_color: data.secondary_color || '#764ba2',
+          accent_color: data.accent_color || '#4ade80',
+        }));
+      }
+    };
+
+    fetchBranding();
+  }, [companyId]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSaveAPIKeys = () => {
-    updateSettings({
-      whatsapp_api_key: formData.whatsapp_api_key,
-      sms_api_key: formData.sms_api_key,
-      email_api_key: formData.email_api_key,
-      resend_api_key: formData.resend_api_key,
-      twilio_account_sid: formData.twilio_account_sid,
-      twilio_auth_token: formData.twilio_auth_token,
-    });
+  const handleSaveAPIKeys = async () => {
+    try {
+      await updateSettings.mutateAsync({
+        whatsapp_api_key: formData.whatsapp_api_key,
+        sms_api_key: formData.sms_api_key,
+        resend_api_key: formData.resend_api_key,
+        twilio_account_sid: formData.twilio_account_sid,
+        twilio_auth_token: formData.twilio_auth_token,
+      });
+    } catch (error) {
+      console.error('Error saving API keys:', error);
+    }
   };
 
   const handleSaveBranding = async () => {
@@ -164,8 +178,8 @@ export const AdminConfigPanel = () => {
                   />
                 </div>
               </div>
-              <Button onClick={handleSaveBranding} disabled={isUpdating}>
-                {isUpdating ? 'Guardando...' : 'Guardar Configuración'}
+              <Button onClick={handleSaveBranding} disabled={isLoading}>
+                {isLoading ? 'Guardando...' : 'Guardar Configuración'}
               </Button>
             </CardContent>
           </Card>
@@ -231,8 +245,8 @@ export const AdminConfigPanel = () => {
                 </div>
               </div>
 
-              <Button onClick={handleSaveBranding} disabled={isUpdating}>
-                {isUpdating ? 'Guardando...' : 'Guardar Branding'}
+              <Button onClick={handleSaveBranding} disabled={isLoading}>
+                {isLoading ? 'Guardando...' : 'Guardar Branding'}
               </Button>
             </CardContent>
           </Card>
@@ -290,8 +304,8 @@ export const AdminConfigPanel = () => {
                 </div>
               </div>
               
-              <Button onClick={handleSaveAPIKeys} disabled={isUpdating}>
-                {isUpdating ? 'Guardando...' : 'Guardar API Keys'}
+              <Button onClick={handleSaveAPIKeys} disabled={isLoading}>
+                {isLoading ? 'Guardando...' : 'Guardar API Keys'}
               </Button>
             </CardContent>
           </Card>

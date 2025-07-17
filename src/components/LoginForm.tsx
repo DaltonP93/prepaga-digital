@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useAuthContext } from '@/components/AuthProvider';
-import { useCompanyBranding } from '@/hooks/useCompanySettings';
+import { useBranding } from '@/hooks/useBranding';
 import { toast } from 'sonner';
 import { usePasswordReset } from '@/hooks/usePasswordReset';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
@@ -19,7 +19,7 @@ export const LoginForm = () => {
   const { requestPasswordReset } = usePasswordReset();
   
   // Obtener configuración de branding basada en el dominio o configuración por defecto
-  const { data: branding } = useCompanyBranding(companyId || undefined);
+  const { branding } = useBranding();
 
   // Detectar empresa por dominio o usar configuración por defecto
   useEffect(() => {

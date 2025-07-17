@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
-import { useSidebar } from "@/components/SidebarProvider";
 import { useAuthContext } from "@/components/AuthProvider";
-import { useSignOut } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -26,6 +25,7 @@ import {
   CheckSquare,
   Package,
   KanbanSquare,
+  Users,
   LucideIcon,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -50,11 +50,14 @@ interface NavItem {
 export function AppSidebar() {
   const { profile } = useAuthContext();
   const location = useLocation();
-  const { collapsed } = useSidebar();
-  const signOut = useSignOut();
+  const { signOut } = useAuth();
 
   const handleSignOut = async () => {
-    await signOut.mutateAsync();
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
 
   const navigationItems: NavItem[] = [
@@ -118,7 +121,7 @@ export function AppSidebar() {
             <Button variant="ghost" className="relative h-8 w-8 rounded-full">
               <Bell className="h-4 w-4" />
               <Badge
-                variant="primary"
+                variant="secondary"
                 className="absolute -top-1 -right-1 h-4 w-4 rounded-full"
               >
                 2
