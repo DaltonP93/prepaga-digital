@@ -3,6 +3,8 @@ import SalesOverviewWidget from './widgets/SalesOverviewWidget';
 import RecentClientsWidget from './widgets/RecentClientsWidget';
 import QuickActionsWidget from './widgets/QuickActionsWidget';
 import NotificationsWidget from './widgets/NotificationsWidget';
+import SalesByUserWidget from './widgets/SalesByUserWidget';
+import ConversionMetricsWidget from './widgets/ConversionMetricsWidget';
 import AdvancedAnalytics from './AdvancedAnalytics';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
@@ -13,6 +15,8 @@ const WIDGET_COMPONENTS = {
   'notifications': NotificationsWidget,
   'quick_actions': QuickActionsWidget,
   'analytics_chart': AdvancedAnalytics,
+  'sales_by_user': SalesByUserWidget,
+  'conversion_metrics': ConversionMetricsWidget,
   'pending_documents': () => (
     <Card>
       <CardContent className="p-6">

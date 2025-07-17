@@ -291,6 +291,87 @@ export const useCommunications = () => {
     },
   });
 
+  // Enviar comunicación individual
+  const sendCommunication = useMutation({
+    mutationFn: async ({
+      type,
+      recipientId,
+      recipientEmail,
+      recipientPhone,
+      content,
+      subject
+    }: {
+      type: 'email' | 'sms' | 'whatsapp';
+      recipientId: string;
+      recipientEmail?: string;
+      recipientPhone?: string;
+      content: string;
+      subject?: string;
+    }) => {
+      // Crear registro en communication_logs
+      const logData = {
+        type,
+        recipient_id: recipientId,
+        recipient_email: recipientEmail,
+        recipient_phone: recipientPhone,
+        content,
+        subject,
+        status: 'pending',
+        company_id: (await supabase.auth.getUser()).data.user?.user_metadata?.company_id || ''
+      };
+
+      const { data: logEntry, error: logError } = await supabase
+        .from('communication_logs')
+        .insert([logData])
+        .select()
+        .single();
+
+      if (logError) throw logError;
+
+      // Enviar según el tipo
+      if (type === 'email') {
+        const { data, error } = await supabase.functions.invoke('send-notification', {
+          body: { 
+            type: 'email',
+            to: recipientEmail,
+            subject,
+            content,
+            logId: logEntry.id
+          },
+        });
+        if (error) throw error;
+        return data;
+      } else if (type === 'sms' || type === 'whatsapp') {
+        const { data, error } = await supabase.functions.invoke('send-notification', {
+          body: { 
+            type,
+            to: recipientPhone,
+            content,
+            logId: logEntry.id
+          },
+        });
+        if (error) throw error;
+        return data;
+      }
+
+      return logEntry;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['communication-logs'] });
+      toast({
+        title: "Comunicación enviada",
+        description: `${variables.type === 'email' ? 'Email' : variables.type === 'sms' ? 'SMS' : 'WhatsApp'} enviado exitosamente.`,
+      });
+    },
+    onError: (error, variables) => {
+      toast({
+        title: "Error",
+        description: `No se pudo enviar el ${variables.type}.`,
+        variant: "destructive",
+      });
+    },
+  });
+
   return {
     // Data
     emailCampaigns,
@@ -303,6 +384,7 @@ export const useCommunications = () => {
     isLoadingTemplates,
     isLoadingSmsCampaigns,
     isLoadingLogs,
+    isLoading: isLoadingCampaigns || isLoadingTemplates || isLoadingSmsCampaigns || isLoadingLogs,
 
     // Mutations
     createEmailCampaign,
@@ -310,6 +392,7 @@ export const useCommunications = () => {
     createEmailTemplate,
     createSmsCampaign,
     sendSmsCampaign,
+    sendCommunication,
 
     // Mutation states
     isCreatingEmailCampaign: createEmailCampaign.isPending,

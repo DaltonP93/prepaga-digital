@@ -11,6 +11,7 @@ import { BeneficiariesManager } from "@/components/BeneficiariesManager";
 import { SaleDocuments } from "@/components/SaleDocuments";
 import { SaleNotes } from "@/components/SaleNotes";
 import { SaleRequirements } from "@/components/SaleRequirements";
+import CommunicationShareModal from "@/components/CommunicationShareModal";
 import { useSales, useGenerateSignatureLink, useGenerateQuestionnaireLink } from "@/hooks/useSales";
 import { Database } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +34,15 @@ const Sales = () => {
   const [showDocuments, setShowDocuments] = useState<string | null>(null);
   const [showNotes, setShowNotes] = useState<string | null>(null);
   const [showRequirements, setShowRequirements] = useState<string | null>(null);
+  const [showCommunicationModal, setShowCommunicationModal] = useState(false);
+  const [communicationData, setCommunicationData] = useState<{
+    saleId: string;
+    clientName: string;
+    clientEmail?: string;
+    clientPhone?: string;
+    shareUrl: string;
+    shareType: 'questionnaire' | 'signature';
+  } | null>(null);
   const { data: sales = [], isLoading } = useSales();
   const generateSignatureLink = useGenerateSignatureLink();
   const generateQuestionnaireLink = useGenerateQuestionnaireLink();
@@ -452,6 +462,22 @@ const Sales = () => {
             saleId={showRequirements}
             open={!!showRequirements}
             onOpenChange={(open) => !open && setShowRequirements(null)}
+          />
+        )}
+
+        {showCommunicationModal && communicationData && (
+          <CommunicationShareModal
+            isOpen={showCommunicationModal}
+            onClose={() => {
+              setShowCommunicationModal(false);
+              setCommunicationData(null);
+            }}
+            saleId={communicationData.saleId}
+            clientName={communicationData.clientName}
+            clientEmail={communicationData.clientEmail}
+            clientPhone={communicationData.clientPhone}
+            shareUrl={communicationData.shareUrl}
+            shareType={communicationData.shareType}
           />
         )}
       </div>

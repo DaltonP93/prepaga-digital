@@ -19,8 +19,10 @@ const DEFAULT_WIDGETS: Omit<DashboardWidget, 'id' | 'user_id' | 'created_at' | '
   { widget_type: 'recent_clients', position: 1, size: 'medium', visible: true, settings: {} },
   { widget_type: 'notifications', position: 2, size: 'medium', visible: true, settings: {} },
   { widget_type: 'quick_actions', position: 3, size: 'small', visible: true, settings: {} },
-  { widget_type: 'analytics_chart', position: 4, size: 'large', visible: true, settings: {} },
-  { widget_type: 'pending_documents', position: 5, size: 'medium', visible: true, settings: {} }
+  { widget_type: 'sales_by_user', position: 4, size: 'large', visible: true, settings: {} },
+  { widget_type: 'conversion_metrics', position: 5, size: 'medium', visible: true, settings: {} },
+  { widget_type: 'analytics_chart', position: 6, size: 'large', visible: false, settings: {} },
+  { widget_type: 'pending_documents', position: 7, size: 'medium', visible: false, settings: {} }
 ];
 
 export const useDashboardWidgets = () => {
