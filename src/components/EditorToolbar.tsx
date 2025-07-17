@@ -19,7 +19,8 @@ import {
   AlignRight,
   Heading1,
   Heading2,
-  Heading3
+  Heading3,
+  MessageSquare
 } from 'lucide-react';
 import { Editor } from '@tiptap/react';
 import {
@@ -33,12 +34,14 @@ interface EditorToolbarProps {
   editor: Editor;
   onImageClick: () => void;
   onSignatureClick: () => void;
+  onQuestionClick?: () => void;
 }
 
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   editor,
   onImageClick,
   onSignatureClick,
+  onQuestionClick,
 }) => {
   const ToolbarButton = ({ 
     onClick, 
@@ -238,6 +241,14 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           >
             <PenTool className="w-4 h-4" />
           </ToolbarButton>
+          {onQuestionClick && (
+            <ToolbarButton
+              onClick={onQuestionClick}
+              tooltip="Insertar pregunta dinámica"
+            >
+              <MessageSquare className="w-4 h-4" />
+            </ToolbarButton>
+          )}
         </div>
       </div>
     </TooltipProvider>

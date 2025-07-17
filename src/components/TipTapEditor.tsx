@@ -24,6 +24,7 @@ import { useTemplatePlaceholders } from '@/hooks/useTemplatePlaceholders';
 import { DraggablePlaceholdersSidebar } from '@/components/DraggablePlaceholdersSidebar';
 import { ImageManager } from '@/components/ImageManager';
 import { EditorToolbar } from '@/components/EditorToolbar';
+import { DynamicQuestionExtension } from '@/components/DynamicQuestionExtension';
 
 // Custom extension for dynamic placeholders
 const DynamicPlaceholder = Node.create({
@@ -157,6 +158,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       TextStyle,
       DynamicPlaceholder,
       SignatureField,
+      DynamicQuestionExtension,
     ],
     content: content || '<p></p>',
     onUpdate: ({ editor }) => {
@@ -236,6 +238,23 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     }).run();
   }, [editor]);
 
+  const insertDynamicQuestion = useCallback(() => {
+    if (!editor) return;
+    
+    const questionId = `q_${Date.now()}`;
+    editor.chain().focus().insertContent({
+      type: 'dynamicQuestion',
+      attrs: {
+        question: {
+          id: questionId,
+          type: 'text',
+          label: 'Nueva pregunta',
+          required: false,
+        },
+      },
+    }).run();
+  }, [editor]);
+
   const addImage = useCallback((url?: string) => {
     if (!editor) return;
     
@@ -281,6 +300,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
               editor={editor}
               onImageClick={() => addImage()}
               onSignatureClick={insertSignature}
+              onQuestionClick={insertDynamicQuestion}
             />
             
             <div 

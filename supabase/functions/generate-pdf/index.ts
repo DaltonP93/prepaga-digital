@@ -56,6 +56,21 @@ function processTipTapContent(htmlContent: string, dynamicFields: any[], clientD
     </div>`
   );
 
+  // Process dynamic questions from TipTap
+  processedContent = processedContent.replace(
+    /<div[^>]*data-dynamic-question="([^"]*)"[^>]*data-question-label="([^"]*)"[^>]*>.*?<\/div>/g,
+    (match, questionId, questionLabel) => {
+      return `<div class="question-field">
+        <div class="question-label">📝 Pregunta: ${questionLabel}</div>
+        <div class="question-answer">
+          <div style="border: 1px solid #d1d5db; padding: 12px; min-height: 40px; background: #f9fafb; border-radius: 4px;">
+            <em style="color: #6b7280;">Respuesta pendiente</em>
+          </div>
+        </div>
+      </div>`;
+    }
+  );
+
   // Clean up TipTap editor artifacts
   processedContent = processedContent.replace(
     /class="prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none[^"]*"/g,
@@ -244,6 +259,27 @@ serve(async (req) => {
           .signature-content {
             font-weight: 600;
             color: #1f2937;
+          }
+
+          /* Question field styles */
+          .question-field {
+            border: 1px solid #e5e7eb;
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            page-break-inside: avoid;
+          }
+
+          .question-label {
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 12px;
+            font-size: 14px;
+          }
+
+          .question-answer {
+            margin-top: 8px;
           }
           
           .header {

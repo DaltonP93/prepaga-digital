@@ -33,21 +33,38 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
     PLAN_PRECIO: '850.000',
   };
 
-  // Replace placeholders with sample data
+  // Replace placeholders with sample data - Enhanced for TipTap content
   const processContent = (html: string) => {
     let processedHtml = html;
     
-    // Replace dynamic placeholders
+    // Replace dynamic placeholders from TipTap
     dynamicFields.forEach(field => {
       const regex = new RegExp(`<span[^>]*data-placeholder="${field.name}"[^>]*>\\{${field.name}\\}</span>`, 'g');
       const value = sampleData[field.name] || `[${field.label}]`;
       processedHtml = processedHtml.replace(regex, `<span class="bg-green-100 text-green-800 px-2 py-1 rounded font-medium">${value}</span>`);
     });
     
-    // Replace signature fields
+    // Replace signature fields from TipTap
     processedHtml = processedHtml.replace(
       /<div[^>]*data-signature="true"[^>]*>.*?<\/div>/g,
       '<div class="border-2 border-solid border-green-500 bg-green-50 p-4 text-center rounded-lg my-4 w-48 h-20"><p class="text-green-700 text-sm m-0 font-medium">✓ Firma Digital</p></div>'
+    );
+    
+    // Replace dynamic questions from TipTap
+    processedHtml = processedHtml.replace(
+      /<div[^>]*data-dynamic-question="([^"]*)"[^>]*>.*?<\/div>/g,
+      (match, questionId) => {
+        return `<div class="border-2 border-solid border-indigo-500 bg-indigo-50 p-4 rounded-lg my-4">
+          <p class="text-indigo-700 text-sm m-0 font-medium">📝 Pregunta Dinámica</p>
+          <p class="text-xs text-indigo-600 mt-1">ID: ${questionId}</p>
+        </div>`;
+      }
+    );
+    
+    // Clean up TipTap editor styling for preview
+    processedHtml = processedHtml.replace(
+      /class="prose prose-sm[^"]*"/g,
+      'class="prose max-w-none"'
     );
     
     return processedHtml;
