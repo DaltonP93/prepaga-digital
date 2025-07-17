@@ -913,6 +913,119 @@ export type Database = {
         }
         Relationships: []
       }
+      template_analytics: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json | null
+          session_id: string | null
+          template_id: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          session_id?: string | null
+          template_id: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          session_id?: string | null
+          template_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_analytics_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_analytics_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      template_comments: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          parent_comment_id: string | null
+          resolved: boolean
+          resolved_at: string | null
+          resolved_by: string | null
+          template_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          parent_comment_id?: string | null
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          template_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          parent_comment_id?: string | null
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          template_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_comments_parent_comment_id_fkey"
+            columns: ["parent_comment_id"]
+            isOneToOne: false
+            referencedRelation: "template_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_comments_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_comments_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_comments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       template_placeholders: {
         Row: {
           created_at: string | null
@@ -1090,6 +1203,108 @@ export type Database = {
           },
         ]
       }
+      template_versions: {
+        Row: {
+          change_notes: string | null
+          content: Json
+          created_at: string
+          created_by: string
+          dynamic_fields: Json | null
+          id: string
+          is_major_version: boolean
+          static_content: string | null
+          template_id: string
+          version_number: number
+        }
+        Insert: {
+          change_notes?: string | null
+          content?: Json
+          created_at?: string
+          created_by: string
+          dynamic_fields?: Json | null
+          id?: string
+          is_major_version?: boolean
+          static_content?: string | null
+          template_id: string
+          version_number: number
+        }
+        Update: {
+          change_notes?: string | null
+          content?: Json
+          created_at?: string
+          created_by?: string
+          dynamic_fields?: Json | null
+          id?: string
+          is_major_version?: boolean
+          static_content?: string | null
+          template_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_versions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      template_workflow_states: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          notes: string | null
+          state: string
+          template_id: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          notes?: string | null
+          state?: string
+          template_id: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          notes?: string | null
+          state?: string
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_workflow_states_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_workflow_states_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       templates: {
         Row: {
           active: boolean | null
@@ -1207,6 +1422,10 @@ export type Database = {
           p_request_path?: string
           p_request_method?: string
         }
+        Returns: string
+      }
+      update_template_workflow_state: {
+        Args: { p_template_id: string; p_new_state: string; p_notes?: string }
         Returns: string
       }
       validate_reset_token: {
