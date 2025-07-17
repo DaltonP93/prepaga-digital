@@ -9,14 +9,14 @@ export interface BrandingConfig {
   primaryColor: string;
   secondaryColor: string;
   accentColor: string;
-  companyName?: string;
-  logoUrl?: string;
-  favicon?: string;
-  fontFamily?: string;
-  borderRadius?: string;
-  shadows?: boolean;
-  darkMode?: boolean;
-  customCSS?: string;
+  companyName: string;
+  logoUrl: string;
+  favicon: string;
+  fontFamily: string;
+  borderRadius: string;
+  shadows: boolean;
+  darkMode: boolean;
+  customCSS: string;
 }
 
 export const useBranding = () => {
@@ -28,7 +28,7 @@ export const useBranding = () => {
       try {
         const { data } = await supabase
           .from('companies')
-          .select('login_title, login_subtitle, login_logo_url, login_background_url, primary_color, secondary_color, accent_color')
+          .select('*')
           .limit(1)
           .single();
 
@@ -41,6 +41,14 @@ export const useBranding = () => {
             primaryColor: data.primary_color || "#667eea",
             secondaryColor: data.secondary_color || "#764ba2",
             accentColor: data.accent_color || "#4ade80",
+            companyName: data.name || "Mi Empresa",
+            logoUrl: data.logo_url || "",
+            favicon: data.favicon || "/favicon.ico",
+            fontFamily: data.font_family || "Inter",
+            borderRadius: data.border_radius || "0.5rem",
+            shadows: data.shadows ?? true,
+            darkMode: data.dark_mode ?? false,
+            customCSS: data.custom_css || "",
           });
         }
       } catch (error) {
@@ -78,6 +86,14 @@ export const useBranding = () => {
       primaryColor: "#667eea",
       secondaryColor: "#764ba2",
       accentColor: "#4ade80",
+      companyName: "Mi Empresa",
+      logoUrl: "",
+      favicon: "/favicon.ico",
+      fontFamily: "Inter",
+      borderRadius: "0.5rem",
+      shadows: true,
+      darkMode: false,
+      customCSS: "",
     };
 
     try {
