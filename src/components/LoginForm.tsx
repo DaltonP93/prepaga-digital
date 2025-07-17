@@ -1,17 +1,30 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthContext } from '@/components/AuthProvider';
+import { useCompanyBranding } from '@/hooks/useCompanySettings';
 import { toast } from 'sonner';
 
 export const LoginForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [companyId, setCompanyId] = useState<string | null>(null);
   const { signIn } = useAuthContext();
+  
+  // Obtener configuración de branding basada en el dominio o configuración por defecto
+  const { data: branding } = useCompanyBranding(companyId || undefined);
+
+  // Detectar empresa por dominio o usar configuración por defecto
+  useEffect(() => {
+    // Por ahora usamos una empresa por defecto, se puede extender para detección por dominio
+    // TODO: Implementar detección de empresa por dominio personalizado
+    const defaultCompanyId = "default-company-id"; // Se puede obtener de configuración
+    setCompanyId(defaultCompanyId);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,12 +40,29 @@ export const LoginForm = () => {
     }
   };
 
+  const backgroundStyle = branding?.login_background_url
+    ? { backgroundImage: `url(${branding.login_background_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+    : {};
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Seguro Digital</CardTitle>
-          <CardDescription>Sistema de Firma Digital</CardDescription>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20" style={backgroundStyle}>
+      <Card className="w-full max-w-md backdrop-blur-sm bg-background/95 border-border/50">
+        <CardHeader className="text-center space-y-4">
+          {branding?.login_logo_url && (
+            <div className="flex justify-center">
+              <img 
+                src={branding.login_logo_url} 
+                alt="Logo" 
+                className="h-16 w-auto object-contain"
+              />
+            </div>
+          )}
+          <CardTitle className="text-2xl font-bold text-foreground">
+            {branding?.login_title || "Seguro Digital"}
+          </CardTitle>
+          <CardDescription className="text-muted-foreground">
+            {branding?.login_subtitle || "Sistema de Firma Digital"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

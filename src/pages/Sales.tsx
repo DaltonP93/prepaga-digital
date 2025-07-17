@@ -271,6 +271,7 @@ const Sales = () => {
                   <TableHead>Estado</TableHead>
                   <TableHead>Último Proceso</TableHead>
                   <TableHead>Nro. Contrato</TableHead>
+                  <TableHead>N° Solicitud</TableHead>
                   <TableHead>Vendedor</TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead>Acciones</TableHead>
@@ -302,6 +303,11 @@ const Sales = () => {
                       <span className="text-sm font-mono">
                         {sale.contract_number || '-'}
                       </span>
+                    </TableCell>
+                    <TableCell>
+                      <code className="text-xs bg-muted px-2 py-1 rounded">
+                        {sale.request_number || 'Generando...'}
+                      </code>
                     </TableCell>
                     <TableCell>
                       {sale.salesperson ? `${sale.salesperson.first_name} ${sale.salesperson.last_name}` : 'Sin vendedor'}

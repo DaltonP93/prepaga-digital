@@ -1,386 +1,302 @@
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Settings, Mail, MessageSquare, Phone } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-
-interface EmailConfig {
-  provider: string;
-  apiKey: string;
-  fromEmail: string;
-  fromName: string;
-  templates: {
-    signature: string;
-    reminder: string;
-    questionnaire: string;
-  };
-}
-
-interface SMSConfig {
-  provider: string;
-  apiKey: string;
-  fromNumber: string;
-  templates: {
-    signature: string;
-    reminder: string;
-    questionnaire: string;
-  };
-}
-
-interface WhatsAppConfig {
-  provider: string;
-  apiKey: string;
-  fromNumber: string;
-  templates: {
-    signature: string;
-    reminder: string;
-    questionnaire: string;
-  };
-}
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useCompanySettings, useCompanyBranding } from '@/hooks/useCompanySettings';
+import { useAuthContext } from '@/components/AuthProvider';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { Settings, Palette, MessageSquare } from 'lucide-react';
 
 export const AdminConfigPanel = () => {
-  const { toast } = useToast();
-  const [emailEnabled, setEmailEnabled] = useState(false);
-  const [smsEnabled, setSmsEnabled] = useState(false);
-  const [whatsappEnabled, setWhatsappEnabled] = useState(false);
+  const { user } = useAuthContext();
+  const [activeTab, setActiveTab] = useState('general');
+  
+  // Obtener ID de empresa del usuario actual
+  const companyId = user?.user_metadata?.company_id;
+  const { settings, updateSettings, isUpdating } = useCompanySettings(companyId);
+  const { data: branding } = useCompanyBranding(companyId);
 
-  const emailForm = useForm<EmailConfig>({
-    defaultValues: {
-      provider: "resend",
-      apiKey: "",
-      fromEmail: "",
-      fromName: "",
-      templates: {
-        signature: "Hola {{cliente.nombre}}, tienes un documento para firmar: {{enlace}}",
-        reminder: "Recordatorio: Tienes un documento pendiente de firma: {{enlace}}",
-        questionnaire: "Hola {{cliente.nombre}}, completa tu cuestionario: {{enlace}}"
-      }
-    }
+  const [formData, setFormData] = useState({
+    // API Keys
+    whatsapp_api_key: '',
+    sms_api_key: '',
+    email_api_key: '',
+    resend_api_key: '',
+    twilio_account_sid: '',
+    twilio_auth_token: '',
+    
+    // Branding
+    login_title: 'Seguro Digital',
+    login_subtitle: 'Sistema de Firma Digital',
+    login_background_url: '',
+    login_logo_url: '',
+    primary_color: '#667eea',
+    secondary_color: '#764ba2',
+    accent_color: '#4ade80',
   });
 
-  const smsForm = useForm<SMSConfig>({
-    defaultValues: {
-      provider: "twilio",
-      apiKey: "",
-      fromNumber: "",
-      templates: {
-        signature: "Tienes un documento para firmar: {{enlace}}",
-        reminder: "Recordatorio: Documento pendiente de firma: {{enlace}}",
-        questionnaire: "Completa tu cuestionario: {{enlace}}"
-      }
+  // Cargar datos existentes
+  useEffect(() => {
+    if (settings) {
+      setFormData(prev => ({
+        ...prev,
+        whatsapp_api_key: settings.whatsapp_api_key || '',
+        sms_api_key: settings.sms_api_key || '',
+        email_api_key: settings.email_api_key || '',
+        resend_api_key: settings.resend_api_key || '',
+        twilio_account_sid: settings.twilio_account_sid || '',
+        twilio_auth_token: settings.twilio_auth_token || '',
+      }));
     }
-  });
+  }, [settings]);
 
-  const whatsappForm = useForm<WhatsAppConfig>({
-    defaultValues: {
-      provider: "twilio",
-      apiKey: "",
-      fromNumber: "",
-      templates: {
-        signature: "Hola {{cliente.nombre}}, tienes un documento para firmar: {{enlace}}",
-        reminder: "Recordatorio: Tienes un documento pendiente de firma: {{enlace}}",
-        questionnaire: "Hola {{cliente.nombre}}, completa tu cuestionario: {{enlace}}"
-      }
+  useEffect(() => {
+    if (branding) {
+      setFormData(prev => ({
+        ...prev,
+        login_title: branding.login_title || 'Seguro Digital',
+        login_subtitle: branding.login_subtitle || 'Sistema de Firma Digital',
+        login_background_url: branding.login_background_url || '',
+        login_logo_url: branding.login_logo_url || '',
+        primary_color: branding.primary_color || '#667eea',
+        secondary_color: branding.secondary_color || '#764ba2',
+        accent_color: branding.accent_color || '#4ade80',
+      }));
     }
-  });
+  }, [branding]);
 
-  const saveEmailConfig = async (data: EmailConfig) => {
-    try {
-      // TODO: Save email configuration to database
-      toast({
-        title: "Configuración guardada",
-        description: "La configuración de email ha sido guardada exitosamente",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo guardar la configuración de email",
-        variant: "destructive",
-      });
-    }
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const saveSMSConfig = async (data: SMSConfig) => {
-    try {
-      // TODO: Save SMS configuration to database
-      toast({
-        title: "Configuración guardada",
-        description: "La configuración de SMS ha sido guardada exitosamente",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo guardar la configuración de SMS",
-        variant: "destructive",
-      });
-    }
+  const handleSaveAPIKeys = () => {
+    updateSettings({
+      whatsapp_api_key: formData.whatsapp_api_key,
+      sms_api_key: formData.sms_api_key,
+      email_api_key: formData.email_api_key,
+      resend_api_key: formData.resend_api_key,
+      twilio_account_sid: formData.twilio_account_sid,
+      twilio_auth_token: formData.twilio_auth_token,
+    });
   };
 
-  const saveWhatsAppConfig = async (data: WhatsAppConfig) => {
+  const handleSaveBranding = async () => {
     try {
-      // TODO: Save WhatsApp configuration to database
-      toast({
-        title: "Configuración guardada",
-        description: "La configuración de WhatsApp ha sido guardada exitosamente",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo guardar la configuración de WhatsApp",
-        variant: "destructive",
-      });
+      // Actualizar configuración de empresa (branding)
+      const { error } = await supabase
+        .from('companies')
+        .update({
+          login_title: formData.login_title,
+          login_subtitle: formData.login_subtitle,
+          login_background_url: formData.login_background_url,
+          login_logo_url: formData.login_logo_url,
+          primary_color: formData.primary_color,
+          secondary_color: formData.secondary_color,
+          accent_color: formData.accent_color,
+        })
+        .eq('id', companyId);
+
+      if (error) throw error;
+
+      toast.success("Branding actualizado correctamente");
+    } catch (error: any) {
+      toast.error(error.message);
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <Settings className="h-6 w-6" />
-        <h2 className="text-2xl font-bold">Panel de Configuración</h2>
-        <Badge variant="secondary">Solo para Administradores</Badge>
+    <div className="container mx-auto py-6">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold flex items-center gap-2">
+          <Settings className="h-8 w-8" />
+          Configuración de Empresa
+        </h1>
+        <p className="text-muted-foreground">
+          Administra las configuraciones y personalizaciones de tu empresa
+        </p>
       </div>
 
-      <Tabs defaultValue="email" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="email" className="flex items-center gap-2">
-            <Mail className="h-4 w-4" />
-            Email
+          <TabsTrigger value="general" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            General
           </TabsTrigger>
-          <TabsTrigger value="sms" className="flex items-center gap-2">
-            <Phone className="h-4 w-4" />
-            SMS
+          <TabsTrigger value="branding" className="flex items-center gap-2">
+            <Palette className="h-4 w-4" />
+            Branding
           </TabsTrigger>
-          <TabsTrigger value="whatsapp" className="flex items-center gap-2">
+          <TabsTrigger value="integrations" className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4" />
-            WhatsApp
+            Integraciones
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="email">
+        <TabsContent value="general">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Configuración de Email</CardTitle>
-                <div className="flex items-center space-x-2">
-                  <Label htmlFor="email-enabled">Habilitado</Label>
-                  <Switch
-                    id="email-enabled"
-                    checked={emailEnabled}
-                    onCheckedChange={setEmailEnabled}
+              <CardTitle>Configuración General</CardTitle>
+              <CardDescription>
+                Configuraciones básicas de la empresa
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="login-title">Título del Login</Label>
+                  <Input
+                    id="login-title"
+                    value={formData.login_title}
+                    onChange={(e) => handleInputChange('login_title', e.target.value)}
+                    placeholder="Seguro Digital"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="login-subtitle">Subtítulo del Login</Label>
+                  <Input
+                    id="login-subtitle"
+                    value={formData.login_subtitle}
+                    onChange={(e) => handleInputChange('login_subtitle', e.target.value)}
+                    placeholder="Sistema de Firma Digital"
                   />
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={emailForm.handleSubmit(saveEmailConfig)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Proveedor</Label>
-                    <Input {...emailForm.register("provider")} disabled />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>API Key</Label>
-                    <Input {...emailForm.register("apiKey")} type="password" />
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Email remitente</Label>
-                    <Input {...emailForm.register("fromEmail")} type="email" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Nombre remitente</Label>
-                    <Input {...emailForm.register("fromName")} />
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-lg font-medium">Plantillas de Mensajes</h4>
-                  
-                  <div className="space-y-2">
-                    <Label>Template para Firma</Label>
-                    <Textarea {...emailForm.register("templates.signature")} />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Template para Recordatorio</Label>
-                    <Textarea {...emailForm.register("templates.reminder")} />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Template para Cuestionario</Label>
-                    <Textarea {...emailForm.register("templates.questionnaire")} />
-                  </div>
-                </div>
-
-                <Button type="submit" disabled={!emailEnabled}>
-                  Guardar Configuración de Email
-                </Button>
-              </form>
+              <Button onClick={handleSaveBranding} disabled={isUpdating}>
+                {isUpdating ? 'Guardando...' : 'Guardar Configuración'}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="sms">
+        <TabsContent value="branding">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Configuración de SMS</CardTitle>
-                <div className="flex items-center space-x-2">
-                  <Label htmlFor="sms-enabled">Habilitado</Label>
-                  <Switch
-                    id="sms-enabled"
-                    checked={smsEnabled}
-                    onCheckedChange={setSmsEnabled}
+              <CardTitle>Personalización de Marca</CardTitle>
+              <CardDescription>
+                Personaliza la apariencia de tu sistema
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="logo-url">URL del Logo</Label>
+                  <Input
+                    id="logo-url"
+                    value={formData.login_logo_url}
+                    onChange={(e) => handleInputChange('login_logo_url', e.target.value)}
+                    placeholder="https://ejemplo.com/logo.png"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="background-url">URL de Fondo</Label>
+                  <Input
+                    id="background-url"
+                    value={formData.login_background_url}
+                    onChange={(e) => handleInputChange('login_background_url', e.target.value)}
+                    placeholder="https://ejemplo.com/fondo.jpg"
                   />
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={smsForm.handleSubmit(saveSMSConfig)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Proveedor</Label>
-                    <Input {...smsForm.register("provider")} disabled />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>API Key</Label>
-                    <Input {...smsForm.register("apiKey")} type="password" />
-                  </div>
+              
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="primary-color">Color Primario</Label>
+                  <Input
+                    id="primary-color"
+                    type="color"
+                    value={formData.primary_color}
+                    onChange={(e) => handleInputChange('primary_color', e.target.value)}
+                  />
                 </div>
-                
-                <div className="space-y-2">
-                  <Label>Número remitente</Label>
-                  <Input {...smsForm.register("fromNumber")} />
+                <div>
+                  <Label htmlFor="secondary-color">Color Secundario</Label>
+                  <Input
+                    id="secondary-color"
+                    type="color"
+                    value={formData.secondary_color}
+                    onChange={(e) => handleInputChange('secondary_color', e.target.value)}
+                  />
                 </div>
+                <div>
+                  <Label htmlFor="accent-color">Color de Acento</Label>
+                  <Input
+                    id="accent-color"
+                    type="color"
+                    value={formData.accent_color}
+                    onChange={(e) => handleInputChange('accent_color', e.target.value)}
+                  />
+                </div>
+              </div>
 
-                <div className="space-y-4">
-                  <h4 className="text-lg font-medium">Plantillas de Mensajes</h4>
-                  
-                  <div className="space-y-2">
-                    <Label>Template para Firma</Label>
-                    <Textarea {...smsForm.register("templates.signature")} />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Template para Recordatorio</Label>
-                    <Textarea {...smsForm.register("templates.reminder")} />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Template para Cuestionario</Label>
-                    <Textarea {...smsForm.register("templates.questionnaire")} />
-                  </div>
-                </div>
-
-                <Button type="submit" disabled={!smsEnabled}>
-                  Guardar Configuración de SMS
-                </Button>
-              </form>
+              <Button onClick={handleSaveBranding} disabled={isUpdating}>
+                {isUpdating ? 'Guardando...' : 'Guardar Branding'}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="whatsapp">
+        <TabsContent value="integrations">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Configuración de WhatsApp</CardTitle>
-                <div className="flex items-center space-x-2">
-                  <Label htmlFor="whatsapp-enabled">Habilitado</Label>
-                  <Switch
-                    id="whatsapp-enabled"
-                    checked={whatsappEnabled}
-                    onCheckedChange={setWhatsappEnabled}
+              <CardTitle>Integraciones de API</CardTitle>
+              <CardDescription>
+                Configura las API keys para servicios externos
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="whatsapp-key">WhatsApp API Key</Label>
+                  <Input
+                    id="whatsapp-key"
+                    type="password"
+                    value={formData.whatsapp_api_key}
+                    onChange={(e) => handleInputChange('whatsapp_api_key', e.target.value)}
+                    placeholder="••••••••••••••••"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="sms-key">SMS API Key</Label>
+                  <Input
+                    id="sms-key"
+                    type="password"
+                    value={formData.sms_api_key}
+                    onChange={(e) => handleInputChange('sms_api_key', e.target.value)}
+                    placeholder="••••••••••••••••"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="resend-key">Resend API Key</Label>
+                  <Input
+                    id="resend-key"
+                    type="password"
+                    value={formData.resend_api_key}
+                    onChange={(e) => handleInputChange('resend_api_key', e.target.value)}
+                    placeholder="••••••••••••••••"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="twilio-sid">Twilio Account SID</Label>
+                  <Input
+                    id="twilio-sid"
+                    type="password"
+                    value={formData.twilio_account_sid}
+                    onChange={(e) => handleInputChange('twilio_account_sid', e.target.value)}
+                    placeholder="••••••••••••••••"
                   />
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={whatsappForm.handleSubmit(saveWhatsAppConfig)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Proveedor</Label>
-                    <Input {...whatsappForm.register("provider")} disabled />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>API Key</Label>
-                    <Input {...whatsappForm.register("apiKey")} type="password" />
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Número de WhatsApp Business</Label>
-                  <Input {...whatsappForm.register("fromNumber")} />
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-lg font-medium">Plantillas de Mensajes</h4>
-                  
-                  <div className="space-y-2">
-                    <Label>Template para Firma</Label>
-                    <Textarea {...whatsappForm.register("templates.signature")} />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Template para Recordatorio</Label>
-                    <Textarea {...whatsappForm.register("templates.reminder")} />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Template para Cuestionario</Label>
-                    <Textarea {...whatsappForm.register("templates.questionnaire")} />
-                  </div>
-                </div>
-
-                <Button type="submit" disabled={!whatsappEnabled}>
-                  Guardar Configuración de WhatsApp
-                </Button>
-              </form>
+              
+              <Button onClick={handleSaveAPIKeys} disabled={isUpdating}>
+                {isUpdating ? 'Guardando...' : 'Guardar API Keys'}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Variables Disponibles</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div>
-              <h5 className="font-medium mb-2">Cliente:</h5>
-              <ul className="space-y-1 text-muted-foreground">
-                <li>{'{{cliente.nombre}}'}</li>
-                <li>{'{{cliente.email}}'}</li>
-                <li>{'{{cliente.telefono}}'}</li>
-              </ul>
-            </div>
-            <div>
-              <h5 className="font-medium mb-2">Plan:</h5>
-              <ul className="space-y-1 text-muted-foreground">
-                <li>{'{{plan.nombre}}'}</li>
-                <li>{'{{plan.precio}}'}</li>
-              </ul>
-            </div>
-            <div>
-              <h5 className="font-medium mb-2">Enlaces:</h5>
-              <ul className="space-y-1 text-muted-foreground">
-                <li>{'{{enlace}}'}</li>
-                <li>{'{{fecha_vencimiento}}'}</li>
-              </ul>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };

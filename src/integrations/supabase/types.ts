@@ -268,6 +268,10 @@ export type Database = {
           favicon: string | null
           font_family: string | null
           id: string
+          login_background_url: string | null
+          login_logo_url: string | null
+          login_subtitle: string | null
+          login_title: string | null
           logo_url: string | null
           name: string
           phone: string | null
@@ -288,6 +292,10 @@ export type Database = {
           favicon?: string | null
           font_family?: string | null
           id?: string
+          login_background_url?: string | null
+          login_logo_url?: string | null
+          login_subtitle?: string | null
+          login_title?: string | null
           logo_url?: string | null
           name: string
           phone?: string | null
@@ -308,6 +316,10 @@ export type Database = {
           favicon?: string | null
           font_family?: string | null
           id?: string
+          login_background_url?: string | null
+          login_logo_url?: string | null
+          login_subtitle?: string | null
+          login_title?: string | null
           logo_url?: string | null
           name?: string
           phone?: string | null
@@ -317,6 +329,56 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      company_settings: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          email_api_key: string | null
+          id: string
+          resend_api_key: string | null
+          settings: Json | null
+          sms_api_key: string | null
+          twilio_account_sid: string | null
+          twilio_auth_token: string | null
+          updated_at: string | null
+          whatsapp_api_key: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          email_api_key?: string | null
+          id?: string
+          resend_api_key?: string | null
+          settings?: Json | null
+          sms_api_key?: string | null
+          twilio_account_sid?: string | null
+          twilio_auth_token?: string | null
+          updated_at?: string | null
+          whatsapp_api_key?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          email_api_key?: string | null
+          id?: string
+          resend_api_key?: string | null
+          settings?: Json | null
+          sms_api_key?: string | null
+          twilio_account_sid?: string | null
+          twilio_auth_token?: string | null
+          updated_at?: string | null
+          whatsapp_api_key?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       dashboard_widgets: {
         Row: {
@@ -351,6 +413,42 @@ export type Database = {
           user_id?: string | null
           visible?: boolean
           widget_type?: string
+        }
+        Relationships: []
+      }
+      document_access_logs: {
+        Row: {
+          access_time: string
+          action: string
+          device_type: string | null
+          document_id: string
+          id: string
+          ip_address: unknown | null
+          metadata: Json | null
+          session_id: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          access_time?: string
+          action: string
+          device_type?: string | null
+          document_id: string
+          id?: string
+          ip_address?: unknown | null
+          metadata?: Json | null
+          session_id?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          access_time?: string
+          action?: string
+          device_type?: string | null
+          document_id?: string
+          id?: string
+          ip_address?: unknown | null
+          metadata?: Json | null
+          session_id?: string | null
+          user_agent?: string | null
         }
         Relationships: []
       }
@@ -943,6 +1041,7 @@ export type Database = {
           pediatrician: string | null
           plan_id: string | null
           profession: string | null
+          request_number: string | null
           sale_date: string | null
           salesperson_id: string | null
           signature_expires_at: string | null
@@ -972,6 +1071,7 @@ export type Database = {
           pediatrician?: string | null
           plan_id?: string | null
           profession?: string | null
+          request_number?: string | null
           sale_date?: string | null
           salesperson_id?: string | null
           signature_expires_at?: string | null
@@ -1001,6 +1101,7 @@ export type Database = {
           pediatrician?: string | null
           plan_id?: string | null
           profession?: string | null
+          request_number?: string | null
           sale_date?: string | null
           salesperson_id?: string | null
           signature_expires_at?: string | null
@@ -1055,32 +1156,41 @@ export type Database = {
       }
       signatures: {
         Row: {
+          completion_progress: number | null
+          device_info: Json | null
           document_id: string | null
           id: string
           ip_address: unknown | null
           sale_id: string | null
           signature_data: string | null
           signed_at: string | null
+          signed_pdf_url: string | null
           status: Database["public"]["Enums"]["document_status"] | null
           user_agent: string | null
         }
         Insert: {
+          completion_progress?: number | null
+          device_info?: Json | null
           document_id?: string | null
           id?: string
           ip_address?: unknown | null
           sale_id?: string | null
           signature_data?: string | null
           signed_at?: string | null
+          signed_pdf_url?: string | null
           status?: Database["public"]["Enums"]["document_status"] | null
           user_agent?: string | null
         }
         Update: {
+          completion_progress?: number | null
+          device_info?: Json | null
           document_id?: string | null
           id?: string
           ip_address?: unknown | null
           sale_id?: string | null
           signature_data?: string | null
           signed_at?: string | null
+          signed_pdf_url?: string | null
           status?: Database["public"]["Enums"]["document_status"] | null
           user_agent?: string | null
         }
