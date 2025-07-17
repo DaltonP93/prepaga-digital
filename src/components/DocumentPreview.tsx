@@ -1,17 +1,20 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { PDFGeneratorControls } from '@/components/PDFGeneratorControls';
 
 interface DocumentPreviewProps {
   content: string;
   dynamicFields: any[];
   templateType: string;
+  templateName?: string;
 }
 
 export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   content,
   dynamicFields,
   templateType,
+  templateName = 'documento',
 }) => {
   // Generate sample data for placeholders
   const sampleData: Record<string, string> = {
@@ -54,13 +57,21 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   const wordCount = content.replace(/<[^>]*>/g, '').split(' ').filter(word => word.length > 0).length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Header Info */}
       <div className="flex flex-wrap gap-2 items-center">
         <Badge variant="outline">{templateType}</Badge>
         <Badge variant="secondary">{dynamicFields.length} campos dinámicos</Badge>
         <Badge variant="secondary">{wordCount} palabras</Badge>
       </div>
+
+      {/* PDF Generator Controls */}
+      <PDFGeneratorControls
+        content={content}
+        dynamicFields={dynamicFields}
+        templateType={templateType}
+        templateName={templateName}
+      />
 
       {/* Preview Content */}
       <Card>

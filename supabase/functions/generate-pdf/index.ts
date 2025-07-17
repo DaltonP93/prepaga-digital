@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import puppeteer from "https://deno.land/x/puppeteer@16.2.0/mod.ts";
@@ -8,13 +7,90 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Helper functions for TipTap content processing
+function processTipTapContent(htmlContent: string, dynamicFields: any[], clientData: any): string {
+  let processedContent = htmlContent;
+
+  // Default sample data for placeholders (when clientData is not provided)
+  const defaultData: Record<string, string> = {
+    NOMBRE_CLIENTE: clientData.nombre || 'Juan Carlos',
+    APELLIDO_CLIENTE: clientData.apellido || 'González',
+    DNI_CI_CLIENTE: clientData.dni || '2.123.456',
+    EMAIL_CLIENTE: clientData.email || 'juan.gonzalez@email.com',
+    TELEFONO_CLIENTE: clientData.telefono || '0981-123456',
+    DOMICILIO_CLIENTE: clientData.domicilio || 'Av. España 1234, Asunción',
+    BARRIO_CLIENTE: clientData.barrio || 'Centro',
+    ESTADO_CIVIL_CLIENTE: clientData.estado_civil || 'Casado',
+    FECHA_NACIMIENTO_CLIENTE: clientData.fecha_nacimiento || '15/05/1985',
+    FECHA_ACTUAL: new Date().toLocaleDateString('es-PY'),
+    EMPRESA_NOMBRE: 'Aseguradora Ejemplo S.A.',
+    PLAN_NOMBRE: clientData.plan_nombre || 'Plan Salud Premium',
+    PLAN_PRECIO: clientData.plan_precio || '850.000',
+  };
+
+  // Process dynamic placeholders from TipTap
+  dynamicFields.forEach(field => {
+    // Replace TipTap placeholder elements with actual values
+    const placeholderRegex = new RegExp(
+      `<span[^>]*data-placeholder="${field.name}"[^>]*>\\{${field.name}\\}</span>`, 
+      'g'
+    );
+    
+    const value = clientData[field.name] || defaultData[field.name] || `[${field.label}]`;
+    const styledValue = `<span class="dynamic-field">${value}</span>`;
+    
+    processedContent = processedContent.replace(placeholderRegex, styledValue);
+  });
+
+  // Process signature fields from TipTap
+  processedContent = processedContent.replace(
+    /<div[^>]*data-signature="true"[^>]*>.*?<\/div>/g,
+    `<div class="signature-field">
+      <div class="signature-label">Campo de Firma</div>
+      <div class="signature-content">
+        <p>Firma pendiente</p>
+        <p style="font-size: 12px; color: #6b7280;">
+          Este documento será firmado digitalmente
+        </p>
+      </div>
+    </div>`
+  );
+
+  // Clean up TipTap editor artifacts
+  processedContent = processedContent.replace(
+    /class="prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none[^"]*"/g,
+    'class="prose"'
+  );
+
+  return processedContent;
+}
+
+function getDocumentTitle(documentType: string, templateData: any): string {
+  const titles: Record<string, string> = {
+    contract: 'CONTRATO DE SEGURO',
+    declaration: 'DECLARACIÓN JURADA',
+    questionnaire: 'CUESTIONARIO',
+    other: 'DOCUMENTO LEGAL'
+  };
+
+  return templateData.name || titles[documentType] || 'DOCUMENTO LEGAL';
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { htmlContent, filename, saleId, documentType = 'contract' } = await req.json();
+    const { 
+      htmlContent, 
+      filename, 
+      saleId, 
+      documentType = 'contract',
+      dynamicFields = [],
+      clientData = {},
+      templateData = {} 
+    } = await req.json();
 
     // Initialize Supabase client for audit logging
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -26,10 +102,18 @@ serve(async (req) => {
       p_table_name: 'documents',
       p_action: 'pdf_generation_started',
       p_record_id: saleId,
-      p_new_values: { filename, documentType },
+      p_new_values: { 
+        filename, 
+        documentType,
+        fields_count: dynamicFields.length,
+        has_client_data: Object.keys(clientData).length > 0
+      },
       p_request_path: '/functions/v1/generate-pdf',
       p_request_method: 'POST'
     });
+
+    // Process TipTap content and replace placeholders
+    const processedContent = processTipTapContent(htmlContent, dynamicFields, clientData);
 
     // Enhanced HTML template with professional styling
     const enhancedHtml = `
@@ -57,11 +141,116 @@ serve(async (req) => {
             margin: 0;
             padding: 0;
           }
+
+          /* TipTap prose styles */
+          .prose {
+            max-width: 100%;
+            line-height: 1.75;
+          }
+
+          .prose h1, .prose h2, .prose h3 {
+            color: #1f2937;
+            font-weight: bold;
+            margin-top: 2em;
+            margin-bottom: 1em;
+            line-height: 1.25;
+            page-break-after: avoid;
+          }
+
+          .prose h1 { font-size: 2em; }
+          .prose h2 { font-size: 1.5em; }
+          .prose h3 { font-size: 1.25em; }
+
+          .prose p {
+            margin-top: 1.25em;
+            margin-bottom: 1.25em;
+            orphans: 3;
+            widows: 3;
+          }
+
+          .prose strong { font-weight: 600; color: #1f2937; }
+          .prose em { font-style: italic; }
+          .prose u { text-decoration: underline; }
+
+          .prose ul, .prose ol {
+            margin-top: 1.25em;
+            margin-bottom: 1.25em;
+            padding-left: 1.625em;
+          }
+
+          .prose li {
+            margin-top: 0.5em;
+            margin-bottom: 0.5em;
+          }
+
+          .prose blockquote {
+            font-weight: 500;
+            font-style: italic;
+            color: #1f2937;
+            border-left: 0.25rem solid #d1d5db;
+            quotes: "\\201C""\\201D""\\2018""\\2019";
+            margin-top: 1.6em;
+            margin-bottom: 1.6em;
+            padding-left: 1em;
+          }
+
+          .prose img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 0.375rem;
+            margin: 1.5em 0;
+            page-break-inside: avoid;
+          }
+
+          /* Dynamic field styles */
+          .dynamic-field {
+            background-color: #fef3c7;
+            color: #92400e;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 500;
+            white-space: nowrap;
+          }
+
+          /* Signature field styles */
+          .signature-field {
+            border: 2px solid #374151;
+            background: #f9fafb;
+            padding: 40px 20px;
+            text-align: center;
+            border-radius: 8px;
+            margin: 30px 0;
+            min-height: 120px;
+            position: relative;
+            page-break-inside: avoid;
+          }
+
+          .signature-field.signed {
+            background: #f0f9ff;
+            border-color: #0ea5e9;
+          }
+
+          .signature-field .signature-label {
+            position: absolute;
+            top: -12px;
+            left: 20px;
+            background: white;
+            padding: 0 8px;
+            font-size: 12px;
+            color: #6b7280;
+            font-weight: 500;
+          }
+
+          .signature-content {
+            font-weight: 600;
+            color: #1f2937;
+          }
           
           .header {
             border-bottom: 3px solid #2563eb;
             padding-bottom: 20px;
             margin-bottom: 30px;
+            page-break-after: avoid;
           }
           
           .company-logo {
@@ -82,62 +271,7 @@ serve(async (req) => {
             padding: 20px;
             border-left: 4px solid #2563eb;
             margin: 20px 0;
-          }
-          
-          .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin: 20px 0;
-          }
-          
-          .info-item {
-            padding: 10px 0;
-            border-bottom: 1px solid #e5e7eb;
-          }
-          
-          .info-label {
-            font-weight: bold;
-            color: #374151;
-            display: inline-block;
-            min-width: 120px;
-          }
-          
-          .info-value {
-            color: #1f2937;
-          }
-          
-          .section {
-            margin: 30px 0;
             page-break-inside: avoid;
-          }
-          
-          .section-title {
-            font-size: 18px;
-            font-weight: bold;
-            color: #1f2937;
-            border-bottom: 2px solid #e5e7eb;
-            padding-bottom: 10px;
-            margin-bottom: 15px;
-          }
-          
-          .signature-area {
-            margin-top: 50px;
-            padding: 30px;
-            border: 2px solid #e5e7eb;
-            background: #fafafa;
-            text-align: center;
-          }
-          
-          .signature-line {
-            border-top: 1px solid #333;
-            margin: 40px auto 10px;
-            width: 200px;
-          }
-          
-          .signature-label {
-            font-size: 12px;
-            color: #666;
           }
           
           .footer {
@@ -147,19 +281,9 @@ serve(async (req) => {
             font-size: 12px;
             color: #666;
             text-align: center;
+            page-break-inside: avoid;
           }
-          
-          .watermark {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(-45deg);
-            font-size: 60px;
-            color: rgba(0, 0, 0, 0.1);
-            z-index: -1;
-            pointer-events: none;
-          }
-          
+
           .page-break {
             page-break-before: always;
           }
@@ -168,6 +292,7 @@ serve(async (req) => {
             width: 100%;
             border-collapse: collapse;
             margin: 15px 0;
+            page-break-inside: avoid;
           }
           
           th, td {
@@ -180,18 +305,20 @@ serve(async (req) => {
             background-color: #f8fafc;
             font-weight: bold;
           }
-          
-          .highlight {
-            background-color: #fef3c7;
-            padding: 15px;
-            border-left: 4px solid #f59e0b;
-            margin: 15px 0;
+
+          /* Print optimizations */
+          @media print {
+            .prose { font-size: 11pt; }
+            .dynamic-field { 
+              background-color: #fef3c7 !important; 
+              -webkit-print-color-adjust: exact; 
+            }
           }
         </style>
       </head>
       <body>
         <div class="header">
-          <div class="document-title">${documentType === 'contract' ? 'CONTRATO DE SEGURO' : 'DOCUMENTO LEGAL'}</div>
+          <div class="document-title">${getDocumentTitle(documentType, templateData)}</div>
           <div style="text-align: right; font-size: 12px; color: #666;">
             Generado el: ${new Date().toLocaleDateString('es-ES', { 
               weekday: 'long', 
@@ -202,26 +329,8 @@ serve(async (req) => {
           </div>
         </div>
         
-        ${htmlContent}
-        
-        <div class="signature-area">
-          <h3>FIRMAS</h3>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 50px; margin-top: 40px;">
-            <div>
-              <div class="signature-line"></div>
-              <div class="signature-label">Firma del Cliente</div>
-              <div style="margin-top: 10px; font-size: 11px;">
-                Fecha: ________________
-              </div>
-            </div>
-            <div>
-              <div class="signature-line"></div>
-              <div class="signature-label">Representante de la Empresa</div>
-              <div style="margin-top: 10px; font-size: 11px;">
-                Fecha: ________________
-              </div>
-            </div>
-          </div>
+        <div class="prose">
+          ${processedContent}
         </div>
         
         <div class="footer">
@@ -270,7 +379,9 @@ serve(async (req) => {
         filename, 
         documentType,
         pdfSize: pdfBuffer.length,
-        status: 'success'
+        status: 'success',
+        fields_processed: dynamicFields.length,
+        processing_time: Date.now()
       },
       p_request_path: '/functions/v1/generate-pdf',
       p_request_method: 'POST'

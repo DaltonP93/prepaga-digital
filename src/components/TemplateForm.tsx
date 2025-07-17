@@ -288,6 +288,7 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
                   content={form.watch("static_content") || ""}
                   dynamicFields={form.watch("dynamic_fields") || []}
                   templateType={form.watch("template_type") || "document"}
+                  templateName={form.watch("name") || "documento"}
                 />
               )}
             </TabsContent>
