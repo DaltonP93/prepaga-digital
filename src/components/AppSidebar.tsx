@@ -1,180 +1,148 @@
+
+import { Link, useLocation } from 'react-router-dom';
 import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
+  LayoutDashboard,
+  Users,
+  FileText,
+  Settings,
+  User,
+  ShoppingBag,
+  FileImage,
+  Building2,
+  CreditCard,
+  UserCog,
+  Shield,
+  Workflow,
+  BarChart3,
+  MessageSquare,
+  Palette,
+} from "lucide-react";
+
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
+  SidebarGroupContent,
   SidebarGroupLabel,
-  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarSeparator,
-} from "@/components/ui/sidebar"
-import { useToast } from "@/hooks/use-toast"
-import {
-  BarChart3,
-  Bell,
-  Book,
-  Calendar,
-  CheckCircle2,
-  ChevronDown,
-  File,
-  FileText,
-  FolderKanban,
-  Home,
-  LayoutDashboard,
-  ListChecks,
-  Mail,
-  MessageSquare,
-  Plus,
-  Settings,
-  ShoppingBag,
-  Tag,
-  User,
-  Users,
-  LogOut,
-} from "lucide-react"
+  SidebarHeader,
+} from "@/components/ui/sidebar";
 
-import { useAuthContext } from '@/components/AuthProvider';
+import { MainNavItem } from "@/types";
 
-export function AppSidebar() {
-  const { toast } = useToast()
-  const user = {
-    name: "Emerson Silva",
-    email: "emerson.silva@example.com",
-    image: "/images/avatars/01.png",
+interface AppSidebarProps {
+  isSuperAdmin?: boolean;
+}
+
+export function AppSidebar({ isSuperAdmin = false }: AppSidebarProps) {
+  const location = useLocation();
+  
+  const menuItems: MainNavItem[] = [
+    {
+      title: "Dashboard",
+      url: "/",
+      icon: LayoutDashboard,
+    },
+    {
+      title: "Ventas",
+      url: "/sales",
+      icon: ShoppingBag,
+    },
+    {
+      title: "Clientes",
+      url: "/clients",
+      icon: Users,
+    },
+    {
+      title: "Planes",
+      url: "/plans",
+      icon: CreditCard,
+    },
+    {
+      title: "Documentos",
+      url: "/documents",
+      icon: FileText,
+    },
+    {
+      title: "Templates",
+      url: "/templates",
+      icon: FileImage,
+    },
+    {
+      title: "Flujo de Firmas",
+      url: "/signature-workflow",
+      icon: Workflow,
+    },
+    {
+      title: "Analytics", 
+      url: "/analytics",
+      icon: BarChart3,
+    },
+    {
+      title: "Comunicaciones",
+      url: "/communications", 
+      icon: MessageSquare,
+    },
+    {
+      title: "Experiencia",
+      url: "/experience", 
+      icon: Palette,
+    },
+    {
+      title: "Mi Perfil",
+      url: "/profile",
+      icon: User,
+    },
+  ];
+
+  // Admin specific items
+  if (isSuperAdmin) {
+    menuItems.push(
+      {
+        title: "Usuarios",
+        url: "/users",
+        icon: UserCog,
+      },
+      {
+        title: "Empresas",
+        url: "/companies",
+        icon: Building2,
+      },
+      {
+        title: "Auditoría",
+        url: "/audit",
+        icon: Shield,
+      }
+    );
   }
-
-  const navigation = [
-    {
-      title: "General",
-      items: [
-        {
-          title: "Dashboard",
-          href: "/dashboard",
-          icon: LayoutDashboard,
-        },
-        {
-          title: "Ventas",
-          href: "/sales",
-          icon: ShoppingBag,
-        },
-        {
-          title: "Flujo de Firmas",
-          href: "/signature-workflow",
-          icon: FileText,
-        },
-        {
-          title: "Clientes",
-          href: "/clients",
-          icon: Users,
-        },
-      ],
-    },
-    {
-      title: "Administración",
-      items: [
-        {
-          title: "Templates",
-          href: "/templates",
-          icon: File,
-        },
-        {
-          title: "Compañias",
-          href: "/companies",
-          icon: Book,
-        },
-        {
-          title: "Planes",
-          href: "/plans",
-          icon: ListChecks,
-        },
-        {
-          title: "Usuarios",
-          href: "/users",
-          icon: User,
-        },
-        {
-          title: "Configuración",
-          href: "/settings",
-          icon: Settings,
-        },
-      ],
-    },
-  ]
-
-  const { signOut } = useAuthContext();
 
   return (
     <Sidebar>
       <SidebarHeader>
-        <div className="flex items-center space-x-2">
-          <Avatar>
-            <AvatarImage src={user.image} alt={user.name} />
-            <AvatarFallback>OM</AvatarFallback>
-          </Avatar>
-          <div>
-            <h3 className="font-medium">{user.name}</h3>
-            <p className="text-muted-foreground text-sm">{user.email}</p>
-          </div>
+        <div className="px-2 py-4">
+          <h2 className="text-lg font-semibold">Seguro Digital</h2>
         </div>
       </SidebarHeader>
       <SidebarContent>
-        {navigation.map((group) => (
-          <SidebarGroup key={group.title}>
-            <SidebarGroupLabel>{group.title}</SidebarGroupLabel>
+        <SidebarGroup>
+          <SidebarGroupLabel>Navegación</SidebarGroupLabel>
+          <SidebarGroupContent>
             <SidebarMenu>
-              {group.items.map((item) => (
+              {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton href={item.href} tooltip={item.title}>
-                    <item.icon className="mr-2 h-4 w-4" />
-                    <span>{item.title}</span>
+                  <SidebarMenuButton asChild isActive={location.pathname === item.url}>
+                    <Link to={item.url}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
-          </SidebarGroup>
-        ))}
-        
-        {/* Separador antes del botón de cerrar sesión */}
-        <SidebarSeparator />
-        
-        {/* Elemento de menú para cerrar sesión al final */}
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton 
-              onClick={signOut}
-              tooltip="Cerrar sesión"
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              <span>Cerrar sesión</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
     </Sidebar>
   );
