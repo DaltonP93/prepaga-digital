@@ -100,6 +100,56 @@ export type Database = {
         }
         Relationships: []
       }
+      beneficiaries: {
+        Row: {
+          birth_date: string | null
+          created_at: string
+          dni: string | null
+          email: string | null
+          first_name: string
+          id: string
+          last_name: string
+          phone: string | null
+          relationship: string
+          sale_id: string
+          updated_at: string
+        }
+        Insert: {
+          birth_date?: string | null
+          created_at?: string
+          dni?: string | null
+          email?: string | null
+          first_name: string
+          id?: string
+          last_name: string
+          phone?: string | null
+          relationship: string
+          sale_id: string
+          updated_at?: string
+        }
+        Update: {
+          birth_date?: string | null
+          created_at?: string
+          dni?: string | null
+          email?: string | null
+          first_name?: string
+          id?: string
+          last_name?: string
+          phone?: string | null
+          relationship?: string
+          sale_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beneficiaries_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           address: string | null
@@ -676,6 +726,156 @@ export type Database = {
           },
         ]
       }
+      sale_documents: {
+        Row: {
+          created_at: string
+          document_name: string
+          document_type: string
+          file_size: number | null
+          file_url: string
+          id: string
+          mime_type: string | null
+          observations: string | null
+          sale_id: string
+          updated_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          document_name: string
+          document_type: string
+          file_size?: number | null
+          file_url: string
+          id?: string
+          mime_type?: string | null
+          observations?: string | null
+          sale_id: string
+          updated_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string
+          document_name?: string
+          document_type?: string
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          mime_type?: string | null
+          observations?: string | null
+          sale_id?: string
+          updated_at?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_documents_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sale_notes: {
+        Row: {
+          created_at: string
+          id: string
+          note: string
+          sale_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          note: string
+          sale_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          note?: string
+          sale_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_notes_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_notes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sale_requirements: {
+        Row: {
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          id: string
+          is_completed: boolean
+          notes: string | null
+          requirement_name: string
+          sale_id: string
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean
+          notes?: string | null
+          requirement_name: string
+          sale_id: string
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean
+          notes?: string | null
+          requirement_name?: string
+          sale_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_requirements_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_requirements_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sale_templates: {
         Row: {
           created_at: string | null
@@ -729,55 +929,91 @@ export type Database = {
       }
       sales: {
         Row: {
+          birth_place: string | null
           client_id: string | null
           company_id: string | null
+          contract_number: string | null
           created_at: string | null
           id: string
+          immediate_validity: boolean | null
+          last_process: string | null
+          leads_id: string | null
+          maternity_bonus: boolean | null
           notes: string | null
+          pediatrician: string | null
           plan_id: string | null
+          profession: string | null
           sale_date: string | null
           salesperson_id: string | null
           signature_expires_at: string | null
+          signature_modality: string | null
           signature_token: string | null
           signed_document_url: string | null
           status: Database["public"]["Enums"]["sale_status"] | null
           template_id: string | null
           total_amount: number | null
           updated_at: string | null
+          work_address: string | null
+          work_phone: string | null
+          workplace: string | null
         }
         Insert: {
+          birth_place?: string | null
           client_id?: string | null
           company_id?: string | null
+          contract_number?: string | null
           created_at?: string | null
           id?: string
+          immediate_validity?: boolean | null
+          last_process?: string | null
+          leads_id?: string | null
+          maternity_bonus?: boolean | null
           notes?: string | null
+          pediatrician?: string | null
           plan_id?: string | null
+          profession?: string | null
           sale_date?: string | null
           salesperson_id?: string | null
           signature_expires_at?: string | null
+          signature_modality?: string | null
           signature_token?: string | null
           signed_document_url?: string | null
           status?: Database["public"]["Enums"]["sale_status"] | null
           template_id?: string | null
           total_amount?: number | null
           updated_at?: string | null
+          work_address?: string | null
+          work_phone?: string | null
+          workplace?: string | null
         }
         Update: {
+          birth_place?: string | null
           client_id?: string | null
           company_id?: string | null
+          contract_number?: string | null
           created_at?: string | null
           id?: string
+          immediate_validity?: boolean | null
+          last_process?: string | null
+          leads_id?: string | null
+          maternity_bonus?: boolean | null
           notes?: string | null
+          pediatrician?: string | null
           plan_id?: string | null
+          profession?: string | null
           sale_date?: string | null
           salesperson_id?: string | null
           signature_expires_at?: string | null
+          signature_modality?: string | null
           signature_token?: string | null
           signed_document_url?: string | null
           status?: Database["public"]["Enums"]["sale_status"] | null
           template_id?: string | null
           total_amount?: number | null
           updated_at?: string | null
+          work_address?: string | null
+          work_phone?: string | null
+          workplace?: string | null
         }
         Relationships: [
           {

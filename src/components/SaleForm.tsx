@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useClients } from "@/hooks/useClients";
 import { usePlans } from "@/hooks/usePlans";
 import { useTemplates } from "@/hooks/useTemplates";
@@ -28,6 +30,21 @@ interface SaleFormData {
   template_id?: string;
   total_amount: number;
   notes?: string;
+  // Campos laborales
+  workplace?: string;
+  profession?: string;
+  work_phone?: string;
+  work_address?: string;
+  // Campos contractuales
+  signature_modality?: string;
+  maternity_bonus?: boolean;
+  immediate_validity?: boolean;
+  // CRM
+  leads_id?: string;
+  // Para menores
+  pediatrician?: string;
+  birth_place?: string;
+  contract_number?: string;
 }
 
 export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
@@ -46,6 +63,17 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
       template_id: sale?.template_id || "no-template",
       total_amount: sale?.total_amount || 0,
       notes: sale?.notes || "",
+      workplace: sale?.workplace || "",
+      profession: sale?.profession || "",
+      work_phone: sale?.work_phone || "",
+      work_address: sale?.work_address || "",
+      signature_modality: sale?.signature_modality || "",
+      maternity_bonus: sale?.maternity_bonus || false,
+      immediate_validity: sale?.immediate_validity || false,
+      leads_id: sale?.leads_id || "",
+      pediatrician: sale?.pediatrician || "",
+      birth_place: sale?.birth_place || "",
+      contract_number: sale?.contract_number || "",
     }
   });
 
@@ -94,7 +122,7 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? "Editar Venta" : "Nueva Venta"}
@@ -102,6 +130,14 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <Tabs defaultValue="basic" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="basic">Información Básica</TabsTrigger>
+              <TabsTrigger value="work">Información Laboral</TabsTrigger>
+              <TabsTrigger value="contract">Datos Contractuales</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="basic" className="space-y-4">
           <div className="space-y-2">
             <Label>Cliente</Label>
             <Select value={watch("client_id")} onValueChange={(value) => setValue("client_id", value)}>
@@ -189,6 +225,116 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
               placeholder="Notas adicionales sobre la venta..."
             />
           </div>
+            </TabsContent>
+            
+            <TabsContent value="work" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="workplace">Lugar de Trabajo</Label>
+                <Input
+                  id="workplace"
+                  {...register("workplace")}
+                  placeholder="Empresa o lugar donde trabaja"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="profession">Profesión</Label>
+                <Input
+                  id="profession"
+                  {...register("profession")}
+                  placeholder="Profesión u ocupación"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="work_phone">Teléfono Laboral</Label>
+                <Input
+                  id="work_phone"
+                  {...register("work_phone")}
+                  placeholder="Teléfono del trabajo"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="work_address">Dirección Laboral</Label>
+                <Textarea
+                  id="work_address"
+                  {...register("work_address")}
+                  placeholder="Dirección completa del lugar de trabajo"
+                />
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="contract" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="contract_number">Número de Contrato</Label>
+                <Input
+                  id="contract_number"
+                  {...register("contract_number")}
+                  placeholder="Número de contrato asignado"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Modalidad de Firma</Label>
+                <Select value={watch("signature_modality")} onValueChange={(value) => setValue("signature_modality", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar modalidad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="digital">Digital</SelectItem>
+                    <SelectItem value="presencial">Presencial</SelectItem>
+                    <SelectItem value="hibrida">Híbrida</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="maternity_bonus"
+                  checked={watch("maternity_bonus")}
+                  onCheckedChange={(checked) => setValue("maternity_bonus", checked as boolean)}
+                />
+                <Label htmlFor="maternity_bonus">Prima de Maternidad</Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="immediate_validity"
+                  checked={watch("immediate_validity")}
+                  onCheckedChange={(checked) => setValue("immediate_validity", checked as boolean)}
+                />
+                <Label htmlFor="immediate_validity">Vigencia Inmediata</Label>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="leads_id">ID Leads (CRM)</Label>
+                <Input
+                  id="leads_id"
+                  {...register("leads_id")}
+                  placeholder="ID del lead en el sistema CRM"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="pediatrician">Pediatra (Para menores)</Label>
+                <Input
+                  id="pediatrician"
+                  {...register("pediatrician")}
+                  placeholder="Nombre del pediatra asignado"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="birth_place">Lugar de Nacimiento</Label>
+                <Input
+                  id="birth_place"
+                  {...register("birth_place")}
+                  placeholder="Ciudad y país de nacimiento"
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

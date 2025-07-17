@@ -5,8 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Pencil, Link, Eye, FileText, Download, MessageSquare } from "lucide-react";
+import { Plus, Pencil, Link, Eye, FileText, Download, MessageSquare, Users, Upload, ClipboardList, FileCheck } from "lucide-react";
 import { SaleForm } from "@/components/SaleForm";
+import { BeneficiariesManager } from "@/components/BeneficiariesManager";
+import { SaleDocuments } from "@/components/SaleDocuments";
+import { SaleNotes } from "@/components/SaleNotes";
+import { SaleRequirements } from "@/components/SaleRequirements";
 import { useSales, useGenerateSignatureLink, useGenerateQuestionnaireLink } from "@/hooks/useSales";
 import { Database } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
@@ -25,6 +29,10 @@ const Sales = () => {
   const [showSaleForm, setShowSaleForm] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
   const [filters, setFilters] = useState<FilterOptions>({ search: '' });
+  const [showBeneficiaries, setShowBeneficiaries] = useState<string | null>(null);
+  const [showDocuments, setShowDocuments] = useState<string | null>(null);
+  const [showNotes, setShowNotes] = useState<string | null>(null);
+  const [showRequirements, setShowRequirements] = useState<string | null>(null);
   const { data: sales = [], isLoading } = useSales();
   const generateSignatureLink = useGenerateSignatureLink();
   const generateQuestionnaireLink = useGenerateQuestionnaireLink();
@@ -168,6 +176,12 @@ const Sales = () => {
     { value: 'firmado', label: 'Firmado' },
     { value: 'completado', label: 'Completado' },
     { value: 'cancelado', label: 'Cancelado' },
+    { value: 'pendiente', label: 'Pendiente' },
+    { value: 'procesado', label: 'Procesado' },
+    { value: 'cerrado', label: 'Cerrado' },
+    { value: 'esperando_firma', label: 'Esperando Firma' },
+    { value: 'esperando_documentos', label: 'Esperando Documentos' },
+    { value: 'firmado_parcialmente', label: 'Firmado Parcialmente' },
   ];
 
   const handleExport = () => {
@@ -243,9 +257,10 @@ const Sales = () => {
                 <TableRow>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Plan</TableHead>
-                  <TableHead>Template</TableHead>
-                  <TableHead>Monto</TableHead>
+                  <TableHead>Monto (Gs.)</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead>Último Proceso</TableHead>
+                  <TableHead>Nro. Contrato</TableHead>
                   <TableHead>Vendedor</TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead>Acciones</TableHead>
@@ -261,19 +276,22 @@ const Sales = () => {
                       {sale.plans?.name || 'Sin plan'}
                     </TableCell>
                     <TableCell>
-                      {sale.templates?.name ? (
-                        <Badge variant="outline">{sale.templates.name}</Badge>
-                      ) : (
-                        <span className="text-muted-foreground">Sin template</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      ${sale.total_amount || 0}
+                      {Number(sale.total_amount || 0).toLocaleString('es-PY')}
                     </TableCell>
                     <TableCell>
                       <Badge variant={getStatusBadgeVariant(sale.status || 'borrador')}>
                         {getStatusLabel(sale.status || 'borrador')}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-muted-foreground">
+                        {sale.last_process || 'Inicio'}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm font-mono">
+                        {sale.contract_number || '-'}
+                      </span>
                     </TableCell>
                     <TableCell>
                       {sale.salesperson ? `${sale.salesperson.first_name} ${sale.salesperson.last_name}` : 'Sin vendedor'}
@@ -282,61 +300,106 @@ const Sales = () => {
                       {sale.sale_date ? new Date(sale.sale_date).toLocaleDateString() : '-'}
                     </TableCell>
                     <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditSale(sale)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDownloadContract(sale)}
-                          title="Descargar contrato"
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-
-                        {sale.status === 'borrador' && sale.template_id && (
+                      <div className="flex flex-wrap gap-1">
+                        {/* Primera fila de botones principales */}
+                        <div className="flex space-x-1 mb-1">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleGenerateQuestionnaireLink(sale)}
-                            disabled={generateQuestionnaireLink.isPending}
-                            title="Enviar cuestionario"
+                            onClick={() => handleEditSale(sale)}
+                            title="Editar venta"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowBeneficiaries(sale.id)}
+                            title="Gestionar beneficiarios"
+                          >
+                            <Users className="h-4 w-4" />
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowDocuments(sale.id)}
+                            title="Digitalizaciones"
+                          >
+                            <Upload className="h-4 w-4" />
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowNotes(sale.id)}
+                            title="Novedades"
                           >
                             <MessageSquare className="h-4 w-4" />
                           </Button>
-                        )}
-                        
-                        {sale.status === 'borrador' && !sale.template_id && (
+                        </div>
+
+                        {/* Segunda fila de botones */}
+                        <div className="flex space-x-1">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleGenerateSignatureLink(sale)}
-                            disabled={generateSignatureLink.isPending}
+                            onClick={() => setShowRequirements(sale.id)}
+                            title="Requisitos"
                           >
-                            <Link className="h-4 w-4" />
+                            <ClipboardList className="h-4 w-4" />
                           </Button>
-                        )}
-                        
-                        {sale.signature_token && (
+
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => window.open(
-                              sale.template_id 
-                                ? `/questionnaire/${sale.signature_token}`
-                                : `/signature/${sale.signature_token}`, 
-                              '_blank'
-                            )}
+                            onClick={() => handleDownloadContract(sale)}
+                            title="Imprimir DJ / Contrato"
                           >
-                            <Eye className="h-4 w-4" />
+                            <FileCheck className="h-4 w-4" />
                           </Button>
-                        )}
+
+                          {sale.status === 'borrador' && sale.template_id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleGenerateQuestionnaireLink(sale)}
+                              disabled={generateQuestionnaireLink.isPending}
+                              title="Completar DJ"
+                            >
+                              <FileText className="h-4 w-4" />
+                            </Button>
+                          )}
+                          
+                          {sale.status === 'borrador' && !sale.template_id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleGenerateSignatureLink(sale)}
+                              disabled={generateSignatureLink.isPending}
+                              title="Generar enlace de firma"
+                            >
+                              <Link className="h-4 w-4" />
+                            </Button>
+                          )}
+                          
+                          {sale.signature_token && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(
+                                sale.template_id 
+                                  ? `/questionnaire/${sale.signature_token}`
+                                  : `/signature/${sale.signature_token}`, 
+                                '_blank'
+                              )}
+                              title="Ver documento"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -359,6 +422,38 @@ const Sales = () => {
           onOpenChange={handleCloseForm}
           sale={editingSale}
         />
+
+        {showBeneficiaries && (
+          <BeneficiariesManager
+            saleId={showBeneficiaries}
+            open={!!showBeneficiaries}
+            onOpenChange={(open) => !open && setShowBeneficiaries(null)}
+          />
+        )}
+
+        {showDocuments && (
+          <SaleDocuments
+            saleId={showDocuments}
+            open={!!showDocuments}
+            onOpenChange={(open) => !open && setShowDocuments(null)}
+          />
+        )}
+
+        {showNotes && (
+          <SaleNotes
+            saleId={showNotes}
+            open={!!showNotes}
+            onOpenChange={(open) => !open && setShowNotes(null)}
+          />
+        )}
+
+        {showRequirements && (
+          <SaleRequirements
+            saleId={showRequirements}
+            open={!!showRequirements}
+            onOpenChange={(open) => !open && setShowRequirements(null)}
+          />
+        )}
       </div>
     </Layout>
   );
