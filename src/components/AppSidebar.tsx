@@ -16,6 +16,7 @@ import {
   BarChart3,
   MessageSquare,
   Palette,
+  LogOut,
 } from "lucide-react";
 
 import {
@@ -30,6 +31,7 @@ import {
   SidebarHeader,
 } from "@/components/ui/sidebar";
 
+import { useAuthContext } from "@/components/AuthProvider";
 import { MainNavItem } from "@/types";
 
 interface AppSidebarProps {
@@ -38,6 +40,7 @@ interface AppSidebarProps {
 
 export function AppSidebar({ isSuperAdmin = false }: AppSidebarProps) {
   const location = useLocation();
+  const { signOut } = useAuthContext();
   
   const menuItems: MainNavItem[] = [
     {
@@ -140,6 +143,19 @@ export function AppSidebar({ isSuperAdmin = false }: AppSidebarProps) {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={signOut}>
+                  <LogOut className="h-4 w-4" />
+                  <span>Cerrar Sesión</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

@@ -3,10 +3,12 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useAuthContext } from '@/components/AuthProvider';
 import { useCompanyBranding } from '@/hooks/useCompanySettings';
 import { toast } from 'sonner';
+import { usePasswordReset } from '@/hooks/usePasswordReset';
+import { Eye, EyeOff, LogIn } from 'lucide-react';
 
 export const LoginForm = () => {
   const [email, setEmail] = useState('');
@@ -14,6 +16,7 @@ export const LoginForm = () => {
   const [loading, setLoading] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const { signIn } = useAuthContext();
+  const { requestPasswordReset } = usePasswordReset();
   
   // Obtener configuración de branding basada en el dominio o configuración por defecto
   const { data: branding } = useCompanyBranding(companyId || undefined);
@@ -86,9 +89,37 @@ export const LoginForm = () => {
                 required
               />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-            </Button>
+            <div className="space-y-4">
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    Iniciando sesión...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <LogIn className="h-4 w-4" />
+                    Iniciar Sesión
+                  </span>
+                )}
+              </Button>
+              
+              <div className="text-center">
+                <Button 
+                  variant="link" 
+                  type="button"
+                  className="text-sm text-muted-foreground hover:text-primary"
+                  onClick={() => {
+                    const email = prompt('Ingresa tu correo electrónico');
+                    if (email) {
+                      requestPasswordReset(email);
+                    }
+                  }}
+                >
+                  ¿Olvidaste tu contraseña?
+                </Button>
+              </div>
+            </div>
           </form>
         </CardContent>
       </Card>

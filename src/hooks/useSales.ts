@@ -36,14 +36,18 @@ export const useCreateSale = () => {
 
   return useMutation({
     mutationFn: async (saleData: SaleInsert) => {
-      const { data, error } = await supabase
+      // First create the sale to get generated numbers
+      const { data: sale, error: saleError } = await supabase
         .from('sales')
         .insert(saleData)
-        .select()
+        .select(`
+          *,
+          templates:template_id(*)
+        `)
         .single();
 
-      if (error) throw error;
-      return data;
+      if (saleError) throw saleError;
+      return sale;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
