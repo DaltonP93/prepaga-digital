@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useSales, useGenerateSignatureLink } from "@/hooks/useSales";
 import { useToast } from "@/hooks/use-toast";
+import { DocumentTrackingCard } from "@/components/DocumentTrackingCard";
 
 interface SaleCardProps {
   sale: any;
@@ -131,11 +132,11 @@ function SaleCard({ sale }: SaleCardProps) {
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <Smartphone className="h-4 w-4 text-muted-foreground" />
-                <span>Dispositivo: No accedido</span>
+                <span>Dispositivo: {sale.documents?.[0] ? 'Accedido' : 'No accedido'}</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-                <span>Progreso: 0%</span>
+                <span>Progreso: {sale.status === 'firmado' ? '100%' : sale.status === 'enviado' ? '50%' : '0%'}</span>
               </div>
             </div>
           </div>
@@ -229,6 +230,16 @@ function SaleCard({ sale }: SaleCardProps) {
             </div>
           </div>
         </div>
+
+        {/* Agregar tracking si existe un documento */}
+        {sale.documents?.[0] && (
+          <div className="mt-6">
+            <DocumentTrackingCard 
+              saleId={sale.id} 
+              documentId={sale.documents[0].id} 
+            />
+          </div>
+        )}
       </CardContent>
     </Card>
   );

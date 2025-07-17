@@ -1,73 +1,76 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import { useAuthContext } from '@/components/AuthProvider';
 
-type CompanySettings = Tables<"company_settings">;
-type CompanySettingsInsert = TablesInsert<"company_settings">;
-type CompanySettingsUpdate = TablesUpdate<"company_settings">;
+interface CompanySettings {
+  id?: string;
+  company_id: string;
+  resend_api_key?: string;
+  whatsapp_api_key?: string;
+  twilio_account_sid?: string;
+  twilio_auth_token?: string;
+  sms_api_key?: string;
+  settings?: any;
+}
 
-export const useCompanySettings = (companyId?: string) => {
+export const useCompanySettings = () => {
   const { toast } = useToast();
+  const { profile } = useAuthContext();
   const queryClient = useQueryClient();
 
-  // Obtener configuración de la empresa
-  const {
-    data: settings,
-    isLoading,
-    error
-  } = useQuery({
-    queryKey: ['company-settings', companyId],
+  const { data: settings, isLoading } = useQuery({
+    queryKey: ['company-settings', profile?.company_id],
     queryFn: async () => {
+      if (!profile?.company_id) return null;
+      
       const { data, error } = await supabase
         .from('company_settings')
         .select('*')
-        .eq('company_id', companyId!)
-        .maybeSingle();
+        .eq('company_id', profile.company_id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+      
+      return data;
+    },
+    enabled: !!profile?.company_id,
+  });
+
+  const updateSettings = useMutation({
+    mutationFn: async (newSettings: Partial<CompanySettings>) => {
+      if (!profile?.company_id) throw new Error('No company ID found');
+
+      const settingsData = {
+        company_id: profile.company_id,
+        ...newSettings,
+      };
+
+      const { data, error } = await supabase
+        .from('company_settings')
+        .upsert(settingsData, {
+          onConflict: 'company_id'
+        })
+        .select()
+        .single();
 
       if (error) throw error;
       return data;
     },
-    enabled: !!companyId,
-  });
-
-  // Crear o actualizar configuración
-  const updateSettingsMutation = useMutation({
-    mutationFn: async (updates: Partial<CompanySettingsInsert & CompanySettingsUpdate>) => {
-      if (settings) {
-        // Actualizar existente
-        const { data, error } = await supabase
-          .from('company_settings')
-          .update(updates)
-          .eq('company_id', companyId!)
-          .select()
-          .single();
-        
-        if (error) throw error;
-        return data;
-      } else {
-        // Crear nuevo
-        const { data, error } = await supabase
-          .from('company_settings')
-          .insert({ company_id: companyId!, ...updates })
-          .select()
-          .single();
-        
-        if (error) throw error;
-        return data;
-      }
-    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['company-settings', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['company-settings'] });
       toast({
         title: "Configuración actualizada",
-        description: "La configuración de la empresa se ha guardado correctamente.",
+        description: "Los cambios han sido guardados exitosamente.",
       });
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "No se pudo actualizar la configuración.",
         variant: "destructive",
       });
     },
@@ -76,26 +79,6 @@ export const useCompanySettings = (companyId?: string) => {
   return {
     settings,
     isLoading,
-    error,
-    updateSettings: updateSettingsMutation.mutate,
-    isUpdating: updateSettingsMutation.isPending,
+    updateSettings,
   };
-};
-
-// Hook para obtener configuración de branding de empresa
-export const useCompanyBranding = (companyId?: string) => {
-  return useQuery({
-    queryKey: ['company-branding', companyId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('login_background_url, login_logo_url, login_title, login_subtitle, primary_color, secondary_color, accent_color, logo_url')
-        .eq('id', companyId!)
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!companyId,
-  });
 };
