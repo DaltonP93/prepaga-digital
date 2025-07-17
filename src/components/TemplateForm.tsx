@@ -103,6 +103,7 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
 
       if (template) {
         updateTemplate({ id: template.id, updates: templateData });
+        analytics.trackEvent('template_updated', template.id);
       } else {
         createTemplate(templateData);
       }
@@ -140,21 +141,21 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
           </DialogTitle>
         </DialogHeader>
         
-        <Tabs defaultValue="info" className="h-full">
-          <TabsList className="grid w-full grid-cols-7">
-            <TabsTrigger value="info">Info</TabsTrigger>
-            <TabsTrigger value="editor">Editor</TabsTrigger>
-            <TabsTrigger value="questions" disabled={!template}>Preguntas</TabsTrigger>
-            <TabsTrigger value="workflow" disabled={!template}>Workflow</TabsTrigger>
-            <TabsTrigger value="collaboration" disabled={!template}>Colaboración</TabsTrigger>
-            <TabsTrigger value="versions" disabled={!template}>Versiones</TabsTrigger>
-            <TabsTrigger value="analytics" disabled={!template}>Analytics</TabsTrigger>
-            <TabsTrigger value="preview">Preview</TabsTrigger>
-          </TabsList>
+        <Form {...form}>
+          <Tabs defaultValue="info" className="h-full">
+            <TabsList className="grid w-full grid-cols-7">
+              <TabsTrigger value="info">Info</TabsTrigger>
+              <TabsTrigger value="editor">Editor</TabsTrigger>
+              <TabsTrigger value="questions" disabled={!template}>Preguntas</TabsTrigger>
+              <TabsTrigger value="workflow" disabled={!template}>Workflow</TabsTrigger>
+              <TabsTrigger value="collaboration" disabled={!template}>Colaboración</TabsTrigger>
+              <TabsTrigger value="versions" disabled={!template}>Versiones</TabsTrigger>
+              <TabsTrigger value="analytics" disabled={!template}>Analytics</TabsTrigger>
+              <TabsTrigger value="preview">Preview</TabsTrigger>
+            </TabsList>
 
-          <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
-            <TabsContent value="info" className="space-y-4 mt-4">
-              <Form {...form}>
+            <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
+              <TabsContent value="info" className="space-y-4 mt-4">
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   <FormField
                     control={form.control}
@@ -248,78 +249,78 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
                     </Button>
                   </div>
                 </form>
-              </Form>
-            </TabsContent>
+              </TabsContent>
 
-            <TabsContent value="editor" className="mt-4 h-full">
-              {form.watch("template_type") === "questionnaire" ? (
-                <div className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="content"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Contenido del Cuestionario (JSON)</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            {...field} 
-                            placeholder='{"title": "Mi Cuestionario", "questions": [...]}'
-                            rows={15}
-                            className="font-mono text-sm"
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Define la estructura del cuestionario en formato JSON
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+              <TabsContent value="editor" className="mt-4 h-full">
+                {form.watch("template_type") === "questionnaire" ? (
+                  <div className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="content"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Contenido del Cuestionario (JSON)</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              {...field} 
+                              placeholder='{"title": "Mi Cuestionario", "questions": [...]}'
+                              rows={15}
+                              className="font-mono text-sm"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Define la estructura del cuestionario en formato JSON
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                ) : (
+                  <TipTapEditor
+                    content={form.watch("static_content") || ""}
+                    onContentChange={(content) => form.setValue("static_content", content)}
+                    dynamicFields={form.watch("dynamic_fields") || []}
+                    onDynamicFieldsChange={(fields) => form.setValue("dynamic_fields", fields)}
                   />
-                </div>
-              ) : (
-                <TipTapEditor
-                  content={form.watch("static_content") || ""}
-                  onContentChange={(content) => form.setValue("static_content", content)}
-                  dynamicFields={form.watch("dynamic_fields") || []}
-                  onDynamicFieldsChange={(fields) => form.setValue("dynamic_fields", fields)}
-                />
-              )}
-            </TabsContent>
+                )}
+              </TabsContent>
 
-            <TabsContent value="questions" className="mt-4">
-              {template && <QuestionBuilder templateId={template.id} />}
-            </TabsContent>
+              <TabsContent value="questions" className="mt-4">
+                {template && <QuestionBuilder templateId={template.id} />}
+              </TabsContent>
 
-            <TabsContent value="workflow" className="mt-4">
-              {template && <WorkflowManager templateId={template.id} />}
-            </TabsContent>
+              <TabsContent value="workflow" className="mt-4">
+                {template && <WorkflowManager templateId={template.id} />}
+              </TabsContent>
 
-            <TabsContent value="collaboration" className="mt-4">
-              {template && <CollaborationPanel templateId={template.id} />}
-            </TabsContent>
+              <TabsContent value="collaboration" className="mt-4">
+                {template && <CollaborationPanel templateId={template.id} />}
+              </TabsContent>
 
-            <TabsContent value="versions" className="mt-4">
-              {template && <VersionControlPanel templateId={template.id} />}
-            </TabsContent>
+              <TabsContent value="versions" className="mt-4">
+                {template && <VersionControlPanel templateId={template.id} />}
+              </TabsContent>
 
-            <TabsContent value="analytics" className="mt-4">
-              {template && <AnalyticsDashboard templateId={template.id} />}
-            </TabsContent>
+              <TabsContent value="analytics" className="mt-4">
+                {template && <AnalyticsDashboard templateId={template.id} />}
+              </TabsContent>
 
-            <TabsContent value="preview" className="mt-4">
-              {form.watch("template_type") === "questionnaire" ? (
-                template && <QuestionnairePreview templateId={template.id} />
-              ) : (
-                <DocumentPreview
-                  content={form.watch("static_content") || ""}
-                  dynamicFields={form.watch("dynamic_fields") || []}
-                  templateType={form.watch("template_type") || "document"}
-                  templateName={form.watch("name") || "documento"}
-                />
-              )}
-            </TabsContent>
-          </div>
-        </Tabs>
+              <TabsContent value="preview" className="mt-4">
+                {form.watch("template_type") === "questionnaire" ? (
+                  template && <QuestionnairePreview templateId={template.id} />
+                ) : (
+                  <DocumentPreview
+                    content={form.watch("static_content") || ""}
+                    dynamicFields={form.watch("dynamic_fields") || []}
+                    templateType={form.watch("template_type") || "document"}
+                    templateName={form.watch("name") || "documento"}
+                  />
+                )}
+              </TabsContent>
+            </div>
+          </Tabs>
+        </Form>
       </DialogContent>
     </Dialog>
   );
