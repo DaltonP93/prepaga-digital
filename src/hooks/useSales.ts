@@ -16,8 +16,8 @@ export const useSales = () => {
         .from('sales')
         .select(`
           *,
-          clients:client_id(first_name, last_name, email, phone),
-          plans:plan_id(name, price),
+          clients:client_id(first_name, last_name, email, phone, dni),
+          plans:plan_id(name, price, description, coverage_details),
           salesperson:salesperson_id(first_name, last_name, email),
           companies:company_id(name),
           templates:template_id(name, description)
@@ -107,7 +107,7 @@ export const useGenerateQuestionnaireLink = () => {
         .select(`
           *,
           clients:client_id(first_name, last_name, email),
-          templates:template_id(name)
+          templates:template_id(name, question_count:template_questions(count))
         `)
         .eq('id', saleId)
         .single();
@@ -146,6 +146,10 @@ export const useGenerateQuestionnaireLink = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
+      
+      // Copy to clipboard
+      navigator.clipboard.writeText(data.questionnaireUrl);
+      
       toast({
         title: "Enlace del cuestionario generado",
         description: "El enlace ha sido copiado al portapapeles y está listo para enviar al cliente.",
@@ -164,15 +168,35 @@ export const useGenerateQuestionnaireLink = () => {
 export const useGenerateSignatureLink = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { sendSignatureNotification } = useNotifications();
 
   return useMutation({
     mutationFn: async (saleId: string) => {
+      // Check if questionnaire needs to be completed first
+      const { data: sale, error: saleError } = await supabase
+        .from('sales')
+        .select(`
+          *,
+          clients:client_id(first_name, last_name, email, phone),
+          plans:plan_id(name, price),
+          profiles:salesperson_id(first_name, last_name, email),
+          templates:template_id(name),
+          template_responses(id)
+        `)
+        .eq('id', saleId)
+        .single();
+
+      if (saleError) throw saleError;
+
+      // If there's a template but no responses, require questionnaire completion
+      if (sale.template_id && (!sale.template_responses || sale.template_responses.length === 0)) {
+        throw new Error('El cliente debe completar el cuestionario antes de firmar. Genere y envíe primero el enlace del cuestionario.');
+      }
+
       const token = crypto.randomUUID();
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7); // Expires in 7 days
 
-      const { data, error } = await supabase
+      const { data: updatedSale, error } = await supabase
         .from('sales')
         .update({
           signature_token: token,
@@ -192,16 +216,17 @@ export const useGenerateSignatureLink = () => {
       
       const signatureUrl = `${window.location.origin}/signature/${token}`;
       
-      // Enviar notificación por email
-      await sendSignatureNotification(data, signatureUrl);
-      
-      return { sale: data, signatureUrl };
+      return { sale: updatedSale, signatureUrl };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
+      
+      // Copy to clipboard
+      navigator.clipboard.writeText(data.signatureUrl);
+      
       toast({
-        title: "Enlace generado y enviado",
-        description: "El enlace de firma ha sido generado y enviado por email al cliente.",
+        title: "Enlace de firma generado",
+        description: "El enlace ha sido copiado al portapapeles. Envíelo al cliente para que complete la firma.",
       });
     },
     onError: (error: any) => {
@@ -211,5 +236,37 @@ export const useGenerateSignatureLink = () => {
         variant: "destructive",
       });
     },
+  });
+};
+
+// Nueva función para validar el estado de una venta antes de generar enlaces
+export const useValidateSaleForSignature = () => {
+  return useMutation({
+    mutationFn: async (saleId: string) => {
+      const { data: sale, error } = await supabase
+        .from('sales')
+        .select(`
+          *,
+          clients:client_id(first_name, last_name, email),
+          plans:plan_id(name, price),
+          templates:template_id(name),
+          template_responses(id)
+        `)
+        .eq('id', saleId)
+        .single();
+
+      if (error) throw error;
+
+      const validation = {
+        hasClient: !!sale.client_id,
+        hasPlan: !!sale.plan_id,
+        hasTemplate: !!sale.template_id,
+        hasQuestionnaireResponses: sale.template_responses && sale.template_responses.length > 0,
+        readyForQuestionnaire: !!sale.client_id && !!sale.plan_id && !!sale.template_id,
+        readyForSignature: !!sale.client_id && !!sale.plan_id && (!sale.template_id || (sale.template_responses && sale.template_responses.length > 0))
+      };
+
+      return { sale, validation };
+    }
   });
 };

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useSales } from '@/hooks/useSales';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +12,7 @@ import { SaleDocuments } from '@/components/SaleDocuments';
 import { SaleNotes } from '@/components/SaleNotes';
 import { SaleRequirements } from '@/components/SaleRequirements';
 import { DocumentTrackingPanel } from '@/components/DocumentTrackingPanel';
+import { useGenerateQuestionnaireLink, useGenerateSignatureLink, useValidateSaleForSignature } from '@/hooks/useSales';
 
 export default function Sales() {
   const [search, setSearch] = useState('');
@@ -21,6 +21,9 @@ export default function Sales() {
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
   const { data: sales, isLoading } = useSales();
+  const generateQuestionnaireLink = useGenerateQuestionnaireLink();
+  const generateSignatureLink = useGenerateSignatureLink();
+  const validateSale = useValidateSaleForSignature();
 
   const getStatusBadge = (status: string) => {
     const badges = {
@@ -54,6 +57,22 @@ export default function Sales() {
   const closeModal = () => {
     setActiveModal(null);
     setSelectedSale(null);
+  };
+
+  const handleGenerateQuestionnaireLink = async (saleId: string) => {
+    try {
+      await generateQuestionnaireLink.mutateAsync(saleId);
+    } catch (error) {
+      console.error('Error generating questionnaire link:', error);
+    }
+  };
+
+  const handleGenerateSignatureLink = async (saleId: string) => {
+    try {
+      await generateSignatureLink.mutateAsync(saleId);
+    } catch (error) {
+      console.error('Error generating signature link:', error);
+    }
   };
 
   if (isLoading) {
@@ -147,7 +166,8 @@ export default function Sales() {
                     </div>
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    {/* Botones de gestión */}
                     <Button
                       variant="outline"
                       size="sm"
@@ -193,6 +213,32 @@ export default function Sales() {
                       <TrendingUp className="h-4 w-4" />
                       Tracking
                     </Button>
+
+                    {/* Botones de firma digital */}
+                    {sale.template_id && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleGenerateQuestionnaireLink(sale.id)}
+                        disabled={generateQuestionnaireLink.isPending}
+                        className="flex items-center gap-1"
+                      >
+                        <FileText className="h-4 w-4" />
+                        {generateQuestionnaireLink.isPending ? 'Generando...' : 'Enviar Cuestionario'}
+                      </Button>
+                    )}
+                    
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleGenerateSignatureLink(sale.id)}
+                      disabled={generateSignatureLink.isPending}
+                      className="flex items-center gap-1"
+                    >
+                      <FileText className="h-4 w-4" />
+                      {generateSignatureLink.isPending ? 'Generando...' : 'Enviar Firma'}
+                    </Button>
+
                     <Link to={`/sales/${sale.id}`}>
                       <Button size="sm" className="flex items-center gap-1">
                         <Eye className="h-4 w-4" />

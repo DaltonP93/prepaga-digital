@@ -3,11 +3,10 @@ import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useCreateSignature, useCompleteSignature } from '@/hooks/useSignature';
-import { generatePDFContent } from '@/lib/pdfGenerator';
-import { createTemplateContext, interpolateTemplate } from '@/lib/templateEngine';
 
 export const useSignatureFlow = () => {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
   const { toast } = useToast();
   const createSignature = useCreateSignature();
   const completeSignature = useCompleteSignature();
@@ -19,12 +18,16 @@ export const useSignatureFlow = () => {
   ) => {
     setIsProcessing(true);
     try {
+      setCurrentStep(1); // Guardando firma
+      
       // 1. Guardar la firma
       await createSignature.mutateAsync({
         saleId: saleData.id,
         documentId: documentId,
         signatureData: signatureData,
       });
+
+      setCurrentStep(2); // Obteniendo respuestas del cuestionario
 
       // 2. Obtener respuestas del cuestionario si existe template
       let questionnaireResponses = {};
@@ -51,22 +54,23 @@ export const useSignatureFlow = () => {
         }
       }
 
-      // 3. Generar PDF con firma y respuestas del cuestionario
-      const pdfData = {
-        content: saleData.documents?.[0]?.content || '',
+      setCurrentStep(3); // Generando documento PDF
+
+      // 3. Generar contenido HTML para el PDF
+      const htmlContent = generateContractHTML({
+        sale: saleData,
+        client: saleData.clients,
+        plan: saleData.plans,
         signatures: [{
           signature_data: signatureData,
           signed_at: new Date().toISOString(),
           document_id: documentId,
         }],
-        client: saleData.clients,
-        plan: saleData.plans,
-        company: { name: 'Mi Empresa' }, // TODO: Get from company data
         questionnaire_responses: questionnaireResponses,
-      };
+      });
 
-      const htmlContent = generatePDFContent(pdfData);
-      
+      setCurrentStep(4); // Creando PDF
+
       // 4. Generar PDF usando edge function
       const { data: pdfBlob, error: pdfError } = await supabase.functions.invoke('generate-pdf', {
         body: {
@@ -76,6 +80,8 @@ export const useSignatureFlow = () => {
       });
 
       if (pdfError) throw pdfError;
+
+      setCurrentStep(5); // Guardando documento
 
       // 5. Subir PDF a Storage
       const fileName = `contracts/${saleData.id}-signed.pdf`;
@@ -87,6 +93,8 @@ export const useSignatureFlow = () => {
         });
 
       if (uploadError) throw uploadError;
+
+      setCurrentStep(6); // Finalizando
 
       // 6. Actualizar venta con URL del documento firmado
       const { error: updateError } = await supabase
@@ -104,7 +112,7 @@ export const useSignatureFlow = () => {
 
       toast({
         title: "Proceso completado",
-        description: "El documento ha sido firmado y guardado exitosamente con las respuestas del cuestionario incluidas.",
+        description: "El documento ha sido firmado y guardado exitosamente.",
       });
 
       return { success: true, documentUrl: fileName };
@@ -118,11 +126,86 @@ export const useSignatureFlow = () => {
       return { success: false, error: error.message };
     } finally {
       setIsProcessing(false);
+      setCurrentStep(0);
     }
+  };
+
+  const generateContractHTML = (data: any) => {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Contrato de Seguro</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .client-info { margin: 20px 0; }
+          .plan-info { margin: 20px 0; }
+          .signature-section { margin-top: 40px; border-top: 1px solid #ccc; padding-top: 20px; }
+          .signature-image { max-width: 200px; height: auto; }
+          .questionnaire { margin: 20px 0; }
+          .question { margin: 10px 0; }
+          .answer { font-weight: bold; color: #2563eb; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>CONTRATO DE SEGURO</h1>
+          <p>Fecha: ${new Date().toLocaleDateString()}</p>
+        </div>
+
+        <div class="client-info">
+          <h2>Información del Cliente</h2>
+          <p><strong>Nombre:</strong> ${data.client?.first_name} ${data.client?.last_name}</p>
+          <p><strong>Email:</strong> ${data.client?.email}</p>
+          <p><strong>Teléfono:</strong> ${data.client?.phone || 'N/A'}</p>
+          <p><strong>DNI:</strong> ${data.client?.dni || 'N/A'}</p>
+        </div>
+
+        <div class="plan-info">
+          <h2>Plan Contratado</h2>
+          <p><strong>Plan:</strong> ${data.plan?.name}</p>
+          <p><strong>Precio:</strong> ${Number(data.plan?.price || 0).toLocaleString()} Gs.</p>
+          <p><strong>Descripción:</strong> ${data.plan?.description || 'N/A'}</p>
+        </div>
+
+        ${Object.keys(data.questionnaire_responses || {}).length > 0 ? `
+        <div class="questionnaire">
+          <h2>Respuestas del Cuestionario</h2>
+          ${Object.values(data.questionnaire_responses).map((response: any) => `
+            <div class="question">
+              <p><strong>Pregunta:</strong> ${response.question}</p>
+              <p class="answer">Respuesta: ${response.answer}</p>
+            </div>
+          `).join('')}
+        </div>
+        ` : ''}
+
+        <div class="signature-section">
+          <h2>Firmas</h2>
+          ${data.signatures.map((sig: any) => `
+            <div>
+              <p><strong>Firmado el:</strong> ${new Date(sig.signed_at).toLocaleString()}</p>
+              <div>
+                <img src="${sig.signature_data}" alt="Firma" class="signature-image" />
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <div style="margin-top: 40px; text-align: center; font-size: 12px; color: #666;">
+          <p>Este documento ha sido generado digitalmente y es válido sin firma manuscrita.</p>
+          <p>Documento generado el ${new Date().toLocaleString()}</p>
+        </div>
+      </body>
+      </html>
+    `;
   };
 
   return {
     processSignature,
     isProcessing,
+    currentStep,
   };
 };
