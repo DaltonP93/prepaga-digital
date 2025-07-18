@@ -15,6 +15,18 @@ interface CompanySettings {
   settings?: any;
 }
 
+interface CompanyBranding {
+  id?: string;
+  name?: string;
+  login_logo_url?: string;
+  login_background_url?: string;
+  login_title?: string;
+  login_subtitle?: string;
+  primary_color?: string;
+  secondary_color?: string;
+  accent_color?: string;
+}
+
 export const useCompanySettings = () => {
   const { toast } = useToast();
   const { profile } = useAuthContext();
@@ -80,5 +92,32 @@ export const useCompanySettings = () => {
     settings,
     isLoading,
     updateSettings,
+  };
+};
+
+export const useCompanyBranding = (companyId?: string) => {
+  const { data: branding, isLoading } = useQuery({
+    queryKey: ['company-branding', companyId],
+    queryFn: async () => {
+      if (!companyId) return null;
+      
+      const { data, error } = await supabase
+        .from('companies')
+        .select('*')
+        .eq('id', companyId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+      
+      return data as CompanyBranding;
+    },
+    enabled: !!companyId,
+  });
+
+  return {
+    data: branding,
+    isLoading,
   };
 };
