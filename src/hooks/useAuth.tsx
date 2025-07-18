@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
+import { useMutation } from '@tanstack/react-query';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 
@@ -130,4 +131,13 @@ export const useAuth = (): AuthContextType => {
     signOut,
     signUp,
   };
+};
+
+export const useSignOut = () => {
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    },
+  });
 };

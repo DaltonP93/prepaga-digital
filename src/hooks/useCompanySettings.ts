@@ -12,6 +12,7 @@ interface CompanySettings {
   twilio_account_sid?: string;
   twilio_auth_token?: string;
   sms_api_key?: string;
+  email_api_key?: string;
   settings?: any;
 }
 
@@ -27,20 +28,22 @@ interface CompanyBranding {
   accent_color?: string;
 }
 
-export const useCompanySettings = () => {
+export const useCompanySettings = (companyId?: string) => {
   const { toast } = useToast();
   const { profile } = useAuthContext();
   const queryClient = useQueryClient();
+  
+  const actualCompanyId = companyId || profile?.company_id;
 
   const { data: settings, isLoading } = useQuery({
-    queryKey: ['company-settings', profile?.company_id],
+    queryKey: ['company-settings', actualCompanyId],
     queryFn: async () => {
-      if (!profile?.company_id) return null;
+      if (!actualCompanyId) return null;
       
       const { data, error } = await supabase
         .from('company_settings')
         .select('*')
-        .eq('company_id', profile.company_id)
+        .eq('company_id', actualCompanyId)
         .single();
 
       if (error && error.code !== 'PGRST116') {
@@ -49,15 +52,15 @@ export const useCompanySettings = () => {
       
       return data;
     },
-    enabled: !!profile?.company_id,
+    enabled: !!actualCompanyId,
   });
 
   const updateSettings = useMutation({
     mutationFn: async (newSettings: Partial<CompanySettings>) => {
-      if (!profile?.company_id) throw new Error('No company ID found');
+      if (!actualCompanyId) throw new Error('No company ID found');
 
       const settingsData = {
-        company_id: profile.company_id,
+        company_id: actualCompanyId,
         ...newSettings,
       };
 
@@ -91,7 +94,8 @@ export const useCompanySettings = () => {
   return {
     settings,
     isLoading,
-    updateSettings,
+    updateSettings: updateSettings.mutate,
+    isUpdating: updateSettings.isPending,
   };
 };
 
