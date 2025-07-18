@@ -25,10 +25,12 @@ export function Layout({ children, title, description }: LayoutProps) {
     );
   }
 
+  const isSuperAdmin = profile?.role === 'super_admin';
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
-        <AppSidebar />
+        <AppSidebar isSuperAdmin={isSuperAdmin} />
         <SidebarInset>
           <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger className="-ml-1" />

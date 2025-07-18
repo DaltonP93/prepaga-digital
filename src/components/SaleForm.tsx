@@ -15,7 +15,6 @@ import { useTemplates } from "@/hooks/useTemplates";
 import { useCreateSale, useUpdateSale } from "@/hooks/useSales";
 import { useAuthContext } from "@/components/AuthProvider";
 import { Database } from "@/integrations/supabase/types";
-import { MultiTemplateSelector } from "@/components/MultiTemplateSelector";
 
 type Sale = Database['public']['Tables']['sales']['Row'];
 
@@ -29,7 +28,6 @@ interface SaleFormData {
   client_id: string;
   plan_id: string;
   template_id?: string;
-  template_ids?: string[];
   total_amount: number;
   notes?: string;
   // Campos laborales
@@ -179,14 +177,22 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label>Templates</Label>
-            <MultiTemplateSelector
-              selectedTemplates={watch("template_ids") || []}
-              onTemplatesChange={(templates) => setValue("template_ids", templates)}
-              templates={templates}
-            />
+            <Label>Template (Opcional)</Label>
+            <Select value={watch("template_id")} onValueChange={handleTemplateChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar template para cuestionario" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="no-template">Sin template</SelectItem>
+                {templates.map((template) => (
+                  <SelectItem key={template.id} value={template.id}>
+                    {template.name} ({template.question_count || 0} preguntas)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <p className="text-sm text-gray-500">
-              Puedes seleccionar múltiples templates para esta venta
+              Si seleccionas un template, se enviará un cuestionario antes de la firma
             </p>
           </div>
 
@@ -265,13 +271,8 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
                 <Input
                   id="contract_number"
                   {...register("contract_number")}
-                  placeholder="Se genera automáticamente al guardar"
-                  readOnly
-                  className="bg-muted"
+                  placeholder="Número de contrato asignado"
                 />
-                <p className="text-sm text-muted-foreground">
-                  El número se asignará automáticamente cuando se guarde la venta
-                </p>
               </div>
 
               <div className="space-y-2">
@@ -313,9 +314,6 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
                   {...register("leads_id")}
                   placeholder="ID del lead en el sistema CRM"
                 />
-                <p className="text-sm text-muted-foreground">
-                  Identificador del prospecto en el sistema de gestión de leads
-                </p>
               </div>
 
               <div className="space-y-2">
@@ -325,9 +323,6 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
                   {...register("pediatrician")}
                   placeholder="Nombre del pediatra asignado"
                 />
-                <p className="text-sm text-muted-foreground">
-                  Requerido si el titular o beneficiarios son menores de edad
-                </p>
               </div>
 
               <div className="space-y-2">
@@ -337,9 +332,6 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
                   {...register("birth_place")}
                   placeholder="Ciudad y país de nacimiento"
                 />
-                <p className="text-sm text-muted-foreground">
-                  Información requerida para algunos tipos de seguros
-                </p>
               </div>
             </TabsContent>
           </Tabs>

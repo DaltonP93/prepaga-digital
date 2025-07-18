@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,6 @@ import { Database } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
 import { SearchAndFilters, FilterOptions } from "@/components/SearchAndFilters";
 import { generatePDFContent, downloadPDF } from "@/lib/pdfGenerator";
-import { SaleActions } from "@/components/SaleActions";
 
 type Sale = Database['public']['Tables']['sales']['Row'] & {
   clients?: { first_name: string; last_name: string; email: string; phone: string };
@@ -30,6 +30,10 @@ const Sales = () => {
   const [showSaleForm, setShowSaleForm] = useState(false);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
   const [filters, setFilters] = useState<FilterOptions>({ search: '' });
+  const [showBeneficiaries, setShowBeneficiaries] = useState<string | null>(null);
+  const [showDocuments, setShowDocuments] = useState<string | null>(null);
+  const [showNotes, setShowNotes] = useState<string | null>(null);
+  const [showRequirements, setShowRequirements] = useState<string | null>(null);
   const [showCommunicationModal, setShowCommunicationModal] = useState(false);
   const [communicationData, setCommunicationData] = useState<{
     saleId: string;
@@ -312,11 +316,107 @@ const Sales = () => {
                       {sale.sale_date ? new Date(sale.sale_date).toLocaleDateString() : '-'}
                     </TableCell>
                     <TableCell>
-                      <SaleActions
-                        sale={sale}
-                        onEdit={handleEditSale}
-                        onDownloadContract={handleDownloadContract}
-                      />
+                      <div className="flex flex-wrap gap-1">
+                        {/* Primera fila de botones principales */}
+                        <div className="flex space-x-1 mb-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditSale(sale)}
+                            title="Editar venta"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowBeneficiaries(sale.id)}
+                            title="Gestionar beneficiarios"
+                          >
+                            <Users className="h-4 w-4" />
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowDocuments(sale.id)}
+                            title="Digitalizaciones"
+                          >
+                            <Upload className="h-4 w-4" />
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowNotes(sale.id)}
+                            title="Novedades"
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                          </Button>
+                        </div>
+
+                        {/* Segunda fila de botones */}
+                        <div className="flex space-x-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowRequirements(sale.id)}
+                            title="Requisitos"
+                          >
+                            <ClipboardList className="h-4 w-4" />
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownloadContract(sale)}
+                            title="Imprimir DJ / Contrato"
+                          >
+                            <FileCheck className="h-4 w-4" />
+                          </Button>
+
+                          {sale.status === 'borrador' && sale.template_id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleGenerateQuestionnaireLink(sale)}
+                              disabled={generateQuestionnaireLink.isPending}
+                              title="Completar DJ"
+                            >
+                              <FileText className="h-4 w-4" />
+                            </Button>
+                          )}
+                          
+                          {sale.status === 'borrador' && !sale.template_id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleGenerateSignatureLink(sale)}
+                              disabled={generateSignatureLink.isPending}
+                              title="Generar enlace de firma"
+                            >
+                              <Link className="h-4 w-4" />
+                            </Button>
+                          )}
+                          
+                          {sale.signature_token && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(
+                                sale.template_id 
+                                  ? `/questionnaire/${sale.signature_token}`
+                                  : `/signature/${sale.signature_token}`, 
+                                '_blank'
+                              )}
+                              title="Ver documento"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -338,6 +438,38 @@ const Sales = () => {
           onOpenChange={handleCloseForm}
           sale={editingSale}
         />
+
+        {showBeneficiaries && (
+          <BeneficiariesManager
+            saleId={showBeneficiaries}
+            open={!!showBeneficiaries}
+            onOpenChange={(open) => !open && setShowBeneficiaries(null)}
+          />
+        )}
+
+        {showDocuments && (
+          <SaleDocuments
+            saleId={showDocuments}
+            open={!!showDocuments}
+            onOpenChange={(open) => !open && setShowDocuments(null)}
+          />
+        )}
+
+        {showNotes && (
+          <SaleNotes
+            saleId={showNotes}
+            open={!!showNotes}
+            onOpenChange={(open) => !open && setShowNotes(null)}
+          />
+        )}
+
+        {showRequirements && (
+          <SaleRequirements
+            saleId={showRequirements}
+            open={!!showRequirements}
+            onOpenChange={(open) => !open && setShowRequirements(null)}
+          />
+        )}
 
         {showCommunicationModal && communicationData && (
           <CommunicationShareModal
