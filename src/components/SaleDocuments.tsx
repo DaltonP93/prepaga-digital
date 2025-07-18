@@ -173,6 +173,15 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  const handleDownload = (doc: SaleDocument) => {
+    const link = window.document.createElement('a');
+    link.href = doc.file_url;
+    link.download = doc.document_name;
+    window.document.body.appendChild(link);
+    link.click();
+    window.document.body.removeChild(link);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
@@ -263,26 +272,26 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
               <div className="text-center py-8">Cargando documentos...</div>
             ) : documents && documents.length > 0 ? (
               <div className="grid gap-4">
-                {documents.map((document) => (
-                  <Card key={document.id}>
+                {documents.map((doc) => (
+                  <Card key={doc.id}>
                     <CardContent className="p-4">
                       <div className="flex justify-between items-start">
                         <div className="space-y-2 flex-1">
                           <div className="flex items-center gap-2">
                             <FileText className="h-4 w-4" />
-                            <h4 className="font-medium">{document.document_name}</h4>
+                            <h4 className="font-medium">{doc.document_name}</h4>
                             <Badge variant="outline">
-                              {documentTypes.find(t => t.value === document.document_type)?.label || document.document_type}
+                              {documentTypes.find(t => t.value === doc.document_type)?.label || doc.document_type}
                             </Badge>
                           </div>
                           
                           <div className="text-sm text-muted-foreground space-y-1">
-                            {document.file_size && (
-                              <p>Tamaño: {formatFileSize(document.file_size)}</p>
+                            {doc.file_size && (
+                              <p>Tamaño: {formatFileSize(doc.file_size)}</p>
                             )}
-                            <p>Subido: {new Date(document.created_at).toLocaleString()}</p>
-                            {document.observations && (
-                              <p>Observaciones: {document.observations}</p>
+                            <p>Subido: {new Date(doc.created_at).toLocaleString()}</p>
+                            {doc.observations && (
+                              <p>Observaciones: {doc.observations}</p>
                             )}
                           </div>
                         </div>
@@ -291,26 +300,21 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => window.open(document.file_url, '_blank')}
+                            onClick={() => window.open(doc.file_url, '_blank')}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => {
-                              const link = document.createElement('a');
-                              link.href = document.file_url;
-                              link.download = document.document_name;
-                              link.click();
-                            }}
+                            onClick={() => handleDownload(doc)}
                           >
                             <Download className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => deleteDocument.mutate(document.id)}
+                            onClick={() => deleteDocument.mutate(doc.id)}
                             disabled={deleteDocument.isPending}
                             className="text-destructive hover:text-destructive"
                           >
