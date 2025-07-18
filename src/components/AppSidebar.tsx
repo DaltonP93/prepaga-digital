@@ -1,8 +1,8 @@
-
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
+import { useSidebar } from "@/components/SidebarProvider";
 import { useAuthContext } from "@/components/AuthProvider";
-import { useAuth } from "@/hooks/useAuth";
+import { useSignOut } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -26,13 +26,20 @@ import {
   CheckSquare,
   Package,
   KanbanSquare,
-  Users,
   LucideIcon,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 interface NavItem {
   name: string;
@@ -43,14 +50,11 @@ interface NavItem {
 export function AppSidebar() {
   const { profile } = useAuthContext();
   const location = useLocation();
-  const { signOut } = useAuth();
+  const { collapsed } = useSidebar();
+  const signOut = useSignOut();
 
   const handleSignOut = async () => {
-    try {
-      await signOut();
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
+    await signOut.mutateAsync();
   };
 
   const navigationItems: NavItem[] = [
@@ -96,7 +100,7 @@ export function AppSidebar() {
     },
   ];
 
-  // Add API Configuration for admin and super_admin only
+  // Add API Configuration for admin and super_admin
   if (profile?.role === 'admin' || profile?.role === 'super_admin') {
     navigationItems.push({
       name: "Configuración API",
@@ -114,7 +118,7 @@ export function AppSidebar() {
             <Button variant="ghost" className="relative h-8 w-8 rounded-full">
               <Bell className="h-4 w-4" />
               <Badge
-                variant="secondary"
+                variant="primary"
                 className="absolute -top-1 -right-1 h-4 w-4 rounded-full"
               >
                 2
