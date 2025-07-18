@@ -13,6 +13,7 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const { signIn } = useAuthContext();
   const navigate = useNavigate();
 
@@ -48,6 +49,7 @@ const Login = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="username"
               />
             </div>
             <div>
@@ -58,6 +60,7 @@ const Login = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                autoComplete="current-password"
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
@@ -65,11 +68,14 @@ const Login = () => {
             </Button>
             
             <div className="text-center">
-              <ForgotPasswordDialog>
-                <Button variant="link" type="button" className="text-sm p-0 h-auto">
-                  ¿Olvidaste tu contraseña?
-                </Button>
-              </ForgotPasswordDialog>
+              <Button 
+                variant="link" 
+                type="button" 
+                className="text-sm p-0 h-auto"
+                onClick={() => setShowForgotPassword(true)}
+              >
+                ¿Olvidaste tu contraseña?
+              </Button>
             </div>
             
             <div className="text-center text-sm">
@@ -81,6 +87,11 @@ const Login = () => {
           </form>
         </CardContent>
       </Card>
+
+      <ForgotPasswordDialog
+        open={showForgotPassword}
+        onOpenChange={setShowForgotPassword}
+      />
     </div>
   );
 };
