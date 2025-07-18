@@ -1,33 +1,26 @@
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MessageSquare, Plus } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuthContext } from "@/components/AuthProvider";
+
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { MessageSquare, Plus, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface SaleNote {
   id: string;
-  sale_id: string;
-  user_id: string;
   note: string;
   created_at: string;
   updated_at: string;
+  user_id: string;
   profiles?: {
-    first_name: string;
-    last_name: string;
+    first_name?: string;
+    last_name?: string;
     avatar_url?: string;
   };
-}
-
-interface SaleNoteFormData {
-  note: string;
 }
 
 interface SaleNotesProps {
@@ -36,23 +29,24 @@ interface SaleNotesProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function SaleNotes({ saleId, open, onOpenChange }: SaleNotesProps) {
-  const [showForm, setShowForm] = useState(false);
-  const { toast } = useToast();
+export const SaleNotes: React.FC<SaleNotesProps> = ({
+  saleId,
+  open,
+  onOpenChange,
+}) => {
+  const [newNote, setNewNote] = useState('');
+  const [isAdding, setIsAdding] = useState(false);
+
   const queryClient = useQueryClient();
-  const { profile } = useAuthContext();
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<SaleNoteFormData>();
-
-  // Fetch notes
-  const { data: notes = [], isLoading } = useQuery({
+  const { data: notes, isLoading } = useQuery({
     queryKey: ['sale-notes', saleId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('sale_notes')
         .select(`
           *,
-          profiles:user_id (
+          profiles (
             first_name,
             last_name,
             avatar_url
@@ -64,117 +58,139 @@ export function SaleNotes({ saleId, open, onOpenChange }: SaleNotesProps) {
       if (error) throw error;
       return data as SaleNote[];
     },
-    enabled: !!saleId,
+    enabled: open && !!saleId,
   });
 
-  // Create note mutation
-  const createNote = useMutation({
-    mutationFn: async (data: SaleNoteFormData) => {
-      const { error } = await supabase
+  const addNote = useMutation({
+    mutationFn: async (note: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const { data, error } = await supabase
         .from('sale_notes')
         .insert({
-          ...data,
           sale_id: saleId,
-          user_id: profile?.id!,
-        });
+          note: note.trim(),
+          user_id: user.id,
+        })
+        .select(`
+          *,
+          profiles (
+            first_name,
+            last_name,
+            avatar_url
+          )
+        `)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sale-notes', saleId] });
+      toast.success('Nota agregada correctamente');
+      setNewNote('');
+      setIsAdding(false);
+    },
+    onError: (error) => {
+      console.error('Error adding note:', error);
+      toast.error('Error al agregar nota');
+    },
+  });
+
+  const deleteNote = useMutation({
+    mutationFn: async (noteId: string) => {
+      const { error } = await supabase
+        .from('sale_notes')
+        .delete()
+        .eq('id', noteId);
 
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sale-notes', saleId] });
-      toast({
-        title: "Novedad agregada",
-        description: "La novedad ha sido agregada exitosamente.",
-      });
-      reset();
-      setShowForm(false);
+      toast.success('Nota eliminada correctamente');
     },
     onError: (error) => {
-      toast({
-        title: "Error",
-        description: "No se pudo agregar la novedad.",
-        variant: "destructive",
-      });
-      console.error('Error creating note:', error);
+      console.error('Error deleting note:', error);
+      toast.error('Error al eliminar nota');
     },
   });
 
-  const onSubmit = async (data: SaleNoteFormData) => {
-    await createNote.mutateAsync(data);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newNote.trim()) {
+      toast.error('La nota no puede estar vacía');
+      return;
+    }
+    addNote.mutate(newNote);
   };
 
-  const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
+  const getUserName = (note: SaleNote) => {
+    if (note.profiles?.first_name || note.profiles?.last_name) {
+      return `${note.profiles.first_name || ''} ${note.profiles.last_name || ''}`.trim();
+    }
+    return 'Usuario';
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('es-ES', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
+  const getUserInitials = (note: SaleNote) => {
+    const firstName = note.profiles?.first_name || '';
+    const lastName = note.profiles?.last_name || '';
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || 'U';
   };
-
-  if (!open) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Novedades de la Venta</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <MessageSquare className="h-5 w-5" />
+            Novedades y Notas
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Botón para agregar nota */}
           <div className="flex justify-between items-center">
-            <div>
-              <h3 className="text-lg font-medium">Comentarios Internos</h3>
-              <p className="text-sm text-muted-foreground">
-                Registra novedades y comentarios sobre esta venta
-              </p>
-            </div>
-            <Button onClick={() => setShowForm(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nueva Novedad
+            <p className="text-sm text-muted-foreground">
+              Registra novedades y observaciones importantes sobre esta venta
+            </p>
+            <Button
+              onClick={() => setIsAdding(true)}
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Nueva Nota
             </Button>
           </div>
 
-          {/* Add Note Form */}
-          {showForm && (
+          {/* Formulario para nueva nota */}
+          {isAdding && (
             <Card>
               <CardHeader>
-                <CardTitle>Agregar Novedad</CardTitle>
+                <CardTitle>Agregar Nueva Nota</CardTitle>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="note">Comentario *</Label>
-                    <Textarea
-                      id="note"
-                      {...register("note", { required: "El comentario es requerido" })}
-                      placeholder="Describe la novedad o comentario..."
-                      rows={4}
-                    />
-                    {errors.note && (
-                      <span className="text-sm text-red-500">{errors.note.message}</span>
-                    )}
-                  </div>
-
-                  <div className="flex space-x-2">
-                    <Button 
-                      type="submit" 
-                      disabled={createNote.isPending}
-                    >
-                      {createNote.isPending ? "Guardando..." : "Guardar"}
-                    </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={() => setShowForm(false)}
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <Textarea
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    placeholder="Escribe tu nota aquí..."
+                    rows={4}
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setIsAdding(false);
+                        setNewNote('');
+                      }}
                     >
                       Cancelar
+                    </Button>
+                    <Button type="submit" disabled={addNote.isPending}>
+                      {addNote.isPending ? 'Guardando...' : 'Guardar Nota'}
                     </Button>
                   </div>
                 </form>
@@ -182,60 +198,61 @@ export function SaleNotes({ saleId, open, onOpenChange }: SaleNotesProps) {
             </Card>
           )}
 
-          {/* Notes List */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Historial de Novedades</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="text-center py-4">Cargando novedades...</div>
-              ) : notes.length > 0 ? (
-                <div className="space-y-4">
-                  {notes.map((note) => (
-                    <div key={note.id} className="border rounded-lg p-4">
-                      <div className="flex items-start space-x-3">
-                        <Avatar className="w-8 h-8">
-                          <AvatarImage src={note.profiles?.avatar_url} />
-                          <AvatarFallback className="text-xs">
-                            {note.profiles ? 
-                              getInitials(note.profiles.first_name, note.profiles.last_name) : 
-                              'U'
-                            }
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-2">
-                              <span className="font-medium text-sm">
-                                {note.profiles ? 
-                                  `${note.profiles.first_name} ${note.profiles.last_name}` : 
-                                  'Usuario desconocido'
-                                }
-                              </span>
-                              <MessageSquare className="w-4 h-4 text-muted-foreground" />
-                            </div>
+          {/* Lista de notas */}
+          <div className="space-y-4">
+            {isLoading ? (
+              <div className="text-center py-8">Cargando notas...</div>
+            ) : notes && notes.length > 0 ? (
+              notes.map((note) => (
+                <Card key={note.id}>
+                  <CardContent className="p-4">
+                    <div className="flex gap-3">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={note.profiles?.avatar_url} />
+                        <AvatarFallback>{getUserInitials(note)}</AvatarFallback>
+                      </Avatar>
+                      
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">{getUserName(note)}</span>
                             <span className="text-xs text-muted-foreground">
-                              {formatDate(note.created_at)}
+                              {new Date(note.created_at).toLocaleString()}
                             </span>
                           </div>
-                          <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                            {note.note}
-                          </p>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteNote.mutate(note.id)}
+                            disabled={deleteNote.isPending}
+                            className="text-destructive hover:text-destructive h-6 w-6 p-0"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
                         </div>
+                        
+                        <p className="text-sm text-foreground whitespace-pre-wrap">
+                          {note.note}
+                        </p>
+                        
+                        {note.updated_at !== note.created_at && (
+                          <p className="text-xs text-muted-foreground">
+                            Editado: {new Date(note.updated_at).toLocaleString()}
+                          </p>
+                        )}
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  No hay novedades registradas
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No hay notas registradas
+              </div>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
   );
-}
+};

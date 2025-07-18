@@ -1,37 +1,30 @@
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import { Plus, CheckCircle, Circle, Trash2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuthContext } from "@/components/AuthProvider";
+
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { CheckSquare, Plus, Clock, CheckCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface SaleRequirement {
   id: string;
-  sale_id: string;
   requirement_name: string;
   is_completed: boolean;
-  completed_by?: string;
-  completed_at?: string;
   notes?: string;
+  completed_at?: string;
+  completed_by?: string;
   created_at: string;
-  updated_at: string;
   profiles?: {
-    first_name: string;
-    last_name: string;
+    first_name?: string;
+    last_name?: string;
   };
-}
-
-interface RequirementFormData {
-  requirement_name: string;
 }
 
 interface SaleRequirementsProps {
@@ -40,25 +33,27 @@ interface SaleRequirementsProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function SaleRequirements({ saleId, open, onOpenChange }: SaleRequirementsProps) {
-  const [showForm, setShowForm] = useState(false);
-  const [updatingNotes, setUpdatingNotes] = useState<string | null>(null);
-  const [tempNotes, setTempNotes] = useState('');
-  const { toast } = useToast();
+export const SaleRequirements: React.FC<SaleRequirementsProps> = ({
+  saleId,
+  open,
+  onOpenChange,
+}) => {
+  const [isAdding, setIsAdding] = useState(false);
+  const [formData, setFormData] = useState({
+    requirement_name: '',
+    notes: '',
+  });
+
   const queryClient = useQueryClient();
-  const { profile } = useAuthContext();
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<RequirementFormData>();
-
-  // Fetch requirements
-  const { data: requirements = [], isLoading } = useQuery({
+  const { data: requirements, isLoading } = useQuery({
     queryKey: ['sale-requirements', saleId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('sale_requirements')
         .select(`
           *,
-          profiles:completed_by (
+          profiles (
             first_name,
             last_name
           )
@@ -69,222 +64,202 @@ export function SaleRequirements({ saleId, open, onOpenChange }: SaleRequirement
       if (error) throw error;
       return data as SaleRequirement[];
     },
-    enabled: !!saleId,
+    enabled: open && !!saleId,
   });
 
-  // Create requirement mutation
-  const createRequirement = useMutation({
-    mutationFn: async (data: RequirementFormData) => {
-      const { error } = await supabase
+  const addRequirement = useMutation({
+    mutationFn: async (requirement: { requirement_name: string; notes?: string }) => {
+      const { data, error } = await supabase
         .from('sale_requirements')
         .insert({
-          ...data,
           sale_id: saleId,
-        });
+          requirement_name: requirement.requirement_name,
+          notes: requirement.notes,
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sale-requirements', saleId] });
-      toast({
-        title: "Requisito agregado",
-        description: "El requisito ha sido agregado exitosamente.",
-      });
-      reset();
-      setShowForm(false);
+      toast.success('Requisito agregado correctamente');
+      setFormData({ requirement_name: '', notes: '' });
+      setIsAdding(false);
     },
     onError: (error) => {
-      toast({
-        title: "Error",
-        description: "No se pudo agregar el requisito.",
-        variant: "destructive",
-      });
-      console.error('Error creating requirement:', error);
+      console.error('Error adding requirement:', error);
+      toast.error('Error al agregar requisito');
     },
   });
 
-  // Update requirement completion mutation
-  const updateRequirement = useMutation({
-    mutationFn: async ({ id, is_completed, notes }: { id: string; is_completed: boolean; notes?: string }) => {
-      const updateData: any = { is_completed };
-      
-      if (is_completed) {
-        updateData.completed_by = profile?.id;
+  const toggleRequirement = useMutation({
+    mutationFn: async ({ requirementId, isCompleted }: { requirementId: string; isCompleted: boolean }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const updateData: any = {
+        is_completed: isCompleted,
+      };
+
+      if (isCompleted) {
         updateData.completed_at = new Date().toISOString();
+        updateData.completed_by = user.id;
       } else {
-        updateData.completed_by = null;
         updateData.completed_at = null;
+        updateData.completed_by = null;
       }
 
-      if (notes !== undefined) {
-        updateData.notes = notes;
-      }
-
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('sale_requirements')
         .update(updateData)
-        .eq('id', id);
+        .eq('id', requirementId)
+        .select()
+        .single();
 
       if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sale-requirements', saleId] });
-      toast({
-        title: "Requisito actualizado",
-        description: "El estado del requisito ha sido actualizado.",
-      });
     },
     onError: (error) => {
-      toast({
-        title: "Error",
-        description: "No se pudo actualizar el requisito.",
-        variant: "destructive",
-      });
       console.error('Error updating requirement:', error);
+      toast.error('Error al actualizar requisito');
     },
   });
 
-  // Delete requirement mutation
-  const deleteRequirement = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('sale_requirements')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sale-requirements', saleId] });
-      toast({
-        title: "Requisito eliminado",
-        description: "El requisito ha sido eliminado exitosamente.",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar el requisito.",
-        variant: "destructive",
-      });
-      console.error('Error deleting requirement:', error);
-    },
-  });
-
-  const onSubmit = async (data: RequirementFormData) => {
-    await createRequirement.mutateAsync(data);
-  };
-
-  const handleToggleComplete = (requirement: SaleRequirement) => {
-    updateRequirement.mutate({
-      id: requirement.id,
-      is_completed: !requirement.is_completed,
-    });
-  };
-
-  const handleUpdateNotes = (requirement: SaleRequirement) => {
-    updateRequirement.mutate({
-      id: requirement.id,
-      is_completed: requirement.is_completed,
-      notes: tempNotes,
-    });
-    setUpdatingNotes(null);
-    setTempNotes('');
-  };
-
-  const handleDelete = (id: string) => {
-    if (confirm('¿Estás seguro de que quieres eliminar este requisito?')) {
-      deleteRequirement.mutate(id);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.requirement_name.trim()) {
+      toast.error('El nombre del requisito es obligatorio');
+      return;
     }
+    addRequirement.mutate(formData);
   };
 
-  const startEditingNotes = (requirement: SaleRequirement) => {
-    setUpdatingNotes(requirement.id);
-    setTempNotes(requirement.notes || '');
+  const getCompletionPercentage = () => {
+    if (!requirements || requirements.length === 0) return 0;
+    const completed = requirements.filter(r => r.is_completed).length;
+    return Math.round((completed / requirements.length) * 100);
   };
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('es-ES', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
-  };
-
-  const completedCount = requirements.filter(req => req.is_completed).length;
-  const totalCount = requirements.length;
-  const completionPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
-
-  if (!open) return null;
+  const defaultRequirements = [
+    'Documento de Identidad',
+    'Comprobante de Ingresos',
+    'Constancia de Trabajo',
+    'Comprobante de Domicilio',
+    'Certificado Médico',
+    'Declaración Jurada',
+    'Formulario de Beneficiarios',
+  ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Requisitos de la Venta</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <CheckSquare className="h-5 w-5" />
+            Control de Requisitos
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Barra de progreso */}
+          {requirements && requirements.length > 0 && (
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium">Progreso de Requisitos</span>
+                  <span className="text-sm text-muted-foreground">
+                    {requirements.filter(r => r.is_completed).length} de {requirements.length} completados
+                  </span>
+                </div>
+                <div className="w-full bg-secondary rounded-full h-2">
+                  <div 
+                    className="bg-primary h-2 rounded-full transition-all"
+                    style={{ width: `${getCompletionPercentage()}%` }}
+                  />
+                </div>
+                <div className="text-center mt-2">
+                  <span className="text-lg font-bold">{getCompletionPercentage()}%</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Botón para agregar requisito */}
           <div className="flex justify-between items-center">
-            <div>
-              <h3 className="text-lg font-medium">Checklist de Requisitos</h3>
-              <p className="text-sm text-muted-foreground">
-                Progreso: {completedCount} de {totalCount} completados ({completionPercentage}%)
-              </p>
-            </div>
-            <Button onClick={() => setShowForm(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nuevo Requisito
+            <p className="text-sm text-muted-foreground">
+              Controla el cumplimiento de requisitos para esta venta
+            </p>
+            <Button
+              onClick={() => setIsAdding(true)}
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Agregar Requisito
             </Button>
           </div>
 
-          {/* Progress Bar */}
-          {totalCount > 0 && (
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-primary h-2 rounded-full transition-all duration-300" 
-                style={{ width: `${completionPercentage}%` }}
-              />
-            </div>
-          )}
-
-          {/* Add Requirement Form */}
-          {showForm && (
+          {/* Formulario para nuevo requisito */}
+          {isAdding && (
             <Card>
               <CardHeader>
-                <CardTitle>Agregar Requisito</CardTitle>
+                <CardTitle>Nuevo Requisito</CardTitle>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="space-y-2">
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
                     <Label htmlFor="requirement_name">Nombre del Requisito *</Label>
                     <Input
                       id="requirement_name"
-                      {...register("requirement_name", { required: "El nombre del requisito es requerido" })}
-                      placeholder="Ej: Cédula de identidad, Comprobante de ingresos..."
+                      value={formData.requirement_name}
+                      onChange={(e) => setFormData(prev => ({ ...prev, requirement_name: e.target.value }))}
+                      placeholder="Ej: Documento de Identidad"
+                      required
                     />
-                    {errors.requirement_name && (
-                      <span className="text-sm text-red-500">{errors.requirement_name.message}</span>
-                    )}
                   </div>
 
-                  <div className="flex space-x-2">
-                    <Button 
-                      type="submit" 
-                      disabled={createRequirement.isPending}
-                    >
-                      {createRequirement.isPending ? "Guardando..." : "Agregar"}
-                    </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={() => setShowForm(false)}
+                  <div>
+                    <Label htmlFor="notes">Observaciones</Label>
+                    <Textarea
+                      id="notes"
+                      value={formData.notes}
+                      onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                      placeholder="Detalles o instrucciones adicionales"
+                      rows={3}
+                    />
+                  </div>
+
+                  {/* Requisitos comunes para selección rápida */}
+                  <div>
+                    <Label>Requisitos Comunes (clic para agregar rápido)</Label>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {defaultRequirements.map((req) => (
+                        <Badge
+                          key={req}
+                          variant="outline"
+                          className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
+                          onClick={() => setFormData(prev => ({ ...prev, requirement_name: req }))}
+                        >
+                          {req}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsAdding(false)}
                     >
                       Cancelar
+                    </Button>
+                    <Button type="submit" disabled={addRequirement.isPending}>
+                      {addRequirement.isPending ? 'Agregando...' : 'Agregar Requisito'}
                     </Button>
                   </div>
                 </form>
@@ -292,114 +267,73 @@ export function SaleRequirements({ saleId, open, onOpenChange }: SaleRequirement
             </Card>
           )}
 
-          {/* Requirements List */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Lista de Requisitos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="text-center py-4">Cargando requisitos...</div>
-              ) : requirements.length > 0 ? (
-                <div className="space-y-4">
-                  {requirements.map((requirement) => (
-                    <div key={requirement.id} className="border rounded-lg p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start space-x-3 flex-1">
-                          <button
-                            onClick={() => handleToggleComplete(requirement)}
-                            className="mt-1"
-                          >
+          {/* Lista de requisitos */}
+          <div className="space-y-3">
+            {isLoading ? (
+              <div className="text-center py-8">Cargando requisitos...</div>
+            ) : requirements && requirements.length > 0 ? (
+              requirements.map((requirement) => (
+                <Card key={requirement.id} className={requirement.is_completed ? 'bg-green-50 border-green-200' : ''}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        checked={requirement.is_completed}
+                        onCheckedChange={(checked) => 
+                          toggleRequirement.mutate({ 
+                            requirementId: requirement.id, 
+                            isCompleted: checked as boolean 
+                          })
+                        }
+                        disabled={toggleRequirement.isPending}
+                      />
+                      
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h3 className={`font-medium ${requirement.is_completed ? 'line-through text-muted-foreground' : ''}`}>
+                            {requirement.requirement_name}
+                          </h3>
+                          <div className="flex items-center gap-2">
                             {requirement.is_completed ? (
-                              <CheckCircle className="w-5 h-5 text-green-500" />
+                              <Badge variant="default" className="bg-green-600">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Completado
+                              </Badge>
                             ) : (
-                              <Circle className="w-5 h-5 text-gray-400" />
-                            )}
-                          </button>
-                          
-                          <div className="flex-1 space-y-2">
-                            <div className="flex items-center space-x-2">
-                              <span className={`font-medium ${requirement.is_completed ? 'line-through text-muted-foreground' : ''}`}>
-                                {requirement.requirement_name}
-                              </span>
-                              {requirement.is_completed && (
-                                <Badge variant="outline" className="text-green-600">
-                                  Completado
-                                </Badge>
-                              )}
-                            </div>
-                            
-                            {requirement.is_completed && requirement.completed_by && (
-                              <p className="text-xs text-muted-foreground">
-                                Completado por {requirement.profiles?.first_name} {requirement.profiles?.last_name} el {formatDate(requirement.completed_at)}
-                              </p>
-                            )}
-                            
-                            {updatingNotes === requirement.id ? (
-                              <div className="space-y-2">
-                                <Textarea
-                                  value={tempNotes}
-                                  onChange={(e) => setTempNotes(e.target.value)}
-                                  placeholder="Agregar notas..."
-                                  rows={2}
-                                />
-                                <div className="flex space-x-2">
-                                  <Button 
-                                    size="sm" 
-                                    onClick={() => handleUpdateNotes(requirement)}
-                                  >
-                                    Guardar
-                                  </Button>
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline" 
-                                    onClick={() => setUpdatingNotes(null)}
-                                  >
-                                    Cancelar
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div>
-                                {requirement.notes && (
-                                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                    {requirement.notes}
-                                  </p>
-                                )}
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-0 h-auto text-xs"
-                                  onClick={() => startEditingNotes(requirement)}
-                                >
-                                  {requirement.notes ? 'Editar notas' : 'Agregar notas'}
-                                </Button>
-                              </div>
+                              <Badge variant="secondary">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Pendiente
+                              </Badge>
                             )}
                           </div>
                         </div>
-                        
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelete(requirement.id)}
-                          className="ml-2"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+
+                        {requirement.notes && (
+                          <p className="text-sm text-muted-foreground">
+                            {requirement.notes}
+                          </p>
+                        )}
+
+                        {requirement.is_completed && requirement.completed_at && (
+                          <div className="text-xs text-muted-foreground">
+                            Completado el {new Date(requirement.completed_at).toLocaleString()}
+                            {requirement.profiles && (
+                              <span> por {requirement.profiles.first_name} {requirement.profiles.last_name}</span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  No hay requisitos registrados
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No hay requisitos registrados
+              </div>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
   );
-}
+};

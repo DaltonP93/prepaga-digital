@@ -1,71 +1,59 @@
-import { useQuery, useMutation } from '@tanstack/react-query';
+
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
-type DocumentAccessLog = Tables<"document_access_logs">;
-type DocumentAccessLogInsert = TablesInsert<"document_access_logs">;
+interface DocumentTrackingRecord {
+  id: string;
+  sale_id: string;
+  document_type: string;
+  access_time: string;
+  ip_address?: string;
+  user_agent?: string;
+  device_type?: string;
+  device_os?: string;
+  browser?: string;
+  action: string;
+  progress_percentage: number;
+  time_spent_seconds: number;
+  country?: string;
+  city?: string;
+  metadata: any;
+  created_at: string;
+}
 
-export const useDocumentTracking = (documentId?: string) => {
-  // Obtener logs de acceso del documento
-  const {
-    data: accessLogs,
-    isLoading: isLoadingLogs,
-  } = useQuery({
-    queryKey: ['document-access-logs', documentId],
+export const useDocumentTracking = (saleId?: string) => {
+  const queryClient = useQueryClient();
+
+  const { data: trackingRecords, isLoading } = useQuery({
+    queryKey: ['document-tracking', saleId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('document_access_logs')
+        .from('document_tracking')
         .select('*')
-        .eq('document_id', documentId!)
+        .eq('sale_id', saleId!)
         .order('access_time', { ascending: false });
 
       if (error) throw error;
-      return data;
+      return data as DocumentTrackingRecord[];
     },
-    enabled: !!documentId,
+    enabled: !!saleId,
   });
 
-  // Obtener estadísticas del documento
-  const {
-    data: stats,
-    isLoading: isLoadingStats,
-  } = useQuery({
-    queryKey: ['document-stats', documentId],
-    queryFn: async () => {
-      if (!documentId) return null;
-
-      const { data: logs, error } = await supabase
-        .from('document_access_logs')
-        .select('action, device_type')
-        .eq('document_id', documentId);
-
-      if (error) throw error;
-
-      const views = logs.filter(log => log.action === 'viewed').length;
-      const completions = logs.filter(log => log.action === 'completed').length;
-      const signatures = logs.filter(log => log.action === 'signed').length;
-      const deviceTypes = [...new Set(logs.map(log => log.device_type).filter(Boolean))];
-
-      return {
-        views,
-        completions,
-        signatures,
-        deviceTypes,
-        totalAccess: logs.length,
-      };
-    },
-    enabled: !!documentId,
-  });
-
-  // Registrar acceso al documento
-  const logAccessMutation = useMutation({
-    mutationFn: async (logData: Omit<DocumentAccessLogInsert, 'id' | 'access_time'>) => {
+  const createTrackingRecord = useMutation({
+    mutationFn: async (record: Omit<DocumentTrackingRecord, 'id' | 'access_time' | 'created_at'>) => {
+      // Detectar información del dispositivo
+      const userAgent = navigator.userAgent;
+      const deviceInfo = getDeviceInfo(userAgent);
+      
       const { data, error } = await supabase
-        .from('document_access_logs')
+        .from('document_tracking')
         .insert({
-          ...logData,
+          ...record,
+          user_agent: userAgent,
+          device_type: deviceInfo.type,
+          device_os: deviceInfo.os,
+          browser: deviceInfo.browser,
           ip_address: await getClientIP(),
-          device_type: getDeviceType(),
         })
         .select()
         .single();
@@ -73,19 +61,65 @@ export const useDocumentTracking = (documentId?: string) => {
       if (error) throw error;
       return data;
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['document-tracking', saleId] });
+    },
   });
 
+  const getStats = () => {
+    if (!trackingRecords) return null;
+
+    const totalViews = trackingRecords.filter(r => r.action === 'viewed').length;
+    const totalCompleted = trackingRecords.filter(r => r.action === 'completed').length;
+    const totalSigned = trackingRecords.filter(r => r.action === 'signed').length;
+    const uniqueDevices = new Set(trackingRecords.map(r => r.device_type)).size;
+    const averageProgress = trackingRecords.length > 0 
+      ? trackingRecords.reduce((sum, r) => sum + r.progress_percentage, 0) / trackingRecords.length 
+      : 0;
+
+    return {
+      totalViews,
+      totalCompleted,
+      totalSigned,
+      uniqueDevices,
+      averageProgress,
+    };
+  };
+
   return {
-    accessLogs,
-    stats,
-    isLoadingLogs,
-    isLoadingStats,
-    logAccess: logAccessMutation.mutate,
-    isLoggingAccess: logAccessMutation.isPending,
+    trackingRecords,
+    isLoading,
+    createTrackingRecord: createTrackingRecord.mutate,
+    isCreating: createTrackingRecord.isPending,
+    stats: getStats(),
   };
 };
 
 // Funciones utilitarias
+function getDeviceInfo(userAgent: string) {
+  const isMobile = /Mobile|Android|iPhone|iPad/i.test(userAgent);
+  const isTablet = /iPad|Tablet/i.test(userAgent);
+  
+  let type = 'desktop';
+  if (isTablet) type = 'tablet';
+  else if (isMobile) type = 'mobile';
+
+  let os = 'Unknown';
+  if (/Windows/i.test(userAgent)) os = 'Windows';
+  else if (/Mac/i.test(userAgent)) os = 'macOS';
+  else if (/Linux/i.test(userAgent)) os = 'Linux';
+  else if (/Android/i.test(userAgent)) os = 'Android';
+  else if (/iOS|iPhone|iPad/i.test(userAgent)) os = 'iOS';
+
+  let browser = 'Unknown';
+  if (/Chrome/i.test(userAgent)) browser = 'Chrome';
+  else if (/Firefox/i.test(userAgent)) browser = 'Firefox';
+  else if (/Safari/i.test(userAgent)) browser = 'Safari';
+  else if (/Edge/i.test(userAgent)) browser = 'Edge';
+
+  return { type, os, browser };
+}
+
 async function getClientIP(): Promise<string | null> {
   try {
     const response = await fetch('https://api.ipify.org?format=json');
@@ -94,15 +128,4 @@ async function getClientIP(): Promise<string | null> {
   } catch {
     return null;
   }
-}
-
-function getDeviceType(): string {
-  const userAgent = navigator.userAgent;
-  if (/tablet|ipad|playbook|silk/i.test(userAgent)) {
-    return 'tablet';
-  }
-  if (/mobile|iphone|ipod|android|blackberry|opera|mini|windows\sce|palm|smartphone|iemobile/i.test(userAgent)) {
-    return 'mobile';
-  }
-  return 'desktop';
 }
