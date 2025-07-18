@@ -26,9 +26,11 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
+  SidebarFooter,
 } from "@/components/ui/sidebar";
 
 import { MainNavItem } from "@/types";
+import { LogoutButton } from './LogoutButton';
 
 interface AppSidebarProps {
   isSuperAdmin?: boolean;
@@ -137,6 +139,11 @@ export function AppSidebar({ isSuperAdmin = false }: AppSidebarProps) {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter>
+        <div className="p-2">
+          <LogoutButton />
+        </div>
+      </SidebarFooter>
     </Sidebar>
   );
 }

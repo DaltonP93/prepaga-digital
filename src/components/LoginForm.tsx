@@ -7,12 +7,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuthContext } from '@/components/AuthProvider';
 import { useCompanyBranding } from '@/hooks/useCompanySettings';
 import { toast } from 'sonner';
+import { Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { ForgotPasswordDialog } from './ForgotPasswordDialog';
+import { Link } from 'react-router-dom';
 
 export const LoginForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [loginAttempts, setLoginAttempts] = useState(0);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blockTimeLeft, setBlockTimeLeft] = useState(0);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const { signIn } = useAuthContext();
   
   // Obtener configuración de branding basada en el dominio o configuración por defecto
@@ -20,21 +28,98 @@ export const LoginForm = () => {
 
   // Detectar empresa por dominio o usar configuración por defecto
   useEffect(() => {
-    // Por ahora usamos una empresa por defecto, se puede extender para detección por dominio
-    // TODO: Implementar detección de empresa por dominio personalizado
-    const defaultCompanyId = "default-company-id"; // Se puede obtener de configuración
+    const defaultCompanyId = "default-company-id";
     setCompanyId(defaultCompanyId);
   }, []);
 
+  // Manejo de bloqueo por intentos fallidos
+  useEffect(() => {
+    const storedAttempts = localStorage.getItem('loginAttempts');
+    const lastAttempt = localStorage.getItem('lastLoginAttempt');
+    
+    if (storedAttempts && lastAttempt) {
+      const attempts = parseInt(storedAttempts);
+      const lastAttemptTime = new Date(lastAttempt);
+      const now = new Date();
+      const timeDiff = (now.getTime() - lastAttemptTime.getTime()) / 1000 / 60; // minutos
+      
+      if (attempts >= 5 && timeDiff < 15) {
+        setIsBlocked(true);
+        setLoginAttempts(attempts);
+        setBlockTimeLeft(Math.ceil(15 - timeDiff));
+        
+        const timer = setInterval(() => {
+          setBlockTimeLeft(prev => {
+            if (prev <= 1) {
+              setIsBlocked(false);
+              setLoginAttempts(0);
+              localStorage.removeItem('loginAttempts');
+              localStorage.removeItem('lastLoginAttempt');
+              clearInterval(timer);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 60000);
+        
+        return () => clearInterval(timer);
+      } else if (timeDiff >= 15) {
+        // Reset después de 15 minutos
+        localStorage.removeItem('loginAttempts');
+        localStorage.removeItem('lastLoginAttempt');
+        setLoginAttempts(0);
+      } else {
+        setLoginAttempts(attempts);
+      }
+    }
+  }, []);
+
+  const validatePassword = (password: string) => {
+    const minLength = password.length >= 8;
+    const hasUpper = /[A-Z]/.test(password);
+    const hasLower = /[a-z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    
+    return {
+      isValid: minLength && hasUpper && hasLower && hasNumber,
+      minLength,
+      hasUpper,
+      hasLower,
+      hasNumber
+    };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (isBlocked) {
+      toast.error(`Cuenta bloqueada. Intente nuevamente en ${blockTimeLeft} minutos.`);
+      return;
+    }
+    
     setLoading(true);
 
     try {
       await signIn(email, password);
       toast.success('¡Bienvenido!');
+      
+      // Reset intentos exitosos
+      localStorage.removeItem('loginAttempts');
+      localStorage.removeItem('lastLoginAttempt');
+      setLoginAttempts(0);
     } catch (error: any) {
-      toast.error('Error al iniciar sesión: ' + error.message);
+      const newAttempts = loginAttempts + 1;
+      setLoginAttempts(newAttempts);
+      localStorage.setItem('loginAttempts', newAttempts.toString());
+      localStorage.setItem('lastLoginAttempt', new Date().toISOString());
+      
+      if (newAttempts >= 5) {
+        setIsBlocked(true);
+        setBlockTimeLeft(15);
+        toast.error('Demasiados intentos fallidos. Cuenta bloqueada por 15 minutos.');
+      } else {
+        toast.error(`Error al iniciar sesión. Intentos restantes: ${5 - newAttempts}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -65,6 +150,24 @@ export const LoginForm = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {isBlocked && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-600" />
+              <span className="text-sm text-red-700">
+                Cuenta bloqueada por seguridad. Tiempo restante: {blockTimeLeft} minutos.
+              </span>
+            </div>
+          )}
+          
+          {loginAttempts > 0 && loginAttempts < 5 && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <span className="text-sm text-amber-700">
+                Intentos fallidos: {loginAttempts}/5. Cuidado con el bloqueo automático.
+              </span>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label htmlFor="email">Email</Label>
@@ -74,24 +177,67 @@ export const LoginForm = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={isBlocked}
+                autoComplete="username"
               />
             </div>
             <div>
               <Label htmlFor="password">Contraseña</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={isBlocked}
+                  autoComplete="off"
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                  disabled={isBlocked}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            
+            <div className="flex items-center justify-between">
+              <Button 
+                type="button" 
+                variant="link" 
+                className="p-0 h-auto text-sm"
+                onClick={() => setShowForgotPassword(true)}
+                disabled={isBlocked}
+              >
+                ¿Olvidó su contraseña?
+              </Button>
+              
+              <Link to="/register" className="text-sm text-primary hover:underline">
+                Crear cuenta
+              </Link>
+            </div>
+            
+            <Button type="submit" className="w-full" disabled={loading || isBlocked}>
               {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </Button>
           </form>
         </CardContent>
       </Card>
+
+      <ForgotPasswordDialog
+        open={showForgotPassword}
+        onOpenChange={setShowForgotPassword}
+      />
     </div>
   );
 };
