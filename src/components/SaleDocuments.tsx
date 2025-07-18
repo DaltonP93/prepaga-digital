@@ -37,7 +37,6 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
   open,
   onOpenChange,
 }) => {
-  const [isUploading, setIsUploading] = useState(false);
   const [uploadForm, setUploadForm] = useState({
     document_name: '',
     document_type: '',
@@ -109,7 +108,6 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
         document_type: '',
         observations: '',
       });
-      setIsUploading(false);
     },
     onError: (error) => {
       console.error('Error uploading document:', error);

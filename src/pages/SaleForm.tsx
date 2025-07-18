@@ -10,11 +10,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ClientForm } from '@/components/ClientForm';
 import { MultiTemplateSelector } from '@/components/MultiTemplateSelector';
 import { useClients } from '@/hooks/useClients';
 import { usePlans } from '@/hooks/usePlans';
-import { HelpCircle, Save, ArrowLeft } from 'lucide-react';
+import { HelpCircle, Save, ArrowLeft, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SaleForm() {
@@ -123,10 +122,10 @@ export default function SaleForm() {
     createSale.mutate(submitData);
   };
 
-  const handleClientCreated = (clientId: string) => {
-    setFormData(prev => ({ ...prev, client_id: clientId }));
+  const handleClientCreated = () => {
     setShowClientForm(false);
     queryClient.invalidateQueries({ queryKey: ['clients'] });
+    toast.success('Cliente creado correctamente');
   };
 
   return (
@@ -181,6 +180,7 @@ export default function SaleForm() {
                     onClick={() => setShowClientForm(true)}
                     className="mt-6"
                   >
+                    <Plus className="h-4 w-4 mr-2" />
                     Nuevo Cliente
                   </Button>
                 </div>
@@ -409,7 +409,17 @@ export default function SaleForm() {
                   ×
                 </Button>
               </div>
-              <ClientForm onClientCreated={handleClientCreated} />
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">
+                  Funcionalidad de creación de cliente en desarrollo
+                </p>
+                <Button
+                  onClick={handleClientCreated}
+                  className="mt-4"
+                >
+                  Simular Creación
+                </Button>
+              </div>
             </div>
           </div>
         )}

@@ -33,7 +33,7 @@ export const useCompanyConfiguration = () => {
   const { data: configuration, isLoading } = useQuery({
     queryKey: ['company-configuration'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('company_configurations')
         .select('*')
         .single();
@@ -49,7 +49,7 @@ export const useCompanyConfiguration = () => {
   const updateConfiguration = useMutation({
     mutationFn: async (updates: Partial<CompanyConfiguration>) => {
       if (configuration?.id) {
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from('company_configurations')
           .update(updates)
           .eq('id', configuration.id)
@@ -65,7 +65,7 @@ export const useCompanyConfiguration = () => {
           .eq('id', (await supabase.auth.getUser()).data.user?.id)
           .single();
 
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from('company_configurations')
           .insert({
             company_id: profile?.company_id,

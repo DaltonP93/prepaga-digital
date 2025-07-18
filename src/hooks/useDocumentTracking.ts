@@ -27,7 +27,7 @@ export const useDocumentTracking = (saleId?: string) => {
   const { data: trackingRecords, isLoading } = useQuery({
     queryKey: ['document-tracking', saleId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('document_tracking')
         .select('*')
         .eq('sale_id', saleId!)
@@ -45,7 +45,7 @@ export const useDocumentTracking = (saleId?: string) => {
       const userAgent = navigator.userAgent;
       const deviceInfo = getDeviceInfo(userAgent);
       
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('document_tracking')
         .insert({
           ...record,
