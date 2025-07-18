@@ -8,7 +8,7 @@ import { Toaster } from '@/components/ui/sonner';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import ResetPassword from '@/pages/ResetPassword';
-import Dashboard from '@/pages/Dashboard';
+import Index from '@/pages/Index';
 import Clients from '@/pages/Clients';
 import Sales from '@/pages/Sales';
 import Documents from '@/pages/Documents';
@@ -52,15 +52,10 @@ function App() {
             <Route path="/signature/:token" element={<SignatureView />} />
             <Route path="/questionnaire/:token" element={<QuestionnaireView />} />
             
-            {/* Protected routes - Dashboard as main route */}
+            {/* Protected routes */}
             <Route path="/" element={
               <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/dashboard" element={
-              <ProtectedRoute>
-                <Dashboard />
+                <Index />
               </ProtectedRoute>
             } />
             <Route path="/clients" element={

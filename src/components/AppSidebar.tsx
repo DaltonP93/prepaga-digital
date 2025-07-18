@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   Users,
   FileText,
-  Settings,
   User,
   ShoppingBag,
   FileImage,
@@ -14,8 +13,7 @@ import {
   Shield,
   Workflow,
   BarChart3,
-  MessageSquare,
-  Palette,
+  Settings,
 } from "lucide-react";
 
 import {
@@ -81,16 +79,6 @@ export function AppSidebar({ isSuperAdmin = false }: AppSidebarProps) {
       icon: BarChart3,
     },
     {
-      title: "Comunicaciones",
-      url: "/communications", 
-      icon: MessageSquare,
-    },
-    {
-      title: "Experiencia",
-      url: "/experience", 
-      icon: Palette,
-    },
-    {
       title: "Mi Perfil",
       url: "/profile",
       icon: User,
@@ -114,6 +102,11 @@ export function AppSidebar({ isSuperAdmin = false }: AppSidebarProps) {
         title: "Auditoría",
         url: "/audit",
         icon: Shield,
+      },
+      {
+        title: "Configuración",
+        url: "/experience",
+        icon: Settings,
       }
     );
   }
