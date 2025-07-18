@@ -1,5 +1,6 @@
+
 import { useState } from 'react';
-import { Bell, Check, CheckCheck, X } from 'lucide-react';
+import { Bell, Check, CheckCheck, X, Settings } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,11 +8,14 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useRealTimeNotifications } from '@/hooks/useRealTimeNotifications';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const NotificationCenter = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  
   const {
     notifications,
     unreadCount,
@@ -22,14 +26,22 @@ const NotificationCenter = () => {
     isMarkingAllAsRead
   } = useNotifications();
 
+  const { isConnected } = useRealTimeNotifications();
+
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'success':
+      case 'signature_completed':
         return '✅';
       case 'warning':
+      case 'signature_pending':
         return '⚠️';
       case 'error':
         return '❌';
+      case 'document_generated':
+        return '📄';
+      case 'reminder':
+        return '⏰';
       default:
         return 'ℹ️';
     }
@@ -38,14 +50,30 @@ const NotificationCenter = () => {
   const getNotificationColor = (type: string) => {
     switch (type) {
       case 'success':
+      case 'signature_completed':
         return 'bg-green-50 border-green-200';
       case 'warning':
+      case 'signature_pending':
         return 'bg-yellow-50 border-yellow-200';
       case 'error':
         return 'bg-red-50 border-red-200';
-      default:
+      case 'document_generated':
         return 'bg-blue-50 border-blue-200';
+      case 'reminder':
+        return 'bg-purple-50 border-purple-200';
+      default:
+        return 'bg-gray-50 border-gray-200';
     }
+  };
+
+  const getPriorityBadge = (type: string) => {
+    if (type === 'signature_completed' || type === 'error') {
+      return <Badge variant="destructive" className="h-2 w-2 p-0"></Badge>;
+    }
+    if (type === 'signature_pending' || type === 'reminder') {
+      return <Badge variant="secondary" className="h-2 w-2 p-0 bg-yellow-500"></Badge>;
+    }
+    return null;
   };
 
   return (
@@ -61,6 +89,10 @@ const NotificationCenter = () => {
               {unreadCount > 99 ? '99+' : unreadCount}
             </Badge>
           )}
+          {/* Indicador de conexión en tiempo real */}
+          <div className={`absolute -bottom-1 -right-1 h-2 w-2 rounded-full ${
+            isConnected ? 'bg-green-500' : 'bg-gray-400'
+          }`} title={isConnected ? 'Conectado en tiempo real' : 'Desconectado'} />
         </Button>
       </PopoverTrigger>
       
@@ -68,8 +100,23 @@ const NotificationCenter = () => {
         <Card className="border-0 shadow-lg">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Notificaciones</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                Notificaciones
+                {isConnected && (
+                  <Badge variant="outline" className="text-xs">
+                    En tiempo real
+                  </Badge>
+                )}
+              </CardTitle>
               <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowSettings(!showSettings)}
+                  className="h-6 w-6"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
                 {unreadCount > 0 && (
                   <Button
                     variant="ghost"
@@ -118,17 +165,22 @@ const NotificationCenter = () => {
                   {notifications.map((notification) => (
                     <div
                       key={notification.id}
-                      className={`p-4 hover:bg-muted/50 transition-colors ${
+                      className={`p-4 hover:bg-muted/50 transition-colors relative ${
                         !notification.read ? 'bg-muted/30' : ''
                       }`}
                     >
                       <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0 mt-1">
+                        <div className="flex-shrink-0 mt-1 relative">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${
                             getNotificationColor(notification.type)
                           }`}>
                             {getNotificationIcon(notification.type)}
                           </div>
+                          {!notification.read && getPriorityBadge(notification.type) && (
+                            <div className="absolute -top-1 -right-1">
+                              {getPriorityBadge(notification.type)}
+                            </div>
+                          )}
                         </div>
                         
                         <div className="flex-1 min-w-0">
@@ -139,7 +191,7 @@ const NotificationCenter = () => {
                               }`}>
                                 {notification.title}
                               </h4>
-                              <p className="text-xs text-muted-foreground mt-1">
+                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                                 {notification.message}
                               </p>
                               <p className="text-xs text-muted-foreground mt-2">
