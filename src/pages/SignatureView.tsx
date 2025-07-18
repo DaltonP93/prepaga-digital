@@ -223,7 +223,7 @@ export default function SignatureView() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <SignatureCanvas
-                    onSignature={setSignatureData}
+                    onSignatureChange={setSignatureData}
                     width={300}
                     height={200}
                   />
