@@ -1,33 +1,24 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthContext } from '@/components/AuthProvider';
 import { useBranding } from '@/hooks/useBranding';
 import { toast } from 'sonner';
 import { usePasswordReset } from '@/hooks/usePasswordReset';
-import { Eye, EyeOff, LogIn } from 'lucide-react';
+import { LogIn } from 'lucide-react';
 
 export const LoginForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [companyId, setCompanyId] = useState<string | null>(null);
   const { signIn } = useAuthContext();
   const { requestPasswordReset } = usePasswordReset();
   
   // Obtener configuración de branding basada en el dominio o configuración por defecto
   const { branding } = useBranding();
-
-  // Detectar empresa por dominio o usar configuración por defecto
-  useEffect(() => {
-    // Por ahora usamos una empresa por defecto, se puede extender para detección por dominio
-    // TODO: Implementar detección de empresa por dominio personalizado
-    const defaultCompanyId = "default-company-id"; // Se puede obtener de configuración
-    setCompanyId(defaultCompanyId);
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +28,15 @@ export const LoginForm = () => {
       await signIn(email, password);
       toast.success('¡Bienvenido!');
     } catch (error: any) {
-      toast.error('Error al iniciar sesión: ' + error.message);
+      console.error('Error en login:', error);
+      // Mostrar mensaje específico de error
+      if (error.message?.includes('Invalid login credentials') || error.message?.includes('invalid_credentials')) {
+        toast.error('Credenciales incorrectas. Verifica tu email y contraseña.');
+      } else if (error.message?.includes('Email not confirmed')) {
+        toast.error('Por favor confirma tu email antes de iniciar sesión.');
+      } else {
+        toast.error('Error al iniciar sesión: ' + (error.message || 'Intenta de nuevo'));
+      }
     } finally {
       setLoading(false);
     }
@@ -77,6 +76,7 @@ export const LoginForm = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                placeholder="tu@email.com"
               />
             </div>
             <div>
@@ -87,6 +87,7 @@ export const LoginForm = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                placeholder="Tu contraseña"
               />
             </div>
             <div className="space-y-4">

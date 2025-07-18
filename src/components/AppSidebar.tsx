@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuthContext } from "@/components/AuthProvider";
@@ -32,14 +33,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
 
 interface NavItem {
   name: string;
@@ -103,7 +96,7 @@ export function AppSidebar() {
     },
   ];
 
-  // Add API Configuration for admin and super_admin
+  // Add API Configuration for admin and super_admin only
   if (profile?.role === 'admin' || profile?.role === 'super_admin') {
     navigationItems.push({
       name: "Configuración API",

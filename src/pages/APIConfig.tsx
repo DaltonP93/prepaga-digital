@@ -6,7 +6,7 @@ const APIConfig = () => {
   return (
     <Layout 
       title="Configuración API" 
-      description="Gestionar integraciones de comunicación"
+      description="Gestionar claves API y configuraciones de integración"
     >
       <APIConfigPanel />
     </Layout>
