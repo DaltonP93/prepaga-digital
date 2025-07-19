@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { useCompanyConfiguration } from '@/hooks/useCompanyConfiguration';
+import { useCompanyApiConfiguration } from '@/hooks/useCompanyApiConfiguration';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,73 +13,84 @@ import { Settings, Palette, MessageSquare, Mail, Smartphone, Eye } from 'lucide-
 import { toast } from 'sonner';
 
 export const AdminConfigPanel: React.FC = () => {
-  const { configuration, isLoading, updateConfiguration, isUpdating } = useCompanyConfiguration();
-  const [formData, setFormData] = useState({
-    // UI Configuration
-    login_title: configuration?.login_title || 'Sistema de Gestión',
-    login_subtitle: configuration?.login_subtitle || 'Acceso al sistema',
-    primary_color: configuration?.primary_color || '#667eea',
-    secondary_color: configuration?.secondary_color || '#764ba2',
-    login_background_url: configuration?.login_background_url || '',
-    login_logo_url: configuration?.login_logo_url || '',
-    
-    // WhatsApp Configuration
-    whatsapp_api_enabled: configuration?.whatsapp_api_enabled || false,
-    whatsapp_api_token: configuration?.whatsapp_api_token || '',
-    whatsapp_phone_number: configuration?.whatsapp_phone_number || '',
-    
-    // SMS Configuration
-    sms_api_enabled: configuration?.sms_api_enabled || false,
-    sms_api_provider: configuration?.sms_api_provider || 'twilio',
-    sms_api_key: configuration?.sms_api_key || '',
-    sms_api_secret: configuration?.sms_api_secret || '',
-    
-    // Email Configuration
-    email_api_enabled: configuration?.email_api_enabled || false,
-    email_api_provider: configuration?.email_api_provider || 'resend',
-    email_api_key: configuration?.email_api_key || '',
-    email_from_address: configuration?.email_from_address || '',
-    
-    // General Settings
-    tracking_enabled: configuration?.tracking_enabled || true,
-    notifications_enabled: configuration?.notifications_enabled || true,
+  const { configuration: uiConfig, isLoading: uiLoading, updateConfiguration: updateUiConfig, isUpdating: uiUpdating } = useCompanyConfiguration();
+  const { configuration: apiConfig, isLoading: apiLoading, updateConfiguration: updateApiConfig, isUpdating: apiUpdating } = useCompanyApiConfiguration();
+
+  const [uiFormData, setUiFormData] = useState({
+    login_title: uiConfig?.login_title || 'Sistema de Gestión',
+    login_subtitle: uiConfig?.login_subtitle || 'Acceso al sistema',
+    primary_color: uiConfig?.primary_color || '#667eea',
+    secondary_color: uiConfig?.secondary_color || '#764ba2',
+    login_background_url: uiConfig?.login_background_url || '',
+    login_logo_url: uiConfig?.login_logo_url || '',
+  });
+
+  const [apiFormData, setApiFormData] = useState({
+    whatsapp_api_enabled: apiConfig?.whatsapp_api_enabled || false,
+    whatsapp_api_token: apiConfig?.whatsapp_api_token || '',
+    whatsapp_phone_number: apiConfig?.whatsapp_phone_number || '',
+    sms_api_enabled: apiConfig?.sms_api_enabled || false,
+    sms_api_provider: apiConfig?.sms_api_provider || 'twilio',
+    sms_api_key: apiConfig?.sms_api_key || '',
+    sms_api_secret: apiConfig?.sms_api_secret || '',
+    email_api_enabled: apiConfig?.email_api_enabled || false,
+    email_api_provider: apiConfig?.email_api_provider || 'resend',
+    email_api_key: apiConfig?.email_api_key || '',
+    email_from_address: apiConfig?.email_from_address || '',
+    tracking_enabled: apiConfig?.tracking_enabled || true,
+    notifications_enabled: apiConfig?.notifications_enabled || true,
   });
 
   React.useEffect(() => {
-    if (configuration) {
-      setFormData({
-        login_title: configuration.login_title || 'Sistema de Gestión',
-        login_subtitle: configuration.login_subtitle || 'Acceso al sistema',
-        primary_color: configuration.primary_color || '#667eea',
-        secondary_color: configuration.secondary_color || '#764ba2',
-        login_background_url: configuration.login_background_url || '',
-        login_logo_url: configuration.login_logo_url || '',
-        whatsapp_api_enabled: configuration.whatsapp_api_enabled || false,
-        whatsapp_api_token: configuration.whatsapp_api_token || '',
-        whatsapp_phone_number: configuration.whatsapp_phone_number || '',
-        sms_api_enabled: configuration.sms_api_enabled || false,
-        sms_api_provider: configuration.sms_api_provider || 'twilio',
-        sms_api_key: configuration.sms_api_key || '',
-        sms_api_secret: configuration.sms_api_secret || '',
-        email_api_enabled: configuration.email_api_enabled || false,
-        email_api_provider: configuration.email_api_provider || 'resend',
-        email_api_key: configuration.email_api_key || '',
-        email_from_address: configuration.email_from_address || '',
-        tracking_enabled: configuration.tracking_enabled || true,
-        notifications_enabled: configuration.notifications_enabled || true,
+    if (uiConfig) {
+      setUiFormData({
+        login_title: uiConfig.login_title || 'Sistema de Gestión',
+        login_subtitle: uiConfig.login_subtitle || 'Acceso al sistema',
+        primary_color: uiConfig.primary_color || '#667eea',
+        secondary_color: uiConfig.secondary_color || '#764ba2',
+        login_background_url: uiConfig.login_background_url || '',
+        login_logo_url: uiConfig.login_logo_url || '',
       });
     }
-  }, [configuration]);
+  }, [uiConfig]);
 
-  const handleSave = () => {
-    updateConfiguration(formData);
+  React.useEffect(() => {
+    if (apiConfig) {
+      setApiFormData({
+        whatsapp_api_enabled: apiConfig.whatsapp_api_enabled,
+        whatsapp_api_token: apiConfig.whatsapp_api_token,
+        whatsapp_phone_number: apiConfig.whatsapp_phone_number,
+        sms_api_enabled: apiConfig.sms_api_enabled,
+        sms_api_provider: apiConfig.sms_api_provider,
+        sms_api_key: apiConfig.sms_api_key,
+        sms_api_secret: apiConfig.sms_api_secret,
+        email_api_enabled: apiConfig.email_api_enabled,
+        email_api_provider: apiConfig.email_api_provider,
+        email_api_key: apiConfig.email_api_key,
+        email_from_address: apiConfig.email_from_address,
+        tracking_enabled: apiConfig.tracking_enabled,
+        notifications_enabled: apiConfig.notifications_enabled,
+      });
+    }
+  }, [apiConfig]);
+
+  const handleUiSave = () => {
+    updateUiConfig(uiFormData);
   };
 
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleApiSave = () => {
+    updateApiConfig(apiFormData);
   };
 
-  if (isLoading) {
+  const handleUiInputChange = (field: string, value: any) => {
+    setUiFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleApiInputChange = (field: string, value: any) => {
+    setApiFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  if (uiLoading || apiLoading) {
     return (
       <Card>
         <CardContent className="p-6">
@@ -97,9 +109,6 @@ export const AdminConfigPanel: React.FC = () => {
             Configura la personalización visual y las integraciones de APIs
           </p>
         </div>
-        <Button onClick={handleSave} disabled={isUpdating}>
-          {isUpdating ? 'Guardando...' : 'Guardar Cambios'}
-        </Button>
       </div>
 
       <Tabs defaultValue="ui" className="space-y-4">
@@ -124,8 +133,11 @@ export const AdminConfigPanel: React.FC = () => {
 
         <TabsContent value="ui" className="space-y-6">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Personalización de Login</CardTitle>
+              <Button onClick={handleUiSave} disabled={uiUpdating}>
+                {uiUpdating ? 'Guardando...' : 'Guardar UI'}
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -133,8 +145,8 @@ export const AdminConfigPanel: React.FC = () => {
                   <Label htmlFor="login_title">Título del Login</Label>
                   <Input
                     id="login_title"
-                    value={formData.login_title}
-                    onChange={(e) => handleInputChange('login_title', e.target.value)}
+                    value={uiFormData.login_title}
+                    onChange={(e) => handleUiInputChange('login_title', e.target.value)}
                     placeholder="Sistema de Gestión"
                   />
                 </div>
@@ -142,8 +154,8 @@ export const AdminConfigPanel: React.FC = () => {
                   <Label htmlFor="login_subtitle">Subtítulo del Login</Label>
                   <Input
                     id="login_subtitle"
-                    value={formData.login_subtitle}
-                    onChange={(e) => handleInputChange('login_subtitle', e.target.value)}
+                    value={uiFormData.login_subtitle}
+                    onChange={(e) => handleUiInputChange('login_subtitle', e.target.value)}
                     placeholder="Acceso al sistema"
                   />
                 </div>
@@ -156,13 +168,13 @@ export const AdminConfigPanel: React.FC = () => {
                     <Input
                       id="primary_color"
                       type="color"
-                      value={formData.primary_color}
-                      onChange={(e) => handleInputChange('primary_color', e.target.value)}
+                      value={uiFormData.primary_color}
+                      onChange={(e) => handleUiInputChange('primary_color', e.target.value)}
                       className="w-16"
                     />
                     <Input
-                      value={formData.primary_color}
-                      onChange={(e) => handleInputChange('primary_color', e.target.value)}
+                      value={uiFormData.primary_color}
+                      onChange={(e) => handleUiInputChange('primary_color', e.target.value)}
                       placeholder="#667eea"
                     />
                   </div>
@@ -173,13 +185,13 @@ export const AdminConfigPanel: React.FC = () => {
                     <Input
                       id="secondary_color"
                       type="color"
-                      value={formData.secondary_color}
-                      onChange={(e) => handleInputChange('secondary_color', e.target.value)}
+                      value={uiFormData.secondary_color}
+                      onChange={(e) => handleUiInputChange('secondary_color', e.target.value)}
                       className="w-16"
                     />
                     <Input
-                      value={formData.secondary_color}
-                      onChange={(e) => handleInputChange('secondary_color', e.target.value)}
+                      value={uiFormData.secondary_color}
+                      onChange={(e) => handleUiInputChange('secondary_color', e.target.value)}
                       placeholder="#764ba2"
                     />
                   </div>
@@ -191,8 +203,8 @@ export const AdminConfigPanel: React.FC = () => {
                   <Label htmlFor="login_logo_url">URL del Logo</Label>
                   <Input
                     id="login_logo_url"
-                    value={formData.login_logo_url}
-                    onChange={(e) => handleInputChange('login_logo_url', e.target.value)}
+                    value={uiFormData.login_logo_url}
+                    onChange={(e) => handleUiInputChange('login_logo_url', e.target.value)}
                     placeholder="https://ejemplo.com/logo.png"
                   />
                 </div>
@@ -200,8 +212,8 @@ export const AdminConfigPanel: React.FC = () => {
                   <Label htmlFor="login_background_url">URL del Fondo</Label>
                   <Input
                     id="login_background_url"
-                    value={formData.login_background_url}
-                    onChange={(e) => handleInputChange('login_background_url', e.target.value)}
+                    value={uiFormData.login_background_url}
+                    onChange={(e) => handleUiInputChange('login_background_url', e.target.value)}
                     placeholder="https://ejemplo.com/background.jpg"
                   />
                 </div>
@@ -216,14 +228,14 @@ export const AdminConfigPanel: React.FC = () => {
                 <div 
                   className="relative rounded-lg p-6 text-center text-white min-h-[200px] flex flex-col justify-center"
                   style={{
-                    background: formData.login_background_url 
-                      ? `url(${formData.login_background_url}) center/cover` 
-                      : `linear-gradient(135deg, ${formData.primary_color}, ${formData.secondary_color})`,
+                    background: uiFormData.login_background_url 
+                      ? `url(${uiFormData.login_background_url}) center/cover` 
+                      : `linear-gradient(135deg, ${uiFormData.primary_color}, ${uiFormData.secondary_color})`,
                   }}
                 >
-                  {formData.login_logo_url && (
+                  {uiFormData.login_logo_url && (
                     <img 
-                      src={formData.login_logo_url} 
+                      src={uiFormData.login_logo_url} 
                       alt="Logo" 
                       className="h-12 w-auto mx-auto mb-4"
                       onError={(e) => {
@@ -231,8 +243,8 @@ export const AdminConfigPanel: React.FC = () => {
                       }}
                     />
                   )}
-                  <h1 className="text-2xl font-bold mb-2">{formData.login_title}</h1>
-                  <p className="text-lg opacity-90">{formData.login_subtitle}</p>
+                  <h1 className="text-2xl font-bold mb-2">{uiFormData.login_title}</h1>
+                  <p className="text-lg opacity-90">{uiFormData.login_subtitle}</p>
                 </div>
               </div>
             </CardContent>
@@ -241,28 +253,31 @@ export const AdminConfigPanel: React.FC = () => {
 
         <TabsContent value="whatsapp" className="space-y-6">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Configuración de WhatsApp API</CardTitle>
+              <Button onClick={handleApiSave} disabled={apiUpdating}>
+                {apiUpdating ? 'Guardando...' : 'Guardar API'}
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center space-x-2">
                 <Switch
                   id="whatsapp_enabled"
-                  checked={formData.whatsapp_api_enabled}
-                  onCheckedChange={(checked) => handleInputChange('whatsapp_api_enabled', checked)}
+                  checked={apiFormData.whatsapp_api_enabled}
+                  onCheckedChange={(checked) => handleApiInputChange('whatsapp_api_enabled', checked)}
                 />
                 <Label htmlFor="whatsapp_enabled">Habilitar integración con WhatsApp</Label>
               </div>
 
-              {formData.whatsapp_api_enabled && (
+              {apiFormData.whatsapp_api_enabled && (
                 <>
                   <div>
                     <Label htmlFor="whatsapp_token">Token de API</Label>
                     <Input
                       id="whatsapp_token"
                       type="password"
-                      value={formData.whatsapp_api_token}
-                      onChange={(e) => handleInputChange('whatsapp_api_token', e.target.value)}
+                      value={apiFormData.whatsapp_api_token}
+                      onChange={(e) => handleApiInputChange('whatsapp_api_token', e.target.value)}
                       placeholder="Tu token de WhatsApp Business API"
                     />
                   </div>
@@ -270,8 +285,8 @@ export const AdminConfigPanel: React.FC = () => {
                     <Label htmlFor="whatsapp_phone">Número de Teléfono</Label>
                     <Input
                       id="whatsapp_phone"
-                      value={formData.whatsapp_phone_number}
-                      onChange={(e) => handleInputChange('whatsapp_phone_number', e.target.value)}
+                      value={apiFormData.whatsapp_phone_number}
+                      onChange={(e) => handleApiInputChange('whatsapp_phone_number', e.target.value)}
                       placeholder="+1234567890"
                     />
                   </div>
@@ -283,26 +298,29 @@ export const AdminConfigPanel: React.FC = () => {
 
         <TabsContent value="sms" className="space-y-6">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Configuración de SMS</CardTitle>
+              <Button onClick={handleApiSave} disabled={apiUpdating}>
+                {apiUpdating ? 'Guardando...' : 'Guardar API'}
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center space-x-2">
                 <Switch
                   id="sms_enabled"
-                  checked={formData.sms_api_enabled}
-                  onCheckedChange={(checked) => handleInputChange('sms_api_enabled', checked)}
+                  checked={apiFormData.sms_api_enabled}
+                  onCheckedChange={(checked) => handleApiInputChange('sms_api_enabled', checked)}
                 />
                 <Label htmlFor="sms_enabled">Habilitar envío de SMS</Label>
               </div>
 
-              {formData.sms_api_enabled && (
+              {apiFormData.sms_api_enabled && (
                 <>
                   <div>
                     <Label htmlFor="sms_provider">Proveedor de SMS</Label>
                     <Select
-                      value={formData.sms_api_provider}
-                      onValueChange={(value) => handleInputChange('sms_api_provider', value)}
+                      value={apiFormData.sms_api_provider}
+                      onValueChange={(value) => handleApiInputChange('sms_api_provider', value)}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -320,8 +338,8 @@ export const AdminConfigPanel: React.FC = () => {
                       <Input
                         id="sms_key"
                         type="password"
-                        value={formData.sms_api_key}
-                        onChange={(e) => handleInputChange('sms_api_key', e.target.value)}
+                        value={apiFormData.sms_api_key}
+                        onChange={(e) => handleApiInputChange('sms_api_key', e.target.value)}
                         placeholder="Tu API Key"
                       />
                     </div>
@@ -330,8 +348,8 @@ export const AdminConfigPanel: React.FC = () => {
                       <Input
                         id="sms_secret"
                         type="password"
-                        value={formData.sms_api_secret}
-                        onChange={(e) => handleInputChange('sms_api_secret', e.target.value)}
+                        value={apiFormData.sms_api_secret}
+                        onChange={(e) => handleApiInputChange('sms_api_secret', e.target.value)}
                         placeholder="Tu API Secret"
                       />
                     </div>
@@ -344,26 +362,29 @@ export const AdminConfigPanel: React.FC = () => {
 
         <TabsContent value="email" className="space-y-6">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Configuración de Email</CardTitle>
+              <Button onClick={handleApiSave} disabled={apiUpdating}>
+                {apiUpdating ? 'Guardando...' : 'Guardar API'}
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center space-x-2">
                 <Switch
                   id="email_enabled"
-                  checked={formData.email_api_enabled}
-                  onCheckedChange={(checked) => handleInputChange('email_api_enabled', checked)}
+                  checked={apiFormData.email_api_enabled}
+                  onCheckedChange={(checked) => handleApiInputChange('email_api_enabled', checked)}
                 />
                 <Label htmlFor="email_enabled">Habilitar envío de emails</Label>
               </div>
 
-              {formData.email_api_enabled && (
+              {apiFormData.email_api_enabled && (
                 <>
                   <div>
                     <Label htmlFor="email_provider">Proveedor de Email</Label>
                     <Select
-                      value={formData.email_api_provider}
-                      onValueChange={(value) => handleInputChange('email_api_provider', value)}
+                      value={apiFormData.email_api_provider}
+                      onValueChange={(value) => handleApiInputChange('email_api_provider', value)}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -381,8 +402,8 @@ export const AdminConfigPanel: React.FC = () => {
                       <Input
                         id="email_key"
                         type="password"
-                        value={formData.email_api_key}
-                        onChange={(e) => handleInputChange('email_api_key', e.target.value)}
+                        value={apiFormData.email_api_key}
+                        onChange={(e) => handleApiInputChange('email_api_key', e.target.value)}
                         placeholder="Tu API Key de email"
                       />
                     </div>
@@ -390,8 +411,8 @@ export const AdminConfigPanel: React.FC = () => {
                       <Label htmlFor="email_from">Email Remitente</Label>
                       <Input
                         id="email_from"
-                        value={formData.email_from_address}
-                        onChange={(e) => handleInputChange('email_from_address', e.target.value)}
+                        value={apiFormData.email_from_address}
+                        onChange={(e) => handleApiInputChange('email_from_address', e.target.value)}
                         placeholder="noreply@tuempresa.com"
                       />
                     </div>
