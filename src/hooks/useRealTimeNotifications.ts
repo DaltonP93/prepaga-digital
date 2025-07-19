@@ -105,14 +105,6 @@ export const useRealTimeNotifications = () => {
       title: notification.title,
       description: notification.message,
       variant,
-      action: notification.action_url ? (
-        <button
-          onClick={() => window.location.href = notification.action_url!}
-          className="text-sm underline"
-        >
-          Ver
-        </button>
-      ) : undefined
     });
   };
 
@@ -128,12 +120,6 @@ export const useRealTimeNotifications = () => {
             url: notification.action_url,
             notificationId: notification.id
           },
-          actions: notification.action_url ? [
-            {
-              action: 'view',
-              title: 'Ver'
-            }
-          ] : [],
           requireInteraction: notification.type === 'signature_completed' || notification.type === 'signature_pending'
         });
       });

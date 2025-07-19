@@ -18,13 +18,13 @@ import NotificationSettings from '@/components/NotificationSettings';
 
 interface Profile {
   id: string;
-  first_name: string;
-  last_name: string;
-  phone: string;
-  address: string;
-  city: string;
-  country: string;
-  zip_code: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  zip_code?: string;
   avatar_url?: string;
   company_id?: string;
   email?: string;
@@ -78,41 +78,48 @@ const Profile = () => {
     resolver: zodResolver(profileSchema),
   });
 
-  const { data: user } = useQuery('user', async () => {
-    const { data, error } = await supabase.auth.getUser();
-    if (error) throw error;
-    return data.user;
+  const { data: user } = useQuery({
+    queryKey: ['user'],
+    queryFn: async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (error) throw error;
+      return data.user;
+    }
   });
 
-  const { data: profileData, isLoading, error, refetch } = useQuery('profile', async () => {
-    if (!user) return null;
+  const { data: profileData, isLoading, error, refetch } = useQuery({
+    queryKey: ['profile'],
+    queryFn: async () => {
+      if (!user) return null;
 
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
 
-    if (error) throw error;
-    return profile as Profile;
+      if (error) throw error;
+      return profile;
+    },
+    enabled: !!user
   });
 
   useEffect(() => {
     if (profileData) {
-      setProfile(profileData);
-      setValue('first_name', profileData.first_name);
-      setValue('last_name', profileData.last_name);
-      setValue('phone', profileData.phone);
-      setValue('address', profileData.address);
-      setValue('city', profileData.city);
-      setValue('country', profileData.country);
-      setValue('zip_code', profileData.zip_code);
+      setProfile(profileData as Profile);
+      setValue('first_name', profileData.first_name || '');
+      setValue('last_name', profileData.last_name || '');
+      setValue('phone', profileData.phone || '');
+      setValue('address', (profileData as any).address || '');
+      setValue('city', (profileData as any).city || '');
+      setValue('country', (profileData as any).country || '');
+      setValue('zip_code', (profileData as any).zip_code || '');
       setIsLoadingProfile(false);
     }
   }, [profileData, setValue]);
 
-  const updateProfileMutation = useMutation(
-    async (data: z.infer<typeof profileSchema>) => {
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof profileSchema>) => {
       if (!user) throw new Error('User not found');
 
       const { error } = await supabase
@@ -122,30 +129,28 @@ const Profile = () => {
 
       if (error) throw error;
     },
-    {
-      onSuccess: () => {
-        toast({
-          title: "Perfil actualizado",
-          description: "Tu perfil ha sido actualizado exitosamente.",
-        });
-        refetch();
-      },
-      onError: (error: any) => {
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive",
-        });
-      },
-    }
-  );
+    onSuccess: () => {
+      toast({
+        title: "Perfil actualizado",
+        description: "Tu perfil ha sido actualizado exitosamente.",
+      });
+      refetch();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const onSubmit = (data: z.infer<typeof profileSchema>) => {
     updateProfileMutation.mutate(data);
   };
 
   return (
-    <Layout>
+    <Layout title="Perfil">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold tracking-tight">Perfil</h1>
@@ -266,8 +271,8 @@ const Profile = () => {
                     </div>
                   </div>
 
-                  <Button type="submit" disabled={updateProfileMutation.isLoading}>
-                    {updateProfileMutation.isLoading ? "Actualizando..." : "Actualizar Perfil"}
+                  <Button type="submit" disabled={updateProfileMutation.isPending}>
+                    {updateProfileMutation.isPending ? "Actualizando..." : "Actualizar Perfil"}
                   </Button>
                 </form>
               </CardContent>

@@ -143,12 +143,6 @@ export const usePushNotifications = () => {
           icon: '/icons/icon-192x192.png',
           badge: '/icons/icon-192x192.png',
           tag: 'test-notification',
-          actions: [
-            {
-              action: 'view',
-              title: 'Ver'
-            }
-          ]
         });
       });
     }
