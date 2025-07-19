@@ -31,24 +31,33 @@ export const useAuth = (): AuthContextType => {
         
         setUser(session?.user ?? null);
         if (session?.user) {
-          await fetchProfile(session.user.id);
+          // Use setTimeout to defer the profile fetch
+          setTimeout(() => {
+            fetchProfile(session.user.id);
+          }, 0);
+        } else {
+          setLoading(false);
         }
       } catch (error) {
         console.error('Error getting initial session:', error);
-      } finally {
         setLoading(false);
       }
     };
 
     getInitialSession();
 
-    // Listen for auth changes
+    // Listen for auth changes - NO ASYNC HERE
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔄 Auth state change:', event, !!session);
       setUser(session?.user ?? null);
+      
       if (session?.user) {
-        await fetchProfile(session.user.id);
+        // Use setTimeout to defer Supabase calls
+        setTimeout(() => {
+          fetchProfile(session.user.id);
+        }, 0);
       } else {
         setProfile(null);
         setLoading(false);
@@ -63,18 +72,11 @@ export const useAuth = (): AuthContextType => {
       console.log('🔍 Fetching profile for user:', userId);
       setLoading(true);
       
-      // Add timeout to prevent hanging
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
-      );
-      
-      const fetchPromise = supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle();
-      
-      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
 
       if (error) {
         console.error('❌ Error fetching profile:', error);

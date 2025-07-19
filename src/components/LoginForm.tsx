@@ -16,21 +16,14 @@ export const LoginForm = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [companyId, setCompanyId] = useState<string | null>(null);
   const [loginAttempts, setLoginAttempts] = useState(0);
   const [isBlocked, setIsBlocked] = useState(false);
   const [blockTimeLeft, setBlockTimeLeft] = useState(0);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const { signIn } = useAuthContext();
   
-  // Obtener configuración de branding basada en el dominio o configuración por defecto
-  const { data: branding } = useCompanyBranding(companyId || undefined);
-
-  // Detectar empresa por dominio o usar configuración por defecto
-  useEffect(() => {
-    const defaultCompanyId = "default-company-id";
-    setCompanyId(defaultCompanyId);
-  }, []);
+  // Obtener configuración de branding - con fallback si no hay datos
+  const { data: branding } = useCompanyBranding();
 
   // Manejo de bloqueo por intentos fallidos
   useEffect(() => {
@@ -74,21 +67,6 @@ export const LoginForm = () => {
     }
   }, []);
 
-  const validatePassword = (password: string) => {
-    const minLength = password.length >= 8;
-    const hasUpper = /[A-Z]/.test(password);
-    const hasLower = /[a-z]/.test(password);
-    const hasNumber = /\d/.test(password);
-    
-    return {
-      isValid: minLength && hasUpper && hasLower && hasNumber,
-      minLength,
-      hasUpper,
-      hasLower,
-      hasNumber
-    };
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -125,6 +103,7 @@ export const LoginForm = () => {
     }
   };
 
+  // Usar valores por defecto si no hay branding
   const backgroundStyle = branding?.login_background_url
     ? { backgroundImage: `url(${branding.login_background_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
     : {};
@@ -191,7 +170,7 @@ export const LoginForm = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={isBlocked}
-                  autoComplete="off"
+                  autoComplete="current-password"
                   className="pr-10"
                 />
                 <Button
