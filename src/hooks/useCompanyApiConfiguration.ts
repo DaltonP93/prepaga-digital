@@ -54,9 +54,12 @@ export const useCompanyApiConfiguration = () => {
       }
 
       const defaultConfig = getDefaultConfiguration();
+      // Ensure we only spread if settings is a valid object
+      const settings = data.settings && typeof data.settings === 'object' ? data.settings : {};
+      
       return {
         ...defaultConfig,
-        ...(data.settings || {})
+        ...settings
       } as CompanyApiConfiguration;
     },
     enabled: !!profile?.company_id,
