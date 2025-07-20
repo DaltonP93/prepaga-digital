@@ -22,44 +22,45 @@ export const useAuth = (): AuthContextType => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   
-  // Rate limiting protection
+  // Improved rate limiting and caching
   const lastFetchTime = useRef<number>(0);
-  const fetchAttempts = useRef<number>(0);
-  const profileCache = useRef<{ [key: string]: Profile }>({});
+  const profileCache = useRef<{ [key: string]: { profile: Profile; timestamp: number } }>({});
+  const isProfileFetching = useRef<boolean>(false);
 
-  const resetFetchAttempts = useCallback(() => {
-    fetchAttempts.current = 0;
-  }, []);
+  const CACHE_DURATION = 60000; // 1 minute cache
+  const MIN_FETCH_INTERVAL = 1000; // 1 second minimum between fetches
 
   const fetchProfile = useCallback(async (userId: string) => {
     const now = Date.now();
-    const timeSinceLastFetch = now - lastFetchTime.current;
     
-    // Rate limiting: minimum 2 seconds between requests
-    if (timeSinceLastFetch < 2000) {
-      console.log('⏳ Fetch profile rate limited, using cache if available');
-      if (profileCache.current[userId]) {
-        setProfile(profileCache.current[userId]);
-        setLoading(false);
-        return;
-      }
-      // Wait for the remaining time
-      await new Promise(resolve => setTimeout(resolve, 2000 - timeSinceLastFetch));
-    }
-
     // Check cache first
-    if (profileCache.current[userId]) {
+    const cached = profileCache.current[userId];
+    if (cached && (now - cached.timestamp < CACHE_DURATION)) {
       console.log('📋 Using cached profile for user:', userId);
-      setProfile(profileCache.current[userId]);
+      setProfile(cached.profile);
       setLoading(false);
       return;
     }
 
+    // Prevent concurrent fetches
+    if (isProfileFetching.current) {
+      console.log('🔄 Profile fetch already in progress, skipping...');
+      return;
+    }
+
+    // Rate limiting check
+    if (now - lastFetchTime.current < MIN_FETCH_INTERVAL) {
+      console.log('⏳ Rate limited, waiting...');
+      setTimeout(() => fetchProfile(userId), MIN_FETCH_INTERVAL);
+      return;
+    }
+
+    isProfileFetching.current = true;
+    lastFetchTime.current = now;
+
     try {
       console.log('🔍 Fetching profile for user:', userId);
       setLoading(true);
-      lastFetchTime.current = Date.now();
-      fetchAttempts.current++;
       
       const { data, error } = await supabase
         .from('profiles')
@@ -70,24 +71,45 @@ export const useAuth = (): AuthContextType => {
       if (error) {
         console.error('❌ Error fetching profile:', error);
         
-        // Handle rate limiting
+        // Enhanced error handling for rate limiting
         if (error.message?.includes('429') || error.message?.includes('rate')) {
-          const backoffTime = Math.min(5000 * fetchAttempts.current, 30000); // Max 30s
-          console.log(`⏳ Rate limited, backing off for ${backoffTime}ms`);
+          console.log('📊 Rate limit detected, implementing exponential backoff');
+          const retryDelay = Math.min(2000, 500 * Math.pow(2, 1)); // Start with 1 second
           setTimeout(() => {
-            if (user?.id === userId) { // Only retry if user is still the same
+            if (user?.id === userId) {
               fetchProfile(userId);
             }
-          }, backoffTime);
+          }, retryDelay);
           return;
         }
         
-        setProfile(null);
+        // If profile doesn't exist, create basic profile from auth data
+        if (error.code === 'PGRST116' && user) {
+          console.log('🔧 Creating basic profile from auth data');
+          const basicProfile: Profile = {
+            id: userId,
+            email: user.email || '',
+            first_name: user.user_metadata?.first_name || '',
+            last_name: user.user_metadata?.last_name || '',
+            role: 'vendedor' as any,
+            company_id: null,
+            active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            phone: null,
+            avatar_url: null,
+          };
+          setProfile(basicProfile);
+          // Cache the basic profile
+          profileCache.current[userId] = { profile: basicProfile, timestamp: now };
+        } else {
+          setProfile(null);
+        }
       } else if (data) {
-        console.log('✅ Profile found:', data);
-        profileCache.current[userId] = data;
+        console.log('✅ Profile loaded successfully:', data);
         setProfile(data);
-        resetFetchAttempts();
+        // Cache the profile
+        profileCache.current[userId] = { profile: data, timestamp: now };
       } else {
         console.warn('⚠️ No profile found for user:', userId);
         setProfile(null);
@@ -96,10 +118,10 @@ export const useAuth = (): AuthContextType => {
       console.error('❌ Unexpected error fetching profile:', error);
       setProfile(null);
     } finally {
-      console.log('🏁 Profile fetch completed, setting loading to false');
+      isProfileFetching.current = false;
       setLoading(false);
     }
-  }, [user, resetFetchAttempts]);
+  }, [user]);
 
   useEffect(() => {
     let mounted = true;
@@ -112,6 +134,8 @@ export const useAuth = (): AuthContextType => {
         if (error) {
           console.error('❌ Error getting initial session:', error);
           if (mounted) {
+            setUser(null);
+            setProfile(null);
             setLoading(false);
           }
           return;
@@ -120,19 +144,17 @@ export const useAuth = (): AuthContextType => {
         if (mounted) {
           setUser(session?.user ?? null);
           if (session?.user) {
-            // Use setTimeout to defer the profile fetch
-            setTimeout(() => {
-              if (mounted) {
-                fetchProfile(session.user.id);
-              }
-            }, 100);
+            fetchProfile(session.user.id);
           } else {
+            setProfile(null);
             setLoading(false);
           }
         }
       } catch (error) {
         console.error('❌ Error getting initial session:', error);
         if (mounted) {
+          setUser(null);
+          setProfile(null);
           setLoading(false);
         }
       }
@@ -140,10 +162,8 @@ export const useAuth = (): AuthContextType => {
 
     getInitialSession();
 
-    // Listen for auth changes - NO ASYNC HERE
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('🔄 Auth state change:', event, !!session);
       
       if (!mounted) return;
@@ -151,18 +171,12 @@ export const useAuth = (): AuthContextType => {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        // Use setTimeout to defer Supabase calls
-        setTimeout(() => {
-          if (mounted) {
-            fetchProfile(session.user.id);
-          }
-        }, 100);
+        fetchProfile(session.user.id);
       } else {
         setProfile(null);
         setLoading(false);
         // Clear cache when user logs out
         profileCache.current = {};
-        resetFetchAttempts();
       }
     });
 
@@ -170,7 +184,7 @@ export const useAuth = (): AuthContextType => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [fetchProfile, resetFetchAttempts]);
+  }, [fetchProfile]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
@@ -181,9 +195,10 @@ export const useAuth = (): AuthContextType => {
   };
 
   const signOut = async () => {
-    // Clear cache and reset attempts before signing out
+    // Clear cache and reset state before signing out
     profileCache.current = {};
-    resetFetchAttempts();
+    setProfile(null);
+    setUser(null);
     
     const { error } = await supabase.auth.signOut();
     if (error) throw error;

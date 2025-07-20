@@ -53,9 +53,10 @@ export const useCompanyApiConfiguration = () => {
         return getDefaultConfiguration();
       }
 
+      const defaultConfig = getDefaultConfiguration();
       return {
-        ...getDefaultConfiguration(),
-        ...data.settings
+        ...defaultConfig,
+        ...(data.settings || {})
       } as CompanyApiConfiguration;
     },
     enabled: !!profile?.company_id,
@@ -109,6 +110,6 @@ const getDefaultConfiguration = (): CompanyApiConfiguration => ({
   email_api_provider: 'resend',
   email_api_key: '',
   email_from_address: '',
-  tracking_enabled: true,
-  notifications_enabled: true,
+  tracking_enabled: false,
+  notifications_enabled: false,
 });

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useCompanyConfiguration } from '@/hooks/useCompanyConfiguration';
 import { useCompanyApiConfiguration } from '@/hooks/useCompanyApiConfiguration';
@@ -37,8 +36,8 @@ export const AdminConfigPanel: React.FC = () => {
     email_api_provider: apiConfig?.email_api_provider || 'resend',
     email_api_key: apiConfig?.email_api_key || '',
     email_from_address: apiConfig?.email_from_address || '',
-    tracking_enabled: apiConfig?.tracking_enabled || true,
-    notifications_enabled: apiConfig?.notifications_enabled || true,
+    tracking_enabled: apiConfig?.tracking_enabled || false,
+    notifications_enabled: apiConfig?.notifications_enabled || false,
   });
 
   React.useEffect(() => {
@@ -57,19 +56,19 @@ export const AdminConfigPanel: React.FC = () => {
   React.useEffect(() => {
     if (apiConfig) {
       setApiFormData({
-        whatsapp_api_enabled: apiConfig.whatsapp_api_enabled,
-        whatsapp_api_token: apiConfig.whatsapp_api_token,
-        whatsapp_phone_number: apiConfig.whatsapp_phone_number,
-        sms_api_enabled: apiConfig.sms_api_enabled,
-        sms_api_provider: apiConfig.sms_api_provider,
-        sms_api_key: apiConfig.sms_api_key,
-        sms_api_secret: apiConfig.sms_api_secret,
-        email_api_enabled: apiConfig.email_api_enabled,
-        email_api_provider: apiConfig.email_api_provider,
-        email_api_key: apiConfig.email_api_key,
-        email_from_address: apiConfig.email_from_address,
-        tracking_enabled: apiConfig.tracking_enabled,
-        notifications_enabled: apiConfig.notifications_enabled,
+        whatsapp_api_enabled: apiConfig.whatsapp_api_enabled || false,
+        whatsapp_api_token: apiConfig.whatsapp_api_token || '',
+        whatsapp_phone_number: apiConfig.whatsapp_phone_number || '',
+        sms_api_enabled: apiConfig.sms_api_enabled || false,
+        sms_api_provider: apiConfig.sms_api_provider || 'twilio',
+        sms_api_key: apiConfig.sms_api_key || '',
+        sms_api_secret: apiConfig.sms_api_secret || '',
+        email_api_enabled: apiConfig.email_api_enabled || false,
+        email_api_provider: apiConfig.email_api_provider || 'resend',
+        email_api_key: apiConfig.email_api_key || '',
+        email_from_address: apiConfig.email_from_address || '',
+        tracking_enabled: apiConfig.tracking_enabled || false,
+        notifications_enabled: apiConfig.notifications_enabled || false,
       });
     }
   }, [apiConfig]);
