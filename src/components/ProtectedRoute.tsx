@@ -2,9 +2,11 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useSessionManager } from "@/hooks/useSessionManager";
+import { AuthLoadingState } from "@/components/auth/AuthLoadingState";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshCw, AlertCircle, LogOut } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -12,84 +14,101 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
-  const { user, profile, loading, refreshProfile, forceRefreshProfile, signOut } = useAuth();
+  const { 
+    user, 
+    profile, 
+    loading, 
+    refreshProfile, 
+    forceRefreshProfile, 
+    signOut,
+    connectionStatus,
+    loadingStage,
+    loadingProgress
+  } = useAuth();
+  
+  const { session, isConnected, updateActivity } = useSessionManager(5, 30);
   const location = useLocation();
-  const [showProfileError, setShowProfileError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
   
   const MAX_RETRIES = 3;
-  const PROFILE_TIMEOUT = 8000; // 8 seconds timeout
 
-  // Handle profile loading timeout and retries
+  // Update activity when user interacts with protected routes
   useEffect(() => {
-    if (!user) return;
+    if (user) {
+      updateActivity();
+    }
+  }, [user, updateActivity, location.pathname]);
 
-    if (loading && !profile) {
-      // Start timeout timer
+  // Handle automatic retries for profile loading
+  useEffect(() => {
+    if (loadingStage === 'error' && retryCount < MAX_RETRIES && user && !isRetrying) {
+      const retryDelay = Math.min(2000 * Math.pow(2, retryCount), 10000); // Exponential backoff, max 10s
+      
       const timeoutId = setTimeout(() => {
-        if (loading && !profile && retryCount < MAX_RETRIES) {
-          console.log(`Profile loading timeout, retry ${retryCount + 1}/${MAX_RETRIES}`);
-          setRetryCount(prev => prev + 1);
-          setIsRetrying(true);
-          
-          // Try to refresh profile
-          refreshProfile().finally(() => {
-            setIsRetrying(false);
-          });
-        } else if (!profile && retryCount >= MAX_RETRIES) {
-          console.log('Max retries reached, showing profile error');
-          setShowProfileError(true);
-        }
-      }, PROFILE_TIMEOUT);
+        console.log(`Auto-retry attempt ${retryCount + 1}/${MAX_RETRIES}`);
+        setRetryCount(prev => prev + 1);
+        setIsRetrying(true);
+        
+        refreshProfile().finally(() => {
+          setIsRetrying(false);
+        });
+      }, retryDelay);
 
       return () => clearTimeout(timeoutId);
     }
+  }, [loadingStage, retryCount, user, isRetrying, refreshProfile]);
 
-    // Reset states when profile is loaded
-    if (profile) {
-      setShowProfileError(false);
+  // Reset retry count when user changes or profile loads successfully
+  useEffect(() => {
+    if (profile || !user) {
       setRetryCount(0);
       setIsRetrying(false);
     }
-  }, [user, loading, profile, retryCount, refreshProfile]);
-
-  // Reset retry state when user changes
-  useEffect(() => {
-    setRetryCount(0);
-    setShowProfileError(false);
-    setIsRetrying(false);
-  }, [user?.id]);
+  }, [profile, user?.id]);
 
   // Redirect to login if not authenticated
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Show loading while authenticating or loading profile (with timeout)
-  if (loading || (!profile && !showProfileError && retryCount < MAX_RETRIES)) {
+  // Show enhanced loading states
+  if (loading || loadingStage !== 'ready') {
+    const handleRetry = async () => {
+      setIsRetrying(true);
+      try {
+        await refreshProfile();
+      } finally {
+        setIsRetrying(false);
+      }
+    };
+
+    const handleForceRefresh = async () => {
+      setIsRetrying(true);
+      try {
+        await forceRefreshProfile();
+      } finally {
+        setIsRetrying(false);
+      }
+    };
+
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-            <CardTitle>
-              {isRetrying ? `Reintentando (${retryCount}/${MAX_RETRIES})...` : 'Cargando...'}
-            </CardTitle>
-            <CardDescription>
-              {isRetrying 
-                ? 'Intentando cargar tu perfil nuevamente'
-                : 'Verificando tu información de usuario'
-              }
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
+      <AuthLoadingState
+        stage={isRetrying ? 'retrying' : loadingStage}
+        progress={loadingProgress}
+        retryCount={retryCount}
+        maxRetries={MAX_RETRIES}
+        isConnected={isConnected && connectionStatus === 'connected'}
+        onRetry={handleRetry}
+        onForceRefresh={handleForceRefresh}
+        onSignOut={signOut}
+        message={connectionStatus === 'disconnected' ? 'Sin conexión a internet' : undefined}
+      />
     );
   }
 
-  // Show profile error with recovery options
-  if (showProfileError || (!profile && !loading)) {
+  // Show profile error with enhanced recovery options
+  if (!profile && !loading && loadingStage !== 'loading_profile') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
@@ -99,7 +118,7 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
             </div>
             <CardTitle className="text-destructive">Error de Perfil</CardTitle>
             <CardDescription>
-              No se pudo cargar tu perfil de usuario. Esto puede deberse a problemas de conexión o configuración.
+              No se pudo cargar tu perfil de usuario. Esto puede deberse a problemas de conexión, configuración o datos faltantes.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -107,19 +126,16 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
               <Button 
                 onClick={async () => {
                   setIsRetrying(true);
-                  setShowProfileError(false);
-                  setRetryCount(0);
                   try {
                     await refreshProfile();
                   } finally {
                     setIsRetrying(false);
                   }
                 }}
-                disabled={isRetrying}
+                disabled={isRetrying || !isConnected}
                 className="w-full"
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${isRetrying ? 'animate-spin' : ''}`} />
-                {isRetrying ? 'Reintentando...' : 'Reintentar'}
+                {isRetrying ? 'Reintentando...' : 'Reintentar Carga'}
               </Button>
               
               <Button 
@@ -132,11 +148,10 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
                     setIsRetrying(false);
                   }
                 }}
-                disabled={isRetrying}
+                disabled={isRetrying || !isConnected}
                 className="w-full"
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${isRetrying ? 'animate-spin' : ''}`} />
-                Forzar Actualización
+                Actualización Completa
               </Button>
               
               <Button 
@@ -145,18 +160,34 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
                 disabled={isRetrying}
                 className="w-full"
               >
-                <LogOut className="h-4 w-4 mr-2" />
                 Cerrar Sesión
               </Button>
             </div>
             
-            <div className="text-xs text-muted-foreground text-center space-y-1">
-              <p>Si el problema persiste:</p>
-              <ul className="text-left space-y-1">
-                <li>• Verifica tu conexión a internet</li>
-                <li>• Intenta cerrar sesión y volver a iniciar</li>
-                <li>• Contacta al administrador del sistema</li>
-              </ul>
+            <div className="text-xs text-muted-foreground text-center space-y-2 pt-4 border-t">
+              <div className="flex items-center justify-between">
+                <span>Estado de conexión:</span>
+                <span className={`px-2 py-1 rounded text-xs ${
+                  isConnected 
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-red-100 text-red-800'
+                }`}>
+                  {isConnected ? 'Conectado' : 'Desconectado'}
+                </span>
+              </div>
+              
+              <div className="text-left">
+                <p className="font-medium mb-1">Pasos de resolución:</p>
+                <ul className="space-y-1 text-xs">
+                  <li>1. Verifica tu conexión a internet</li>
+                  <li>2. Intenta "Actualización Completa"</li>
+                  <li>3. Refresca la página (F5)</li>
+                  <li>4. Cierra sesión y vuelve a iniciar</li>
+                  {retryCount > 0 && (
+                    <li>• Intentos automáticos: {retryCount}/{MAX_RETRIES}</li>
+                  )}
+                </ul>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -164,8 +195,8 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
     );
   }
 
-  // Check role permissions
-  if (requiredRole && requiredRole.length > 0) {
+  // Check role permissions with enhanced error handling
+  if (requiredRole && requiredRole.length > 0 && profile) {
     if (!profile.role || !requiredRole.includes(profile.role)) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -176,7 +207,8 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
               </div>
               <CardTitle>Acceso Restringido</CardTitle>
               <CardDescription>
-                No tienes los permisos necesarios para acceder a esta sección.
+                Tu rol actual ({profile.role}) no tiene permisos para acceder a esta sección.
+                Roles requeridos: {requiredRole.join(', ')}.
               </CardDescription>
             </CardHeader>
             <CardContent>

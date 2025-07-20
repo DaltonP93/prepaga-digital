@@ -1,9 +1,10 @@
-
 import { useEffect, useState, useCallback, useRef } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Tables } from "@/integrations/supabase/types";
+import { ProfileBackupManager, validateProfileIntegrity } from "@/utils/profileUtils";
+import { useAuthNotifications } from "./useAuthNotifications";
 
 type Profile = Tables<"profiles">;
 
@@ -15,9 +16,13 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   forceRefreshProfile: () => Promise<void>;
+  connectionStatus: 'connected' | 'disconnected' | 'reconnecting';
+  lastActivity: Date;
+  loadingStage: 'initializing' | 'loading_profile' | 'retrying' | 'ready' | 'error';
+  loadingProgress: number;
 }
 
-// Profile cache with TTL and localStorage backup
+// Enhanced Profile cache with better error handling
 class ProfileCache {
   private static CACHE_KEY = 'user_profile_cache';
   private static TTL = 5 * 60 * 1000; // 5 minutes
@@ -27,14 +32,17 @@ class ProfileCache {
     try {
       // Try memory cache first
       if (this.cache && Date.now() - this.cache.timestamp < this.TTL) {
-        return this.cache.profile;
+        const profile = this.cache.profile;
+        if (profile && validateProfileIntegrity(profile)) {
+          return profile;
+        }
       }
 
       // Try localStorage backup
       const stored = localStorage.getItem(`${this.CACHE_KEY}_${userId}`);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Date.now() - parsed.timestamp < this.TTL) {
+        if (Date.now() - parsed.timestamp < this.TTL && parsed.profile && validateProfileIntegrity(parsed.profile)) {
           this.cache = parsed;
           return parsed.profile;
         }
@@ -47,11 +55,19 @@ class ProfileCache {
 
   static set(userId: string, profile: Profile | null): void {
     try {
+      if (profile && !validateProfileIntegrity(profile)) {
+        console.warn('Invalid profile data, not caching');
+        return;
+      }
+
       const cacheData = { profile, timestamp: Date.now() };
       this.cache = cacheData;
       
-      // Backup to localStorage
+      // Backup to localStorage and ProfileBackupManager
       localStorage.setItem(`${this.CACHE_KEY}_${userId}`, JSON.stringify(cacheData));
+      if (profile) {
+        ProfileBackupManager.backupProfile(profile);
+      }
     } catch (error) {
       console.warn('Error storing profile cache:', error);
     }
@@ -62,36 +78,21 @@ class ProfileCache {
     if (userId) {
       try {
         localStorage.removeItem(`${this.CACHE_KEY}_${userId}`);
+        ProfileBackupManager.clearBackup(userId);
       } catch (error) {
         console.warn('Error clearing profile cache:', error);
       }
     }
   }
-
-  static getCriticalData(userId: string): { email?: string; role?: string; company_id?: string } | null {
-    try {
-      const profile = this.get(userId);
-      if (profile) {
-        return {
-          email: profile.email,
-          role: profile.role,
-          company_id: profile.company_id || undefined
-        };
-      }
-    } catch (error) {
-      console.warn('Error getting critical profile data:', error);
-    }
-    return null;
-  }
 }
 
-// Rate limiter with exponential backoff
+// Enhanced Rate limiter with better backoff strategy
 class RateLimiter {
   private static lastRequest = 0;
   private static failureCount = 0;
-  private static readonly BASE_DELAY = 1000; // 1 second
-  private static readonly MAX_DELAY = 30000; // 30 seconds
-
+  private static readonly BASE_DELAY = 1000;
+  private static readonly MAX_DELAY = 30000;
+  
   static async waitIfNeeded(): Promise<void> {
     const now = Date.now();
     const delay = this.calculateDelay();
@@ -99,7 +100,7 @@ class RateLimiter {
 
     if (timeSinceLastRequest < delay) {
       const waitTime = delay - timeSinceLastRequest;
-      console.log(`Rate limiting: waiting ${waitTime}ms`);
+      console.log(`Rate limiting: waiting ${waitTime}ms (failures: ${this.failureCount})`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
 
@@ -107,16 +108,23 @@ class RateLimiter {
   }
 
   private static calculateDelay(): number {
-    if (this.failureCount === 0) return 500; // Normal delay
-    return Math.min(this.BASE_DELAY * Math.pow(2, this.failureCount - 1), this.MAX_DELAY);
+    if (this.failureCount === 0) return 500;
+    const exponentialDelay = Math.min(this.BASE_DELAY * Math.pow(2, this.failureCount - 1), this.MAX_DELAY);
+    // Add jitter to prevent thundering herd
+    const jitter = Math.random() * 1000;
+    return exponentialDelay + jitter;
   }
 
   static recordSuccess(): void {
-    this.failureCount = 0;
+    this.failureCount = Math.max(0, this.failureCount - 1);
   }
 
   static recordFailure(): void {
     this.failureCount++;
+  }
+
+  static getFailureCount(): number {
+    return this.failureCount;
   }
 }
 
@@ -125,23 +133,52 @@ export const useAuth = (): AuthContextType => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'reconnecting'>('connected');
+  const [lastActivity, setLastActivity] = useState(new Date());
+  const [loadingStage, setLoadingStage] = useState<'initializing' | 'loading_profile' | 'retrying' | 'ready' | 'error'>('initializing');
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  
   const { toast } = useToast();
+  const { showNetworkError, showProfileError } = useAuthNotifications(user);
   
   const fetchAttemptRef = useRef(0);
   const isInitializedRef = useRef(false);
+  const retryTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Create profile from auth data as fallback
+  // Monitor connection status
+  useEffect(() => {
+    const handleOnline = () => {
+      setConnectionStatus('connected');
+      console.log('Connection restored');
+    };
+
+    const handleOffline = () => {
+      setConnectionStatus('disconnected');
+      showNetworkError();
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [showNetworkError]);
+
+  // Enhanced profile creation with better error handling
   const createProfileFromAuth = useCallback(async (user: User): Promise<Profile | null> => {
     try {
       console.log('Creating profile from auth data for user:', user.id);
+      setLoadingProgress(25);
       
-      // Extract data from user metadata
       const metadata = user.user_metadata || {};
       const email = user.email || '';
       const firstName = metadata.first_name || metadata.name?.split(' ')[0] || '';
       const lastName = metadata.last_name || metadata.name?.split(' ').slice(1).join(' ') || '';
       
-      // Try to create the profile
+      setLoadingProgress(50);
+      
       const { data, error } = await supabase
         .from('profiles')
         .insert({
@@ -155,10 +192,11 @@ export const useAuth = (): AuthContextType => {
         .select()
         .single();
 
+      setLoadingProgress(75);
+
       if (error) {
         console.error('Error creating profile from auth:', error);
         
-        // If profile already exists, try to fetch it
         if (error.code === '23505') {
           const { data: existingProfile } = await supabase
             .from('profiles')
@@ -166,32 +204,42 @@ export const useAuth = (): AuthContextType => {
             .eq('id', user.id)
             .maybeSingle();
           
+          setLoadingProgress(100);
           return existingProfile;
         }
         return null;
       }
 
       console.log('Profile created successfully from auth data');
+      setLoadingProgress(100);
       return data;
     } catch (error) {
       console.error('Failed to create profile from auth:', error);
+      setLoadingProgress(0);
       return null;
     }
   }, []);
 
+  // Enhanced profile fetching with progress tracking
   const fetchProfile = useCallback(async (userId: string, forceRefresh = false): Promise<Profile | null> => {
     try {
-      // Check cache first unless forcing refresh
+      setLoadingStage(forceRefresh ? 'retrying' : 'loading_profile');
+      setLoadingProgress(10);
+
       if (!forceRefresh) {
         const cachedProfile = ProfileCache.get(userId);
         if (cachedProfile) {
           console.log('Using cached profile');
+          setLoadingProgress(100);
           return cachedProfile;
         }
       }
 
-      // Apply rate limiting
+      setLoadingProgress(25);
+      setConnectionStatus('reconnecting');
+      
       await RateLimiter.waitIfNeeded();
+      setLoadingProgress(40);
 
       console.log('Fetching profile from database for user:', userId);
       
@@ -201,19 +249,23 @@ export const useAuth = (): AuthContextType => {
         .eq('id', userId)
         .maybeSingle();
 
+      setLoadingProgress(70);
+      setConnectionStatus('connected');
+
       if (error) {
         console.error('Error fetching profile:', error);
         RateLimiter.recordFailure();
         
-        // If it's a rate limiting error, throw to trigger exponential backoff
         if (error.message.includes('429') || error.message.includes('rate limit')) {
           throw new Error('Rate limited');
         }
         
+        setLoadingProgress(0);
         return null;
       }
 
       RateLimiter.recordSuccess();
+      setLoadingProgress(85);
 
       if (!data) {
         console.log('No profile found, attempting to create from auth data');
@@ -222,19 +274,33 @@ export const useAuth = (): AuthContextType => {
           const newProfile = await createProfileFromAuth(currentUser);
           if (newProfile) {
             ProfileCache.set(userId, newProfile);
+            setLoadingProgress(100);
             return newProfile;
           }
         }
+        
+        // Try to restore from backup
+        const restoredProfile = await ProfileBackupManager.restoreProfileFromBackup(userId);
+        if (restoredProfile) {
+          ProfileCache.set(userId, restoredProfile);
+          setLoadingProgress(100);
+          return restoredProfile;
+        }
+        
+        setLoadingProgress(0);
         return null;
       }
 
       console.log('Profile fetched successfully');
       ProfileCache.set(userId, data);
+      setLoadingProgress(100);
       return data;
       
     } catch (error) {
       console.error('Failed to fetch profile:', error);
       RateLimiter.recordFailure();
+      setConnectionStatus('disconnected');
+      setLoadingProgress(0);
       return null;
     }
   }, [createProfileFromAuth]);
@@ -243,82 +309,100 @@ export const useAuth = (): AuthContextType => {
     if (!user) return;
     
     console.log('Refreshing profile...');
+    setLastActivity(new Date());
     const freshProfile = await fetchProfile(user.id, false);
     setProfile(freshProfile);
+    setLoadingStage(freshProfile ? 'ready' : 'error');
   }, [user, fetchProfile]);
 
   const forceRefreshProfile = useCallback(async () => {
     if (!user) return;
     
     console.log('Force refreshing profile...');
+    setLastActivity(new Date());
     ProfileCache.clear(user.id);
     const freshProfile = await fetchProfile(user.id, true);
     setProfile(freshProfile);
+    setLoadingStage(freshProfile ? 'ready' : 'error');
     
     if (!freshProfile) {
-      toast({
-        title: "Error al actualizar perfil",
-        description: "No se pudo actualizar el perfil. Intente cerrar sesión y volver a iniciar.",
-        variant: "destructive",
-      });
+      showProfileError();
     }
-  }, [user, fetchProfile, toast]);
+  }, [user, fetchProfile, showProfileError]);
 
   const loadUserProfile = useCallback(async (currentUser: User | null) => {
     if (!currentUser) {
       setProfile(null);
       setLoading(false);
+      setLoadingStage('ready');
+      setLoadingProgress(0);
       return;
     }
 
     try {
       setLoading(true);
+      setLoadingStage('loading_profile');
+      setLoadingProgress(5);
+      
       const userProfile = await fetchProfile(currentUser.id);
       
       if (userProfile) {
         setProfile(userProfile);
+        setLoadingStage('ready');
       } else {
-        // Try to get critical data from cache as last resort
-        const criticalData = ProfileCache.getCriticalData(currentUser.id);
-        if (criticalData) {
-          console.log('Using critical data from cache');
-          // Create a minimal profile object with critical data
-          const minimalProfile: Profile = {
-            id: currentUser.id,
-            email: criticalData.email || currentUser.email || '',
-            first_name: '',
-            last_name: '',
-            role: (criticalData.role as any) || 'vendedor',
-            company_id: criticalData.company_id || null,
-            active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            phone: null,
-            avatar_url: null
-          };
-          setProfile(minimalProfile);
+        // Enhanced fallback with multiple attempts
+        const maxAttempts = 3;
+        let attempt = 1;
+        let fallbackProfile = null;
+
+        while (attempt <= maxAttempts && !fallbackProfile) {
+          setLoadingStage('retrying');
+          console.log(`Profile fallback attempt ${attempt}/${maxAttempts}`);
+          
+          // Try backup restoration
+          fallbackProfile = await ProfileBackupManager.restoreProfileFromBackup(currentUser.id);
+          
+          if (!fallbackProfile && attempt < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Exponential backoff
+          }
+          
+          attempt++;
+        }
+
+        if (fallbackProfile) {
+          setProfile(fallbackProfile);
+          setLoadingStage('ready');
         } else {
           setProfile(null);
+          setLoadingStage('error');
+          showProfileError();
         }
       }
     } catch (error) {
       console.error('Error loading user profile:', error);
       setProfile(null);
+      setLoadingStage('error');
     } finally {
       setLoading(false);
+      setLoadingProgress(100);
     }
-  }, [fetchProfile]);
+  }, [fetchProfile, showProfileError]);
 
   const signOut = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadingStage('initializing');
+      setLoadingProgress(25);
       
-      // Clear cache before signing out
       if (user) {
         ProfileCache.clear(user.id);
       }
       
+      setLoadingProgress(50);
+      
       const { error } = await supabase.auth.signOut();
+      setLoadingProgress(75);
+      
       if (error) {
         console.error('Error signing out:', error);
         toast({
@@ -327,10 +411,13 @@ export const useAuth = (): AuthContextType => {
           variant: "destructive",
         });
       }
+      
+      setLoadingProgress(100);
     } catch (error) {
       console.error('Unexpected error during sign out:', error);
     } finally {
       setLoading(false);
+      setLoadingStage('ready');
     }
   }, [user, toast]);
 
@@ -338,21 +425,30 @@ export const useAuth = (): AuthContextType => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
+        setLoadingStage('initializing');
+        setLoadingProgress(10);
+        
         const { data: { session: currentSession } } = await supabase.auth.getSession();
+        setLoadingProgress(30);
         
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
+        setLoadingProgress(50);
         
         if (currentSession?.user) {
           await loadUserProfile(currentSession.user);
         } else {
           setLoading(false);
+          setLoadingStage('ready');
+          setLoadingProgress(100);
         }
         
         isInitializedRef.current = true;
       } catch (error) {
         console.error('Error initializing auth:', error);
         setLoading(false);
+        setLoadingStage('error');
+        setLoadingProgress(0);
         isInitializedRef.current = true;
       }
     };
@@ -367,17 +463,18 @@ export const useAuth = (): AuthContextType => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
         console.log('Auth state changed:', event);
+        setLastActivity(new Date());
         
         setSession(newSession);
         setUser(newSession?.user ?? null);
 
         if (event === 'SIGNED_OUT') {
           setProfile(null);
+          setLoadingStage('ready');
           ProfileCache.clear();
         } else if (event === 'SIGNED_IN' && newSession?.user) {
           await loadUserProfile(newSession.user);
         } else if (event === 'TOKEN_REFRESHED' && newSession?.user) {
-          // Don't reload profile on token refresh unless we don't have one
           if (!profile) {
             await loadUserProfile(newSession.user);
           }
@@ -387,6 +484,9 @@ export const useAuth = (): AuthContextType => {
 
     return () => {
       subscription.unsubscribe();
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
     };
   }, [loadUserProfile, profile]);
 
@@ -398,5 +498,9 @@ export const useAuth = (): AuthContextType => {
     signOut,
     refreshProfile,
     forceRefreshProfile,
+    connectionStatus,
+    lastActivity,
+    loadingStage,
+    loadingProgress,
   };
 };
