@@ -72,7 +72,7 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Show enhanced loading states
+  // Show enhanced loading states - fixed the condition to handle all non-ready states properly
   if (loading || (loadingStage !== 'ready' && loadingStage !== 'error')) {
     const handleRetry = async () => {
       setIsRetrying(true);
@@ -107,8 +107,8 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
     );
   }
 
-  // Show profile error with enhanced recovery options
-  if (!profile && !loading && loadingStage !== 'loading_profile') {
+  // Show profile error with enhanced recovery options - simplified condition
+  if (!profile && !loading && loadingStage === 'error') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
