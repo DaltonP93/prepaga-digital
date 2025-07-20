@@ -1,13 +1,15 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthContext } from '@/components/AuthProvider';
 import { useCompanyBranding } from '@/hooks/useCompanySettings';
+import { SecurityAlert } from '@/components/auth/SecurityAlert';
+import { useLoginSecurity } from '@/hooks/useLoginSecurity';
 import { toast } from 'sonner';
-import { Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { ForgotPasswordDialog } from './ForgotPasswordDialog';
 import { Link } from 'react-router-dom';
 
@@ -16,56 +18,19 @@ export const LoginForm = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [loginAttempts, setLoginAttempts] = useState(0);
-  const [isBlocked, setIsBlocked] = useState(false);
-  const [blockTimeLeft, setBlockTimeLeft] = useState(0);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const { signIn } = useAuthContext();
   
+  const { 
+    loginAttempts, 
+    isBlocked, 
+    blockTimeLeft, 
+    recordFailedAttempt, 
+    resetAttempts 
+  } = useLoginSecurity();
+  
   // Obtener configuración de branding - con fallback si no hay datos
   const { data: branding } = useCompanyBranding();
-
-  // Manejo de bloqueo por intentos fallidos
-  useEffect(() => {
-    const storedAttempts = localStorage.getItem('loginAttempts');
-    const lastAttempt = localStorage.getItem('lastLoginAttempt');
-    
-    if (storedAttempts && lastAttempt) {
-      const attempts = parseInt(storedAttempts);
-      const lastAttemptTime = new Date(lastAttempt);
-      const now = new Date();
-      const timeDiff = (now.getTime() - lastAttemptTime.getTime()) / 1000 / 60; // minutos
-      
-      if (attempts >= 5 && timeDiff < 15) {
-        setIsBlocked(true);
-        setLoginAttempts(attempts);
-        setBlockTimeLeft(Math.ceil(15 - timeDiff));
-        
-        const timer = setInterval(() => {
-          setBlockTimeLeft(prev => {
-            if (prev <= 1) {
-              setIsBlocked(false);
-              setLoginAttempts(0);
-              localStorage.removeItem('loginAttempts');
-              localStorage.removeItem('lastLoginAttempt');
-              clearInterval(timer);
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 60000);
-        
-        return () => clearInterval(timer);
-      } else if (timeDiff >= 15) {
-        // Reset después de 15 minutos
-        localStorage.removeItem('loginAttempts');
-        localStorage.removeItem('lastLoginAttempt');
-        setLoginAttempts(0);
-      } else {
-        setLoginAttempts(attempts);
-      }
-    }
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,24 +45,10 @@ export const LoginForm = () => {
     try {
       await signIn(email, password);
       toast.success('¡Bienvenido!');
-      
-      // Reset intentos exitosos
-      localStorage.removeItem('loginAttempts');
-      localStorage.removeItem('lastLoginAttempt');
-      setLoginAttempts(0);
+      resetAttempts();
     } catch (error: any) {
-      const newAttempts = loginAttempts + 1;
-      setLoginAttempts(newAttempts);
-      localStorage.setItem('loginAttempts', newAttempts.toString());
-      localStorage.setItem('lastLoginAttempt', new Date().toISOString());
-      
-      if (newAttempts >= 5) {
-        setIsBlocked(true);
-        setBlockTimeLeft(15);
-        toast.error('Demasiados intentos fallidos. Cuenta bloqueada por 15 minutos.');
-      } else {
-        toast.error(`Error al iniciar sesión. Intentos restantes: ${5 - newAttempts}`);
-      }
+      const result = recordFailedAttempt();
+      toast.error(result.message);
     } finally {
       setLoading(false);
     }
@@ -130,21 +81,17 @@ export const LoginForm = () => {
         </CardHeader>
         <CardContent>
           {isBlocked && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-red-600" />
-              <span className="text-sm text-red-700">
-                Cuenta bloqueada por seguridad. Tiempo restante: {blockTimeLeft} minutos.
-              </span>
-            </div>
+            <SecurityAlert
+              type="blocked"
+              message={`Cuenta bloqueada por seguridad. Tiempo restante: ${blockTimeLeft} minutos.`}
+            />
           )}
           
           {loginAttempts > 0 && loginAttempts < 5 && (
-            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-600" />
-              <span className="text-sm text-amber-700">
-                Intentos fallidos: {loginAttempts}/5. Cuidado con el bloqueo automático.
-              </span>
-            </div>
+            <SecurityAlert
+              type="warning"
+              message={`Intentos fallidos: ${loginAttempts}/5. Cuidado con el bloqueo automático.`}
+            />
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
