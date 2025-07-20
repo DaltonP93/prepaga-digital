@@ -96,7 +96,7 @@ function App() {
                 </ProtectedRoute>
               } />
               <Route path="/profile" element={
-                <ProtectedRoute requireCompleteProfile={false}>
+                <ProtectedRoute>
                   <Profile />
                 </ProtectedRoute>
               } />
