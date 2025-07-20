@@ -1,127 +1,194 @@
 
-import { useAuthContext } from '@/components/AuthProvider';
-import { LoginForm } from '@/components/LoginForm';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useEffect, useState } from 'react';
-import { useProfileCompletion } from '@/hooks/useProfileCompletion';
+import { useEffect, useState } from "react";
+import { Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { RefreshCw, AlertCircle, LogOut } from "lucide-react";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRole?: string[];
-  requireCompleteProfile?: boolean;
 }
 
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
-  children, 
-  requiredRole,
-  requireCompleteProfile = false
-}) => {
-  const { user, profile, loading } = useAuthContext();
-  const navigate = useNavigate();
+export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
+  const { user, profile, loading, refreshProfile, forceRefreshProfile, signOut } = useAuth();
   const location = useLocation();
-  const [profileTimeout, setProfileTimeout] = useState(false);
+  const [showProfileError, setShowProfileError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
   
-  // Always call useProfileCompletion to maintain consistent hook count
-  const { isComplete } = useProfileCompletion();
+  const MAX_RETRIES = 3;
+  const PROFILE_TIMEOUT = 8000; // 8 seconds timeout
 
-  // Handle profile completion redirect
+  // Handle profile loading timeout and retries
   useEffect(() => {
-    if (user && profile && requireCompleteProfile && !isComplete && location.pathname !== '/profile') {
-      console.log('🔄 Redirecting to profile completion');
-      navigate('/profile');
-    }
-  }, [user, profile, requireCompleteProfile, isComplete, location.pathname, navigate]);
+    if (!user) return;
 
-  // Handle profile loading timeout
+    if (loading && !profile) {
+      // Start timeout timer
+      const timeoutId = setTimeout(() => {
+        if (loading && !profile && retryCount < MAX_RETRIES) {
+          console.log(`Profile loading timeout, retry ${retryCount + 1}/${MAX_RETRIES}`);
+          setRetryCount(prev => prev + 1);
+          setIsRetrying(true);
+          
+          // Try to refresh profile
+          refreshProfile().finally(() => {
+            setIsRetrying(false);
+          });
+        } else if (!profile && retryCount >= MAX_RETRIES) {
+          console.log('Max retries reached, showing profile error');
+          setShowProfileError(true);
+        }
+      }, PROFILE_TIMEOUT);
+
+      return () => clearTimeout(timeoutId);
+    }
+
+    // Reset states when profile is loaded
+    if (profile) {
+      setShowProfileError(false);
+      setRetryCount(0);
+      setIsRetrying(false);
+    }
+  }, [user, loading, profile, retryCount, refreshProfile]);
+
+  // Reset retry state when user changes
   useEffect(() => {
-    if (user && !profile && !loading) {
-      const timer = setTimeout(() => {
-        console.log('⏰ Profile loading timeout reached');
-        setProfileTimeout(true);
-      }, 5000); // 5 second timeout
+    setRetryCount(0);
+    setShowProfileError(false);
+    setIsRetrying(false);
+  }, [user?.id]);
 
-      return () => clearTimeout(timer);
-    } else {
-      setProfileTimeout(false);
-    }
-  }, [user, profile, loading]);
-
-  // Show loading spinner while auth is being determined
-  if (loading) {
-    console.log('⏳ ProtectedRoute: Auth loading...');
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Verificando autenticación...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // If no user, show login form
+  // Redirect to login if not authenticated
   if (!user) {
-    console.log('🚪 ProtectedRoute: No user, showing login');
-    return <LoginForm />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // If user exists but no profile and profile loading timed out
-  if (user && !profile && profileTimeout) {
-    console.warn('⚠️ ProtectedRoute: Profile loading timed out');
-    
-    const handleRetry = () => {
-      setProfileTimeout(false);
-      setRetryCount(prev => prev + 1);
-      window.location.reload();
-    };
-
-    const handleForceLogout = () => {
-      console.log('🚪 Force logout due to profile error');
-      window.location.href = '/';
-    };
-
+  // Show loading while authenticating or loading profile (with timeout)
+  if (loading || (!profile && !showProfileError && retryCount < MAX_RETRIES)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
-        <div className="text-center space-y-4 max-w-md">
-          <h1 className="text-2xl font-bold text-foreground">Error de Perfil</h1>
-          <p className="text-muted-foreground">
-            No se pudo cargar el perfil de usuario después de {retryCount} intentos.
-          </p>
-          <div className="flex gap-2 justify-center">
-            <button 
-              onClick={handleRetry} 
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-            >
-              Reintentar ({retryCount}/3)
-            </button>
-            {retryCount >= 2 && (
-              <button 
-                onClick={handleForceLogout} 
-                className="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            <CardTitle>
+              {isRetrying ? `Reintentando (${retryCount}/${MAX_RETRIES})...` : 'Cargando...'}
+            </CardTitle>
+            <CardDescription>
+              {isRetrying 
+                ? 'Intentando cargar tu perfil nuevamente'
+                : 'Verificando tu información de usuario'
+              }
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show profile error with recovery options
+  if (showProfileError || (!profile && !loading)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
+              <AlertCircle className="h-6 w-6 text-destructive" />
+            </div>
+            <CardTitle className="text-destructive">Error de Perfil</CardTitle>
+            <CardDescription>
+              No se pudo cargar tu perfil de usuario. Esto puede deberse a problemas de conexión o configuración.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-2">
+              <Button 
+                onClick={async () => {
+                  setIsRetrying(true);
+                  setShowProfileError(false);
+                  setRetryCount(0);
+                  try {
+                    await refreshProfile();
+                  } finally {
+                    setIsRetrying(false);
+                  }
+                }}
+                disabled={isRetrying}
+                className="w-full"
               >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isRetrying ? 'animate-spin' : ''}`} />
+                {isRetrying ? 'Reintentando...' : 'Reintentar'}
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                onClick={async () => {
+                  setIsRetrying(true);
+                  try {
+                    await forceRefreshProfile();
+                  } finally {
+                    setIsRetrying(false);
+                  }
+                }}
+                disabled={isRetrying}
+                className="w-full"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isRetrying ? 'animate-spin' : ''}`} />
+                Forzar Actualización
+              </Button>
+              
+              <Button 
+                variant="destructive" 
+                onClick={signOut}
+                disabled={isRetrying}
+                className="w-full"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
                 Cerrar Sesión
-              </button>
-            )}
-          </div>
-        </div>
+              </Button>
+            </div>
+            
+            <div className="text-xs text-muted-foreground text-center space-y-1">
+              <p>Si el problema persiste:</p>
+              <ul className="text-left space-y-1">
+                <li>• Verifica tu conexión a internet</li>
+                <li>• Intenta cerrar sesión y volver a iniciar</li>
+                <li>• Contacta al administrador del sistema</li>
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  // Check role-based access
-  if (requiredRole && profile && !requiredRole.includes(profile.role)) {
-    console.warn('🚫 ProtectedRoute: Access denied for role:', profile.role);
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
-        <div className="text-center space-y-4">
-          <h1 className="text-2xl font-bold text-foreground">Acceso Denegado</h1>
-          <p className="text-muted-foreground">No tienes permisos para acceder a esta página.</p>
+  // Check role permissions
+  if (requiredRole && requiredRole.length > 0) {
+    if (!profile.role || !requiredRole.includes(profile.role)) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-warning/10 flex items-center justify-center">
+                <AlertCircle className="h-6 w-6 text-warning" />
+              </div>
+              <CardTitle>Acceso Restringido</CardTitle>
+              <CardDescription>
+                No tienes los permisos necesarios para acceder a esta sección.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={() => window.history.back()} className="w-full">
+                Volver
+              </Button>
+            </CardContent>
+          </Card>
         </div>
-      </div>
-    );
+      );
+    }
   }
 
-  console.log('✅ ProtectedRoute: Access granted');
   return <>{children}</>;
 };
