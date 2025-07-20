@@ -73,7 +73,7 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
   }
 
   // Show enhanced loading states
-  if (loading || loadingStage !== 'ready') {
+  if (loading || (loadingStage !== 'ready' && loadingStage !== 'error')) {
     const handleRetry = async () => {
       setIsRetrying(true);
       try {

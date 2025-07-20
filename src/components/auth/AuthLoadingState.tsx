@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { RefreshCw, Wifi, WifiOff } from 'lucide-react';
 
 interface AuthLoadingStateProps {
-  stage: 'initializing' | 'loading_profile' | 'retrying' | 'error';
+  stage: 'initializing' | 'loading_profile' | 'retrying' | 'error' | 'ready';
   progress?: number;
   retryCount?: number;
   maxRetries?: number;
@@ -54,6 +54,12 @@ export const AuthLoadingState: React.FC<AuthLoadingStateProps> = ({
           description: message || 'No se pudo cargar tu perfil',
           showProgress: false
         };
+      case 'ready':
+        return {
+          title: 'Listo',
+          description: 'Sistema preparado',
+          showProgress: false
+        };
       default:
         return {
           title: 'Cargando...',
@@ -64,6 +70,11 @@ export const AuthLoadingState: React.FC<AuthLoadingStateProps> = ({
   };
 
   const { title, description, showProgress } = getStageInfo();
+
+  // Don't render anything for ready state
+  if (stage === 'ready') {
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
