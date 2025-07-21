@@ -29,7 +29,7 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
   const { isConnected, updateActivity } = useSessionManager(5, 30);
   const location = useLocation();
   
-  const MAX_RETRIES = 3;
+  const MAX_RETRIES = 2; // Reduced retries
 
   const { retryCount, isRetrying, manualRetry, setIsRetrying } = useRetryLogic({
     maxRetries: MAX_RETRIES,
@@ -50,8 +50,8 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Show enhanced loading states
-  if (loading || (loadingStage !== 'ready' && loadingStage !== 'error')) {
+  // Show loading states only when necessary
+  if (loading && loadingStage === 'initializing') {
     const handleRetry = async () => {
       setIsRetrying(true);
       try {
@@ -85,8 +85,8 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
     );
   }
 
-  // Show profile error with enhanced recovery options
-  if (!profile && !loading && loadingStage === 'error') {
+  // Show profile error only in critical cases
+  if (!profile && !loading && loadingStage === 'error' && retryCount >= MAX_RETRIES) {
     return (
       <ProfileErrorCard
         retryCount={retryCount}
@@ -107,7 +107,7 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
     );
   }
 
-  // Check role permissions
+  // Check role permissions only if profile is available and roles are required
   if (requiredRole && requiredRole.length > 0 && profile) {
     if (!profile.role || !requiredRole.includes(profile.role)) {
       return (
@@ -119,5 +119,6 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
     }
   }
 
+  // Allow access even if profile is still loading (non-blocking)
   return <>{children}</>;
 };

@@ -34,12 +34,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   
   const signIn = async (email: string, password: string) => {
     try {
+      console.log('🔐 AuthProvider: Iniciando signIn...');
+      
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
+        console.error('❌ AuthProvider: Error en signIn:', error);
         if (error.message.includes('Invalid login credentials')) {
           throw new Error('Credenciales incorrectas. Verifica tu email y contraseña.');
         } else if (error.message.includes('Email not confirmed')) {
@@ -50,10 +53,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw error;
       }
       
+      console.log('✅ AuthProvider: signIn exitoso');
       updateActivity();
       toast.success('¡Bienvenido! Has iniciado sesión correctamente.');
+      
+      // NO esperamos a que se cargue el perfil aquí
+      // El perfil se cargará en segundo plano mediante useAuth
+      
     } catch (error) {
-      console.error('Sign in error:', error);
+      console.error('❌ AuthProvider: signIn error:', error);
       throw error;
     }
   };

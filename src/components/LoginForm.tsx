@@ -18,7 +18,7 @@ export const LoginForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false); // Estado independiente
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const { signIn } = useAuthContext();
   const navigate = useNavigate();
@@ -43,20 +43,26 @@ export const LoginForm = () => {
       return;
     }
     
-    setLoading(true);
+    setIsLoggingIn(true);
 
     try {
+      console.log('🔑 Iniciando proceso de login...');
       await signIn(email, password);
+      console.log('✅ Login exitoso, redirigiendo...');
+      
       resetAttempts();
       
-      // Redirección automática después del login exitoso
+      // Redirección inmediata después del login exitoso
       const from = location.state?.from?.pathname || '/';
       navigate(from, { replace: true });
+      
     } catch (error: any) {
+      console.error('❌ Error en login:', error);
       const result = recordFailedAttempt();
       toast.error(result.message);
     } finally {
-      setLoading(false);
+      // Siempre resetear el estado de loading
+      setIsLoggingIn(false);
     }
   };
 
@@ -109,7 +115,7 @@ export const LoginForm = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={isBlocked}
+                disabled={isBlocked || isLoggingIn}
                 autoComplete="username"
               />
             </div>
@@ -122,7 +128,7 @@ export const LoginForm = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  disabled={isBlocked}
+                  disabled={isBlocked || isLoggingIn}
                   autoComplete="current-password"
                   className="pr-10"
                 />
@@ -132,7 +138,7 @@ export const LoginForm = () => {
                   size="sm"
                   className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
-                  disabled={isBlocked}
+                  disabled={isBlocked || isLoggingIn}
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4" />
@@ -149,7 +155,7 @@ export const LoginForm = () => {
                 variant="link" 
                 className="p-0 h-auto text-sm"
                 onClick={() => setShowForgotPassword(true)}
-                disabled={isBlocked}
+                disabled={isBlocked || isLoggingIn}
               >
                 ¿Olvidó su contraseña?
               </Button>
@@ -159,8 +165,8 @@ export const LoginForm = () => {
               </Link>
             </div>
             
-            <Button type="submit" className="w-full" disabled={loading || isBlocked}>
-              {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+            <Button type="submit" className="w-full" disabled={isLoggingIn || isBlocked}>
+              {isLoggingIn ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </Button>
           </form>
         </CardContent>
