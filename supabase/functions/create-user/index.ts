@@ -14,6 +14,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log('Create user function called');
+    
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -22,30 +24,57 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization')!
     const token = authHeader.replace('Bearer ', '')
     
+    console.log('Verifying auth token...');
+    
     // Verify the user making the request
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
     if (authError || !user) {
+      console.error('Auth error:', authError);
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
+    console.log('Auth verified, checking permissions...');
+
     // Check if user has permission to create users
-    const { data: profile } = await supabaseAdmin
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single()
 
-    if (!profile || !['super_admin', 'admin'].includes(profile.role)) {
+    if (profileError || !profile) {
+      console.error('Profile error:', profileError);
+      return new Response(JSON.stringify({ error: 'User profile not found' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    if (!['super_admin', 'admin'].includes(profile.role)) {
+      console.error('Insufficient permissions:', profile.role);
       return new Response(JSON.stringify({ error: 'Insufficient permissions' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
+    console.log('Permissions verified, parsing request body...');
+
     const { email, password, first_name, last_name, role, company_id } = await req.json()
+
+    // Validate required fields
+    if (!email || !password || !first_name || !last_name || !role) {
+      return new Response(JSON.stringify({ 
+        error: 'Missing required fields',
+        details: 'email, password, first_name, last_name, and role are required'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
 
     console.log('Creating user with data:', { email, first_name, last_name, role, company_id });
 
@@ -53,6 +82,7 @@ serve(async (req) => {
     const { data: authData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
+      email_confirm: true, // Skip email confirmation for admin-created users
       user_metadata: {
         first_name,
         last_name,
@@ -61,7 +91,7 @@ serve(async (req) => {
     })
 
     if (createError) {
-      console.error('Error creating user:', createError)
+      console.error('Error creating auth user:', createError)
       return new Response(JSON.stringify({ 
         error: createError.message,
         details: createError
@@ -71,7 +101,9 @@ serve(async (req) => {
       })
     }
 
-    // Create profile directly using insert instead of RPC
+    console.log('Auth user created, creating profile...');
+
+    // Create profile directly using insert
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .insert({
@@ -80,7 +112,7 @@ serve(async (req) => {
         first_name,
         last_name,
         role: role,
-        company_id,
+        company_id: company_id || null,
         active: true
       })
 
@@ -96,6 +128,8 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
+
+    console.log('User created successfully');
 
     return new Response(JSON.stringify({ 
       success: true, 

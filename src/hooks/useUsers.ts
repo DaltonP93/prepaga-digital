@@ -18,6 +18,7 @@ export const useUsers = () => {
   return useQuery({
     queryKey: ['users'],
     queryFn: async (): Promise<UserWithCompany[]> => {
+      console.log('Fetching users...');
       const { data, error } = await supabase
         .from('profiles')
         .select(`
@@ -31,6 +32,8 @@ export const useUsers = () => {
         console.error('Error fetching users:', error);
         throw error;
       }
+      
+      console.log('Users fetched successfully:', data);
       return data || [];
     },
     retry: 1,
@@ -43,6 +46,7 @@ export const useUpdateUser = () => {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: ProfileUpdate & { id: string }) => {
+      console.log('Updating user:', id, updates);
       const { data, error } = await supabase
         .from('profiles')
         .update(updates)
@@ -50,7 +54,12 @@ export const useUpdateUser = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating user:', error);
+        throw error;
+      }
+      
+      console.log('User updated successfully:', data);
       return data;
     },
     onSuccess: () => {
@@ -69,12 +78,18 @@ export const useDeleteUser = () => {
 
   return useMutation({
     mutationFn: async (id: string) => {
+      console.log('Deactivating user:', id);
       const { error } = await supabase
         .from('profiles')
         .update({ active: false })
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error deactivating user:', error);
+        throw error;
+      }
+      
+      console.log('User deactivated successfully');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -101,19 +116,30 @@ export const useCreateUser = () => {
     }) => {
       console.log('Creating user via edge function:', userData);
       
+      // Validate required fields
+      if (!userData.email || !userData.password || !userData.first_name || !userData.last_name) {
+        throw new Error('Todos los campos obligatorios deben ser completados');
+      }
+      
+      if (!userData.company_id) {
+        throw new Error('Debe seleccionar una empresa');
+      }
+      
       const { data, error } = await supabase.functions.invoke('create-user', {
         body: userData
       });
 
       if (error) {
         console.error('Edge function error:', error);
-        throw error;
+        throw new Error(error.message || 'Error al crear usuario');
       }
 
-      if (!data.success) {
-        throw new Error(data.error || 'Error creating user');
+      if (!data || !data.success) {
+        console.error('Edge function failed:', data);
+        throw new Error(data?.error || 'Error creating user');
       }
 
+      console.log('User created successfully:', data.user);
       return data.user;
     },
     onSuccess: () => {

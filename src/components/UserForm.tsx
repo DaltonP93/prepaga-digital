@@ -8,12 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Upload, Eye, EyeOff } from "lucide-react";
+import { Upload, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { useCompanies } from "@/hooks/useCompanies";
 import { useCreateUser, useUpdateUser } from "@/hooks/useUsers";
 import { Database } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 type UserRole = Database['public']['Enums']['user_role'];
@@ -80,6 +81,7 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
       setAvatarUrl(publicUrl);
       toast.success('Avatar subido correctamente');
     } catch (error: any) {
+      console.error('Error uploading avatar:', error);
       toast.error('Error al subir el avatar: ' + error.message);
     } finally {
       setUploading(false);
@@ -88,6 +90,8 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
 
   const onSubmit = async (data: UserFormData) => {
     try {
+      console.log('Submitting form with data:', data);
+      
       if (isEditing && user) {
         await updateUser.mutateAsync({
           id: user.id,
@@ -101,8 +105,24 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
         });
       } else {
         if (!data.password) {
-          throw new Error("La contraseña es requerida para usuarios nuevos");
+          toast.error("La contraseña es requerida para usuarios nuevos");
+          return;
         }
+        
+        if (!data.company_id) {
+          toast.error("Debe seleccionar una empresa");
+          return;
+        }
+        
+        console.log('Creating new user with data:', {
+          email: data.email,
+          password: data.password,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          role: data.role as UserRole,
+          company_id: data.company_id,
+        });
+        
         await createUser.mutateAsync({
           email: data.email,
           password: data.password,
@@ -112,10 +132,13 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
           company_id: data.company_id,
         });
       }
+      
       onOpenChange(false);
       reset();
-    } catch (error) {
+      setAvatarUrl("");
+    } catch (error: any) {
       console.error("Error saving user:", error);
+      toast.error("Error al guardar usuario: " + (error.message || "Error desconocido"));
     }
   };
 
@@ -164,6 +187,16 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
             </div>
           </div>
 
+          {/* Error Alert */}
+          {(createUser.error || updateUser.error) && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                {createUser.error?.message || updateUser.error?.message}
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -184,7 +217,10 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  {...register("password", { required: "La contraseña es requerida" })}
+                  {...register("password", { 
+                    required: "La contraseña es requerida",
+                    minLength: { value: 6, message: "La contraseña debe tener al menos 6 caracteres" }
+                  })}
                 />
                 <Button
                   type="button"
@@ -263,6 +299,9 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
                 ))}
               </SelectContent>
             </Select>
+            {!isEditing && !watch("company_id") && (
+              <span className="text-sm text-red-500">La empresa es requerida</span>
+            )}
           </div>
 
           {isEditing && (
