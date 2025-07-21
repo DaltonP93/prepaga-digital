@@ -1,5 +1,6 @@
 
 import { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,6 +21,8 @@ export const LoginForm = () => {
   const [loading, setLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const { signIn } = useAuthContext();
+  const navigate = useNavigate();
+  const location = useLocation();
   
   const { 
     loginAttempts, 
@@ -44,8 +47,11 @@ export const LoginForm = () => {
 
     try {
       await signIn(email, password);
-      toast.success('¡Bienvenido!');
       resetAttempts();
+      
+      // Redirección automática después del login exitoso
+      const from = location.state?.from?.pathname || '/';
+      navigate(from, { replace: true });
     } catch (error: any) {
       const result = recordFailedAttempt();
       toast.error(result.message);

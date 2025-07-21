@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback, useRef } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -421,8 +422,10 @@ export const useAuth = (): AuthContextType => {
     }
   }, [user, toast]);
 
-  // Initialize auth state
+  // Initialize auth state - OPTIMIZED to prevent loops
   useEffect(() => {
+    if (isInitializedRef.current) return;
+    
     const initializeAuth = async () => {
       try {
         setLoadingStage('initializing');
@@ -453,15 +456,18 @@ export const useAuth = (): AuthContextType => {
       }
     };
 
-    if (!isInitializedRef.current) {
-      initializeAuth();
-    }
+    initializeAuth();
   }, [loadUserProfile]);
 
-  // Listen for auth changes
+  // Listen for auth changes - OPTIMIZED to prevent duplicate events
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
+        // Evitar procesar eventos duplicados durante la inicialización
+        if (event === 'INITIAL_SESSION' && isInitializedRef.current) {
+          return;
+        }
+        
         console.log('Auth state changed:', event);
         setLastActivity(new Date());
         
