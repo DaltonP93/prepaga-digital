@@ -29,7 +29,7 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
   const { isConnected, updateActivity } = useSessionManager(5, 30);
   const location = useLocation();
   
-  const MAX_RETRIES = 2; // Reduced retries
+  const MAX_RETRIES = 2;
 
   const { retryCount, isRetrying, manualRetry, setIsRetrying } = useRetryLogic({
     maxRetries: MAX_RETRIES,
@@ -45,13 +45,23 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
     }
   }, [user, updateActivity, location.pathname]);
 
+  console.log('🛡️ ProtectedRoute: Estado actual -', { 
+    user: !!user, 
+    loading, 
+    loadingStage,
+    hasProfile: !!profile
+  });
+
   // Redirect to login if not authenticated
   if (!user) {
+    console.log('🛡️ ProtectedRoute: No hay usuario, redirigiendo a login');
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Show loading states only when necessary
+  // Only show loading for critical initial states
   if (loading && loadingStage === 'initializing') {
+    console.log('🛡️ ProtectedRoute: Mostrando loading state');
+    
     const handleRetry = async () => {
       setIsRetrying(true);
       try {
@@ -85,8 +95,9 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
     );
   }
 
-  // Show profile error only in critical cases
+  // Show profile error only in critical cases after max retries
   if (!profile && !loading && loadingStage === 'error' && retryCount >= MAX_RETRIES) {
+    console.log('🛡️ ProtectedRoute: Error crítico de perfil');
     return (
       <ProfileErrorCard
         retryCount={retryCount}
@@ -108,8 +119,9 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
   }
 
   // Check role permissions only if profile is available and roles are required
-  if (requiredRole && requiredRole.length > 0 && profile) {
-    if (!profile.role || !requiredRole.includes(profile.role)) {
+  if (requiredRole && requiredRole.length > 0 && profile && profile.role) {
+    if (!requiredRole.includes(profile.role)) {
+      console.log('🛡️ ProtectedRoute: Rol no autorizado');
       return (
         <RoleRestrictedCard
           userRole={profile.role}
@@ -119,6 +131,7 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
     }
   }
 
-  // Allow access even if profile is still loading (non-blocking)
+  // Allow access - user is authenticated, let the app render
+  console.log('✅ ProtectedRoute: Acceso permitido, renderizando children');
   return <>{children}</>;
 };

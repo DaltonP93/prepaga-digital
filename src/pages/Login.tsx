@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { LoginForm } from '@/components/LoginForm';
 import { useAuthContext } from '@/components/AuthProvider';
@@ -8,39 +8,28 @@ const Login = () => {
   const { user, loading } = useAuthContext();
   const navigate = useNavigate();
   const location = useLocation();
-  const [redirectHandled, setRedirectHandled] = useState(false);
 
-  // Handle redirection when user becomes authenticated
+  // Simple and direct redirection when user is authenticated
   useEffect(() => {
-    console.log('🔄 Login: Estado actual -', { 
+    console.log('🔄 Login: Checking auth state -', { 
       user: !!user, 
-      loading, 
-      redirectHandled,
+      loading,
       hasUserId: user?.id ? true : false
     });
 
-    if (user && !loading && !redirectHandled) {
-      console.log('✅ Login: Usuario autenticado, redirigiendo...');
+    // If user is authenticated and not loading, redirect immediately
+    if (user && !loading) {
+      console.log('✅ Login: Usuario autenticado, redirigiendo ahora...');
       const from = location.state?.from?.pathname || '/';
       
-      setRedirectHandled(true);
-      
-      // Usar setTimeout para asegurar que el cambio de estado se complete
-      setTimeout(() => {
-        navigate(from, { replace: true });
-      }, 100);
+      console.log('🔄 Login: Navegando a:', from);
+      navigate(from, { replace: true });
     }
-  }, [user, loading, navigate, location.state, redirectHandled]);
+  }, [user, loading, navigate, location.state]);
 
-  // Reset redirect flag when user changes
-  useEffect(() => {
-    if (!user) {
-      setRedirectHandled(false);
-    }
-  }, [user]);
-
-  // Show loading state briefly during redirection
-  if (user && !loading && redirectHandled) {
+  // Don't render anything if user is authenticated (let navigation happen)
+  if (user && !loading) {
+    console.log('🔄 Login: Usuario autenticado, esperando navegación...');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -51,11 +40,7 @@ const Login = () => {
     );
   }
 
-  // Don't render login form if user is already authenticated
-  if (user && !loading) {
-    return null;
-  }
-
+  // Show login form only if user is not authenticated
   return <LoginForm />;
 };
 
