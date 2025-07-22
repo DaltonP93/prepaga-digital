@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,7 +49,7 @@ export const LoginForm = () => {
       resetAttempts();
       toast.success('¡Bienvenido! Has iniciado sesión correctamente.');
       
-      // NO redireccionar manualmente aquí - dejar que Login.tsx maneje la redirección
+      // No manual redirection - let Login.tsx handle it
       
     } catch (error: any) {
       console.error('❌ LoginForm: Error en login:', error);

@@ -9,7 +9,6 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Simple and direct redirection when user is authenticated
   useEffect(() => {
     console.log('🔄 Login: Checking auth state -', { 
       user: !!user, 
@@ -17,19 +16,30 @@ const Login = () => {
       hasUserId: user?.id ? true : false
     });
 
-    // If user is authenticated and not loading, redirect immediately
+    // If user is authenticated, redirect immediately
     if (user && !loading) {
-      console.log('✅ Login: Usuario autenticado, redirigiendo ahora...');
       const from = location.state?.from?.pathname || '/';
+      console.log('✅ Login: Usuario autenticado, navegando a:', from);
       
-      console.log('🔄 Login: Navegando a:', from);
+      // Use replace to avoid back button issues
       navigate(from, { replace: true });
     }
   }, [user, loading, navigate, location.state]);
 
-  // Don't render anything if user is authenticated (let navigation happen)
-  if (user && !loading) {
-    console.log('🔄 Login: Usuario autenticado, esperando navegación...');
+  // Show loading while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+          <p className="text-sm text-muted-foreground">Verificando autenticación...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't show anything if user is authenticated (navigation in progress)
+  if (user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

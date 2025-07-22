@@ -53,11 +53,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw error;
       }
       
-      console.log('✅ AuthProvider: signIn exitoso - autenticación completada');
+      console.log('✅ AuthProvider: signIn exitoso');
       updateActivity();
-      
-      // Solo manejar la autenticación aquí
-      // El perfil se cargará automáticamente en useAuth cuando detecte el cambio de usuario
       
     } catch (error) {
       console.error('❌ AuthProvider: signIn error:', error);
