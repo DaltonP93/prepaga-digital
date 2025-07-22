@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback, useRef } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,7 +30,6 @@ class ProfileCache {
 
   static get(userId: string): Profile | null {
     try {
-      // Try memory cache first
       if (this.cache && Date.now() - this.cache.timestamp < this.TTL) {
         const profile = this.cache.profile;
         if (profile && validateProfileIntegrity(profile)) {
@@ -39,7 +37,6 @@ class ProfileCache {
         }
       }
 
-      // Try localStorage backup
       const stored = localStorage.getItem(`${this.CACHE_KEY}_${userId}`);
       if (stored) {
         const parsed = JSON.parse(stored);
@@ -64,7 +61,6 @@ class ProfileCache {
       const cacheData = { profile, timestamp: Date.now() };
       this.cache = cacheData;
       
-      // Backup to localStorage and ProfileBackupManager
       localStorage.setItem(`${this.CACHE_KEY}_${userId}`, JSON.stringify(cacheData));
       if (profile) {
         ProfileBackupManager.backupProfile(profile);
@@ -87,12 +83,12 @@ class ProfileCache {
   }
 }
 
-// Enhanced Rate limiter with better backoff strategy
+// Rate limiter with better backoff strategy
 class RateLimiter {
   private static lastRequest = 0;
   private static failureCount = 0;
-  private static readonly BASE_DELAY = 1000;
-  private static readonly MAX_DELAY = 10000; // Reduced from 30s
+  private static readonly BASE_DELAY = 500; // Reduced from 1000
+  private static readonly MAX_DELAY = 5000; // Reduced from 10000
   
   static async waitIfNeeded(): Promise<void> {
     const now = Date.now();
@@ -109,9 +105,9 @@ class RateLimiter {
   }
 
   private static calculateDelay(): number {
-    if (this.failureCount === 0) return 200; // Reduced base delay
+    if (this.failureCount === 0) return 100;
     const exponentialDelay = Math.min(this.BASE_DELAY * Math.pow(1.5, this.failureCount - 1), this.MAX_DELAY);
-    const jitter = Math.random() * 500;
+    const jitter = Math.random() * 200;
     return exponentialDelay + jitter;
   }
 
@@ -142,11 +138,7 @@ export const useAuth = (): AuthContextType => {
 
   // Monitor connection status
   useEffect(() => {
-    const handleOnline = () => {
-      setConnectionStatus('connected');
-      console.log('Connection restored');
-    };
-
+    const handleOnline = () => setConnectionStatus('connected');
     const handleOffline = () => {
       setConnectionStatus('disconnected');
       showNetworkError();
@@ -215,12 +207,12 @@ export const useAuth = (): AuthContextType => {
     }
   }, []);
 
-  // Enhanced profile fetching with timeout
+  // Simplified profile fetching with shorter timeout
   const fetchProfile = useCallback(async (userId: string, forceRefresh = false): Promise<Profile | null> => {
     const timeoutPromise = new Promise<Profile | null>((_, reject) => {
       profileTimeoutRef.current = setTimeout(() => {
         reject(new Error('Profile fetch timeout'));
-      }, 10000); // 10 second timeout
+      }, 5000); // Reduced from 10000
     });
 
     const fetchPromise = async (): Promise<Profile | null> => {
@@ -312,7 +304,7 @@ export const useAuth = (): AuthContextType => {
       if (profileTimeoutRef.current) {
         clearTimeout(profileTimeoutRef.current);
       }
-      console.warn('⏰ Profile fetch timed out, continuing without profile');
+      console.warn('⏰ Profile fetch timed out, allowing app to continue');
       return null;
     }
   }, [createProfileFromAuth]);
@@ -324,7 +316,7 @@ export const useAuth = (): AuthContextType => {
     setLastActivity(new Date());
     const freshProfile = await fetchProfile(user.id, false);
     setProfile(freshProfile);
-    setLoadingStage(freshProfile ? 'ready' : 'error');
+    setLoadingStage(freshProfile ? 'ready' : 'ready'); // Changed to always set 'ready'
   }, [user, fetchProfile]);
 
   const forceRefreshProfile = useCallback(async () => {
@@ -335,13 +327,14 @@ export const useAuth = (): AuthContextType => {
     ProfileCache.clear(user.id);
     const freshProfile = await fetchProfile(user.id, true);
     setProfile(freshProfile);
-    setLoadingStage(freshProfile ? 'ready' : 'error');
+    setLoadingStage(freshProfile ? 'ready' : 'ready'); // Changed to always set 'ready'
     
     if (!freshProfile) {
       showProfileError();
     }
   }, [user, fetchProfile, showProfileError]);
 
+  // Simplified user profile loading
   const loadUserProfile = useCallback(async (currentUser: User | null) => {
     if (!currentUser) {
       setProfile(null);
@@ -352,24 +345,23 @@ export const useAuth = (): AuthContextType => {
     }
 
     try {
+      console.log('👤 Loading profile for user:', currentUser.id);
       setLoading(true);
       setLoadingStage('loading_profile');
       setLoadingProgress(5);
       
       const userProfile = await fetchProfile(currentUser.id);
       
-      if (userProfile) {
-        setProfile(userProfile);
-        setLoadingStage('ready');
-      } else {
+      setProfile(userProfile);
+      setLoadingStage('ready'); // Always set to ready, even without profile
+      
+      if (!userProfile) {
         console.warn('⚠️ Could not load profile, but allowing app to continue');
-        setProfile(null);
-        setLoadingStage('ready'); // Changed from 'error' to 'ready'
       }
     } catch (error) {
       console.error('❌ Error loading user profile:', error);
       setProfile(null);
-      setLoadingStage('ready'); // Allow app to continue even without profile
+      setLoadingStage('ready'); // Allow app to continue
     } finally {
       setLoading(false);
       setLoadingProgress(100);
@@ -409,24 +401,31 @@ export const useAuth = (): AuthContextType => {
     }
   }, [user, toast]);
 
-  // Initialize auth state - OPTIMIZED to prevent loops
+  // Initialize auth state - SIMPLIFIED
   useEffect(() => {
     if (isInitializedRef.current) return;
     
     const initializeAuth = async () => {
       try {
+        console.log('🚀 Initializing auth...');
         setLoadingStage('initializing');
         setLoadingProgress(10);
         
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         setLoadingProgress(30);
         
+        console.log('📊 Current session:', { 
+          hasSession: !!currentSession, 
+          hasUser: !!currentSession?.user,
+          userId: currentSession?.user?.id 
+        });
+        
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         setLoadingProgress(50);
         
         if (currentSession?.user) {
-          // Load profile in background, don't block the app
+          // Load profile but don't block the auth initialization
           loadUserProfile(currentSession.user);
         } else {
           setLoading(false);
@@ -435,10 +434,11 @@ export const useAuth = (): AuthContextType => {
         }
         
         isInitializedRef.current = true;
+        console.log('✅ Auth initialization complete');
       } catch (error) {
-        console.error('Error initializing auth:', error);
+        console.error('❌ Error initializing auth:', error);
         setLoading(false);
-        setLoadingStage('ready'); // Changed from 'error' to 'ready'
+        setLoadingStage('ready');
         setLoadingProgress(0);
         isInitializedRef.current = true;
       }
@@ -447,18 +447,21 @@ export const useAuth = (): AuthContextType => {
     initializeAuth();
   }, [loadUserProfile]);
 
-  // Listen for auth changes - OPTIMIZED to prevent duplicate events
+  // Listen for auth changes - OPTIMIZED
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
-        // Evitar procesar eventos duplicados durante la inicialización
         if (event === 'INITIAL_SESSION' && isInitializedRef.current) {
-          return;
+          return; // Skip duplicate initial session event
         }
         
-        console.log('🔄 Auth state changed:', event);
-        setLastActivity(new Date());
+        console.log('🔄 Auth state changed:', event, { 
+          hasSession: !!newSession, 
+          hasUser: !!newSession?.user,
+          userId: newSession?.user?.id 
+        });
         
+        setLastActivity(new Date());
         setSession(newSession);
         setUser(newSession?.user ?? null);
 
@@ -467,10 +470,12 @@ export const useAuth = (): AuthContextType => {
           setLoadingStage('ready');
           ProfileCache.clear();
         } else if (event === 'SIGNED_IN' && newSession?.user) {
+          console.log('✅ User signed in, loading profile in background');
           // Load profile in background after sign in
           loadUserProfile(newSession.user);
         } else if (event === 'TOKEN_REFRESHED' && newSession?.user) {
           if (!profile) {
+            console.log('🔄 Token refreshed, loading profile if missing');
             loadUserProfile(newSession.user);
           }
         }

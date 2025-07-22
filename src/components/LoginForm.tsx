@@ -1,6 +1,4 @@
-
 import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,11 +16,9 @@ export const LoginForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoggingIn, setIsLoggingIn] = useState(false); // Estado independiente
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const { signIn } = useAuthContext();
-  const navigate = useNavigate();
-  const location = useLocation();
   
   const { 
     loginAttempts, 
@@ -32,7 +28,6 @@ export const LoginForm = () => {
     resetAttempts 
   } = useLoginSecurity();
   
-  // Obtener configuración de branding - con fallback si no hay datos
   const { data: branding } = useCompanyBranding();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -46,27 +41,24 @@ export const LoginForm = () => {
     setIsLoggingIn(true);
 
     try {
-      console.log('🔑 Iniciando proceso de login...');
+      console.log('🔑 LoginForm: Iniciando proceso de login...');
       await signIn(email, password);
-      console.log('✅ Login exitoso, redirigiendo...');
+      console.log('✅ LoginForm: Login exitoso');
       
       resetAttempts();
+      toast.success('¡Bienvenido! Has iniciado sesión correctamente.');
       
-      // Redirección inmediata después del login exitoso
-      const from = location.state?.from?.pathname || '/';
-      navigate(from, { replace: true });
+      // NO redireccionar manualmente aquí - dejar que Login.tsx maneje la redirección
       
     } catch (error: any) {
-      console.error('❌ Error en login:', error);
+      console.error('❌ LoginForm: Error en login:', error);
       const result = recordFailedAttempt();
       toast.error(result.message);
     } finally {
-      // Siempre resetear el estado de loading
       setIsLoggingIn(false);
     }
   };
 
-  // Usar valores por defecto si no hay branding
   const backgroundStyle = branding?.login_background_url
     ? { backgroundImage: `url(${branding.login_background_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
     : {};
