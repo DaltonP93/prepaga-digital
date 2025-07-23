@@ -1,5 +1,5 @@
 
-import { Layout } from "@/components/Layout";
+import { SimpleLayout } from "@/components/SimpleLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 
@@ -13,7 +13,7 @@ const SimpleDashboard = () => {
   });
 
   return (
-    <Layout 
+    <SimpleLayout 
       title={`¡Bienvenido, ${profile?.first_name || user?.email || 'Usuario'}!`} 
       description="Dashboard Principal"
     >
@@ -49,7 +49,7 @@ const SimpleDashboard = () => {
           </CardContent>
         </Card>
       </div>
-    </Layout>
+    </SimpleLayout>
   );
 };
 

@@ -4,7 +4,6 @@ import { useSimpleAuth } from '@/hooks/useSimpleAuth';
 import { User } from '@supabase/supabase-js';
 import { Database } from '@/integrations/supabase/types';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 
@@ -20,6 +19,13 @@ const SimpleAuthContext = createContext<SimpleAuthContextType | undefined>(undef
 
 export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const auth = useSimpleAuth();
+  
+  console.log('🔒 SimpleAuthProvider: Estado actual', {
+    user: !!auth.user,
+    profile: !!auth.profile,
+    loading: auth.loading,
+    email: auth.user?.email
+  });
   
   const signIn = async (email: string, password: string) => {
     try {
