@@ -5,14 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useAuthContext } from '@/components/AuthProvider';
+import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { useProfile } from '@/hooks/useProfile';
 import { useProfileCompletion } from '@/hooks/useProfileCompletion';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 export const ProfileForm = () => {
-  const { profile, user } = useAuthContext();
+  const { profile, user } = useSimpleAuthContext();
   const { updateProfile, isUpdating } = useProfile();
   const { isComplete } = useProfileCompletion();
   const navigate = useNavigate();
@@ -43,7 +43,7 @@ export const ProfileForm = () => {
     // If profile was incomplete and now might be complete, redirect to dashboard
     if (wasIncomplete && firstName.trim() && lastName.trim()) {
       setTimeout(() => {
-        navigate('/dashboard');
+        navigate('/');
       }, 1000);
     }
   };
