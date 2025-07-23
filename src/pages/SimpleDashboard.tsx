@@ -1,10 +1,10 @@
 
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuthContext } from "@/components/AuthProvider";
+import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 
 const SimpleDashboard = () => {
-  const { profile, user } = useAuthContext();
+  const { profile, user } = useSimpleAuthContext();
 
   console.log('🏠 SimpleDashboard: Renderizando dashboard simple', { 
     hasUser: !!user,
