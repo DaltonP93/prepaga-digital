@@ -1,5 +1,5 @@
 
-import { Layout } from "@/components/Layout";
+import { SimpleLayout } from "@/components/SimpleLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SystemStatus } from "@/components/SystemStatus";
 import { Badge } from "@/components/ui/badge";
@@ -7,29 +7,29 @@ import { Progress } from "@/components/ui/progress";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Users, Building2, FileText, DollarSign, TrendingUp, TrendingDown, Clock } from "lucide-react";
 import { useDashboardStats } from "@/hooks/useDashboard";
-import { useAuthContext } from "@/components/AuthProvider";
+import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 
 const Index = () => {
-  const { profile } = useAuthContext();
+  const { profile } = useSimpleAuthContext();
   const { data: stats, isLoading, error } = useDashboardStats();
 
   if (isLoading) {
     return (
-      <Layout title="Dashboard" description="Resumen general del sistema">
+      <SimpleLayout title="Dashboard" description="Resumen general del sistema">
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
         </div>
-      </Layout>
+      </SimpleLayout>
     );
   }
 
   if (error) {
     return (
-      <Layout title="Dashboard" description="Resumen general del sistema">
+      <SimpleLayout title="Dashboard" description="Resumen general del sistema">
         <div className="text-center py-8">
           <p className="text-red-500">Error al cargar datos del dashboard</p>
         </div>
-      </Layout>
+      </SimpleLayout>
     );
   }
 
@@ -44,7 +44,7 @@ const Index = () => {
   const isGrowthPositive = (growth: number) => growth > 0;
 
   return (
-    <Layout 
+    <SimpleLayout 
       title={`¡Bienvenido, ${profile?.first_name || 'Usuario'}!`} 
       description="Resumen general del sistema"
     >
@@ -239,7 +239,7 @@ const Index = () => {
           </Card>
         )}
       </div>
-    </Layout>
+    </SimpleLayout>
   );
 };
 

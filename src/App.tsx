@@ -6,7 +6,7 @@ import { SimpleAuthProvider } from '@/components/SimpleAuthProvider';
 import { SimpleProtectedRoute } from '@/components/SimpleProtectedRoute';
 import { Toaster } from '@/components/ui/sonner';
 import SimpleLogin from '@/pages/SimpleLogin';
-import SimpleDashboard from '@/pages/SimpleDashboard';
+import Index from '@/pages/Index';
 import Register from '@/pages/Register';
 import ResetPassword from '@/pages/ResetPassword';
 import Clients from '@/pages/Clients';
@@ -40,7 +40,7 @@ const queryClient = new QueryClient({
 });
 
 function App() {
-  console.log('🚀 App: Iniciando aplicación simplificada');
+  console.log('🚀 App: Iniciando aplicación con dashboard completo');
   
   return (
     <QueryClientProvider client={queryClient}>
@@ -54,10 +54,10 @@ function App() {
             <Route path="/signature/:token" element={<SignatureView />} />
             <Route path="/questionnaire/:token" element={<QuestionnaireView />} />
             
-            {/* Protected routes - usando SimpleDashboard como página principal */}
+            {/* Protected routes - usando Index como página principal */}
             <Route path="/" element={
               <SimpleProtectedRoute>
-                <SimpleDashboard />
+                <Index />
               </SimpleProtectedRoute>
             } />
             <Route path="/clients" element={
