@@ -1,4 +1,5 @@
-import { useAuthContext } from '@/components/AuthProvider';
+
+import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 
 export interface ProfileCompletionStatus {
   isComplete: boolean;
@@ -7,7 +8,7 @@ export interface ProfileCompletionStatus {
 }
 
 export const useProfileCompletion = (): ProfileCompletionStatus => {
-  const { profile } = useAuthContext();
+  const { profile } = useSimpleAuthContext();
 
   // Always return a consistent structure, regardless of profile state
   const requiredFields = [
