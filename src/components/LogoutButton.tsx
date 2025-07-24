@@ -2,13 +2,13 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
-import { useAuthContext } from '@/components/AuthProvider';
+import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { LogoutConfirmDialog } from './LogoutConfirmDialog';
 
 export const LogoutButton = () => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { signOut } = useAuthContext();
+  const { signOut } = useSimpleAuthContext();
 
   const handleLogout = async () => {
     setIsLoading(true);
