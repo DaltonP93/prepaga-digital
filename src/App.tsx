@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
@@ -29,13 +30,13 @@ import SignatureView from '@/pages/SignatureView';
 import SignatureWorkflow from '@/pages/SignatureWorkflow';
 import PaymentSuccess from '@/pages/PaymentSuccess';
 import PaymentCanceled from '@/pages/PaymentCanceled';
+import SaleDetail from "@/pages/SaleDetail";
 
 // Import your authentication provider and protected route component
 import { SimpleAuthProvider } from '@/components/SimpleAuthProvider';
 import { SimpleProtectedRoute } from '@/components/SimpleProtectedRoute';
 
 const queryClient = new QueryClient();
-import SaleDetail from "@/pages/SaleDetail";
 
 function App() {
   return (
@@ -54,8 +55,8 @@ function App() {
             <Route path="/payment-success" element={<PaymentSuccess />} />
             <Route path="/payment-canceled" element={<PaymentCanceled />} />
 
-            {/* Protected routes */}
-            <Route path="/" element={<SimpleProtectedRoute><SimpleDashboard /></SimpleProtectedRoute>} />
+            {/* Protected routes - Changed root route to sales */}
+            <Route path="/" element={<SimpleProtectedRoute><Sales /></SimpleProtectedRoute>} />
             <Route path="/dashboard" element={<SimpleProtectedRoute><Dashboard /></SimpleProtectedRoute>} />
             <Route path="/profile" element={<SimpleProtectedRoute><Profile /></SimpleProtectedRoute>} />
             <Route path="/clients" element={<SimpleProtectedRoute><Clients /></SimpleProtectedRoute>} />

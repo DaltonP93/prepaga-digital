@@ -1,156 +1,212 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
-import { useToast } from "@/hooks/use-toast";
 
-type Template = Tables<"templates"> & {
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Database } from '@/integrations/supabase/types';
+import { useToast } from '@/hooks/use-toast';
+
+type Template = Database['public']['Tables']['templates']['Row'] & {
+  company?: { name: string } | null;
+  creator?: { first_name: string; last_name: string } | null;
   question_count?: number;
 };
-type TemplateInsert = TablesInsert<"templates">;
-type TemplateUpdate = TablesUpdate<"templates">;
+
+type TemplateInsert = Database['public']['Tables']['templates']['Insert'];
+type TemplateUpdate = Database['public']['Tables']['templates']['Update'];
 
 export const useTemplates = () => {
+  const { data: templates, isLoading, error } = useQuery({
+    queryKey: ['templates'],
+    queryFn: async () => {
+      console.log('🔍 Fetching templates...');
+      
+      const { data, error } = await supabase
+        .from('templates')
+        .select(`
+          *,
+          company:company_id(name),
+          creator:created_by(first_name, last_name),
+          template_questions(id)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ Error fetching templates:', error);
+        throw error;
+      }
+
+      console.log('✅ Templates fetched:', data?.length || 0, 'items');
+      
+      // Add question count to each template
+      const templatesWithCount = data?.map(template => ({
+        ...template,
+        question_count: template.template_questions?.length || 0
+      })) || [];
+
+      return templatesWithCount;
+    },
+  });
+
+  return { templates, isLoading, error };
+};
+
+export const useCreateTemplate = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: templates, isLoading } = useQuery({
-    queryKey: ["templates"],
-    queryFn: async () => {
-      console.log("Fetching templates...");
+  return useMutation({
+    mutationFn: async (templateData: TemplateInsert) => {
+      console.log('🔨 Creating template:', templateData);
+      
       const { data, error } = await supabase
-        .from("templates")
-        .select(`
-          *,
-          company:companies(name),
-          creator:profiles!templates_created_by_fkey(first_name, last_name),
-          template_questions(
-            id,
-            is_active
-          )
-        `)
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("Error fetching templates:", error);
-        throw error;
-      }
-
-      // Add question count to each template
-      const templatesWithQuestionCount = data?.map(template => ({
-        ...template,
-        question_count: template.template_questions?.filter(q => q.is_active).length || 0
-      })) || [];
-
-      console.log("Templates fetched:", templatesWithQuestionCount);
-      return templatesWithQuestionCount;
-    },
-  });
-
-  const createTemplateMutation = useMutation({
-    mutationFn: async (template: TemplateInsert) => {
-      console.log("Creating template:", template);
-      const { data, error } = await supabase
-        .from("templates")
-        .insert([template])
+        .from('templates')
+        .insert(templateData)
         .select()
         .single();
 
       if (error) {
-        console.error("Error creating template:", error);
+        console.error('❌ Error creating template:', error);
         throw error;
       }
-
+      
+      console.log('✅ Template created:', data);
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["templates"] });
+      queryClient.invalidateQueries({ queryKey: ['templates'] });
       toast({
         title: "Template creado",
-        description: "El template se ha creado exitosamente.",
+        description: "El template ha sido creado exitosamente.",
       });
     },
-    onError: (error) => {
-      console.error("Error creating template:", error);
+    onError: (error: any) => {
+      console.error('❌ Template creation failed:', error);
       toast({
         title: "Error",
-        description: "No se pudo crear el template.",
+        description: error.message || "No se pudo crear el template.",
         variant: "destructive",
       });
     },
   });
+};
 
-  const updateTemplateMutation = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: TemplateUpdate }) => {
-      console.log("Updating template:", id, updates);
+export const useUpdateTemplate = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: TemplateUpdate & { id: string }) => {
+      console.log('🔄 Updating template:', id, updates);
+      
       const { data, error } = await supabase
-        .from("templates")
+        .from('templates')
         .update(updates)
-        .eq("id", id)
+        .eq('id', id)
         .select()
         .single();
 
       if (error) {
-        console.error("Error updating template:", error);
+        console.error('❌ Error updating template:', error);
         throw error;
       }
-
+      
+      console.log('✅ Template updated:', data);
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["templates"] });
+      queryClient.invalidateQueries({ queryKey: ['templates'] });
       toast({
         title: "Template actualizado",
-        description: "El template se ha actualizado exitosamente.",
+        description: "Los cambios han sido guardados exitosamente.",
       });
     },
-    onError: (error) => {
-      console.error("Error updating template:", error);
+    onError: (error: any) => {
+      console.error('❌ Template update failed:', error);
       toast({
         title: "Error",
-        description: "No se pudo actualizar el template.",
+        description: error.message || "No se pudo actualizar el template.",
         variant: "destructive",
       });
     },
   });
+};
 
-  const deleteTemplateMutation = useMutation({
-    mutationFn: async (id: string) => {
-      console.log("Deleting template:", id);
+export const useDeleteTemplate = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (templateId: string) => {
+      console.log('🗑️ Deleting template:', templateId);
+      
       const { error } = await supabase
-        .from("templates")
+        .from('templates')
         .delete()
-        .eq("id", id);
+        .eq('id', templateId);
 
       if (error) {
-        console.error("Error deleting template:", error);
+        console.error('❌ Error deleting template:', error);
         throw error;
       }
+      
+      console.log('✅ Template deleted');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["templates"] });
+      queryClient.invalidateQueries({ queryKey: ['templates'] });
       toast({
         title: "Template eliminado",
-        description: "El template se ha eliminado exitosamente.",
+        description: "El template ha sido eliminado exitosamente.",
       });
     },
-    onError: (error) => {
-      console.error("Error deleting template:", error);
+    onError: (error: any) => {
+      console.error('❌ Template deletion failed:', error);
       toast({
         title: "Error",
-        description: "No se pudo eliminar el template.",
+        description: error.message || "No se pudo eliminar el template.",
         variant: "destructive",
       });
     },
   });
+};
 
-  return {
-    templates,
-    isLoading,
-    createTemplate: createTemplateMutation.mutate,
-    updateTemplate: updateTemplateMutation.mutate,
-    deleteTemplate: deleteTemplateMutation.mutate,
-    isCreating: createTemplateMutation.isPending,
-    isUpdating: updateTemplateMutation.isPending,
-    isDeleting: deleteTemplateMutation.isPending,
-  };
+// Hook para obtener un template específico con sus preguntas
+export const useTemplate = (templateId?: string) => {
+  return useQuery({
+    queryKey: ['template', templateId],
+    queryFn: async () => {
+      if (!templateId) return null;
+      
+      console.log('🔍 Fetching template:', templateId);
+      
+      const { data, error } = await supabase
+        .from('templates')
+        .select(`
+          *,
+          template_questions(
+            id,
+            question_text,
+            question_type,
+            is_required,
+            order_index,
+            conditional_logic,
+            template_question_options(
+              id,
+              option_text,
+              option_value,
+              order_index
+            )
+          )
+        `)
+        .eq('id', templateId)
+        .single();
+
+      if (error) {
+        console.error('❌ Error fetching template:', error);
+        throw error;
+      }
+
+      console.log('✅ Template fetched:', data);
+      return data;
+    },
+    enabled: !!templateId,
+  });
 };
