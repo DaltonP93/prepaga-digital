@@ -1,4 +1,3 @@
-
 import React from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -10,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Switch } from "@/components/ui/switch";
 import { useCompanies } from "@/hooks/useCompanies";
 import { useCreatePlan, useUpdatePlan } from "@/hooks/usePlans";
-import { useAuthContext } from "@/components/AuthProvider";
+import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 import { Database } from "@/integrations/supabase/types";
 
 type Plan = Database['public']['Tables']['plans']['Row'];
@@ -32,7 +31,7 @@ interface PlanFormData {
 
 export function PlanForm({ open, onOpenChange, plan }: PlanFormProps) {
   const { data: companies = [] } = useCompanies();
-  const { profile } = useAuthContext();
+  const { profile } = useSimpleAuthContext();
   const createPlan = useCreatePlan();
   const updatePlan = useUpdatePlan();
   const isEditing = !!plan;
