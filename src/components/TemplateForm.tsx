@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -32,7 +33,7 @@ import {
 } from "@/components/ui/form";
 import { TipTapEditor } from "@/components/TipTapEditor";
 import { DocumentPreview } from "@/components/DocumentPreview";
-import { useTemplates } from "@/hooks/useTemplates";
+import { useCreateTemplate, useUpdateTemplate } from "@/hooks/useTemplates";
 import { QuestionBuilder } from "@/components/QuestionBuilder";
 import { QuestionnairePreview } from "@/components/QuestionnairePreview";
 import { VisualTemplateEditor } from "@/components/VisualTemplateEditor";
@@ -64,7 +65,8 @@ interface TemplateFormProps {
 
 export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
   const [open, setOpen] = useState(false);
-  const { createTemplate, updateTemplate, isCreating, isUpdating } = useTemplates();
+  const createTemplateMutation = useCreateTemplate();
+  const updateTemplateMutation = useUpdateTemplate();
   const { trackEvent } = useTemplateAnalytics(template?.id);
 
   const form = useForm<TemplateFormData>({
@@ -100,10 +102,10 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
       };
 
       if (template) {
-        updateTemplate({ id: template.id, updates: templateData });
+        updateTemplateMutation.mutate({ id: template.id, ...templateData });
         trackEvent?.('template_updated');
       } else {
-        createTemplate(templateData);
+        createTemplateMutation.mutate(templateData);
       }
       
       setOpen(false);
@@ -241,7 +243,7 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
                     </Button>
                     <Button
                       type="submit"
-                      disabled={isCreating || isUpdating}
+                      disabled={createTemplateMutation.isPending || updateTemplateMutation.isPending}
                     >
                       {template ? "Actualizar" : "Crear"}
                     </Button>

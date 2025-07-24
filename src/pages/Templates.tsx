@@ -1,7 +1,7 @@
 
 import { Layout } from "@/components/Layout";
 import { TemplateForm } from "@/components/TemplateForm";
-import { useTemplates } from "@/hooks/useTemplates";
+import { useTemplates, useDeleteTemplate } from "@/hooks/useTemplates";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -23,7 +23,8 @@ import { Trash2, Globe, Building } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 const Templates = () => {
-  const { templates, isLoading, deleteTemplate } = useTemplates();
+  const { templates, isLoading, error } = useTemplates();
+  const deleteTemplateMutation = useDeleteTemplate();
 
   if (isLoading) {
     return (
@@ -139,7 +140,7 @@ const Templates = () => {
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                 <AlertDialogAction
-                                  onClick={() => deleteTemplate(template.id)}
+                                  onClick={() => deleteTemplateMutation.mutate(template.id)}
                                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                 >
                                   Eliminar
