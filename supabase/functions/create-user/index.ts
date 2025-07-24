@@ -39,14 +39,14 @@ serve(async (req) => {
     console.log('Auth verified, checking permissions...');
 
     // Check if user has permission to create users
-    const { data: profile, error: profileError } = await supabaseAdmin
+    const { data: profile, error: profileCheckError } = await supabaseAdmin
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single()
 
-    if (profileError || !profile) {
-      console.error('Profile error:', profileError);
+    if (profileCheckError || !profile) {
+      console.error('Profile error:', profileCheckError);
       return new Response(JSON.stringify({ error: 'User profile not found' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -104,7 +104,7 @@ serve(async (req) => {
     console.log('Auth user created, creating profile...');
 
     // Create profile directly using insert
-    const { error: profileError } = await supabaseAdmin
+    const { error: profileInsertError } = await supabaseAdmin
       .from('profiles')
       .insert({
         id: authData.user.id,
@@ -116,13 +116,13 @@ serve(async (req) => {
         active: true
       })
 
-    if (profileError) {
-      console.error('Error creating profile:', profileError)
+    if (profileInsertError) {
+      console.error('Error creating profile:', profileInsertError)
       // If profile creation fails, we should delete the auth user
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
       return new Response(JSON.stringify({ 
         error: 'Failed to create user profile', 
-        details: profileError.message 
+        details: profileInsertError.message 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

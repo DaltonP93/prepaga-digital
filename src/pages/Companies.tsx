@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -7,13 +8,13 @@ import { Plus, Search, Building2, Users, FileText, Palette } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useCompanies } from "@/hooks/useCompanies";
-import { useAuthContext } from "@/components/AuthProvider";
+import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 import { CompanyForm } from "@/components/CompanyForm";
 import { CompanyActions } from "@/components/CompanyActions";
 import { CompanyBrandingForm } from "@/components/CompanyBrandingForm";
 
 const Companies = () => {
-  const { profile } = useAuthContext();
+  const { profile } = useSimpleAuthContext();
   const { data: companies, isLoading } = useCompanies();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showBrandingForm, setShowBrandingForm] = useState(false);
