@@ -1,150 +1,82 @@
-
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Toaster } from 'sonner';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { SimpleAuthProvider } from '@/components/SimpleAuthProvider';
-import { SimpleProtectedRoute } from '@/components/SimpleProtectedRoute';
-import { Toaster } from '@/components/ui/sonner';
-import SimpleLogin from '@/pages/SimpleLogin';
-import Index from '@/pages/Index';
-import Register from '@/pages/Register';
-import ResetPassword from '@/pages/ResetPassword';
-import Clients from '@/pages/Clients';
-import Sales from '@/pages/Sales';
-import Documents from '@/pages/Documents';
-import Templates from '@/pages/Templates';
-import SignatureView from '@/pages/SignatureView';
+
+// Import your page components
+import SimpleDashboard from '@/pages/SimpleDashboard';
+import Dashboard from '@/pages/Dashboard';
 import Profile from '@/pages/Profile';
-import Users from '@/pages/Users';
+import Clients from '@/pages/Clients';
 import Plans from '@/pages/Plans';
-import Companies from '@/pages/Companies';
-import QuestionnaireView from '@/pages/QuestionnaireView';
-import AuditDashboard from '@/pages/AuditDashboard';
-import SignatureWorkflow from '@/pages/SignatureWorkflow';
+import Sales from '@/pages/Sales';
+import SaleForm from '@/pages/SaleForm';
+import Templates from '@/pages/Templates';
+import Documents from '@/pages/Documents';
 import Analytics from '@/pages/Analytics';
-import PaymentSuccess from '@/pages/PaymentSuccess';
-import PaymentCanceled from '@/pages/PaymentCanceled';
+import Companies from '@/pages/Companies';
+import Users from '@/pages/Users';
 import Communications from '@/pages/Communications';
 import FileManagement from '@/pages/FileManagement';
 import Experience from '@/pages/Experience';
+import AuditDashboard from '@/pages/AuditDashboard';
+import NotFound from '@/pages/NotFound';
+import SimpleLogin from '@/pages/SimpleLogin';
+import Register from '@/pages/Register';
+import ResetPassword from '@/pages/ResetPassword';
+import QuestionnaireView from '@/pages/QuestionnaireView';
+import SignatureView from '@/pages/SignatureView';
+import SignatureWorkflow from '@/pages/SignatureWorkflow';
+import PaymentSuccess from '@/pages/PaymentSuccess';
+import PaymentCanceled from '@/pages/PaymentCanceled';
 
-// Crear QueryClient simplificado
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-      staleTime: 5 * 60 * 1000,
-    },
-  },
-});
+// Import your authentication provider and protected route component
+import { SimpleAuthProvider } from '@/components/SimpleAuthProvider';
+import { SimpleProtectedRoute } from '@/components/SimpleProtectedRoute';
+
+const queryClient = new QueryClient();
+import SaleDetail from "@/pages/SaleDetail";
 
 function App() {
-  console.log('🚀 App: Iniciando aplicación con dashboard completo');
-  
   return (
-    <QueryClientProvider client={queryClient}>
-      <SimpleAuthProvider>
-        <Router>
+    <BrowserRouter>
+      <Toaster />
+      <QueryClientProvider client={queryClient}>
+        <SimpleAuthProvider>
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<SimpleLogin />} />
             <Route path="/register" element={<Register />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/signature/:token" element={<SignatureView />} />
             <Route path="/questionnaire/:token" element={<QuestionnaireView />} />
-            
-            {/* Protected routes - usando Index como página principal */}
-            <Route path="/" element={
-              <SimpleProtectedRoute>
-                <Index />
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/clients" element={
-              <SimpleProtectedRoute>
-                <Clients />
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/sales" element={
-              <SimpleProtectedRoute>
-                <Sales />
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/documents" element={
-              <SimpleProtectedRoute>
-                <Documents />
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/templates" element={
-              <SimpleProtectedRoute>
-                <Templates />
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/users" element={
-              <SimpleProtectedRoute>
-                <Users />
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/plans" element={
-              <SimpleProtectedRoute>
-                <Plans />
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/companies" element={
-              <SimpleProtectedRoute>
-                <Companies />
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/profile" element={
-              <SimpleProtectedRoute>
-                <Profile />
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/audit" element={
-              <SimpleProtectedRoute>
-                <AuditDashboard />
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/signature-workflow" element={
-              <SimpleProtectedRoute>
-                <SignatureWorkflow />
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/analytics" element={
-              <SimpleProtectedRoute>
-                <Analytics />
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/payment-success" element={
-              <SimpleProtectedRoute>
-                <PaymentSuccess />
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/payment-canceled" element={
-              <SimpleProtectedRoute>
-                <PaymentCanceled />
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/communications" element={
-              <SimpleProtectedRoute>
-                <Communications />
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/file-management" element={
-              <SimpleProtectedRoute>
-                <FileManagement />
-              </SimpleProtectedRoute>
-            } />
-            <Route path="/experience" element={
-              <SimpleProtectedRoute>
-                <Experience />
-              </SimpleProtectedRoute>
-            } />
+            <Route path="/signature/:token" element={<SignatureView />} />
+            <Route path="/signature-workflow/:token" element={<SignatureWorkflow />} />
+            <Route path="/payment-success" element={<PaymentSuccess />} />
+            <Route path="/payment-canceled" element={<PaymentCanceled />} />
+
+            {/* Protected routes */}
+            <Route path="/" element={<SimpleProtectedRoute><SimpleDashboard /></SimpleProtectedRoute>} />
+            <Route path="/dashboard" element={<SimpleProtectedRoute><Dashboard /></SimpleProtectedRoute>} />
+            <Route path="/profile" element={<SimpleProtectedRoute><Profile /></SimpleProtectedRoute>} />
+            <Route path="/clients" element={<SimpleProtectedRoute><Clients /></SimpleProtectedRoute>} />
+            <Route path="/plans" element={<SimpleProtectedRoute><Plans /></SimpleProtectedRoute>} />
+            <Route path="/sales" element={<SimpleProtectedRoute><Sales /></SimpleProtectedRoute>} />
+            <Route path="/sales/new" element={<SimpleProtectedRoute><SaleForm /></SimpleProtectedRoute>} />
+            <Route path="/sales/:id" element={<SimpleProtectedRoute><SaleDetail /></SimpleProtectedRoute>} />
+            <Route path="/templates" element={<SimpleProtectedRoute><Templates /></SimpleProtectedRoute>} />
+            <Route path="/documents" element={<SimpleProtectedRoute><Documents /></SimpleProtectedRoute>} />
+            <Route path="/analytics" element={<SimpleProtectedRoute><Analytics /></SimpleProtectedRoute>} />
+            <Route path="/companies" element={<SimpleProtectedRoute><Companies /></SimpleProtectedRoute>} />
+            <Route path="/users" element={<SimpleProtectedRoute><Users /></SimpleProtectedRoute>} />
+            <Route path="/communications" element={<SimpleProtectedRoute><Communications /></SimpleProtectedRoute>} />
+            <Route path="/file-management" element={<SimpleProtectedRoute><FileManagement /></SimpleProtectedRoute>} />
+            <Route path="/experience" element={<SimpleProtectedRoute><Experience /></SimpleProtectedRoute>} />
+            <Route path="/audit" element={<SimpleProtectedRoute><AuditDashboard /></SimpleProtectedRoute>} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
-          <Toaster />
-        </Router>
-      </SimpleAuthProvider>
-    </QueryClientProvider>
+        </SimpleAuthProvider>
+      </QueryClientProvider>
+    </BrowserRouter>
   );
 }
 

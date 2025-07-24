@@ -1,175 +1,133 @@
 
 import React from 'react';
-import { useDocumentTracking } from '@/hooks/useDocumentTracking';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useSales } from '@/hooks/useSales';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Activity, Eye, CheckCircle, Smartphone, Monitor, Tablet } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { CheckCircle, Clock, AlertCircle, FileText, Send, Eye } from 'lucide-react';
 
 interface DocumentTrackingPanelProps {
   saleId: string;
 }
 
 export const DocumentTrackingPanel: React.FC<DocumentTrackingPanelProps> = ({ saleId }) => {
-  const { trackingRecords, isLoading, stats } = useDocumentTracking(saleId);
+  const { data: sales } = useSales();
+  const sale = sales?.find(s => s.id === saleId);
 
-  if (isLoading) {
+  if (!sale) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center">Cargando estadísticas...</div>
-        </CardContent>
-      </Card>
+      <div className="text-center py-4 text-muted-foreground">
+        No se encontró información de la venta
+      </div>
     );
   }
 
-  const getDeviceIcon = (deviceType?: string) => {
-    switch (deviceType) {
-      case 'mobile':
-        return <Smartphone className="h-4 w-4" />;
-      case 'tablet':
-        return <Tablet className="h-4 w-4" />;
+  const getStatusInfo = (status: string) => {
+    switch (status) {
+      case 'borrador':
+        return {
+          icon: <Clock className="h-4 w-4" />,
+          label: 'Borrador',
+          color: 'bg-gray-100 text-gray-800',
+          description: 'Documento en preparación'
+        };
+      case 'enviado':
+        return {
+          icon: <Send className="h-4 w-4" />,
+          label: 'Enviado',
+          color: 'bg-blue-100 text-blue-800',
+          description: 'Documento enviado al cliente'
+        };
+      case 'firmado':
+        return {
+          icon: <CheckCircle className="h-4 w-4" />,
+          label: 'Firmado',
+          color: 'bg-green-100 text-green-800',
+          description: 'Documento firmado por el cliente'
+        };
+      case 'completado':
+        return {
+          icon: <CheckCircle className="h-4 w-4" />,
+          label: 'Completado',
+          color: 'bg-purple-100 text-purple-800',
+          description: 'Proceso completado exitosamente'
+        };
+      case 'cancelado':
+        return {
+          icon: <AlertCircle className="h-4 w-4" />,
+          label: 'Cancelado',
+          color: 'bg-red-100 text-red-800',
+          description: 'Documento cancelado'
+        };
       default:
-        return <Monitor className="h-4 w-4" />;
+        return {
+          icon: <FileText className="h-4 w-4" />,
+          label: 'Desconocido',
+          color: 'bg-gray-100 text-gray-800',
+          description: 'Estado no definido'
+        };
     }
   };
 
-  const getActionColor = (action: string) => {
-    const colors: Record<string, string> = {
-      'viewed': 'bg-blue-100 text-blue-800',
-      'started': 'bg-yellow-100 text-yellow-800',
-      'progress': 'bg-orange-100 text-orange-800',
-      'completed': 'bg-green-100 text-green-800',
-      'signed': 'bg-purple-100 text-purple-800',
-    };
-    return colors[action] || 'bg-gray-100 text-gray-800';
-  };
-
-  const getActionLabel = (action: string) => {
-    const labels: Record<string, string> = {
-      'viewed': 'Visualizado',
-      'started': 'Iniciado',
-      'progress': 'En Progreso',
-      'completed': 'Completado',
-      'signed': 'Firmado',
-    };
-    return labels[action] || action;
-  };
+  const statusInfo = getStatusInfo(sale.status || 'borrador');
 
   return (
-    <div className="space-y-6">
-      {/* Estadísticas generales */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Vistas</p>
-                  <p className="text-2xl font-bold">{stats.totalViews}</p>
-                </div>
-                <Eye className="h-8 w-8 text-blue-500" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Completados</p>
-                  <p className="text-2xl font-bold">{stats.totalCompleted}</p>
-                </div>
-                <CheckCircle className="h-8 w-8 text-green-500" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Firmados</p>
-                  <p className="text-2xl font-bold">{stats.totalSigned}</p>
-                </div>
-                <CheckCircle className="h-8 w-8 text-purple-500" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Progreso Promedio</p>
-                  <p className="text-2xl font-bold">{Math.round(stats.averageProgress)}%</p>
-                </div>
-                <div className="h-8 w-8">
-                  <Progress value={stats.averageProgress} className="h-2" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Historial de actividad */}
+    <div className="space-y-4">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5" />
-            Historial de Actividad
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {trackingRecords && trackingRecords.length > 0 ? (
-            <div className="space-y-4 max-h-96 overflow-y-auto">
-              {trackingRecords.map((record) => (
-                <div key={record.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    {getDeviceIcon(record.device_type)}
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Badge className={getActionColor(record.action)}>
-                          {getActionLabel(record.action)}
-                        </Badge>
-                        <span className="text-sm font-medium">{record.document_type}</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {new Date(record.access_time).toLocaleString()}
-                      </div>
-                      {record.progress_percentage > 0 && (
-                        <div className="mt-1">
-                          <Progress value={record.progress_percentage} className="h-1 w-24" />
-                          <span className="text-xs text-muted-foreground">
-                            {record.progress_percentage}% completado
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="text-right text-xs text-muted-foreground">
-                    {record.device_os && (
-                      <div>{record.device_os}</div>
-                    )}
-                    {record.browser && (
-                      <div>{record.browser}</div>
-                    )}
-                    {record.ip_address && (
-                      <div>IP: {record.ip_address}</div>
-                    )}
-                  </div>
-                </div>
-              ))}
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex-shrink-0">
+              {statusInfo.icon}
             </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              No hay actividad registrada
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <Badge className={statusInfo.color}>
+                  {statusInfo.label}
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {statusInfo.description}
+              </p>
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">Fecha de creación:</span>
+          <span>{new Date(sale.created_at || '').toLocaleDateString()}</span>
+        </div>
+        
+        {sale.sale_date && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Fecha de venta:</span>
+            <span>{new Date(sale.sale_date).toLocaleDateString()}</span>
+          </div>
+        )}
+
+        {sale.signature_expires_at && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Vence el:</span>
+            <span>{new Date(sale.signature_expires_at).toLocaleDateString()}</span>
+          </div>
+        )}
+
+        {sale.template_id && (
+          <div className="flex items-center gap-2 text-sm">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            <span className="text-muted-foreground">Tiene cuestionario asociado</span>
+          </div>
+        )}
+
+        {sale.signature_token && (
+          <div className="flex items-center gap-2 text-sm">
+            <Eye className="h-4 w-4 text-muted-foreground" />
+            <span className="text-muted-foreground">Token de firma generado</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
+
+export default DocumentTrackingPanel;

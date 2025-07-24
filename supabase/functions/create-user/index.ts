@@ -39,14 +39,14 @@ serve(async (req) => {
     console.log('Auth verified, checking permissions...');
 
     // Check if user has permission to create users
-    const { data: profile, error: profileCheckError } = await supabaseAdmin
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single()
 
-    if (profileCheckError || !profile) {
-      console.error('Profile error:', profileCheckError);
+    if (profileError || !profile) {
+      console.error('Profile error:', profileError);
       return new Response(JSON.stringify({ error: 'User profile not found' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
