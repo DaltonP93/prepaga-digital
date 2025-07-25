@@ -43,6 +43,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose 
   const [content, setContent] = useState('');
   const [questions, setQuestions] = useState<any[]>([]);
   const [dynamicFields, setDynamicFields] = useState<any[]>([]);
+  const [customFields, setCustomFields] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('general');
   const [selectedType, setSelectedType] = useState<'contract' | 'declaration' | 'questionnaire' | 'other'>('questionnaire');
   const [requiresSignature, setRequiresSignature] = useState(false);
@@ -72,18 +73,18 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose 
         name: template.name || '',
         description: template.description || '',
         template_type: (template.template_type as 'contract' | 'declaration' | 'questionnaire' | 'other') || 'questionnaire',
-        category: template.category || '',
+        category: (template as any).category || '',
         content: (template.content as string) || '',
         active: template.active !== false,
-        requires_signature: template.requires_signature || false,
-        has_questions: template.has_questions || false,
+        requires_signature: (template as any).requires_signature || false,
+        has_questions: (template as any).has_questions || false,
         dynamic_fields: Array.isArray(template.dynamic_fields) ? template.dynamic_fields : []
       });
       
       setContent((template.content as string) || '');
       setDynamicFields(Array.isArray(template.dynamic_fields) ? template.dynamic_fields : []);
-      setRequiresSignature(template.requires_signature || false);
-      setHasQuestions(template.has_questions || false);
+      setRequiresSignature((template as any).requires_signature || false);
+      setHasQuestions((template as any).has_questions || false);
     }
   }, [template, reset]);
 
@@ -143,6 +144,15 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose 
   const handleRemoveVariable = (index: number) => {
     const newFields = dynamicFields.filter((_, i) => i !== index);
     setDynamicFields(newFields);
+  };
+
+  const handleCustomFieldAdd = (field: any) => {
+    setCustomFields([...customFields, field]);
+  };
+
+  const handleCustomFieldRemove = (index: number) => {
+    const newFields = customFields.filter((_, i) => i !== index);
+    setCustomFields(newFields);
   };
 
   const handleQuestionsChange = (newQuestions: any[]) => {
@@ -270,8 +280,9 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose 
                   <div className="mt-2 border rounded-lg">
                     <TipTapEditor
                       content={content}
-                      onUpdate={(newContent) => handleContentChange(newContent)}
-                      placeholder="Escriba el contenido de su template aquí..."
+                      onContentChange={handleContentChange}
+                      dynamicFields={dynamicFields}
+                      onDynamicFieldsChange={setDynamicFields}
                     />
                   </div>
                 </div>
@@ -279,7 +290,12 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose 
                 <div>
                   <Label>Variables Dinámicas</Label>
                   <div className="mt-2">
-                    <TemplateVariableSelector onVariableSelect={handleAddVariable} />
+                    <TemplateVariableSelector
+                      onVariableSelect={handleAddVariable}
+                      customFields={customFields}
+                      onCustomFieldAdd={handleCustomFieldAdd}
+                      onCustomFieldRemove={handleCustomFieldRemove}
+                    />
                   </div>
                   
                   {dynamicFields.length > 0 && (
@@ -309,13 +325,14 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose 
               <TabsContent value="questions" className="space-y-4">
                 <QuestionBuilder
                   templateId={templateId}
-                  templateType={selectedType}
                 />
               </TabsContent>
 
               <TabsContent value="preview" className="space-y-4">
                 <DocumentPreview
                   content={content}
+                  dynamicFields={dynamicFields}
+                  templateType={selectedType}
                 />
               </TabsContent>
             </Tabs>
