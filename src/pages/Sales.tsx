@@ -7,14 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Search, Eye, Users, FileText, MessageSquare, CheckSquare, TrendingUp } from 'lucide-react';
+import { Plus, Search, Eye, Edit, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { BeneficiariesManager } from '@/components/BeneficiariesManager';
 import { SaleDocuments } from '@/components/SaleDocuments';
 import { SaleNotes } from '@/components/SaleNotes';
 import { SaleRequirements } from '@/components/SaleRequirements';
 import { DocumentTrackingPanel } from '@/components/DocumentTrackingPanel';
-import { useGenerateQuestionnaireLink, useGenerateSignatureLink } from '@/hooks/useSales';
+import { useGenerateSignatureLink } from '@/hooks/useSales';
 
 export default function Sales() {
   const [search, setSearch] = useState('');
@@ -23,7 +23,6 @@ export default function Sales() {
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
   const { data: sales, isLoading } = useSales();
-  const generateQuestionnaireLink = useGenerateQuestionnaireLink();
   const generateSignatureLink = useGenerateSignatureLink();
 
   const getStatusInfo = (status: string) => {
@@ -92,14 +91,6 @@ export default function Sales() {
   const closeModal = () => {
     setActiveModal(null);
     setSelectedSale(null);
-  };
-
-  const handleGenerateQuestionnaireLink = async (saleId: string) => {
-    try {
-      await generateQuestionnaireLink.mutateAsync(saleId);
-    } catch (error) {
-      console.error('Error generating questionnaire link:', error);
-    }
   };
 
   const handleGenerateSignatureLink = async (saleId: string) => {
@@ -174,7 +165,7 @@ export default function Sales() {
           </CardContent>
         </Card>
 
-        {/* Lista de ventas mejorada */}
+        {/* Lista de ventas reorganizada */}
         <div className="grid gap-4">
           {filteredSales && filteredSales.length > 0 ? (
             filteredSales.map((sale) => {
@@ -222,7 +213,23 @@ export default function Sales() {
                             </div>
                           </div>
 
+                          {/* Botones principales reorganizados */}
                           <div className="flex items-center gap-2">
+                            <Link to={`/sales/${sale.id}/edit`}>
+                              <Button size="sm" variant="outline" className="flex items-center gap-1">
+                                <Edit className="h-4 w-4" />
+                                Editar
+                              </Button>
+                            </Link>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openModal('tracking', sale.id)}
+                              className="flex items-center gap-1"
+                            >
+                              <TrendingUp className="h-4 w-4" />
+                              Tracking
+                            </Button>
                             <Link to={`/sales/${sale.id}`}>
                               <Button size="sm" className="flex items-center gap-1">
                                 <Eye className="h-4 w-4" />
@@ -230,80 +237,6 @@ export default function Sales() {
                               </Button>
                             </Link>
                           </div>
-                        </div>
-
-                        {/* Botones de gestión en fila */}
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openModal('beneficiaries', sale.id)}
-                            className="flex items-center gap-1"
-                          >
-                            <Users className="h-4 w-4" />
-                            Beneficiarios
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openModal('documents', sale.id)}
-                            className="flex items-center gap-1"
-                          >
-                            <FileText className="h-4 w-4" />
-                            Digitalizaciones
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openModal('notes', sale.id)}
-                            className="flex items-center gap-1"
-                          >
-                            <MessageSquare className="h-4 w-4" />
-                            Novedades
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openModal('requirements', sale.id)}
-                            className="flex items-center gap-1"
-                          >
-                            <CheckSquare className="h-4 w-4" />
-                            Requisitos
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openModal('tracking', sale.id)}
-                            className="flex items-center gap-1"
-                          >
-                            <TrendingUp className="h-4 w-4" />
-                            Tracking
-                          </Button>
-
-                          {/* Botones de firma digital */}
-                          {sale.template_id && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => handleGenerateQuestionnaireLink(sale.id)}
-                              disabled={generateQuestionnaireLink.isPending}
-                              className="flex items-center gap-1"
-                            >
-                              <FileText className="h-4 w-4" />
-                              {generateQuestionnaireLink.isPending ? 'Generando...' : 'Enviar Cuestionario'}
-                            </Button>
-                          )}
-                          
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => handleGenerateSignatureLink(sale.id)}
-                            disabled={generateSignatureLink.isPending}
-                            className="flex items-center gap-1"
-                          >
-                            <FileText className="h-4 w-4" />
-                            {generateSignatureLink.isPending ? 'Generando...' : 'Enviar Firma'}
-                          </Button>
                         </div>
                       </div>
                     </div>

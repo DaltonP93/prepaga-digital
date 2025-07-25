@@ -22,7 +22,7 @@ interface SaleFormData {
   company_id: string;
   total_amount: number;
   notes?: string;
-  status: 'borrador' | 'completado' | 'enviado' | 'firmado' | 'cancelado';
+  // Remove status field from form - it should be set automatically
 }
 
 const SaleForm = () => {
@@ -47,8 +47,7 @@ const SaleForm = () => {
       plan_id: '',
       company_id: '',
       total_amount: 0,
-      notes: '',
-      status: 'borrador'
+      notes: ''
     }
   });
 
@@ -70,8 +69,7 @@ const SaleForm = () => {
           plan_id: sale.plan_id || '',
           company_id: sale.company_id || '',
           total_amount: sale.total_amount || 0,
-          notes: sale.notes || '',
-          status: sale.status as 'borrador' | 'completado' | 'enviado' | 'firmado' | 'cancelado' || 'borrador'
+          notes: sale.notes || ''
         });
       }
     }
@@ -85,7 +83,11 @@ const SaleForm = () => {
         await updateSale.mutateAsync({ id, ...data });
         toast.success('Venta actualizada exitosamente');
       } else {
-        await createSale.mutateAsync(data);
+        // For new sales, always start with "borrador" status
+        await createSale.mutateAsync({
+          ...data,
+          status: 'borrador'
+        });
         toast.success('Venta creada exitosamente');
       }
       
@@ -244,26 +246,6 @@ const SaleForm = () => {
                 {errors.total_amount && (
                   <p className="text-sm text-red-500">{errors.total_amount.message}</p>
                 )}
-              </div>
-
-              {/* Status */}
-              <div className="space-y-2">
-                <Label htmlFor="status">Estado</Label>
-                <Select
-                  value={watch('status')}
-                  onValueChange={(value) => setValue('status', value as any)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar estado" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="borrador">Borrador</SelectItem>
-                    <SelectItem value="enviado">Enviado</SelectItem>
-                    <SelectItem value="firmado">Firmado</SelectItem>
-                    <SelectItem value="completado">Completado</SelectItem>
-                    <SelectItem value="cancelado">Cancelado</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
 
               {/* Notes */}
