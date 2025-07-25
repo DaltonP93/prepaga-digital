@@ -2,29 +2,53 @@
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { LoginForm } from '@/components/LoginForm';
-import { useAuthContext } from '@/components/AuthProvider';
+import { supabase } from '@/integrations/supabase/client';
+import { useState } from 'react';
+import { User } from '@supabase/supabase-js';
 
 const Login = () => {
-  const { user, loading } = useAuthContext();
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    console.log('🔄 Login: Checking auth state -', { 
-      user: !!user, 
-      loading,
-      hasUserId: user?.id ? true : false
-    });
+    // Check initial session
+    const checkSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user || null);
+        
+        if (session?.user) {
+          const from = location.state?.from?.pathname || '/';
+          console.log('✅ Login: Usuario autenticado, navegando a:', from);
+          navigate(from, { replace: true });
+        }
+      } catch (error) {
+        console.error('Error checking session:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    // If user is authenticated, redirect immediately
-    if (user && !loading) {
-      const from = location.state?.from?.pathname || '/';
-      console.log('✅ Login: Usuario autenticado, navegando a:', from);
-      
-      // Use replace to avoid back button issues
-      navigate(from, { replace: true });
-    }
-  }, [user, loading, navigate, location.state]);
+    checkSession();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('🔄 Auth state changed:', event);
+        setUser(session?.user || null);
+        
+        if (event === 'SIGNED_IN' && session?.user) {
+          const from = location.state?.from?.pathname || '/';
+          console.log('✅ Login: Usuario autenticado, navegando a:', from);
+          navigate(from, { replace: true });
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, [navigate, location.state]);
 
   // Show loading while checking auth
   if (loading) {

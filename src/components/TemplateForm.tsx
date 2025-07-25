@@ -10,7 +10,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { TipTapEditor } from "@/components/TipTapEditor";
 import { TemplateVariableSelector } from "@/components/TemplateVariableSelector";
@@ -32,7 +31,6 @@ interface TemplateFormProps {
 interface TemplateFormData {
   name: string;
   description: string;
-  type: string;
   content: string;
   active: boolean;
   is_global: boolean;
@@ -49,9 +47,8 @@ export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps
     defaultValues: {
       name: template?.name || "",
       description: template?.description || "",
-      type: template?.type || "contract",
       content: template?.content as string || "",
-      active: (template as any)?.active ?? true,
+      active: template?.active ?? true,
       is_global: template?.is_global ?? false,
     }
   });
@@ -63,18 +60,12 @@ export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps
       const templateData = {
         ...data,
         dynamic_fields: dynamicFields,
-        // Cast template properties that might not exist in the type
-        category: (template as any)?.category || 'general',
-        requires_signature: (template as any)?.requires_signature ?? false,
-        has_questions: (template as any)?.has_questions ?? false,
       };
 
       if (isEditing && template) {
         await updateTemplate.mutateAsync({
           id: template.id,
           ...templateData,
-          requires_signature: (template as any)?.requires_signature ?? false,
-          has_questions: (template as any)?.has_questions ?? false,
         });
       } else {
         await createTemplate.mutateAsync(templateData);
@@ -147,32 +138,15 @@ export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps
                     <CardTitle>Información Básica</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Nombre del Template</Label>
-                        <Input
-                          id="name"
-                          {...register("name", { required: "El nombre es requerido" })}
-                        />
-                        {errors.name && (
-                          <span className="text-sm text-red-500">{errors.name.message}</span>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Tipo de Template</Label>
-                        <Select value={watch("type")} onValueChange={(value) => setValue("type", value)}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="contract">Contrato</SelectItem>
-                            <SelectItem value="declaration">Declaración</SelectItem>
-                            <SelectItem value="questionnaire">Cuestionario</SelectItem>
-                            <SelectItem value="other">Otro</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Nombre del Template</Label>
+                      <Input
+                        id="name"
+                        {...register("name", { required: "El nombre es requerido" })}
+                      />
+                      {errors.name && (
+                        <span className="text-sm text-red-500">{errors.name.message}</span>
+                      )}
                     </div>
 
                     <div className="space-y-2">
@@ -224,7 +198,6 @@ export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps
                         <TipTapEditor
                           content={watch("content")}
                           onContentChange={handleContentChange}
-                          placeholder="Escribe el contenido del template aquí..."
                           dynamicFields={dynamicFields}
                           onDynamicFieldsChange={handleDynamicFieldsChange}
                         />
@@ -293,7 +266,7 @@ export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps
                     <DocumentPreview
                       content={watch("content")}
                       dynamicFields={dynamicFields}
-                      templateType={watch("type") as "contract" | "declaration" | "questionnaire" | "other"}
+                      templateType="contract"
                     />
                   </CardContent>
                 </Card>

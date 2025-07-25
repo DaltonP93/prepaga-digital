@@ -19,10 +19,10 @@ interface QuestionCopyDialogProps {
 
 interface TemplateQuestion {
   id: string;
-  question: string;
-  type: string;
-  options: any;
-  required: boolean;
+  question_text: string;
+  question_type: string;
+  conditional_logic: any;
+  is_required: boolean;
   order_index: number;
   template_id: string;
 }
@@ -98,10 +98,10 @@ export function QuestionCopyDialog({ open, onOpenChange, targetTemplateId }: Que
       // Preparar las preguntas para insertar
       const questionsToInsert = questionsData.map((question, index) => ({
         template_id: targetTemplateId,
-        question: question.question,
-        type: question.type,
-        options: question.options,
-        required: question.required,
+        question_text: question.question_text,
+        question_type: question.question_type,
+        conditional_logic: question.conditional_logic,
+        is_required: question.is_required,
         order_index: nextOrderIndex + index,
       }));
 
@@ -217,13 +217,13 @@ export function QuestionCopyDialog({ open, onOpenChange, targetTemplateId }: Que
                             htmlFor={question.id} 
                             className="text-sm font-medium cursor-pointer"
                           >
-                            {question.question}
+                            {question.question_text}
                           </Label>
                           <div className="flex items-center gap-2 mt-1">
                             <span className="text-xs bg-secondary px-2 py-1 rounded">
-                              {question.type}
+                              {question.question_type}
                             </span>
-                            {question.required && (
+                            {question.is_required && (
                               <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
                                 Requerida
                               </span>
