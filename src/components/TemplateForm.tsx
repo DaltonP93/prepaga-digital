@@ -71,17 +71,17 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose 
       reset({
         name: template.name || '',
         description: template.description || '',
-        template_type: template.template_type || 'questionnaire',
+        template_type: (template.template_type as 'contract' | 'declaration' | 'questionnaire' | 'other') || 'questionnaire',
         category: template.category || '',
-        content: template.content || '',
+        content: (template.content as string) || '',
         active: template.active !== false,
         requires_signature: template.requires_signature || false,
         has_questions: template.has_questions || false,
-        dynamic_fields: template.dynamic_fields || []
+        dynamic_fields: Array.isArray(template.dynamic_fields) ? template.dynamic_fields : []
       });
       
-      setContent(template.content || '');
-      setDynamicFields(template.dynamic_fields || []);
+      setContent((template.content as string) || '');
+      setDynamicFields(Array.isArray(template.dynamic_fields) ? template.dynamic_fields : []);
       setRequiresSignature(template.requires_signature || false);
       setHasQuestions(template.has_questions || false);
     }
@@ -270,7 +270,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose 
                   <div className="mt-2 border rounded-lg">
                     <TipTapEditor
                       content={content}
-                      onChange={handleContentChange}
+                      onUpdate={(newContent) => handleContentChange(newContent)}
                       placeholder="Escriba el contenido de su template aquí..."
                     />
                   </div>
@@ -279,7 +279,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose 
                 <div>
                   <Label>Variables Dinámicas</Label>
                   <div className="mt-2">
-                    <TemplateVariableSelector onSelect={handleAddVariable} />
+                    <TemplateVariableSelector onVariableSelect={handleAddVariable} />
                   </div>
                   
                   {dynamicFields.length > 0 && (
@@ -309,7 +309,6 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose 
               <TabsContent value="questions" className="space-y-4">
                 <QuestionBuilder
                   templateId={templateId}
-                  onQuestionsChange={handleQuestionsChange}
                   templateType={selectedType}
                 />
               </TabsContent>
@@ -317,11 +316,6 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose 
               <TabsContent value="preview" className="space-y-4">
                 <DocumentPreview
                   content={content}
-                  templateData={{
-                    name: watchedName,
-                    type: selectedType,
-                    category: watchedCategory,
-                  }}
                 />
               </TabsContent>
             </Tabs>

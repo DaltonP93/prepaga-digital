@@ -22,7 +22,7 @@ interface SaleFormData {
   company_id: string;
   total_amount: number;
   notes?: string;
-  status: 'borrador' | 'pendiente' | 'completado';
+  status: 'borrador' | 'completado' | 'enviado' | 'firmado' | 'cancelado';
 }
 
 const SaleForm = () => {
@@ -71,7 +71,7 @@ const SaleForm = () => {
           company_id: sale.company_id || '',
           total_amount: sale.total_amount || 0,
           notes: sale.notes || '',
-          status: sale.status || 'borrador'
+          status: sale.status as 'borrador' | 'completado' | 'enviado' | 'firmado' | 'cancelado' || 'borrador'
         });
       }
     }
@@ -258,8 +258,10 @@ const SaleForm = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="borrador">Borrador</SelectItem>
-                    <SelectItem value="pendiente">Pendiente</SelectItem>
+                    <SelectItem value="enviado">Enviado</SelectItem>
+                    <SelectItem value="firmado">Firmado</SelectItem>
                     <SelectItem value="completado">Completado</SelectItem>
+                    <SelectItem value="cancelado">Cancelado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
