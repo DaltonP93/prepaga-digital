@@ -27,22 +27,22 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 const Templates = () => {
   const { templates, isLoading, error } = useTemplates();
   const deleteTemplateMutation = useDeleteTemplate();
-  const [selectedTemplate, setSelectedTemplate] = useState<string | undefined>();
+  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   const handleCreateTemplate = () => {
-    setSelectedTemplate(undefined);
+    setSelectedTemplate(null);
     setIsFormOpen(true);
   };
 
-  const handleEditTemplate = (templateId: string) => {
-    setSelectedTemplate(templateId);
+  const handleEditTemplate = (template: any) => {
+    setSelectedTemplate(template);
     setIsFormOpen(true);
   };
 
   const handleCloseForm = () => {
     setIsFormOpen(false);
-    setSelectedTemplate(undefined);
+    setSelectedTemplate(null);
   };
 
   if (isLoading) {
@@ -148,7 +148,7 @@ const Templates = () => {
                           <Button 
                             variant="ghost" 
                             size="sm"
-                            onClick={() => handleEditTemplate(template.id)}
+                            onClick={() => handleEditTemplate(template)}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -186,14 +186,11 @@ const Templates = () => {
           </CardContent>
         </Card>
 
-        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-          <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
-            <TemplateForm
-              templateId={selectedTemplate}
-              onClose={handleCloseForm}
-            />
-          </DialogContent>
-        </Dialog>
+        <TemplateForm
+          open={isFormOpen}
+          onOpenChange={setIsFormOpen}
+          template={selectedTemplate}
+        />
       </div>
     </Layout>
   );
