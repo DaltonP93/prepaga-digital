@@ -1,35 +1,28 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription,
 } from "@/components/ui/form";
 import { TipTapEditor } from "@/components/TipTapEditor";
 import { DocumentPreview } from "@/components/DocumentPreview";
@@ -37,34 +30,31 @@ import { useCreateTemplate, useUpdateTemplate } from "@/hooks/useTemplates";
 import { QuestionBuilder } from "@/components/QuestionBuilder";
 import { QuestionnairePreview } from "@/components/QuestionnairePreview";
 import { VisualTemplateEditor } from "@/components/VisualTemplateEditor";
-import { Plus, Edit } from "lucide-react";
-import { Tables } from "@/integrations/supabase/types";
-import { WorkflowManager } from "@/components/WorkflowManager";
-import { CollaborationPanel } from "@/components/CollaborationPanel";
-import { VersionControlPanel } from "@/components/VersionControlPanel";
-import { AnalyticsDashboard } from "@/components/AnalyticsDashboard";
 import { useTemplateAnalytics } from "@/hooks/useTemplateAnalytics";
 
 const templateSchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
   description: z.string().optional(),
-  content: z.string().optional(),
-  template_type: z.enum(["contract", "declaration", "questionnaire", "other"]).default("questionnaire"),
-  static_content: z.string().optional(),
-  dynamic_fields: z.array(z.any()).default([]),
-  is_global: z.boolean().default(false),
+  category: z.string().min(1, "La categoría es requerida"),
+  type: z.enum(["documento", "declaracion_jurada", "contrato"], {
+    required_error: "El tipo es requerido",
+  }),
+  content: z.string().min(1, "El contenido es requerido"),
+  active: z.boolean().default(true),
+  requires_signature: z.boolean().default(false),
+  has_questions: z.boolean().default(false),
 });
 
 type TemplateFormData = z.infer<typeof templateSchema>;
-type Template = Tables<"templates">;
 
 interface TemplateFormProps {
-  template?: Template;
+  template?: any;
   trigger?: React.ReactNode;
 }
 
 export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
   const [open, setOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("general");
   const createTemplateMutation = useCreateTemplate();
   const updateTemplateMutation = useUpdateTemplate();
   const { trackEvent } = useTemplateAnalytics(template?.id);
@@ -74,31 +64,36 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
     defaultValues: {
       name: template?.name || "",
       description: template?.description || "",
-      content: template?.content ? JSON.stringify(template.content, null, 2) : "",
-      template_type: (template?.template_type as any) || "questionnaire",
-      static_content: template?.static_content || "",
-      dynamic_fields: Array.isArray(template?.dynamic_fields) ? template.dynamic_fields : [],
-      is_global: template?.is_global || false,
+      category: template?.category || "",
+      type: template?.type || "documento",
+      content: template?.content || "",
+      active: template?.active ?? true,
+      requires_signature: template?.requires_signature ?? false,
+      has_questions: template?.has_questions ?? false,
     },
   });
 
-  const onSubmit = (data: TemplateFormData) => {
+  // Watch for type changes to automatically enable questions
+  const watchedType = form.watch("type");
+
+  useEffect(() => {
+    // Automatically enable questions and switch to questions tab when type is declaracion_jurada or contrato
+    if (watchedType === "declaracion_jurada" || watchedType === "contrato") {
+      form.setValue("has_questions", true);
+      form.setValue("requires_signature", true);
+      setActiveTab("questions");
+    } else {
+      form.setValue("has_questions", false);
+      form.setValue("requires_signature", false);
+    }
+  }, [watchedType, form]);
+
+  const onSubmit = async (data: TemplateFormData) => {
     try {
-      let contentData = {};
-      
-      // Si es questionnaire y hay content, parsearlo como JSON
-      if (data.template_type === "questionnaire" && data.content) {
-        contentData = JSON.parse(data.content);
-      }
-      
       const templateData = {
-        name: data.name,
-        description: data.description,
-        template_type: data.template_type,
-        content: contentData,
-        static_content: data.static_content,
-        dynamic_fields: data.dynamic_fields,
-        is_global: data.is_global,
+        ...data,
+        content: data.content,
+        dynamic_fields: [],
       };
 
       if (template) {
@@ -111,74 +106,61 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
       setOpen(false);
       form.reset();
     } catch (error) {
-      form.setError("content", {
-        type: "manual",
-        message: "El contenido JSON no es válido",
-      });
+      console.error('Error saving template:', error);
     }
   };
 
-  const defaultTrigger = template ? (
-    <Button variant="ghost" size="sm">
-      <Edit className="h-4 w-4" />
-    </Button>
-  ) : (
-    <Button>
-      <Plus className="h-4 w-4 mr-2" />
-      Nuevo Template
-    </Button>
-  );
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        {trigger || defaultTrigger}
+        {trigger || (
+          <Button>
+            {template ? "Editar Template" : "Nuevo Template"}
+          </Button>
+        )}
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {template ? "Editar Template" : "Crear Nuevo Template"}
           </DialogTitle>
         </DialogHeader>
-        
-        <Form {...form}>
-          <Tabs defaultValue="info" className="h-full">
-            <TabsList className="grid w-full grid-cols-7">
-              <TabsTrigger value="info">Info</TabsTrigger>
-              <TabsTrigger value="editor">Editor</TabsTrigger>
-              <TabsTrigger value="questions" disabled={!template}>Preguntas</TabsTrigger>
-              <TabsTrigger value="workflow" disabled={!template}>Workflow</TabsTrigger>
-              <TabsTrigger value="collaboration" disabled={!template}>Colaboración</TabsTrigger>
-              <TabsTrigger value="versions" disabled={!template}>Versiones</TabsTrigger>
-              <TabsTrigger value="analytics" disabled={!template}>Analytics</TabsTrigger>
-              <TabsTrigger value="preview">Preview</TabsTrigger>
-            </TabsList>
 
-            <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
-              <TabsContent value="info" className="space-y-4 mt-4">
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <Tabs value={activeTab} onValueChange={handleTabChange}>
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="general">General</TabsTrigger>
+                <TabsTrigger value="editor">Editor</TabsTrigger>
+                <TabsTrigger 
+                  value="questions" 
+                  disabled={!form.watch("has_questions")}
+                  className={form.watch("has_questions") ? "" : "opacity-50"}
+                >
+                  Preguntas
+                  {form.watch("has_questions") && (
+                    <Badge variant="secondary" className="ml-2">
+                      Habilitado
+                    </Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="preview">Vista Previa</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="general" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Nombre</FormLabel>
+                        <FormLabel>Nombre del Template</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="Nombre del template" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                   <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Descripción</FormLabel>
-                        <FormControl>
-                          <Textarea {...field} placeholder="Descripción del template" />
+                          <Input {...field} placeholder="Ej: Contrato de Servicios" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -187,40 +169,90 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
 
                   <FormField
                     control={form.control}
-                    name="template_type"
+                    name="category"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Tipo de Template</FormLabel>
+                        <FormLabel>Categoría</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Selecciona el tipo de template" />
+                              <SelectValue placeholder="Selecciona una categoría" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="contract">Contrato</SelectItem>
-                            <SelectItem value="declaration">Declaración Jurada</SelectItem>
-                            <SelectItem value="questionnaire">Cuestionario</SelectItem>
-                            <SelectItem value="other">Otro</SelectItem>
+                            <SelectItem value="legal">Legal</SelectItem>
+                            <SelectItem value="comercial">Comercial</SelectItem>
+                            <SelectItem value="administrativo">Administrativo</SelectItem>
+                            <SelectItem value="financiero">Financiero</SelectItem>
                           </SelectContent>
                         </Select>
-                        <FormDescription>
-                          Define el tipo de documento que representa este template
-                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                </div>
 
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Descripción</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} placeholder="Describe el propósito del template" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <FormLabel>Tipo de Template</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          className="flex flex-col space-y-2"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="documento" id="documento" />
+                            <Label htmlFor="documento">Documento Simple</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="declaracion_jurada" id="declaracion_jurada" />
+                            <Label htmlFor="declaracion_jurada">Declaración Jurada</Label>
+                            <Badge variant="outline" className="ml-2">
+                              Auto-habilita preguntas
+                            </Badge>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="contrato" id="contrato" />
+                            <Label htmlFor="contrato">Contrato</Label>
+                            <Badge variant="outline" className="ml-2">
+                              Auto-habilita preguntas
+                            </Badge>
+                          </div>
+                        </RadioGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="flex items-center space-x-4">
                   <FormField
                     control={form.control}
-                    name="is_global"
+                    name="active"
                     render={({ field }) => (
                       <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                         <div className="space-y-0.5">
-                          <FormLabel className="text-base">Template Global</FormLabel>
+                          <FormLabel className="text-base">Activo</FormLabel>
                           <FormDescription>
-                            Los templates globales están disponibles para todas las empresas
+                            El template estará disponible para uso
                           </FormDescription>
                         </div>
                         <FormControl>
@@ -232,100 +264,87 @@ export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
                       </FormItem>
                     )}
                   />
-
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setOpen(false)}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button
-                      type="submit"
-                      disabled={createTemplateMutation.isPending || updateTemplateMutation.isPending}
-                    >
-                      {template ? "Actualizar" : "Crear"}
-                    </Button>
-                  </div>
-                </form>
+                </div>
               </TabsContent>
 
-              <TabsContent value="editor" className="mt-4 h-full">
-                {form.watch("template_type") === "questionnaire" ? (
+              <TabsContent value="editor">
+                <FormField
+                  control={form.control}
+                  name="content"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contenido del Template</FormLabel>
+                      <FormControl>
+                        <div className="min-h-[400px]">
+                          <TipTapEditor
+                            content={field.value}
+                            onChange={field.onChange}
+                            placeholder="Escribe el contenido del template aquí..."
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </TabsContent>
+
+              <TabsContent value="questions">
+                {form.watch("has_questions") ? (
                   <div className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="content"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Contenido del Cuestionario (JSON)</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              {...field} 
-                              placeholder='{"title": "Mi Cuestionario", "questions": [...]}'
-                              rows={15}
-                              className="font-mono text-sm"
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Define la estructura del cuestionario en formato JSON
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                ) : (
-                  <TipTapEditor
-                    content={form.watch("static_content") || ""}
-                    onContentChange={(content) => form.setValue("static_content", content)}
-                    dynamicFields={form.watch("dynamic_fields") || []}
-                    onDynamicFieldsChange={(fields) => form.setValue("dynamic_fields", fields)}
-                  />
-                )}
-              </TabsContent>
-
-              <TabsContent value="questions" className="mt-4">
-                {template && <QuestionBuilder templateId={template.id} />}
-              </TabsContent>
-
-              <TabsContent value="workflow" className="mt-4">
-                {template && <WorkflowManager templateId={template.id} />}
-              </TabsContent>
-
-              <TabsContent value="collaboration" className="mt-4">
-                {template && <CollaborationPanel templateId={template.id} />}
-              </TabsContent>
-
-              <TabsContent value="versions" className="mt-4">
-                {template && <VersionControlPanel templateId={template.id} />}
-              </TabsContent>
-
-              <TabsContent value="analytics" className="mt-4">
-                {template && <AnalyticsDashboard templateId={template.id} />}
-              </TabsContent>
-
-              <TabsContent value="preview" className="mt-4">
-                {form.watch("template_type") === "questionnaire" ? (
-                  template && <QuestionnairePreview templateId={template.id} />
-                ) : (
-                  <div className="space-y-4">
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <p className="text-sm text-blue-800 font-medium">Vista Previa en Tiempo Real</p>
-                      <p className="text-xs text-blue-600 mt-1">Esta vista se actualiza automáticamente mientras editas</p>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-medium">Configuración de Preguntas</h3>
+                      <Badge variant="default">
+                        Habilitado automáticamente para {form.watch("type").replace("_", " ")}
+                      </Badge>
                     </div>
-                    <DocumentPreview
-                      content={form.watch("static_content") || ""}
-                      dynamicFields={form.watch("dynamic_fields") || []}
-                      templateType={form.watch("template_type") || "document"}
-                      templateName={form.watch("name") || "documento"}
-                    />
+                    <QuestionBuilder templateId={template?.id} />
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">
+                      Las preguntas se habilitan automáticamente cuando seleccionas "Declaración Jurada" o "Contrato"
+                    </p>
                   </div>
                 )}
               </TabsContent>
+
+              <TabsContent value="preview">
+                <div className="space-y-4">
+                  <DocumentPreview 
+                    content={form.watch("content")} 
+                    templateData={{ 
+                      name: form.watch("name"),
+                      type: form.watch("type"),
+                      category: form.watch("category")
+                    }} 
+                  />
+                  {form.watch("has_questions") && (
+                    <div className="mt-6">
+                      <h3 className="text-lg font-medium mb-4">Vista Previa del Cuestionario</h3>
+                      <QuestionnairePreview templateId={template?.id} />
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
+
+            <div className="flex justify-end space-x-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={createTemplateMutation.isPending || updateTemplateMutation.isPending}
+              >
+                {template ? "Actualizar" : "Crear"}
+              </Button>
             </div>
-          </Tabs>
+          </form>
         </Form>
       </DialogContent>
     </Dialog>

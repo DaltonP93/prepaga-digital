@@ -51,12 +51,11 @@ function App() {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/questionnaire/:token" element={<QuestionnaireView />} />
             <Route path="/signature/:token" element={<SignatureView />} />
-            <Route path="/signature-workflow/:token" element={<SignatureWorkflow />} />
             <Route path="/payment-success" element={<PaymentSuccess />} />
             <Route path="/payment-canceled" element={<PaymentCanceled />} />
 
-            {/* Protected routes - Changed root route to sales */}
-            <Route path="/" element={<SimpleProtectedRoute><Sales /></SimpleProtectedRoute>} />
+            {/* Protected routes - Changed back to dashboard as root */}
+            <Route path="/" element={<SimpleProtectedRoute><Dashboard /></SimpleProtectedRoute>} />
             <Route path="/dashboard" element={<SimpleProtectedRoute><Dashboard /></SimpleProtectedRoute>} />
             <Route path="/profile" element={<SimpleProtectedRoute><Profile /></SimpleProtectedRoute>} />
             <Route path="/clients" element={<SimpleProtectedRoute><Clients /></SimpleProtectedRoute>} />
@@ -64,6 +63,7 @@ function App() {
             <Route path="/sales" element={<SimpleProtectedRoute><Sales /></SimpleProtectedRoute>} />
             <Route path="/sales/new" element={<SimpleProtectedRoute><SaleForm /></SimpleProtectedRoute>} />
             <Route path="/sales/:id" element={<SimpleProtectedRoute><SaleDetail /></SimpleProtectedRoute>} />
+            <Route path="/signature-workflow" element={<SimpleProtectedRoute><SignatureWorkflow /></SimpleProtectedRoute>} />
             <Route path="/templates" element={<SimpleProtectedRoute><Templates /></SimpleProtectedRoute>} />
             <Route path="/documents" element={<SimpleProtectedRoute><Documents /></SimpleProtectedRoute>} />
             <Route path="/analytics" element={<SimpleProtectedRoute><Analytics /></SimpleProtectedRoute>} />
