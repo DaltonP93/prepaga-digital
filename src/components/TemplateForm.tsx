@@ -1,353 +1,330 @@
 
-import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Switch } from '@/components/ui/switch';
-import { toast } from 'sonner';
-import { TipTapEditor } from '@/components/TipTapEditor';
-import { DocumentPreview } from '@/components/DocumentPreview';
-import { useTemplates, useCreateTemplate, useUpdateTemplate, useTemplate } from '@/hooks/useTemplates';
-import { QuestionBuilder } from '@/components/QuestionBuilder';
-import { TemplateVariableSelector } from '@/components/TemplateVariableSelector';
-import { Badge } from '@/components/ui/badge';
-import { Trash2 } from 'lucide-react';
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { TipTapEditor } from "@/components/TipTapEditor";
+import { TemplateVariableSelector } from "@/components/TemplateVariableSelector";
+import { QuestionBuilder } from "@/components/QuestionBuilder";
+import { DocumentPreview } from "@/components/DocumentPreview";
+import { QuestionCopyDialog } from "@/components/QuestionCopyDialog";
+import { FileText, Settings, Eye, HelpCircle, Copy } from "lucide-react";
+import { useCreateTemplate, useUpdateTemplate } from "@/hooks/useTemplates";
+import { Database } from "@/integrations/supabase/types";
+
+type Template = Database['public']['Tables']['templates']['Row'];
+
+interface TemplateFormProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  template?: Template | null;
+}
 
 interface TemplateFormData {
   name: string;
   description: string;
-  template_type: 'contract' | 'declaration' | 'questionnaire' | 'other';
-  category: string;
+  type: string;
   content: string;
   active: boolean;
-  requires_signature: boolean;
-  has_questions: boolean;
-  dynamic_fields: any[];
+  is_global: boolean;
 }
 
-interface TemplateFormProps {
-  templateId?: string;
-  onClose: () => void;
-}
-
-export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose }) => {
+export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps) {
   const createTemplate = useCreateTemplate();
   const updateTemplate = useUpdateTemplate();
-  const { data: template } = useTemplate(templateId);
-  const [content, setContent] = useState('');
-  const [questions, setQuestions] = useState<any[]>([]);
-  const [dynamicFields, setDynamicFields] = useState<any[]>([]);
+  const isEditing = !!template;
+  const [showCopyDialog, setShowCopyDialog] = useState(false);
   const [customFields, setCustomFields] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState('general');
-  const [selectedType, setSelectedType] = useState<'contract' | 'declaration' | 'questionnaire' | 'other'>('questionnaire');
-  const [requiresSignature, setRequiresSignature] = useState(false);
-  const [hasQuestions, setHasQuestions] = useState(false);
 
-  const { register, handleSubmit, formState: { errors }, setValue, watch, reset } = useForm<TemplateFormData>({
+  const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<TemplateFormData>({
     defaultValues: {
-      name: '',
-      description: '',
-      template_type: 'questionnaire',
-      category: '',
-      content: '',
-      active: true,
-      requires_signature: false,
-      has_questions: false,
-      dynamic_fields: []
+      name: template?.name || "",
+      description: template?.description || "",
+      type: template?.type || "contract",
+      content: template?.content as string || "",
+      active: (template as any)?.active ?? true,
+      is_global: template?.is_global ?? false,
     }
   });
 
-  const watchedType = watch('template_type');
-  const watchedName = watch('name');
-  const watchedCategory = watch('category');
-
-  useEffect(() => {
-    if (template) {
-      reset({
-        name: template.name || '',
-        description: template.description || '',
-        template_type: (template.template_type as 'contract' | 'declaration' | 'questionnaire' | 'other') || 'questionnaire',
-        category: (template as any).category || '',
-        content: (template.content as string) || '',
-        active: template.active !== false,
-        requires_signature: (template as any).requires_signature || false,
-        has_questions: (template as any).has_questions || false,
-        dynamic_fields: Array.isArray(template.dynamic_fields) ? template.dynamic_fields : []
-      });
-      
-      setContent((template.content as string) || '');
-      setDynamicFields(Array.isArray(template.dynamic_fields) ? template.dynamic_fields : []);
-      setRequiresSignature((template as any).requires_signature || false);
-      setHasQuestions((template as any).has_questions || false);
-    }
-  }, [template, reset]);
-
-  // Auto-enable options when type changes
-  useEffect(() => {
-    if (watchedType === 'declaration' || watchedType === 'contract') {
-      setRequiresSignature(true);
-      setHasQuestions(true);
-      setValue('requires_signature', true);
-      setValue('has_questions', true);
-      
-      // Switch to questions tab
-      setActiveTab('questions');
-    }
-    setSelectedType(watchedType);
-  }, [watchedType, setValue]);
+  const [dynamicFields, setDynamicFields] = useState<any[]>([]);
 
   const onSubmit = async (data: TemplateFormData) => {
     try {
       const templateData = {
-        name: data.name,
-        description: data.description,
-        template_type: data.template_type,
-        category: data.category,
-        content,
-        active: data.active,
-        requires_signature: requiresSignature,
-        has_questions: hasQuestions,
+        ...data,
         dynamic_fields: dynamicFields,
+        // Cast template properties that might not exist in the type
+        category: (template as any)?.category || 'general',
+        requires_signature: (template as any)?.requires_signature ?? false,
+        has_questions: (template as any)?.has_questions ?? false,
       };
 
-      if (templateId) {
+      if (isEditing && template) {
         await updateTemplate.mutateAsync({
-          id: templateId,
-          ...templateData
+          id: template.id,
+          ...templateData,
+          requires_signature: (template as any)?.requires_signature ?? false,
+          has_questions: (template as any)?.has_questions ?? false,
         });
       } else {
         await createTemplate.mutateAsync(templateData);
       }
       
-      onClose();
+      onOpenChange(false);
+      reset();
     } catch (error) {
-      console.error('Error saving template:', error);
-      toast.error('Error al guardar el template');
+      console.error("Error saving template:", error);
     }
   };
 
   const handleContentChange = (newContent: string) => {
-    setContent(newContent);
-    setValue('content', newContent);
+    setValue("content", newContent);
   };
 
-  const handleAddVariable = (variable: any) => {
-    setDynamicFields([...dynamicFields, variable]);
+  const handleDynamicFieldsChange = (fields: any[]) => {
+    setDynamicFields(fields);
   };
 
-  const handleRemoveVariable = (index: number) => {
-    const newFields = dynamicFields.filter((_, i) => i !== index);
-    setDynamicFields(newFields);
+  const handleVariableSelect = (variable: any) => {
+    const currentContent = watch("content");
+    const newContent = currentContent + `{{${variable.key}}}`;
+    setValue("content", newContent);
   };
 
   const handleCustomFieldAdd = (field: any) => {
-    setCustomFields([...customFields, field]);
+    setCustomFields(prev => [...prev, field]);
   };
 
   const handleCustomFieldRemove = (index: number) => {
-    const newFields = customFields.filter((_, i) => i !== index);
-    setCustomFields(newFields);
-  };
-
-  const handleQuestionsChange = (newQuestions: any[]) => {
-    setQuestions(newQuestions);
+    setCustomFields(prev => prev.filter((_, i) => i !== index));
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>{templateId ? 'Editar Template' : 'Crear Nuevo Template'}</CardTitle>
-          <CardDescription>
-            Configure los detalles del template y su contenido
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              {isEditing ? "Editar Template" : "Nuevo Template"}
+            </DialogTitle>
+          </DialogHeader>
+
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <Tabs defaultValue="basic" className="w-full">
               <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="general">General</TabsTrigger>
-                <TabsTrigger value="content">Contenido</TabsTrigger>
-                <TabsTrigger value="questions">Preguntas</TabsTrigger>
-                <TabsTrigger value="preview">Vista Previa</TabsTrigger>
+                <TabsTrigger value="basic" className="flex items-center gap-2">
+                  <Settings className="h-4 w-4" />
+                  Configuración
+                </TabsTrigger>
+                <TabsTrigger value="content" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Contenido
+                </TabsTrigger>
+                <TabsTrigger value="questions" className="flex items-center gap-2">
+                  <HelpCircle className="h-4 w-4" />
+                  Preguntas
+                </TabsTrigger>
+                <TabsTrigger value="preview" className="flex items-center gap-2">
+                  <Eye className="h-4 w-4" />
+                  Vista Previa
+                </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="general" className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="name">Nombre del Template</Label>
-                    <Input
-                      id="name"
-                      {...register('name', { required: 'El nombre es requerido' })}
-                      placeholder="Ingrese el nombre del template"
-                    />
-                    {errors.name && (
-                      <p className="text-sm text-red-500 mt-1">{errors.name.message}</p>
-                    )}
-                  </div>
+              <TabsContent value="basic" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Información Básica</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Nombre del Template</Label>
+                        <Input
+                          id="name"
+                          {...register("name", { required: "El nombre es requerido" })}
+                        />
+                        {errors.name && (
+                          <span className="text-sm text-red-500">{errors.name.message}</span>
+                        )}
+                      </div>
 
-                  <div>
-                    <Label htmlFor="category">Categoría</Label>
-                    <Input
-                      id="category"
-                      {...register('category')}
-                      placeholder="Ej: Contratos, Documentos legales"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="description">Descripción</Label>
-                  <Textarea
-                    id="description"
-                    {...register('description')}
-                    placeholder="Describe el propósito y uso del template"
-                    rows={3}
-                  />
-                </div>
-
-                <div>
-                  <Label>Tipo de Template</Label>
-                  <RadioGroup
-                    value={watchedType}
-                    onValueChange={(value) => setValue('template_type', value as any)}
-                    className="mt-2"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="questionnaire" id="questionnaire" />
-                      <Label htmlFor="questionnaire">Cuestionario</Label>
+                      <div className="space-y-2">
+                        <Label>Tipo de Template</Label>
+                        <Select value={watch("type")} onValueChange={(value) => setValue("type", value)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="contract">Contrato</SelectItem>
+                            <SelectItem value="declaration">Declaración</SelectItem>
+                            <SelectItem value="questionnaire">Cuestionario</SelectItem>
+                            <SelectItem value="other">Otro</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="declaration" id="declaration" />
-                      <Label htmlFor="declaration">Declaración Jurada</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="contract" id="contract" />
-                      <Label htmlFor="contract">Contrato</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="other" id="other" />
-                      <Label htmlFor="other">Otro</Label>
-                    </div>
-                  </RadioGroup>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="active"
-                      checked={watch('active')}
-                      onCheckedChange={(checked) => setValue('active', checked)}
-                    />
-                    <Label htmlFor="active">Activo</Label>
-                  </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Descripción</Label>
+                      <Textarea
+                        id="description"
+                        {...register("description")}
+                        placeholder="Describe el propósito de este template..."
+                      />
+                    </div>
 
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="requires_signature"
-                      checked={requiresSignature}
-                      onCheckedChange={(checked) => {
-                        setRequiresSignature(checked);
-                        setValue('requires_signature', checked);
-                      }}
-                    />
-                    <Label htmlFor="requires_signature">Requiere Firma</Label>
-                  </div>
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label className="text-base">Template Activo</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Los templates inactivos no aparecerán en las listas de selección
+                        </p>
+                      </div>
+                      <Switch
+                        checked={watch("active")}
+                        onCheckedChange={(checked) => setValue("active", checked)}
+                      />
+                    </div>
 
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="has_questions"
-                      checked={hasQuestions}
-                      onCheckedChange={(checked) => {
-                        setHasQuestions(checked);
-                        setValue('has_questions', checked);
-                      }}
-                    />
-                    <Label htmlFor="has_questions">Tiene Preguntas</Label>
-                  </div>
-                </div>
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label className="text-base">Template Global</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Los templates globales están disponibles para todas las empresas
+                        </p>
+                      </div>
+                      <Switch
+                        checked={watch("is_global")}
+                        onCheckedChange={(checked) => setValue("is_global", checked)}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               <TabsContent value="content" className="space-y-4">
-                <div>
-                  <Label>Contenido del Template</Label>
-                  <div className="mt-2 border rounded-lg">
-                    <TipTapEditor
-                      content={content}
-                      onContentChange={handleContentChange}
-                      dynamicFields={dynamicFields}
-                      onDynamicFieldsChange={setDynamicFields}
-                    />
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  <div className="lg:col-span-2">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Editor de Contenido</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <TipTapEditor
+                          content={watch("content")}
+                          onContentChange={handleContentChange}
+                          placeholder="Escribe el contenido del template aquí..."
+                          dynamicFields={dynamicFields}
+                          onDynamicFieldsChange={handleDynamicFieldsChange}
+                        />
+                      </CardContent>
+                    </Card>
                   </div>
-                </div>
 
-                <div>
-                  <Label>Variables Dinámicas</Label>
-                  <div className="mt-2">
-                    <TemplateVariableSelector
-                      onVariableSelect={handleAddVariable}
-                      customFields={customFields}
-                      onCustomFieldAdd={handleCustomFieldAdd}
-                      onCustomFieldRemove={handleCustomFieldRemove}
-                    />
+                  <div className="space-y-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Variables Disponibles</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <TemplateVariableSelector
+                          onVariableSelect={handleVariableSelect}
+                          customFields={customFields}
+                          onCustomFieldAdd={handleCustomFieldAdd}
+                          onCustomFieldRemove={handleCustomFieldRemove}
+                        />
+                      </CardContent>
+                    </Card>
                   </div>
-                  
-                  {dynamicFields.length > 0 && (
-                    <div className="mt-4 space-y-2">
-                      <Label>Variables Agregadas:</Label>
-                      <div className="flex flex-wrap gap-2">
-                        {dynamicFields.map((field, index) => (
-                          <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                            {field.name}
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveVariable(index)}
-                              className="h-auto p-0 ml-1"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               </TabsContent>
 
               <TabsContent value="questions" className="space-y-4">
-                <QuestionBuilder
-                  templateId={templateId}
-                />
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Preguntas del Template</CardTitle>
+                      {isEditing && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setShowCopyDialog(true)}
+                          className="flex items-center gap-2"
+                        >
+                          <Copy className="h-4 w-4" />
+                          Copiar Preguntas
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {isEditing ? (
+                      <QuestionBuilder
+                        templateId={template.id}
+                      />
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-muted-foreground">
+                          Guarda el template primero para poder agregar preguntas
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               <TabsContent value="preview" className="space-y-4">
-                <DocumentPreview
-                  content={content}
-                  dynamicFields={dynamicFields}
-                  templateType={selectedType}
-                />
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Vista Previa del Template</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <DocumentPreview
+                      content={watch("content")}
+                      dynamicFields={dynamicFields}
+                      templateType={watch("type") as "contract" | "declaration" | "questionnaire" | "other"}
+                    />
+                  </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
 
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button type="button" variant="outline" onClick={onClose}>
+            <Separator />
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={createTemplate.isPending || updateTemplate.isPending}>
-                {createTemplate.isPending || updateTemplate.isPending ? 'Guardando...' : (templateId ? 'Actualizar' : 'Crear')} Template
+              <Button 
+                type="submit" 
+                disabled={createTemplate.isPending || updateTemplate.isPending}
+              >
+                {(createTemplate.isPending || updateTemplate.isPending) ? "Guardando..." : "Guardar"}
               </Button>
-            </div>
+            </DialogFooter>
           </form>
-        </CardContent>
-      </Card>
-    </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para copiar preguntas */}
+      {isEditing && (
+        <QuestionCopyDialog
+          open={showCopyDialog}
+          onOpenChange={setShowCopyDialog}
+          targetTemplateId={template.id}
+        />
+      )}
+    </>
   );
-};
+}
