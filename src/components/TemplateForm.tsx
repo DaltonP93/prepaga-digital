@@ -13,7 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { TipTapEditor } from '@/components/TipTapEditor';
 import { DocumentPreview } from '@/components/DocumentPreview';
-import { useTemplates } from '@/hooks/useTemplates';
+import { useTemplates, useCreateTemplate, useUpdateTemplate, useTemplate } from '@/hooks/useTemplates';
 import { QuestionBuilder } from '@/components/QuestionBuilder';
 import { TemplateVariableSelector } from '@/components/TemplateVariableSelector';
 import { Badge } from '@/components/ui/badge';
@@ -22,7 +22,7 @@ import { Trash2 } from 'lucide-react';
 interface TemplateFormData {
   name: string;
   description: string;
-  type: 'documento' | 'declaracion_jurada' | 'contrato';
+  template_type: 'contract' | 'declaration' | 'questionnaire' | 'other';
   category: string;
   content: string;
   active: boolean;
@@ -37,12 +37,14 @@ interface TemplateFormProps {
 }
 
 export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose }) => {
-  const { createTemplate, updateTemplate, getTemplate } = useTemplates();
+  const createTemplate = useCreateTemplate();
+  const updateTemplate = useUpdateTemplate();
+  const { data: template } = useTemplate(templateId);
   const [content, setContent] = useState('');
   const [questions, setQuestions] = useState<any[]>([]);
   const [dynamicFields, setDynamicFields] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('general');
-  const [selectedType, setSelectedType] = useState<'documento' | 'declaracion_jurada' | 'contrato'>('documento');
+  const [selectedType, setSelectedType] = useState<'contract' | 'declaration' | 'questionnaire' | 'other'>('questionnaire');
   const [requiresSignature, setRequiresSignature] = useState(false);
   const [hasQuestions, setHasQuestions] = useState(false);
 
@@ -50,7 +52,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose 
     defaultValues: {
       name: '',
       description: '',
-      type: 'documento',
+      template_type: 'questionnaire',
       category: '',
       content: '',
       active: true,
@@ -60,19 +62,34 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose 
     }
   });
 
-  const watchedType = watch('type');
+  const watchedType = watch('template_type');
   const watchedName = watch('name');
   const watchedCategory = watch('category');
 
   useEffect(() => {
-    if (templateId) {
-      loadTemplate();
+    if (template) {
+      reset({
+        name: template.name || '',
+        description: template.description || '',
+        template_type: template.template_type || 'questionnaire',
+        category: template.category || '',
+        content: template.content || '',
+        active: template.active !== false,
+        requires_signature: template.requires_signature || false,
+        has_questions: template.has_questions || false,
+        dynamic_fields: template.dynamic_fields || []
+      });
+      
+      setContent(template.content || '');
+      setDynamicFields(template.dynamic_fields || []);
+      setRequiresSignature(template.requires_signature || false);
+      setHasQuestions(template.has_questions || false);
     }
-  }, [templateId]);
+  }, [template, reset]);
 
   // Auto-enable options when type changes
   useEffect(() => {
-    if (watchedType === 'declaracion_jurada' || watchedType === 'contrato') {
+    if (watchedType === 'declaration' || watchedType === 'contract') {
       setRequiresSignature(true);
       setHasQuestions(true);
       setValue('requires_signature', true);
@@ -84,52 +101,27 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose 
     setSelectedType(watchedType);
   }, [watchedType, setValue]);
 
-  const loadTemplate = async () => {
-    if (!templateId) return;
-    
-    try {
-      const template = await getTemplate(templateId);
-      if (template) {
-        reset({
-          name: template.name || '',
-          description: template.description || '',
-          type: template.type || 'documento',
-          category: template.category || '',
-          content: template.content || '',
-          active: template.active !== false,
-          requires_signature: template.requires_signature || false,
-          has_questions: template.has_questions || false,
-          dynamic_fields: template.dynamic_fields || []
-        });
-        
-        setContent(template.content || '');
-        setDynamicFields(template.dynamic_fields || []);
-        setRequiresSignature(template.requires_signature || false);
-        setHasQuestions(template.has_questions || false);
-      }
-    } catch (error) {
-      console.error('Error loading template:', error);
-      toast.error('Error al cargar el template');
-    }
-  };
-
   const onSubmit = async (data: TemplateFormData) => {
     try {
       const templateData = {
-        ...data,
-        name: data.name || '',
+        name: data.name,
+        description: data.description,
+        template_type: data.template_type,
+        category: data.category,
         content,
-        dynamic_fields: dynamicFields,
+        active: data.active,
         requires_signature: requiresSignature,
-        has_questions: hasQuestions
+        has_questions: hasQuestions,
+        dynamic_fields: dynamicFields,
       };
 
       if (templateId) {
-        await updateTemplate(templateId, templateData);
-        toast.success('Template actualizado exitosamente');
+        await updateTemplate.mutateAsync({
+          id: templateId,
+          ...templateData
+        });
       } else {
-        await createTemplate(templateData);
-        toast.success('Template creado exitosamente');
+        await createTemplate.mutateAsync(templateData);
       }
       
       onClose();
@@ -214,20 +206,24 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose 
                   <Label>Tipo de Template</Label>
                   <RadioGroup
                     value={watchedType}
-                    onValueChange={(value) => setValue('type', value as any)}
+                    onValueChange={(value) => setValue('template_type', value as any)}
                     className="mt-2"
                   >
                     <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="documento" id="documento" />
-                      <Label htmlFor="documento">Documento</Label>
+                      <RadioGroupItem value="questionnaire" id="questionnaire" />
+                      <Label htmlFor="questionnaire">Cuestionario</Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="declaracion_jurada" id="declaracion_jurada" />
-                      <Label htmlFor="declaracion_jurada">Declaración Jurada</Label>
+                      <RadioGroupItem value="declaration" id="declaration" />
+                      <Label htmlFor="declaration">Declaración Jurada</Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="contrato" id="contrato" />
-                      <Label htmlFor="contrato">Contrato</Label>
+                      <RadioGroupItem value="contract" id="contract" />
+                      <Label htmlFor="contract">Contrato</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="other" id="other" />
+                      <Label htmlFor="other">Otro</Label>
                     </div>
                   </RadioGroup>
                 </div>
@@ -274,7 +270,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose 
                   <div className="mt-2 border rounded-lg">
                     <TipTapEditor
                       content={content}
-                      onUpdate={handleContentChange}
+                      onChange={handleContentChange}
                       placeholder="Escriba el contenido de su template aquí..."
                     />
                   </div>
@@ -283,7 +279,7 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose 
                 <div>
                   <Label>Variables Dinámicas</Label>
                   <div className="mt-2">
-                    <TemplateVariableSelector onAddVariable={handleAddVariable} />
+                    <TemplateVariableSelector onSelect={handleAddVariable} />
                   </div>
                   
                   {dynamicFields.length > 0 && (
@@ -312,8 +308,8 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose 
 
               <TabsContent value="questions" className="space-y-4">
                 <QuestionBuilder
-                  questions={questions}
-                  onChange={handleQuestionsChange}
+                  templateId={templateId}
+                  onQuestionsChange={handleQuestionsChange}
                   templateType={selectedType}
                 />
               </TabsContent>
@@ -321,7 +317,11 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose 
               <TabsContent value="preview" className="space-y-4">
                 <DocumentPreview
                   content={content}
-                  variables={dynamicFields}
+                  templateData={{
+                    name: watchedName,
+                    type: selectedType,
+                    category: watchedCategory,
+                  }}
                 />
               </TabsContent>
             </Tabs>
@@ -330,8 +330,8 @@ export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose 
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancelar
               </Button>
-              <Button type="submit">
-                {templateId ? 'Actualizar' : 'Crear'} Template
+              <Button type="submit" disabled={createTemplate.isPending || updateTemplate.isPending}>
+                {createTemplate.isPending || updateTemplate.isPending ? 'Guardando...' : (templateId ? 'Actualizar' : 'Crear')} Template
               </Button>
             </div>
           </form>

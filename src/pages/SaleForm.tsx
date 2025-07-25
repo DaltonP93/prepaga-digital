@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { useSales } from '@/hooks/useSales';
+import { useCreateSale, useUpdateSale, useSales } from '@/hooks/useSales';
 import { useClients } from '@/hooks/useClients';
 import { usePlans } from '@/hooks/usePlans';
 import { useCompanies } from '@/hooks/useCompanies';
@@ -30,7 +30,9 @@ const SaleForm = () => {
   const { id } = useParams<{ id: string }>();
   const isEditing = Boolean(id);
 
-  const { createSale, updateSale, getSale } = useSales();
+  const createSale = useCreateSale();
+  const updateSale = useUpdateSale();
+  const { data: sales } = useSales();
   const { data: clients, isLoading: clientsLoading } = useClients();
   const { data: plans, isLoading: plansLoading } = usePlans();
   const { data: companies, isLoading: companiesLoading } = useCompanies();
@@ -60,17 +62,8 @@ const SaleForm = () => {
   }, [selectedPlan, setValue]);
 
   useEffect(() => {
-    if (isEditing && id) {
-      loadSale();
-    }
-  }, [id, isEditing]);
-
-  const loadSale = async () => {
-    if (!id) return;
-    
-    try {
-      setLoading(true);
-      const sale = await getSale(id);
+    if (isEditing && id && sales) {
+      const sale = sales.find(s => s.id === id);
       if (sale) {
         reset({
           client_id: sale.client_id || '',
@@ -81,24 +74,18 @@ const SaleForm = () => {
           status: sale.status || 'borrador'
         });
       }
-    } catch (error) {
-      console.error('Error loading sale:', error);
-      toast.error('Error al cargar la venta');
-      navigate('/sales');
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [id, isEditing, sales, reset]);
 
   const onSubmit = async (data: SaleFormData) => {
     try {
       setLoading(true);
       
       if (isEditing && id) {
-        await updateSale(id, data);
+        await updateSale.mutateAsync({ id, ...data });
         toast.success('Venta actualizada exitosamente');
       } else {
-        await createSale(data);
+        await createSale.mutateAsync(data);
         toast.success('Venta creada exitosamente');
       }
       
