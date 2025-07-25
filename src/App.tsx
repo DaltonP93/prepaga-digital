@@ -54,7 +54,7 @@ function App() {
             <Route path="/payment-success" element={<PaymentSuccess />} />
             <Route path="/payment-canceled" element={<PaymentCanceled />} />
 
-            {/* Protected routes - Changed back to dashboard as root */}
+            {/* Protected routes */}
             <Route path="/" element={<SimpleProtectedRoute><Dashboard /></SimpleProtectedRoute>} />
             <Route path="/dashboard" element={<SimpleProtectedRoute><Dashboard /></SimpleProtectedRoute>} />
             <Route path="/profile" element={<SimpleProtectedRoute><Profile /></SimpleProtectedRoute>} />

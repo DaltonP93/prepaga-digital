@@ -7,10 +7,10 @@ import { Progress } from "@/components/ui/progress";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Users, Building2, FileText, DollarSign, TrendingUp, TrendingDown, Clock } from "lucide-react";
 import { useDashboardStats } from "@/hooks/useDashboard";
-import { useAuthContext } from "@/components/AuthProvider";
+import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 
 const Dashboard = () => {
-  const { profile } = useAuthContext();
+  const { profile } = useSimpleAuthContext();
   const { data: stats, isLoading, error } = useDashboardStats();
 
   if (isLoading) {

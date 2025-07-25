@@ -1,352 +1,342 @@
 
-import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { TipTapEditor } from "@/components/TipTapEditor";
-import { DocumentPreview } from "@/components/DocumentPreview";
-import { useCreateTemplate, useUpdateTemplate } from "@/hooks/useTemplates";
-import { QuestionBuilder } from "@/components/QuestionBuilder";
-import { QuestionnairePreview } from "@/components/QuestionnairePreview";
-import { VisualTemplateEditor } from "@/components/VisualTemplateEditor";
-import { useTemplateAnalytics } from "@/hooks/useTemplateAnalytics";
+import React, { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
+import { toast } from 'sonner';
+import { TipTapEditor } from '@/components/TipTapEditor';
+import { DocumentPreview } from '@/components/DocumentPreview';
+import { useTemplates } from '@/hooks/useTemplates';
+import { QuestionBuilder } from '@/components/QuestionBuilder';
+import { TemplateVariableSelector } from '@/components/TemplateVariableSelector';
+import { Badge } from '@/components/ui/badge';
+import { Trash2 } from 'lucide-react';
 
-const templateSchema = z.object({
-  name: z.string().min(1, "El nombre es requerido"),
-  description: z.string().optional(),
-  category: z.string().min(1, "La categoría es requerida"),
-  type: z.enum(["documento", "declaracion_jurada", "contrato"], {
-    required_error: "El tipo es requerido",
-  }),
-  content: z.string().min(1, "El contenido es requerido"),
-  active: z.boolean().default(true),
-  requires_signature: z.boolean().default(false),
-  has_questions: z.boolean().default(false),
-});
-
-type TemplateFormData = z.infer<typeof templateSchema>;
-
-interface TemplateFormProps {
-  template?: any;
-  trigger?: React.ReactNode;
+interface TemplateFormData {
+  name: string;
+  description: string;
+  type: 'documento' | 'declaracion_jurada' | 'contrato';
+  category: string;
+  content: string;
+  active: boolean;
+  requires_signature: boolean;
+  has_questions: boolean;
+  dynamic_fields: any[];
 }
 
-export const TemplateForm = ({ template, trigger }: TemplateFormProps) => {
-  const [open, setOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("general");
-  const createTemplateMutation = useCreateTemplate();
-  const updateTemplateMutation = useUpdateTemplate();
-  const { trackEvent } = useTemplateAnalytics(template?.id);
+interface TemplateFormProps {
+  templateId?: string;
+  onClose: () => void;
+}
 
-  const form = useForm<TemplateFormData>({
-    resolver: zodResolver(templateSchema),
+export const TemplateForm: React.FC<TemplateFormProps> = ({ templateId, onClose }) => {
+  const { createTemplate, updateTemplate, getTemplate } = useTemplates();
+  const [content, setContent] = useState('');
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [dynamicFields, setDynamicFields] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState('general');
+  const [selectedType, setSelectedType] = useState<'documento' | 'declaracion_jurada' | 'contrato'>('documento');
+  const [requiresSignature, setRequiresSignature] = useState(false);
+  const [hasQuestions, setHasQuestions] = useState(false);
+
+  const { register, handleSubmit, formState: { errors }, setValue, watch, reset } = useForm<TemplateFormData>({
     defaultValues: {
-      name: template?.name || "",
-      description: template?.description || "",
-      category: template?.category || "",
-      type: template?.type || "documento",
-      content: template?.content || "",
-      active: template?.active ?? true,
-      requires_signature: template?.requires_signature ?? false,
-      has_questions: template?.has_questions ?? false,
-    },
+      name: '',
+      description: '',
+      type: 'documento',
+      category: '',
+      content: '',
+      active: true,
+      requires_signature: false,
+      has_questions: false,
+      dynamic_fields: []
+    }
   });
 
-  // Watch for type changes to automatically enable questions
-  const watchedType = form.watch("type");
+  const watchedType = watch('type');
+  const watchedName = watch('name');
+  const watchedCategory = watch('category');
 
   useEffect(() => {
-    // Automatically enable questions and switch to questions tab when type is declaracion_jurada or contrato
-    if (watchedType === "declaracion_jurada" || watchedType === "contrato") {
-      form.setValue("has_questions", true);
-      form.setValue("requires_signature", true);
-      setActiveTab("questions");
-    } else {
-      form.setValue("has_questions", false);
-      form.setValue("requires_signature", false);
+    if (templateId) {
+      loadTemplate();
     }
-  }, [watchedType, form]);
+  }, [templateId]);
+
+  // Auto-enable options when type changes
+  useEffect(() => {
+    if (watchedType === 'declaracion_jurada' || watchedType === 'contrato') {
+      setRequiresSignature(true);
+      setHasQuestions(true);
+      setValue('requires_signature', true);
+      setValue('has_questions', true);
+      
+      // Switch to questions tab
+      setActiveTab('questions');
+    }
+    setSelectedType(watchedType);
+  }, [watchedType, setValue]);
+
+  const loadTemplate = async () => {
+    if (!templateId) return;
+    
+    try {
+      const template = await getTemplate(templateId);
+      if (template) {
+        reset({
+          name: template.name || '',
+          description: template.description || '',
+          type: template.type || 'documento',
+          category: template.category || '',
+          content: template.content || '',
+          active: template.active !== false,
+          requires_signature: template.requires_signature || false,
+          has_questions: template.has_questions || false,
+          dynamic_fields: template.dynamic_fields || []
+        });
+        
+        setContent(template.content || '');
+        setDynamicFields(template.dynamic_fields || []);
+        setRequiresSignature(template.requires_signature || false);
+        setHasQuestions(template.has_questions || false);
+      }
+    } catch (error) {
+      console.error('Error loading template:', error);
+      toast.error('Error al cargar el template');
+    }
+  };
 
   const onSubmit = async (data: TemplateFormData) => {
     try {
       const templateData = {
         ...data,
-        content: data.content,
-        dynamic_fields: [],
+        name: data.name || '',
+        content,
+        dynamic_fields: dynamicFields,
+        requires_signature: requiresSignature,
+        has_questions: hasQuestions
       };
 
-      if (template) {
-        updateTemplateMutation.mutate({ id: template.id, ...templateData });
-        trackEvent?.('template_updated');
+      if (templateId) {
+        await updateTemplate(templateId, templateData);
+        toast.success('Template actualizado exitosamente');
       } else {
-        createTemplateMutation.mutate(templateData);
+        await createTemplate(templateData);
+        toast.success('Template creado exitosamente');
       }
       
-      setOpen(false);
-      form.reset();
+      onClose();
     } catch (error) {
       console.error('Error saving template:', error);
+      toast.error('Error al guardar el template');
     }
   };
 
-  const handleTabChange = (value: string) => {
-    setActiveTab(value);
+  const handleContentChange = (newContent: string) => {
+    setContent(newContent);
+    setValue('content', newContent);
+  };
+
+  const handleAddVariable = (variable: any) => {
+    setDynamicFields([...dynamicFields, variable]);
+  };
+
+  const handleRemoveVariable = (index: number) => {
+    const newFields = dynamicFields.filter((_, i) => i !== index);
+    setDynamicFields(newFields);
+  };
+
+  const handleQuestionsChange = (newQuestions: any[]) => {
+    setQuestions(newQuestions);
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button>
-            {template ? "Editar Template" : "Nuevo Template"}
-          </Button>
-        )}
-      </DialogTrigger>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {template ? "Editar Template" : "Crear Nuevo Template"}
-          </DialogTitle>
-        </DialogHeader>
-
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <Tabs value={activeTab} onValueChange={handleTabChange}>
+    <div className="max-w-6xl mx-auto p-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>{templateId ? 'Editar Template' : 'Crear Nuevo Template'}</CardTitle>
+          <CardDescription>
+            Configure los detalles del template y su contenido
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="general">General</TabsTrigger>
-                <TabsTrigger value="editor">Editor</TabsTrigger>
-                <TabsTrigger 
-                  value="questions" 
-                  disabled={!form.watch("has_questions")}
-                  className={form.watch("has_questions") ? "" : "opacity-50"}
-                >
-                  Preguntas
-                  {form.watch("has_questions") && (
-                    <Badge variant="secondary" className="ml-2">
-                      Habilitado
-                    </Badge>
-                  )}
-                </TabsTrigger>
+                <TabsTrigger value="content">Contenido</TabsTrigger>
+                <TabsTrigger value="questions">Preguntas</TabsTrigger>
                 <TabsTrigger value="preview">Vista Previa</TabsTrigger>
               </TabsList>
 
               <TabsContent value="general" className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nombre del Template</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="Ej: Contrato de Servicios" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
+                  <div>
+                    <Label htmlFor="name">Nombre del Template</Label>
+                    <Input
+                      id="name"
+                      {...register('name', { required: 'El nombre es requerido' })}
+                      placeholder="Ingrese el nombre del template"
+                    />
+                    {errors.name && (
+                      <p className="text-sm text-red-500 mt-1">{errors.name.message}</p>
                     )}
-                  />
+                  </div>
 
-                  <FormField
-                    control={form.control}
-                    name="category"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Categoría</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selecciona una categoría" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="legal">Legal</SelectItem>
-                            <SelectItem value="comercial">Comercial</SelectItem>
-                            <SelectItem value="administrativo">Administrativo</SelectItem>
-                            <SelectItem value="financiero">Financiero</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                  <div>
+                    <Label htmlFor="category">Categoría</Label>
+                    <Input
+                      id="category"
+                      {...register('category')}
+                      placeholder="Ej: Contratos, Documentos legales"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="description">Descripción</Label>
+                  <Textarea
+                    id="description"
+                    {...register('description')}
+                    placeholder="Describe el propósito y uso del template"
+                    rows={3}
                   />
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Descripción</FormLabel>
-                      <FormControl>
-                        <Textarea {...field} placeholder="Describe el propósito del template" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="type"
-                  render={({ field }) => (
-                    <FormItem className="space-y-3">
-                      <FormLabel>Tipo de Template</FormLabel>
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          value={field.value}
-                          className="flex flex-col space-y-2"
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="documento" id="documento" />
-                            <Label htmlFor="documento">Documento Simple</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="declaracion_jurada" id="declaracion_jurada" />
-                            <Label htmlFor="declaracion_jurada">Declaración Jurada</Label>
-                            <Badge variant="outline" className="ml-2">
-                              Auto-habilita preguntas
-                            </Badge>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="contrato" id="contrato" />
-                            <Label htmlFor="contrato">Contrato</Label>
-                            <Badge variant="outline" className="ml-2">
-                              Auto-habilita preguntas
-                            </Badge>
-                          </div>
-                        </RadioGroup>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="flex items-center space-x-4">
-                  <FormField
-                    control={form.control}
-                    name="active"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-base">Activo</FormLabel>
-                          <FormDescription>
-                            El template estará disponible para uso
-                          </FormDescription>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </TabsContent>
-
-              <TabsContent value="editor">
-                <FormField
-                  control={form.control}
-                  name="content"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Contenido del Template</FormLabel>
-                      <FormControl>
-                        <div className="min-h-[400px]">
-                          <TipTapEditor
-                            content={field.value}
-                            onChange={field.onChange}
-                            placeholder="Escribe el contenido del template aquí..."
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </TabsContent>
-
-              <TabsContent value="questions">
-                {form.watch("has_questions") ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-medium">Configuración de Preguntas</h3>
-                      <Badge variant="default">
-                        Habilitado automáticamente para {form.watch("type").replace("_", " ")}
-                      </Badge>
+                <div>
+                  <Label>Tipo de Template</Label>
+                  <RadioGroup
+                    value={watchedType}
+                    onValueChange={(value) => setValue('type', value as any)}
+                    className="mt-2"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="documento" id="documento" />
+                      <Label htmlFor="documento">Documento</Label>
                     </div>
-                    <QuestionBuilder templateId={template?.id} />
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="declaracion_jurada" id="declaracion_jurada" />
+                      <Label htmlFor="declaracion_jurada">Declaración Jurada</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="contrato" id="contrato" />
+                      <Label htmlFor="contrato">Contrato</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="active"
+                      checked={watch('active')}
+                      onCheckedChange={(checked) => setValue('active', checked)}
+                    />
+                    <Label htmlFor="active">Activo</Label>
                   </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">
-                      Las preguntas se habilitan automáticamente cuando seleccionas "Declaración Jurada" o "Contrato"
-                    </p>
+
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="requires_signature"
+                      checked={requiresSignature}
+                      onCheckedChange={(checked) => {
+                        setRequiresSignature(checked);
+                        setValue('requires_signature', checked);
+                      }}
+                    />
+                    <Label htmlFor="requires_signature">Requiere Firma</Label>
                   </div>
-                )}
+
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="has_questions"
+                      checked={hasQuestions}
+                      onCheckedChange={(checked) => {
+                        setHasQuestions(checked);
+                        setValue('has_questions', checked);
+                      }}
+                    />
+                    <Label htmlFor="has_questions">Tiene Preguntas</Label>
+                  </div>
+                </div>
               </TabsContent>
 
-              <TabsContent value="preview">
-                <div className="space-y-4">
-                  <DocumentPreview 
-                    content={form.watch("content")} 
-                    templateData={{ 
-                      name: form.watch("name"),
-                      type: form.watch("type"),
-                      category: form.watch("category")
-                    }} 
-                  />
-                  {form.watch("has_questions") && (
-                    <div className="mt-6">
-                      <h3 className="text-lg font-medium mb-4">Vista Previa del Cuestionario</h3>
-                      <QuestionnairePreview templateId={template?.id} />
+              <TabsContent value="content" className="space-y-4">
+                <div>
+                  <Label>Contenido del Template</Label>
+                  <div className="mt-2 border rounded-lg">
+                    <TipTapEditor
+                      content={content}
+                      onUpdate={handleContentChange}
+                      placeholder="Escriba el contenido de su template aquí..."
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Variables Dinámicas</Label>
+                  <div className="mt-2">
+                    <TemplateVariableSelector onAddVariable={handleAddVariable} />
+                  </div>
+                  
+                  {dynamicFields.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      <Label>Variables Agregadas:</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {dynamicFields.map((field, index) => (
+                          <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                            {field.name}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveVariable(index)}
+                              className="h-auto p-0 ml-1"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
+              </TabsContent>
+
+              <TabsContent value="questions" className="space-y-4">
+                <QuestionBuilder
+                  questions={questions}
+                  onChange={handleQuestionsChange}
+                  templateType={selectedType}
+                />
+              </TabsContent>
+
+              <TabsContent value="preview" className="space-y-4">
+                <DocumentPreview
+                  content={content}
+                  variables={dynamicFields}
+                />
               </TabsContent>
             </Tabs>
 
-            <div className="flex justify-end space-x-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOpen(false)}
-              >
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button type="button" variant="outline" onClick={onClose}>
                 Cancelar
               </Button>
-              <Button
-                type="submit"
-                disabled={createTemplateMutation.isPending || updateTemplateMutation.isPending}
-              >
-                {template ? "Actualizar" : "Crear"}
+              <Button type="submit">
+                {templateId ? 'Actualizar' : 'Crear'} Template
               </Button>
             </div>
           </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
