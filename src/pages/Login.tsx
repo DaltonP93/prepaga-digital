@@ -1,59 +1,35 @@
 
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LoginForm } from '@/components/LoginForm';
-import { supabase } from '@/integrations/supabase/client';
-import { useState } from 'react';
-import { User } from '@supabase/supabase-js';
+import { SimpleLoginForm } from '@/components/SimpleLoginForm';
+import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 
 const Login = () => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, loading } = useSimpleAuthContext();
   const navigate = useNavigate();
   const location = useLocation();
 
+  console.log('🔑 Login: Estado actual', { 
+    user: !!user, 
+    loading,
+    email: user?.email,
+    pathname: location.pathname
+  });
+
   useEffect(() => {
-    // Check initial session
-    const checkSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setUser(session?.user || null);
-        
-        if (session?.user) {
-          const from = location.state?.from?.pathname || '/';
-          console.log('✅ Login: Usuario autenticado, navegando a:', from);
-          navigate(from, { replace: true });
-        }
-      } catch (error) {
-        console.error('Error checking session:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    // Si el usuario está autenticado, redirigir inmediatamente
+    if (user && !loading) {
+      const from = location.state?.from?.pathname || '/';
+      console.log('✅ Login: Usuario autenticado, navegando a:', from);
+      navigate(from, { replace: true });
+    }
+  }, [user, loading, navigate, location.state]);
 
-    checkSession();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('🔄 Auth state changed:', event);
-        setUser(session?.user || null);
-        
-        if (event === 'SIGNED_IN' && session?.user) {
-          const from = location.state?.from?.pathname || '/';
-          console.log('✅ Login: Usuario autenticado, navegando a:', from);
-          navigate(from, { replace: true });
-        }
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, [navigate, location.state]);
-
-  // Show loading while checking auth
+  // Mostrar loading mientras se verifica la autenticación inicial
   if (loading) {
+    console.log('⏳ Login: Mostrando loading...');
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
           <p className="text-sm text-muted-foreground">Verificando autenticación...</p>
@@ -62,20 +38,15 @@ const Login = () => {
     );
   }
 
-  // Don't show anything if user is authenticated (navigation in progress)
+  // Si hay usuario, no mostrar nada (navegación en progreso)
   if (user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-          <p className="text-sm text-muted-foreground">Redirigiendo...</p>
-        </div>
-      </div>
-    );
+    console.log('🔄 Login: Usuario presente, navegación en progreso...');
+    return null;
   }
 
-  // Show login form only if user is not authenticated
-  return <LoginForm />;
+  // Mostrar formulario de login solo si no hay usuario
+  console.log('📋 Login: Mostrando formulario de login');
+  return <SimpleLoginForm />;
 };
 
 export default Login;
