@@ -1,6 +1,6 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { useAuthContext } from '@/components/AuthProvider';
+import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { SessionTimeoutDialog } from './SessionTimeoutDialog';
 
 interface SessionTimeoutContextType {
@@ -24,7 +24,7 @@ export const SessionTimeoutProvider = ({
   const [lastActivity, setLastActivity] = useState(new Date());
   const [showWarning, setShowWarning] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
-  const { user, signOut } = useAuthContext();
+  const { user, signOut } = useSimpleAuthContext();
 
   // Solo activar en producción
   const isProduction = window.location.hostname !== 'localhost' && !window.location.hostname.includes('lovableproject.com');
