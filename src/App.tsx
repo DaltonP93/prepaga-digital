@@ -1,10 +1,9 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "@/components/AuthProvider";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { SimpleAuthProvider } from "@/components/SimpleAuthProvider";
 import { SimpleProtectedRoute } from "@/components/SimpleProtectedRoute";
 import { SessionTimeoutProvider } from "@/components/SessionTimeoutProvider";
@@ -54,219 +53,145 @@ function App() {
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/questionnaire/:token" element={<QuestionnaireView />} />
-            <Route path="/signature/:token" element={<SignatureView />} />
-            <Route path="/payment/success" element={<PaymentSuccess />} />
-            <Route path="/payment/canceled" element={<PaymentCanceled />} />
-            
-            {/* Simple auth routes */}
-            <Route path="/simple-login" element={<SimpleLogin />} />
-            <Route path="/simple-dashboard" element={
-              <SimpleAuthProvider>
-                <SimpleProtectedRoute>
-                  <SimpleDashboard />
-                </SimpleProtectedRoute>
-              </SimpleAuthProvider>
-            } />
-            
-            {/* Protected routes */}
-            <Route path="/" element={
-              <AuthProvider>
-                <SessionTimeoutProvider>
-                  <ProtectedRoute>
+          <SimpleAuthProvider>
+            <SessionTimeoutProvider>
+              <Routes>
+                {/* Public routes */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/questionnaire/:token" element={<QuestionnaireView />} />
+                <Route path="/signature/:token" element={<SignatureView />} />
+                <Route path="/payment/success" element={<PaymentSuccess />} />
+                <Route path="/payment/canceled" element={<PaymentCanceled />} />
+                
+                {/* Simple auth routes - legacy */}
+                <Route path="/simple-login" element={<SimpleLogin />} />
+                <Route path="/simple-dashboard" element={
+                  <SimpleProtectedRoute>
+                    <SimpleDashboard />
+                  </SimpleProtectedRoute>
+                } />
+                
+                {/* Protected routes - ahora todos usan SimpleAuthProvider */}
+                <Route path="/" element={
+                  <SimpleProtectedRoute>
                     <Index />
-                  </ProtectedRoute>
-                </SessionTimeoutProvider>
-              </AuthProvider>
-            } />
-            
-            <Route path="/dashboard" element={
-              <AuthProvider>
-                <SessionTimeoutProvider>
-                  <ProtectedRoute>
+                  </SimpleProtectedRoute>
+                } />
+                
+                <Route path="/dashboard" element={
+                  <SimpleProtectedRoute>
                     <Dashboard />
-                  </ProtectedRoute>
-                </SessionTimeoutProvider>
-              </AuthProvider>
-            } />
-            
-            <Route path="/sales" element={
-              <AuthProvider>
-                <SessionTimeoutProvider>
-                  <ProtectedRoute>
+                  </SimpleProtectedRoute>
+                } />
+                
+                <Route path="/sales" element={
+                  <SimpleProtectedRoute>
                     <Sales />
-                  </ProtectedRoute>
-                </SessionTimeoutProvider>
-              </AuthProvider>
-            } />
-            
-            <Route path="/sales/edit/:id" element={
-              <AuthProvider>
-                <SessionTimeoutProvider>
-                  <ProtectedRoute>
+                  </SimpleProtectedRoute>
+                } />
+                
+                <Route path="/sales/edit/:id" element={
+                  <SimpleProtectedRoute>
                     <SaleEdit />
-                  </ProtectedRoute>
-                </SessionTimeoutProvider>
-              </AuthProvider>
-            } />
-            
-            <Route path="/sales/new" element={
-              <AuthProvider>
-                <SessionTimeoutProvider>
-                  <ProtectedRoute>
+                  </SimpleProtectedRoute>
+                } />
+                
+                <Route path="/sales/new" element={
+                  <SimpleProtectedRoute>
                     <SaleForm />
-                  </ProtectedRoute>
-                </SessionTimeoutProvider>
-              </AuthProvider>
-            } />
-            
-            <Route path="/sales/:id" element={
-              <AuthProvider>
-                <SessionTimeoutProvider>
-                  <ProtectedRoute>
+                  </SimpleProtectedRoute>
+                } />
+                
+                <Route path="/sales/:id" element={
+                  <SimpleProtectedRoute>
                     <SaleDetail />
-                  </ProtectedRoute>
-                </SessionTimeoutProvider>
-              </AuthProvider>
-            } />
+                  </SimpleProtectedRoute>
+                } />
 
-            <Route path="/clients" element={
-              <AuthProvider>
-                <SessionTimeoutProvider>
-                  <ProtectedRoute>
+                <Route path="/clients" element={
+                  <SimpleProtectedRoute>
                     <Clients />
-                  </ProtectedRoute>
-                </SessionTimeoutProvider>
-              </AuthProvider>
-            } />
+                  </SimpleProtectedRoute>
+                } />
 
-            <Route path="/plans" element={
-              <AuthProvider>
-                <SessionTimeoutProvider>
-                  <ProtectedRoute>
+                <Route path="/plans" element={
+                  <SimpleProtectedRoute>
                     <Plans />
-                  </ProtectedRoute>
-                </SessionTimeoutProvider>
-              </AuthProvider>
-            } />
+                  </SimpleProtectedRoute>
+                } />
 
-            <Route path="/documents" element={
-              <AuthProvider>
-                <SessionTimeoutProvider>
-                  <ProtectedRoute>
+                <Route path="/documents" element={
+                  <SimpleProtectedRoute>
                     <Documents />
-                  </ProtectedRoute>
-                </SessionTimeoutProvider>
-              </AuthProvider>
-            } />
+                  </SimpleProtectedRoute>
+                } />
 
-            <Route path="/templates" element={
-              <AuthProvider>
-                <SessionTimeoutProvider>
-                  <ProtectedRoute>
+                <Route path="/templates" element={
+                  <SimpleProtectedRoute>
                     <Templates />
-                  </ProtectedRoute>
-                </SessionTimeoutProvider>
-              </AuthProvider>
-            } />
+                  </SimpleProtectedRoute>
+                } />
 
-            <Route path="/signature-workflow" element={
-              <AuthProvider>
-                <SessionTimeoutProvider>
-                  <ProtectedRoute>
+                <Route path="/signature-workflow" element={
+                  <SimpleProtectedRoute>
                     <SignatureWorkflow />
-                  </ProtectedRoute>
-                </SessionTimeoutProvider>
-              </AuthProvider>
-            } />
+                  </SimpleProtectedRoute>
+                } />
 
-            <Route path="/analytics" element={
-              <AuthProvider>
-                <SessionTimeoutProvider>
-                  <ProtectedRoute>
+                <Route path="/analytics" element={
+                  <SimpleProtectedRoute>
                     <Analytics />
-                  </ProtectedRoute>
-                </SessionTimeoutProvider>
-              </AuthProvider>
-            } />
+                  </SimpleProtectedRoute>
+                } />
 
-            <Route path="/profile" element={
-              <AuthProvider>
-                <SessionTimeoutProvider>
-                  <ProtectedRoute>
+                <Route path="/profile" element={
+                  <SimpleProtectedRoute>
                     <Profile />
-                  </ProtectedRoute>
-                </SessionTimeoutProvider>
-              </AuthProvider>
-            } />
+                  </SimpleProtectedRoute>
+                } />
 
-            <Route path="/users" element={
-              <AuthProvider>
-                <SessionTimeoutProvider>
-                  <ProtectedRoute requiredRole={['super_admin', 'admin']}>
+                <Route path="/users" element={
+                  <SimpleProtectedRoute>
                     <Users />
-                  </ProtectedRoute>
-                </SessionTimeoutProvider>
-              </AuthProvider>
-            } />
+                  </SimpleProtectedRoute>
+                } />
 
-            <Route path="/companies" element={
-              <AuthProvider>
-                <SessionTimeoutProvider>
-                  <ProtectedRoute requiredRole={['super_admin', 'admin']}>
+                <Route path="/companies" element={
+                  <SimpleProtectedRoute>
                     <Companies />
-                  </ProtectedRoute>
-                </SessionTimeoutProvider>
-              </AuthProvider>
-            } />
+                  </SimpleProtectedRoute>
+                } />
 
-            <Route path="/audit" element={
-              <AuthProvider>
-                <SessionTimeoutProvider>
-                  <ProtectedRoute requiredRole={['super_admin', 'admin']}>
+                <Route path="/audit" element={
+                  <SimpleProtectedRoute>
                     <AuditDashboard />
-                  </ProtectedRoute>
-                </SessionTimeoutProvider>
-              </AuthProvider>
-            } />
+                  </SimpleProtectedRoute>
+                } />
 
-            <Route path="/communications" element={
-              <AuthProvider>
-                <SessionTimeoutProvider>
-                  <ProtectedRoute>
+                <Route path="/communications" element={
+                  <SimpleProtectedRoute>
                     <Communications />
-                  </ProtectedRoute>
-                </SessionTimeoutProvider>
-              </AuthProvider>
-            } />
+                  </SimpleProtectedRoute>
+                } />
 
-            <Route path="/files" element={
-              <AuthProvider>
-                <SessionTimeoutProvider>
-                  <ProtectedRoute>
+                <Route path="/files" element={
+                  <SimpleProtectedRoute>
                     <FileManagement />
-                  </ProtectedRoute>
-                </SessionTimeoutProvider>
-              </AuthProvider>
-            } />
+                  </SimpleProtectedRoute>
+                } />
 
-            <Route path="/experience" element={
-              <AuthProvider>
-                <SessionTimeoutProvider>
-                  <ProtectedRoute>
+                <Route path="/experience" element={
+                  <SimpleProtectedRoute>
                     <Experience />
-                  </ProtectedRoute>
-                </SessionTimeoutProvider>
-              </AuthProvider>
-            } />
-            
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+                  </SimpleProtectedRoute>
+                } />
+                
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </SessionTimeoutProvider>
+          </SimpleAuthProvider>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
