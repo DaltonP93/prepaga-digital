@@ -1,186 +1,171 @@
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Copy, Plus, X } from "lucide-react";
-import { toast } from "sonner";
-
-interface Variable {
-  name: string;
-  description: string;
-  example: string;
-}
-
-interface CustomField {
-  name: string;
-  value: string;
-}
+import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Plus, X } from 'lucide-react';
+import { getAvailableVariables } from '@/lib/templateEngine';
+import { useTemplate } from '@/hooks/useTemplates';
 
 interface TemplateVariableSelectorProps {
-  onVariableSelect: (variable: string) => void;
-  customFields: CustomField[];
-  onCustomFieldAdd: (field: CustomField) => void;
+  onVariableSelect: (variable: any) => void;
+  customFields: any[];
+  onCustomFieldAdd: (field: any) => void;
   onCustomFieldRemove: (index: number) => void;
+  templateId?: string;
 }
-
-const defaultVariables: Variable[] = [
-  { name: "{{cliente.nombre}}", description: "Nombre del cliente", example: "Juan Pérez" },
-  { name: "{{cliente.email}}", description: "Email del cliente", example: "juan@email.com" },
-  { name: "{{cliente.telefono}}", description: "Teléfono del cliente", example: "+54 11 1234-5678" },
-  { name: "{{cliente.dni}}", description: "DNI/CI del cliente", example: "12345678" },
-  { name: "{{cliente.direccion}}", description: "Dirección del cliente", example: "Av. Corrientes 1234" },
-  { name: "{{plan.nombre}}", description: "Nombre del plan", example: "Plan Premium" },
-  { name: "{{plan.precio}}", description: "Precio del plan", example: "$199.99" },
-  { name: "{{plan.descripcion}}", description: "Descripción del plan", example: "Cobertura completa..." },
-  { name: "{{empresa.nombre}}", description: "Nombre de la empresa", example: "MediCorp SA" },
-  { name: "{{empresa.direccion}}", description: "Dirección de la empresa", example: "Centro 123" },
-  { name: "{{empresa.telefono}}", description: "Teléfono de la empresa", example: "+54 11 5555-1234" },
-  { name: "{{venta.fecha}}", description: "Fecha de la venta", example: "15/07/2024" },
-  { name: "{{venta.total}}", description: "Total de la venta", example: "$199.99" },
-  { name: "{{venta.vendedor}}", description: "Nombre del vendedor", example: "María García" },
-  { name: "{{fecha.hoy}}", description: "Fecha actual", example: "15/07/2024" },
-  { name: "{{firma.fecha}}", description: "Fecha de firma", example: "16/07/2024" },
-];
 
 export function TemplateVariableSelector({ 
   onVariableSelect, 
   customFields, 
   onCustomFieldAdd, 
-  onCustomFieldRemove 
+  onCustomFieldRemove,
+  templateId 
 }: TemplateVariableSelectorProps) {
-  const [newFieldName, setNewFieldName] = useState("");
-  const [newFieldValue, setNewFieldValue] = useState("");
+  const [newFieldName, setNewFieldName] = useState('');
+  const [newFieldLabel, setNewFieldLabel] = useState('');
+  const { data: templateData } = useTemplate(templateId);
 
-  const handleCopyVariable = (variable: string) => {
-    navigator.clipboard.writeText(variable);
-    toast.success(`Variable ${variable} copiada`);
-    onVariableSelect(variable);
-  };
+  const defaultVariables = getAvailableVariables();
 
   const handleAddCustomField = () => {
-    if (!newFieldName.trim() || !newFieldValue.trim()) return;
-    
-    onCustomFieldAdd({
-      name: newFieldName.trim(),
-      value: newFieldValue.trim()
-    });
-    
-    setNewFieldName("");
-    setNewFieldValue("");
-    toast.success("Campo personalizado agregado");
+    if (newFieldName && newFieldLabel) {
+      onCustomFieldAdd({
+        key: newFieldName,
+        label: newFieldLabel,
+        type: 'text'
+      });
+      setNewFieldName('');
+      setNewFieldLabel('');
+    }
   };
 
+  const handleVariableClick = (variable: string) => {
+    onVariableSelect({ key: variable });
+  };
+
+  // Generar variables de preguntas del template
+  const questionVariables = templateData?.template_questions?.map((question: any) => ({
+    key: `respuestas.${question.id}`,
+    label: question.question_text,
+    type: 'question'
+  })) || [];
+
   return (
-    <div className="space-y-6">
-      {/* Variables Predefinidas */}
+    <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Variables Disponibles</CardTitle>
+          <CardTitle className="text-sm">Variables del Sistema</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 max-h-64 overflow-y-auto">
-            {defaultVariables.map((variable, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+        <CardContent className="space-y-2">
+          <div className="grid grid-cols-1 gap-1">
+            {defaultVariables.map((variable) => (
+              <Button
+                key={variable}
+                variant="ghost"
+                size="sm"
+                className="justify-start text-xs h-8"
+                onClick={() => handleVariableClick(variable)}
               >
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="font-mono text-xs">
-                      {variable.name}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {variable.description}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Ejemplo: {variable.example}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleCopyVariable(variable.name)}
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
-              </div>
+                {variable}
+              </Button>
             ))}
           </div>
         </CardContent>
       </Card>
 
-      {/* Campos Personalizados */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Campos Personalizados</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Agregar nuevo campo */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-            <div>
-              <Label htmlFor="field-name">Nombre del Campo</Label>
-              <Input
-                id="field-name"
-                placeholder="ej: numeroContrato"
-                value={newFieldName}
-                onChange={(e) => setNewFieldName(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="field-value">Valor por Defecto</Label>
-              <Input
-                id="field-value"
-                placeholder="ej: {{custom.numeroContrato}}"
-                value={newFieldValue}
-                onChange={(e) => setNewFieldValue(e.target.value)}
-              />
-            </div>
-            <div className="flex items-end">
-              <Button onClick={handleAddCustomField} className="w-full">
-                <Plus className="h-4 w-4 mr-2" />
-                Agregar
-              </Button>
-            </div>
-          </div>
-
-          {/* Lista de campos personalizados */}
-          {customFields.length > 0 && (
-            <div className="space-y-2">
-              <Label>Campos Agregados:</Label>
-              {customFields.map((field, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-2 border rounded-lg"
+      {questionVariables.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Variables de Preguntas</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="grid grid-cols-1 gap-1">
+              {questionVariables.map((question) => (
+                <Button
+                  key={question.key}
+                  variant="ghost"
+                  size="sm"
+                  className="justify-start text-xs h-8"
+                  onClick={() => handleVariableClick(`{{${question.key}}}`)}
                 >
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="font-mono text-xs">
-                      {field.value}
-                    </Badge>
-                    <span className="text-sm">{field.name}</span>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleCopyVariable(field.value)}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onCustomFieldRemove(index)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
+                  <Badge variant="secondary" className="mr-2 text-xs">
+                    Pregunta
+                  </Badge>
+                  {question.label}
+                </Button>
               ))}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Campos Personalizados</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label htmlFor="fieldName" className="text-xs">Nombre del campo</Label>
+              <Input
+                id="fieldName"
+                value={newFieldName}
+                onChange={(e) => setNewFieldName(e.target.value)}
+                placeholder="nombre_campo"
+                className="h-8 text-xs"
+              />
+            </div>
+            <div>
+              <Label htmlFor="fieldLabel" className="text-xs">Etiqueta</Label>
+              <Input
+                id="fieldLabel"
+                value={newFieldLabel}
+                onChange={(e) => setNewFieldLabel(e.target.value)}
+                placeholder="Etiqueta del campo"
+                className="h-8 text-xs"
+              />
+            </div>
+          </div>
+          <Button
+            onClick={handleAddCustomField}
+            size="sm"
+            className="w-full h-8 text-xs"
+            disabled={!newFieldName || !newFieldLabel}
+          >
+            <Plus className="h-3 w-3 mr-1" />
+            Agregar Campo
+          </Button>
+
+          {customFields.length > 0 && (
+            <>
+              <Separator />
+              <div className="space-y-1">
+                {customFields.map((field, index) => (
+                  <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-xs"
+                      onClick={() => onVariableSelect(field)}
+                    >
+                      {`{{${field.key}}}`}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => onCustomFieldRemove(index)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
