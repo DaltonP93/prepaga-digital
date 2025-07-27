@@ -1,87 +1,181 @@
 
-// Service Worker para modo offline y notificaciones push
-const CACHE_NAME = 'prepaga-digital-v2';
+// Service Worker optimizado para manejo de cache
+const CACHE_NAME = 'prepaga-digital-v3';
+const CACHE_VERSION = '3.0.0';
+const MAX_CACHE_SIZE = 50 * 1024 * 1024; // 50MB
+const CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 horas
+
 const urlsToCache = [
   '/',
   '/manifest.json',
   '/offline.html',
-  // Archivos estáticos principales
   '/src/main.tsx',
   '/src/App.tsx',
   '/src/index.css',
-  // Recursos offline esenciales
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
-  // Sonidos de notificaciones
   '/sounds/notification.mp3',
   '/sounds/success.mp3',
   '/sounds/info.mp3',
   '/sounds/error.mp3'
 ];
 
-// Instalación del Service Worker
+// Instalación del Service Worker con limpieza automática
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('Cache abierto');
+        console.log('Cache abierto:', CACHE_NAME);
         return cache.addAll(urlsToCache);
       })
-  );
-});
-
-// Activación del Service Worker
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Eliminando cache anterior:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
-  );
-});
-
-// Intercepción de peticiones
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Cache hit - devolver respuesta
-        if (response) {
-          return response;
-        }
-
-        return fetch(event.request).then((response) => {
-          // Verificar si recibimos una respuesta válida
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response;
-          }
-
-          // Clonar la respuesta
-          const responseToCache = response.clone();
-
-          caches.open(CACHE_NAME)
-            .then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
-
-          return response;
-        }).catch(() => {
-          // Si falla la petición, mostrar página offline
-          if (event.request.destination === 'document') {
-            return caches.match('/offline.html');
-          }
-        });
+      .then(() => {
+        // Forzar activación inmediata
+        return self.skipWaiting();
       })
   );
 });
 
-// Manejo de mensajes push mejorado
+// Activación con limpieza de cache obsoleto
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    Promise.all([
+      // Limpiar caches obsoletos
+      caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => {
+            if (cacheName !== CACHE_NAME) {
+              console.log('Eliminando cache obsoleto:', cacheName);
+              return caches.delete(cacheName);
+            }
+          })
+        );
+      }),
+      // Tomar control inmediato de todas las páginas
+      self.clients.claim()
+    ])
+  );
+});
+
+// Intercepción de peticiones con gestión inteligente de cache
+self.addEventListener('fetch', (event) => {
+  // Solo cachear peticiones GET
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
+  // Estrategia diferente para diferentes tipos de recursos
+  const url = new URL(event.request.url);
+  
+  // Para archivos estáticos: Cache First
+  if (url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg)$/)) {
+    event.respondWith(cacheFirst(event.request));
+  }
+  // Para páginas: Network First con fallback
+  else if (url.pathname.match(/^\/[^.]*$/)) {
+    event.respondWith(networkFirst(event.request));
+  }
+  // Para API: Network Only
+  else {
+    event.respondWith(fetch(event.request));
+  }
+});
+
+// Estrategia Cache First para archivos estáticos
+async function cacheFirst(request) {
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    const cachedResponse = await cache.match(request);
+    
+    if (cachedResponse) {
+      // Verificar si el cache no está expirado
+      const cachedTime = cachedResponse.headers.get('sw-cache-time');
+      if (cachedTime && (Date.now() - parseInt(cachedTime)) < CACHE_EXPIRY) {
+        return cachedResponse;
+      }
+    }
+    
+    // Si no hay cache o está expirado, buscar en red
+    const networkResponse = await fetch(request);
+    
+    if (networkResponse.status === 200) {
+      const responseClone = networkResponse.clone();
+      const responseWithTime = new Response(responseClone.body, {
+        status: responseClone.status,
+        statusText: responseClone.statusText,
+        headers: {
+          ...responseClone.headers,
+          'sw-cache-time': Date.now().toString()
+        }
+      });
+      
+      await cache.put(request, responseWithTime);
+      await cleanupCache(cache);
+    }
+    
+    return networkResponse;
+  } catch (error) {
+    console.error('Error en cacheFirst:', error);
+    const cache = await caches.open(CACHE_NAME);
+    return cache.match(request) || new Response('Network error', { status: 500 });
+  }
+}
+
+// Estrategia Network First para páginas
+async function networkFirst(request) {
+  try {
+    const networkResponse = await fetch(request);
+    
+    if (networkResponse.status === 200) {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.put(request, networkResponse.clone());
+      await cleanupCache(cache);
+    }
+    
+    return networkResponse;
+  } catch (error) {
+    console.error('Red no disponible, usando cache:', error);
+    const cache = await caches.open(CACHE_NAME);
+    const cachedResponse = await cache.match(request);
+    
+    return cachedResponse || caches.match('/offline.html');
+  }
+}
+
+// Limpieza automática de cache
+async function cleanupCache(cache) {
+  try {
+    const keys = await cache.keys();
+    const now = Date.now();
+    
+    // Eliminar entradas expiradas
+    const expiredKeys = [];
+    
+    for (const key of keys) {
+      const response = await cache.match(key);
+      const cachedTime = response.headers.get('sw-cache-time');
+      
+      if (cachedTime && (now - parseInt(cachedTime)) > CACHE_EXPIRY) {
+        expiredKeys.push(key);
+      }
+    }
+    
+    // Eliminar entradas expiradas
+    await Promise.all(expiredKeys.map(key => cache.delete(key)));
+    
+    // Si el cache sigue siendo muy grande, eliminar las entradas más antiguas
+    const remainingKeys = await cache.keys();
+    if (remainingKeys.length > 100) {
+      const keysToDelete = remainingKeys.slice(0, remainingKeys.length - 100);
+      await Promise.all(keysToDelete.map(key => cache.delete(key)));
+    }
+    
+    console.log(`Cache limpiado: ${expiredKeys.length} entradas expiradas eliminadas`);
+  } catch (error) {
+    console.error('Error limpiando cache:', error);
+  }
+}
+
+// Manejo de mensajes push optimizado
 self.addEventListener('push', (event) => {
   if (event.data) {
     const data = event.data.json();
@@ -120,7 +214,7 @@ self.addEventListener('push', (event) => {
   }
 });
 
-// Manejo de clicks en notificaciones mejorado
+// Manejo de clicks en notificaciones
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   
@@ -129,10 +223,8 @@ self.addEventListener('notificationclick', (event) => {
       clients.openWindow(event.notification.data.url)
     );
   } else if (event.action === 'close') {
-    // Solo cerrar la notificación
     return;
   } else if (event.notification.data.url) {
-    // Click en el cuerpo de la notificación
     event.waitUntil(
       clients.openWindow(event.notification.data.url)
     );
@@ -143,21 +235,20 @@ self.addEventListener('notificationclick', (event) => {
   }
 });
 
-// Sincronización en segundo plano mejorada
+// Sincronización en segundo plano
 self.addEventListener('sync', (event) => {
   if (event.tag === 'background-sync') {
     event.waitUntil(doBackgroundSync());
-  } else if (event.tag === 'notification-sync') {
-    event.waitUntil(syncNotifications());
+  } else if (event.tag === 'cache-cleanup') {
+    event.waitUntil(performCacheCleanup());
   }
 });
 
-function doBackgroundSync() {
-  return new Promise((resolve) => {
+async function doBackgroundSync() {
+  try {
     console.log('Sincronización en segundo plano ejecutada');
     
-    // Sincronizar datos offline
-    fetch('/api/sync-offline-data', {
+    const response = await fetch('/api/sync-offline-data', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -165,60 +256,57 @@ function doBackgroundSync() {
       body: JSON.stringify({
         timestamp: Date.now()
       })
-    }).then(() => {
-      console.log('Datos sincronizados exitosamente');
-      resolve();
-    }).catch((error) => {
-      console.error('Error en sincronización:', error);
-      resolve();
     });
-  });
-}
-
-function syncNotifications() {
-  return new Promise((resolve) => {
-    console.log('Sincronizando notificaciones...');
     
-    // Obtener notificaciones pendientes
-    fetch('/api/notifications/pending')
-      .then(response => response.json())
-      .then(notifications => {
-        notifications.forEach(notification => {
-          self.registration.showNotification(notification.title, {
-            body: notification.message,
-            icon: '/icons/icon-192x192.png',
-            data: notification.data
-          });
-        });
-        resolve();
-      })
-      .catch(error => {
-        console.error('Error sincronizando notificaciones:', error);
-        resolve();
-      });
-  });
+    if (response.ok) {
+      console.log('Datos sincronizados exitosamente');
+    }
+  } catch (error) {
+    console.error('Error en sincronización:', error);
+  }
 }
 
-// Manejo de eventos de visibilidad para optimizar rendimiento
+async function performCacheCleanup() {
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    await cleanupCache(cache);
+    console.log('Limpieza programada de cache completada');
+  } catch (error) {
+    console.error('Error en limpieza programada:', error);
+  }
+}
+
+// Limpieza automática cada 2 horas
+setInterval(async () => {
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    await cleanupCache(cache);
+    
+    // Limpiar notificaciones antiguas
+    const notifications = await self.registration.getNotifications();
+    const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
+    
+    notifications.forEach(notification => {
+      if (notification.data?.dateOfArrival < oneDayAgo) {
+        notification.close();
+      }
+    });
+  } catch (error) {
+    console.error('Error en limpieza automática:', error);
+  }
+}, 2 * 60 * 60 * 1000); // 2 horas
+
+// Manejo de mensajes
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
   
   if (event.data && event.data.type === 'GET_VERSION') {
-    event.ports[0].postMessage({ version: CACHE_NAME });
+    event.ports[0].postMessage({ version: CACHE_VERSION });
+  }
+  
+  if (event.data && event.data.type === 'FORCE_CACHE_CLEANUP') {
+    performCacheCleanup();
   }
 });
-
-// Limpiar notificaciones antiguas cada 24 horas
-setInterval(() => {
-  self.registration.getNotifications().then(notifications => {
-    const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
-    
-    notifications.forEach(notification => {
-      if (notification.data.dateOfArrival < oneDayAgo) {
-        notification.close();
-      }
-    });
-  });
-}, 24 * 60 * 60 * 1000); // 24 horas
