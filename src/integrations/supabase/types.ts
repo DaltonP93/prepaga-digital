@@ -102,6 +102,7 @@ export type Database = {
       }
       beneficiaries: {
         Row: {
+          amount: number | null
           birth_date: string | null
           created_at: string
           dni: string | null
@@ -115,6 +116,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          amount?: number | null
           birth_date?: string | null
           created_at?: string
           dni?: string | null
@@ -128,6 +130,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          amount?: number | null
           birth_date?: string | null
           created_at?: string
           dni?: string | null

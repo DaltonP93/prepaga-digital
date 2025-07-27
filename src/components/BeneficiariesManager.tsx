@@ -208,8 +208,8 @@ export function BeneficiariesManager({ saleId, open, onOpenChange }: Beneficiari
                           <div className="flex items-center gap-4 text-sm text-muted-foreground">
                             <span>DNI: {beneficiary.dni}</span>
                             <Badge variant="outline">{beneficiary.relationship}</Badge>
-                            {beneficiary.amount && (
-                              <span>Monto: ${Number(beneficiary.amount).toLocaleString()}</span>
+                            {(beneficiary.amount || 0) > 0 && (
+                              <span>Monto: ${Number(beneficiary.amount || 0).toLocaleString()}</span>
                             )}
                           </div>
                           <div className="flex items-center gap-4 text-sm text-muted-foreground">
