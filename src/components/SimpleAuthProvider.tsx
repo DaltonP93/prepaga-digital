@@ -56,9 +56,33 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
+  const signOut = async () => {
+    try {
+      console.log('🚪 SimpleAuthProvider: Cerrando sesión...');
+      
+      // Limpiar cache y datos locales primero
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Cerrar sesión en Supabase
+      await supabase.auth.signOut();
+      
+      console.log('✅ SimpleAuthProvider: Sesión cerrada exitosamente');
+      
+      // Forzar recarga de la página para limpiar estado
+      window.location.href = '/login';
+      
+    } catch (error) {
+      console.error('❌ SimpleAuthProvider: Error al cerrar sesión:', error);
+      // Incluso si hay error, limpiar y redirigir
+      window.location.href = '/login';
+    }
+  };
+
   const contextValue: SimpleAuthContextType = {
     ...auth,
     signIn,
+    signOut,
   };
 
   return <SimpleAuthContext.Provider value={contextValue}>{children}</SimpleAuthContext.Provider>;

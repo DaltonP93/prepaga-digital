@@ -1,5 +1,5 @@
+
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ProfileCompletionBanner } from '@/components/ProfileCompletionBanner';
 import { SecuritySettings } from '@/components/SecuritySettings';
 import NotificationSettings from '@/components/NotificationSettings';
+import { ProfileLogoutButton } from '@/components/ProfileLogoutButton';
 
 interface Profile {
   id: string;
@@ -39,30 +40,6 @@ const profileSchema = z.object({
   country: z.string().min(3, { message: "El país debe tener al menos 3 caracteres." }),
   zip_code: z.string().min(4, { message: "El código postal debe tener al menos 4 caracteres." }),
 });
-
-const LogoutButton = () => {
-  const navigate = useNavigate();
-  const { toast } = useToast();
-
-  const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo cerrar la sesión",
-        variant: "destructive"
-      });
-    } else {
-      navigate('/login');
-    }
-  };
-
-  return (
-    <Button variant="destructive" onClick={handleLogout}>
-      Cerrar Sesión
-    </Button>
-  );
-};
 
 const Profile = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -154,7 +131,7 @@ const Profile = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold tracking-tight">Perfil</h1>
-          <LogoutButton />
+          <ProfileLogoutButton />
         </div>
 
         {!profile && (

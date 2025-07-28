@@ -1,11 +1,11 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { LogOut } from 'lucide-react';
+import { LogOut, Loader2 } from 'lucide-react';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { LogoutConfirmDialog } from './LogoutConfirmDialog';
 
-export const LogoutButton = () => {
+export const ProfileLogoutButton = () => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { signOut } = useSimpleAuthContext();
@@ -13,11 +13,11 @@ export const LogoutButton = () => {
   const handleLogout = async () => {
     setIsLoading(true);
     try {
-      console.log('🚪 LogoutButton: Iniciando logout...');
+      console.log('🚪 ProfileLogoutButton: Iniciando logout...');
       await signOut();
-      console.log('✅ LogoutButton: Logout completado');
+      console.log('✅ ProfileLogoutButton: Logout completado');
     } catch (error) {
-      console.error('❌ LogoutButton: Error al cerrar sesión:', error);
+      console.error('❌ ProfileLogoutButton: Error al cerrar sesión:', error);
       // Forzar limpieza y redirección incluso si hay error
       localStorage.clear();
       sessionStorage.clear();
@@ -31,14 +31,22 @@ export const LogoutButton = () => {
   return (
     <>
       <Button
-        variant="ghost"
-        size="sm"
+        variant="destructive"
         onClick={() => setShowConfirm(true)}
-        className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
         disabled={isLoading}
+        className="gap-2"
       >
-        <LogOut className="h-4 w-4 mr-2" />
-        {isLoading ? 'Cerrando...' : 'Cerrar Sesión'}
+        {isLoading ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Cerrando...
+          </>
+        ) : (
+          <>
+            <LogOut className="h-4 w-4" />
+            Cerrar Sesión
+          </>
+        )}
       </Button>
 
       <LogoutConfirmDialog

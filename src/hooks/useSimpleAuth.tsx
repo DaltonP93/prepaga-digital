@@ -20,7 +20,7 @@ export const useSimpleAuth = (): SimpleAuthContextType => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Función simple para obtener perfil
+  // Función optimizada para obtener perfil
   const fetchProfile = useCallback(async (userId: string) => {
     try {
       console.log('👤 SimpleAuth: Obteniendo perfil para:', userId);
@@ -47,16 +47,31 @@ export const useSimpleAuth = (): SimpleAuthContextType => {
   const signOut = useCallback(async () => {
     try {
       console.log('🚪 SimpleAuth: Cerrando sesión...');
-      await supabase.auth.signOut();
+      
+      // Limpiar estados primero
       setUser(null);
       setProfile(null);
       setSession(null);
+      setLoading(false);
+      
+      // Limpiar storage
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Cerrar sesión en Supabase
+      await supabase.auth.signOut();
+      
     } catch (error) {
       console.error('❌ SimpleAuth: Error al cerrar sesión:', error);
+      // Asegurar que los estados se limpien incluso si hay error
+      setUser(null);
+      setProfile(null);
+      setSession(null);
+      setLoading(false);
     }
   }, []);
 
-  // Inicialización simple
+  // Inicialización optimizada
   useEffect(() => {
     let mounted = true;
 
@@ -101,7 +116,7 @@ export const useSimpleAuth = (): SimpleAuthContextType => {
     };
   }, [fetchProfile]);
 
-  // Listener de cambios de autenticación
+  // Listener de cambios de autenticación optimizado
   useEffect(() => {
     console.log('👂 SimpleAuth: Configurando listener...');
     
@@ -117,9 +132,17 @@ export const useSimpleAuth = (): SimpleAuthContextType => {
 
         if (event === 'SIGNED_OUT') {
           setProfile(null);
+          setLoading(false);
         } else if (event === 'SIGNED_IN' && newSession?.user) {
+          setLoading(true);
           const userProfile = await fetchProfile(newSession.user.id);
           setProfile(userProfile);
+          setLoading(false);
+        } else if (event === 'TOKEN_REFRESHED' && newSession?.user) {
+          if (!profile) {
+            const userProfile = await fetchProfile(newSession.user.id);
+            setProfile(userProfile);
+          }
         }
       }
     );
@@ -128,7 +151,7 @@ export const useSimpleAuth = (): SimpleAuthContextType => {
       console.log('🔇 SimpleAuth: Desconectando listener');
       subscription.unsubscribe();
     };
-  }, [fetchProfile]);
+  }, [fetchProfile, profile]);
 
   return {
     user,
