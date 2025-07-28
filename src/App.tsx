@@ -1,9 +1,10 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
-import { AuthProvider } from '@/components/AuthProvider';
+import { SimpleAuthProvider } from '@/components/SimpleAuthProvider';
 import { SessionTimeoutProvider } from '@/components/SessionTimeoutProvider';
 import { useCacheManager } from '@/hooks/useCacheManager';
 import Dashboard from '@/pages/Dashboard';
@@ -68,11 +69,11 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-        <AuthProvider>
+        <SimpleAuthProvider>
           <SessionTimeoutProvider>
             <AppContent />
           </SessionTimeoutProvider>
-        </AuthProvider>
+        </SimpleAuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
