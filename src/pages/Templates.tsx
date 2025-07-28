@@ -20,7 +20,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, Edit } from "lucide-react";
+import { Trash2, Plus, Edit, ExternalLink } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 
@@ -31,11 +31,59 @@ const Templates = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   const handleCreateTemplate = () => {
+    // Abrir en nueva pestaña
+    const newWindow = window.open('', '_blank', 'width=1400,height=900,scrollbars=yes,resizable=yes');
+    if (newWindow) {
+      newWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Nuevo Template</title>
+          <style>
+            body { margin: 0; padding: 20px; font-family: system-ui, -apple-system, sans-serif; }
+            .container { max-width: 1200px; margin: 0 auto; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>Nuevo Template</h1>
+            <p>Cargando formulario...</p>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+    
+    // Alternativa: abrir en la misma ventana pero con más espacio
     setSelectedTemplate(null);
     setIsFormOpen(true);
   };
 
   const handleEditTemplate = (template: any) => {
+    // Abrir en nueva pestaña para edición
+    const newWindow = window.open('', '_blank', 'width=1400,height=900,scrollbars=yes,resizable=yes');
+    if (newWindow) {
+      newWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Editar Template: ${template.name}</title>
+          <style>
+            body { margin: 0; padding: 20px; font-family: system-ui, -apple-system, sans-serif; }
+            .container { max-width: 1200px; margin: 0 auto; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>Editar Template: ${template.name}</h1>
+            <p>Cargando formulario...</p>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+    
+    // Alternativa: abrir en la misma ventana
     setSelectedTemplate(template);
     setIsFormOpen(true);
   };
@@ -71,9 +119,10 @@ const Templates = () => {
               Gestiona las plantillas para generar documentos
             </p>
           </div>
-          <Button onClick={handleCreateTemplate}>
-            <Plus className="h-4 w-4 mr-2" />
+          <Button onClick={handleCreateTemplate} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
             Crear Template
+            <ExternalLink className="h-4 w-4" />
           </Button>
         </div>
 
@@ -88,8 +137,10 @@ const Templates = () => {
             {!templates || templates.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-muted-foreground">No hay templates creados</p>
-                <Button onClick={handleCreateTemplate} className="mt-4">
+                <Button onClick={handleCreateTemplate} className="mt-4 flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
                   Crear primer template
+                  <ExternalLink className="h-4 w-4" />
                 </Button>
               </div>
             ) : (
@@ -149,8 +200,10 @@ const Templates = () => {
                             variant="ghost" 
                             size="sm"
                             onClick={() => handleEditTemplate(template)}
+                            className="flex items-center gap-1"
                           >
                             <Edit className="h-4 w-4" />
+                            <ExternalLink className="h-3 w-3" />
                           </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>

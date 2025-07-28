@@ -1,3 +1,4 @@
+
 import React, { useCallback } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -18,7 +19,9 @@ import {
   Calendar, 
   Hash, 
   ToggleLeft,
-  PenTool
+  PenTool,
+  List,
+  HelpCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTemplatePlaceholders } from '@/hooks/useTemplatePlaceholders';
@@ -133,6 +136,7 @@ interface TipTapEditorProps {
   onContentChange: (content: string) => void;
   dynamicFields: any[];
   onDynamicFieldsChange: (fields: any[]) => void;
+  templateQuestions?: any[];
 }
 
 export const TipTapEditor: React.FC<TipTapEditorProps> = ({
@@ -140,6 +144,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
   onContentChange,
   dynamicFields,
   onDynamicFieldsChange,
+  templateQuestions = [],
 }) => {
   const { placeholders } = useTemplatePlaceholders();
   const [showImageManager, setShowImageManager] = React.useState(false);
@@ -180,11 +185,16 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         const placeholderData = event.dataTransfer?.getData('application/json');
         if (placeholderData) {
           try {
-            const placeholder = JSON.parse(placeholderData);
-            insertPlaceholder(placeholder.placeholder_name);
-            return true;
+            const data = JSON.parse(placeholderData);
+            if (data.type === 'placeholder') {
+              insertPlaceholder(data.placeholder_name);
+              return true;
+            } else if (data.type === 'question') {
+              insertSingleQuestion(data.question);
+              return true;
+            }
           } catch (e) {
-            console.error('Error parsing dropped placeholder:', e);
+            console.error('Error parsing dropped data:', e);
           }
         }
         return false;
@@ -228,6 +238,59 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       },
     }).run();
   }, [editor, placeholders]);
+
+  const insertSingleQuestion = useCallback((question: any) => {
+    if (!editor) return;
+    
+    let questionHTML = `<p><strong>${question.question_text}</strong></p>`;
+    
+    if (question.question_type === 'yes_no') {
+      questionHTML += `<p>☐ Sí &nbsp;&nbsp;&nbsp; ☐ No</p>`;
+    } else if (question.question_type === 'text') {
+      questionHTML += `<p>Respuesta: ________________________</p>`;
+    } else if (question.question_type === 'number') {
+      questionHTML += `<p>Respuesta: ________________________</p>`;
+    } else if (question.question_type === 'select_single' || question.question_type === 'select_multiple') {
+      if (question.template_question_options && question.template_question_options.length > 0) {
+        question.template_question_options.forEach((option: any) => {
+          questionHTML += `<p>☐ ${option.option_text}</p>`;
+        });
+      }
+    }
+    
+    questionHTML += `<br>`;
+    
+    editor.chain().focus().insertContent(questionHTML).run();
+  }, [editor]);
+
+  const insertAllQuestions = useCallback(() => {
+    if (!editor || !templateQuestions || templateQuestions.length === 0) return;
+
+    let questionsHTML = "<h3>Cuestionario</h3>";
+    
+    templateQuestions.forEach((question, index) => {
+      questionsHTML += `<p><strong>${index + 1}. ${question.question_text}</strong></p>`;
+      
+      if (question.question_type === 'yes_no') {
+        questionsHTML += `<p>☐ Sí &nbsp;&nbsp;&nbsp; ☐ No</p>`;
+      } else if (question.question_type === 'text') {
+        questionsHTML += `<p>Respuesta: ________________________</p>`;
+      } else if (question.question_type === 'number') {
+        questionsHTML += `<p>Respuesta: ________________________</p>`;
+      } else if (question.question_type === 'select_single' || question.question_type === 'select_multiple') {
+        if (question.template_question_options && question.template_question_options.length > 0) {
+          question.template_question_options.forEach((option: any) => {
+            questionsHTML += `<p>☐ ${option.option_text}</p>`;
+          });
+        }
+      }
+      
+      questionsHTML += `<br>`;
+    });
+
+    editor.chain().focus().insertContent(questionsHTML).run();
+    toast.success('Preguntas insertadas correctamente');
+  }, [editor, templateQuestions]);
 
   const insertSignature = useCallback(() => {
     if (!editor) return;
@@ -273,12 +336,9 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     console.log('Editor available:', !!editor);
     
     if (editor) {
-      // Ensure editor is focused and ready
       editor.chain().focus().setImage({ src: url }).run();
       console.log('Image insertion command executed');
       setShowImageManager(false);
-      
-      // Add toast feedback
       toast.success('Imagen insertada correctamente');
     } else {
       console.error('Editor not available for image insertion');
@@ -306,10 +366,22 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       <div className="lg:col-span-3 space-y-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle>Editor de Documento</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Editor de Documento</CardTitle>
+              {templateQuestions && templateQuestions.length > 0 && (
+                <Button
+                  onClick={insertAllQuestions}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <List className="h-4 w-4" />
+                  Insertar Todas las Preguntas
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="p-0">
-            {/* Enhanced Toolbar */}
             <EditorToolbar
               editor={editor}
               onImageClick={() => addImage()}
@@ -321,7 +393,6 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
               className="min-h-[500px] relative border-t"
               onDrop={(e) => {
                 e.preventDefault();
-                // Handle drop zone visual feedback
               }}
               onDragOver={(e) => {
                 e.preventDefault();
@@ -330,9 +401,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             >
               <EditorContent editor={editor} />
               
-              {/* Drop Zone Overlay */}
               <div className="absolute top-4 right-4 text-xs text-muted-foreground bg-white/90 px-3 py-2 rounded-md border shadow-sm">
-                💡 Arrastra campos desde el panel lateral
+                💡 Arrastra campos y preguntas desde el panel lateral
               </div>
             </div>
           </CardContent>
@@ -343,13 +413,13 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
           <CardContent className="pt-4">
             <div className="flex gap-6 text-sm text-muted-foreground">
               <span><strong>Campos:</strong> {dynamicFields.length}</span>
+              <span><strong>Preguntas:</strong> {templateQuestions?.length || 0}</span>
               <span><strong>Palabras:</strong> {editor.getText().split(' ').filter(word => word.length > 0).length}</span>
               <span><strong>Caracteres:</strong> {editor.getText().length}</span>
             </div>
           </CardContent>
         </Card>
 
-        {/* Image Manager Modal */}
         {showImageManager && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
@@ -374,6 +444,8 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
         <DraggablePlaceholdersSidebar
           onPlaceholderInsert={insertPlaceholder}
           dynamicFields={dynamicFields}
+          templateQuestions={templateQuestions}
+          onQuestionInsert={insertSingleQuestion}
         />
       </div>
     </div>

@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,8 +15,9 @@ import { TemplateVariableSelector } from "@/components/TemplateVariableSelector"
 import { QuestionBuilder } from "@/components/QuestionBuilder";
 import { DocumentPreview } from "@/components/DocumentPreview";
 import { QuestionCopyDialog } from "@/components/QuestionCopyDialog";
-import { FileText, Settings, Eye, HelpCircle, Copy } from "lucide-react";
+import { FileText, Settings, Eye, HelpCircle, Copy, List } from "lucide-react";
 import { useCreateTemplate, useUpdateTemplate } from "@/hooks/useTemplates";
+import { useTemplateQuestions } from "@/hooks/useTemplateQuestions";
 import { Database } from "@/integrations/supabase/types";
 
 type Template = Database['public']['Tables']['templates']['Row'];
@@ -41,18 +42,38 @@ export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps
   const isEditing = !!template;
   const [showCopyDialog, setShowCopyDialog] = useState(false);
   const [customFields, setCustomFields] = useState<any[]>([]);
+  const [dynamicFields, setDynamicFields] = useState<any[]>([]);
+
+  const { questions } = useTemplateQuestions(template?.id);
 
   const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<TemplateFormData>({
     defaultValues: {
-      name: template?.name || "",
-      description: template?.description || "",
-      content: template?.content as string || "",
-      active: template?.active ?? true,
-      is_global: template?.is_global ?? false,
+      name: "",
+      description: "",
+      content: "",
+      active: true,
+      is_global: false,
     }
   });
 
-  const [dynamicFields, setDynamicFields] = useState<any[]>([]);
+  // Actualizar formulario cuando cambia el template
+  useEffect(() => {
+    if (template) {
+      setValue("name", template.name || "");
+      setValue("description", template.description || "");
+      setValue("content", typeof template.content === 'string' ? template.content : JSON.stringify(template.content) || "");
+      setValue("active", template.active ?? true);
+      setValue("is_global", template.is_global ?? false);
+    } else {
+      reset({
+        name: "",
+        description: "",
+        content: "",
+        active: true,
+        is_global: false,
+      });
+    }
+  }, [template, setValue, reset]);
 
   const onSubmit = async (data: TemplateFormData) => {
     try {
@@ -71,7 +92,6 @@ export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps
       }
       
       onOpenChange(false);
-      reset();
     } catch (error) {
       console.error("Error saving template:", error);
     }
@@ -99,10 +119,40 @@ export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps
     setCustomFields(prev => prev.filter((_, i) => i !== index));
   };
 
+  const insertAllQuestions = () => {
+    if (!questions || questions.length === 0) return;
+
+    let questionsHTML = "<h3>Cuestionario</h3>";
+    
+    questions.forEach((question, index) => {
+      questionsHTML += `<p><strong>${index + 1}. ${question.question_text}</strong></p>`;
+      
+      if (question.question_type === 'yes_no') {
+        questionsHTML += `<p>☐ Sí &nbsp;&nbsp;&nbsp; ☐ No</p>`;
+      } else if (question.question_type === 'text') {
+        questionsHTML += `<p>Respuesta: ________________________</p>`;
+      } else if (question.question_type === 'number') {
+        questionsHTML += `<p>Respuesta: ________________________</p>`;
+      } else if (question.question_type === 'select_single' || question.question_type === 'select_multiple') {
+        if (question.template_question_options && question.template_question_options.length > 0) {
+          question.template_question_options.forEach((option) => {
+            questionsHTML += `<p>☐ ${option.option_text}</p>`;
+          });
+        }
+      }
+      
+      questionsHTML += `<br>`;
+    });
+
+    const currentContent = watch("content");
+    const newContent = currentContent + questionsHTML;
+    setValue("content", newContent);
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-7xl max-h-[95vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
@@ -187,11 +237,22 @@ export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps
               </TabsContent>
 
               <TabsContent value="content" className="space-y-4">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <div className="lg:col-span-2">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                  <div className="lg:col-span-3">
                     <Card>
-                      <CardHeader>
+                      <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Editor de Contenido</CardTitle>
+                        {isEditing && questions && questions.length > 0 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={insertAllQuestions}
+                            className="flex items-center gap-2"
+                          >
+                            <List className="h-4 w-4" />
+                            Insertar Preguntas
+                          </Button>
+                        )}
                       </CardHeader>
                       <CardContent>
                         <TipTapEditor
@@ -199,6 +260,7 @@ export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps
                           onContentChange={handleContentChange}
                           dynamicFields={dynamicFields}
                           onDynamicFieldsChange={handleDynamicFieldsChange}
+                          templateQuestions={questions}
                         />
                       </CardContent>
                     </Card>
@@ -290,7 +352,6 @@ export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps
         </DialogContent>
       </Dialog>
 
-      {/* Dialog para copiar preguntas */}
       {isEditing && (
         <QuestionCopyDialog
           open={showCopyDialog}
