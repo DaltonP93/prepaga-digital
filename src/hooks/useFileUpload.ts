@@ -22,10 +22,16 @@ export const useFileUpload = () => {
     path?: string
   ): Promise<string | null> => {
     try {
+      console.log('🚀 Starting file upload:', file.name, file.type, file.size);
       setUploadState({ progress: 0, isUploading: true, error: null });
 
       const fileName = `${Date.now()}-${file.name}`;
       const filePath = path ? `${path}/${fileName}` : fileName;
+
+      console.log('📁 Upload path:', filePath);
+
+      // Simulate progress updates
+      setUploadState(prev => ({ ...prev, progress: 20 }));
 
       const { data, error } = await supabase.storage
         .from(bucket)
@@ -34,11 +40,23 @@ export const useFileUpload = () => {
           upsert: false,
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Storage upload error:', error);
+        throw error;
+      }
+
+      console.log('✅ File uploaded to storage:', data.path);
+      setUploadState(prev => ({ ...prev, progress: 60 }));
 
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        console.error('❌ User not authenticated:', userError);
+        throw new Error('User not authenticated');
+      }
+
+      console.log('👤 User authenticated:', user.id);
+      setUploadState(prev => ({ ...prev, progress: 80 }));
 
       // Track file upload in database
       const { error: dbError } = await supabase
@@ -54,19 +72,25 @@ export const useFileUpload = () => {
         });
 
       if (dbError) {
-        console.error('Error tracking file upload:', dbError);
+        console.error('❌ Database tracking error:', dbError);
+        // Don't throw here, as the file was successfully uploaded
+      } else {
+        console.log('✅ File tracked in database');
       }
 
-      setUploadState({ progress: 100, isUploading: false, error: null });
+      setUploadState(prev => ({ ...prev, progress: 100 }));
 
       const { data: urlData } = supabase.storage
         .from(bucket)
         .getPublicUrl(data.path);
 
-      toast.success('Archivo subido exitosamente');
+      console.log('🔗 Generated public URL:', urlData.publicUrl);
+
+      setUploadState({ progress: 100, isUploading: false, error: null });
 
       return urlData.publicUrl;
     } catch (error: any) {
+      console.error('❌ Upload failed:', error);
       setUploadState({ progress: 0, isUploading: false, error: error.message });
       toast.error(error.message || 'Error al subir el archivo');
       return null;

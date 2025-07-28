@@ -20,9 +20,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, Edit, ExternalLink } from "lucide-react";
+import { Trash2, Plus, Edit } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 
 const Templates = () => {
   const { templates, isLoading, error } = useTemplates();
@@ -31,61 +30,21 @@ const Templates = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   const handleCreateTemplate = () => {
-    // Abrir en nueva pestaña
-    const newWindow = window.open('', '_blank', 'width=1400,height=900,scrollbars=yes,resizable=yes');
-    if (newWindow) {
-      newWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Nuevo Template</title>
-          <style>
-            body { margin: 0; padding: 20px; font-family: system-ui, -apple-system, sans-serif; }
-            .container { max-width: 1200px; margin: 0 auto; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h1>Nuevo Template</h1>
-            <p>Cargando formulario...</p>
-          </div>
-        </body>
-        </html>
-      `);
-    }
-    
-    // Alternativa: abrir en la misma ventana pero con más espacio
     setSelectedTemplate(null);
     setIsFormOpen(true);
   };
 
   const handleEditTemplate = (template: any) => {
-    // Abrir en nueva pestaña para edición
-    const newWindow = window.open('', '_blank', 'width=1400,height=900,scrollbars=yes,resizable=yes');
-    if (newWindow) {
-      newWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Editar Template: ${template.name}</title>
-          <style>
-            body { margin: 0; padding: 20px; font-family: system-ui, -apple-system, sans-serif; }
-            .container { max-width: 1200px; margin: 0 auto; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h1>Editar Template: ${template.name}</h1>
-            <p>Cargando formulario...</p>
-          </div>
-        </body>
-        </html>
-      `);
-    }
-    
-    // Alternativa: abrir en la misma ventana
     setSelectedTemplate(template);
     setIsFormOpen(true);
+  };
+
+  const handleDeleteTemplate = async (templateId: string) => {
+    try {
+      await deleteTemplateMutation.mutateAsync(templateId);
+    } catch (error) {
+      console.error("Error deleting template:", error);
+    }
   };
 
   const handleCloseForm = () => {
@@ -122,7 +81,6 @@ const Templates = () => {
           <Button onClick={handleCreateTemplate} className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
             Crear Template
-            <ExternalLink className="h-4 w-4" />
           </Button>
         </div>
 
@@ -140,7 +98,6 @@ const Templates = () => {
                 <Button onClick={handleCreateTemplate} className="mt-4 flex items-center gap-2">
                   <Plus className="h-4 w-4" />
                   Crear primer template
-                  <ExternalLink className="h-4 w-4" />
                 </Button>
               </div>
             ) : (
@@ -203,11 +160,14 @@ const Templates = () => {
                             className="flex items-center gap-1"
                           >
                             <Edit className="h-4 w-4" />
-                            <ExternalLink className="h-3 w-3" />
                           </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm">
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                disabled={deleteTemplateMutation.isPending}
+                              >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </AlertDialogTrigger>
@@ -221,10 +181,11 @@ const Templates = () => {
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                 <AlertDialogAction
-                                  onClick={() => deleteTemplateMutation.mutate(template.id)}
+                                  onClick={() => handleDeleteTemplate(template.id)}
                                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  disabled={deleteTemplateMutation.isPending}
                                 >
-                                  Eliminar
+                                  {deleteTemplateMutation.isPending ? "Eliminando..." : "Eliminar"}
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
@@ -241,7 +202,7 @@ const Templates = () => {
 
         <TemplateForm
           open={isFormOpen}
-          onOpenChange={setIsFormOpen}
+          onOpenChange={handleCloseForm}
           template={selectedTemplate}
         />
       </div>

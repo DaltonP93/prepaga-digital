@@ -1,3 +1,4 @@
+
 import React, { useCallback, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,6 +41,8 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
   const { data: images, isLoading, refetch } = useQuery({
     queryKey: ['template-images'],
     queryFn: async () => {
+      console.log('🔍 Fetching images from database...');
+      
       const { data, error } = await supabase
         .from('file_uploads')
         .select('*')
@@ -47,10 +50,15 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
         .like('mime_type', 'image%')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching images:', error);
+        throw error;
+      }
+
+      console.log('✅ Images fetched from database:', data?.length || 0, 'items');
 
       // Get public URLs for images
-      const imagesWithUrls: UploadedImage[] = data.map(img => {
+      const imagesWithUrls: UploadedImage[] = data?.map(img => {
         const { data: urlData } = supabase.storage
           .from('documents')
           .getPublicUrl(img.file_path);
@@ -59,8 +67,9 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
           ...img,
           url: urlData.publicUrl
         };
-      });
+      }) || [];
 
+      console.log('✅ Images with URLs:', imagesWithUrls.length);
       return imagesWithUrls;
     }
   });
@@ -86,14 +95,28 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
   }, []);
 
   const handleFileUpload = async (file: File) => {
+    console.log('📤 Starting file upload:', file.name, file.type);
+    
     if (!file.type.startsWith('image/')) {
       toast.error('Por favor selecciona solo archivos de imagen');
       return;
     }
 
-    const url = await uploadFile(file, 'documents', 'template-images');
-    if (url) {
-      refetch();
+    try {
+      const url = await uploadFile(file, 'documents', 'template-images');
+      console.log('✅ File uploaded successfully:', url);
+      
+      if (url) {
+        // Refresh the images list
+        await refetch();
+        toast.success('Imagen subida exitosamente');
+        
+        // Automatically select the uploaded image
+        onImageSelect(url);
+      }
+    } catch (error) {
+      console.error('❌ Error uploading file:', error);
+      toast.error('Error al subir la imagen');
     }
   };
 
@@ -143,6 +166,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
             accept="image/*"
             onChange={handleInputChange}
             className="hidden"
+            disabled={uploadState.isUploading}
           />
           
           {uploadState.isUploading ? (
@@ -150,6 +174,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
               <Upload className="w-8 h-8 mx-auto text-primary animate-pulse" />
               <p className="text-sm text-muted-foreground">Subiendo imagen...</p>
               <Progress value={uploadState.progress} className="w-full" />
+              <p className="text-xs text-muted-foreground">{uploadState.progress}%</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -162,6 +187,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
                 variant="outline"
                 size="sm"
                 onClick={() => inputRef.current?.click()}
+                disabled={uploadState.isUploading}
               >
                 Seleccionar archivo
               </Button>
