@@ -10,8 +10,6 @@ if (!container) {
 }
 
 const root = createRoot(container);
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+
+// Render sin StrictMode para evitar problemas de inicialización
+root.render(<App />);
