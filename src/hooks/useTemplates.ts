@@ -138,17 +138,29 @@ export const useDeleteTemplate = () => {
     mutationFn: async (templateId: string) => {
       console.log('🗑️ Deleting template:', templateId);
       
-      const { error } = await supabase
+      // First, delete related template questions and options
+      const { error: questionsError } = await supabase
+        .from('template_questions')
+        .delete()
+        .eq('template_id', templateId);
+
+      if (questionsError) {
+        console.error('❌ Error deleting template questions:', questionsError);
+        throw questionsError;
+      }
+
+      // Then delete the template
+      const { error: templateError } = await supabase
         .from('templates')
         .delete()
         .eq('id', templateId);
 
-      if (error) {
-        console.error('❌ Error deleting template:', error);
-        throw error;
+      if (templateError) {
+        console.error('❌ Error deleting template:', templateError);
+        throw templateError;
       }
       
-      console.log('✅ Template deleted');
+      console.log('✅ Template deleted successfully');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['templates'] });
