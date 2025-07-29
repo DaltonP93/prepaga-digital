@@ -88,13 +88,25 @@ serve(async (req) => {
       });
     }
 
+    // Validate role
+    const validRoles = ['super_admin', 'admin', 'gestor', 'vendedor'];
+    if (!validRoles.includes(role)) {
+      return new Response(JSON.stringify({ 
+        error: 'Invalid role provided',
+        details: `Role must be one of: ${validRoles.join(', ')}`
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     console.log('Creating user with data:', { email, first_name, last_name, role, company_id });
 
     // Create user with admin privileges
     const { data: authData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // Skip email confirmation for admin-created users
+      email_confirm: true,
       user_metadata: {
         first_name,
         last_name,

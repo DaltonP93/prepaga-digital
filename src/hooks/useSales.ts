@@ -95,6 +95,36 @@ export const useUpdateSale = () => {
   });
 };
 
+export const useDeleteSale = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (saleId: string) => {
+      const { error } = await supabase
+        .from('sales')
+        .delete()
+        .eq('id', saleId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      toast({
+        title: "Venta eliminada",
+        description: "La venta ha sido eliminada exitosamente.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo eliminar la venta.",
+        variant: "destructive",
+      });
+    },
+  });
+};
+
 export const useGenerateQuestionnaireLink = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
