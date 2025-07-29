@@ -376,7 +376,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
                   className="flex items-center gap-2"
                 >
                   <List className="h-4 w-4" />
-                  Insertar Todas las Preguntas
+                  Insertar Preguntas
                 </Button>
               )}
             </div>

@@ -103,29 +103,35 @@ export const DraggablePlaceholdersSidebar: React.FC<DraggablePlaceholdersSidebar
           <CollapsibleContent>
             <CardContent className="pt-0">
               <div className="space-y-2">
-                {placeholders?.map((placeholder) => (
-                  <div
-                    key={placeholder.id}
-                    className="flex items-center gap-2 p-2 border rounded-lg bg-gray-50 hover:bg-gray-100 cursor-move"
-                    draggable
-                    onDragStart={(e) => handlePlaceholderDragStart(e, placeholder)}
-                    onClick={() => onPlaceholderInsert(placeholder.placeholder_name)}
-                  >
-                    <GripVertical className="h-4 w-4 text-gray-400" />
-                    {getPlaceholderIcon(placeholder.placeholder_type)}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">
-                        {placeholder.placeholder_label}
+                {placeholders && placeholders.length > 0 ? (
+                  placeholders.map((placeholder) => (
+                    <div
+                      key={placeholder.id}
+                      className="flex items-center gap-2 p-2 border rounded-lg bg-gray-50 hover:bg-gray-100 cursor-move"
+                      draggable
+                      onDragStart={(e) => handlePlaceholderDragStart(e, placeholder)}
+                      onClick={() => onPlaceholderInsert(placeholder.placeholder_name)}
+                    >
+                      <GripVertical className="h-4 w-4 text-gray-400" />
+                      {getPlaceholderIcon(placeholder.placeholder_type)}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">
+                          {placeholder.placeholder_label}
+                        </div>
+                        <div className="text-xs text-gray-500 truncate">
+                          {placeholder.placeholder_name}
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-500 truncate">
-                        {placeholder.placeholder_name}
-                      </div>
+                      <Badge variant="secondary" className="text-xs">
+                        {placeholder.placeholder_type}
+                      </Badge>
                     </div>
-                    <Badge variant="secondary" className="text-xs">
-                      {placeholder.placeholder_type}
-                    </Badge>
+                  ))
+                ) : (
+                  <div className="text-center py-4 text-sm text-gray-500">
+                    No hay campos del sistema disponibles
                   </div>
-                ))}
+                )}
               </div>
             </CardContent>
           </CollapsibleContent>
