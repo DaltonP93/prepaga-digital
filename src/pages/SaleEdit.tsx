@@ -1,10 +1,10 @@
 
 import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
-import { SaleForm } from "@/components/SaleForm";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSales } from "@/hooks/useSales";
+import { SaleForm } from "@/components/SaleForm";
 
 export default function SaleEdit() {
   const { id } = useParams<{ id: string }>();

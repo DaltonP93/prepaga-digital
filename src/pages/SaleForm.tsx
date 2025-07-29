@@ -14,7 +14,7 @@ import { useCreateSale, useUpdateSale, useSales } from '@/hooks/useSales';
 import { useClients } from '@/hooks/useClients';
 import { usePlans } from '@/hooks/usePlans';
 import { useCompanies } from '@/hooks/useCompanies';
-import { Loader2, Plus, Search } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 
 interface SaleFormData {
   client_id: string;
@@ -22,7 +22,6 @@ interface SaleFormData {
   company_id: string;
   total_amount: number;
   notes?: string;
-  // Remove status field from form - it should be set automatically
 }
 
 const SaleForm = () => {
@@ -83,7 +82,6 @@ const SaleForm = () => {
         await updateSale.mutateAsync({ id, ...data });
         toast.success('Venta actualizada exitosamente');
       } else {
-        // For new sales, always start with "borrador" status
         await createSale.mutateAsync({
           ...data,
           status: 'borrador'

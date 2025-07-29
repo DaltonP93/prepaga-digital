@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +18,7 @@ import { useTemplates } from "@/hooks/useTemplates";
 import { useCreateSale, useUpdateSale } from "@/hooks/useSales";
 import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 import { Database } from "@/integrations/supabase/types";
+import { toast } from "sonner";
 
 type Sale = Database['public']['Tables']['sales']['Row'];
 
@@ -34,7 +34,6 @@ interface SaleFormData {
   template_ids: string[];
   total_amount: number;
   notes?: string;
-  // ... rest of existing fields
   workplace?: string;
   profession?: string;
   work_phone?: string;
@@ -51,7 +50,7 @@ interface SaleFormData {
 export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
   const { data: clients = [] } = useClients();
   const { data: plans = [] } = usePlans();
-  const { templates = [] } = useTemplates();
+  const { data: templates = [] } = useTemplates();
   const { profile } = useSimpleAuthContext();
   const createSale = useCreateSale();
   const updateSale = useUpdateSale();
@@ -82,6 +81,12 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
 
   const selectedPlan = plans.find(plan => plan.id === watch("plan_id"));
 
+  useEffect(() => {
+    if (selectedPlan) {
+      setValue("total_amount", Number(selectedPlan.price));
+    }
+  }, [selectedPlan, setValue]);
+
   const onSubmit = async (data: SaleFormData) => {
     try {
       if (isEditing && sale) {
@@ -90,6 +95,7 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
           ...data,
           template_id: selectedTemplates.length > 0 ? selectedTemplates[0] : null,
         });
+        toast.success('Venta actualizada exitosamente');
       } else {
         await createSale.mutateAsync({
           ...data,
@@ -98,11 +104,13 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
           salesperson_id: profile?.id,
           status: 'borrador',
         });
+        toast.success('Venta creada exitosamente');
       }
       onOpenChange(false);
       reset();
     } catch (error) {
       console.error("Error saving sale:", error);
+      toast.error('Error al guardar la venta');
     }
   };
 
