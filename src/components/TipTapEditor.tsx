@@ -1,3 +1,4 @@
+
 import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -109,7 +110,7 @@ const ResizableImage = Image.extend({
   },
 
   addNodeView() {
-    return ({ node, getPos }) => {
+    return ({ node, getPos, editor }) => {
       const container = document.createElement('div');
       container.className = 'image-container relative inline-block group';
       
@@ -145,11 +146,10 @@ const ResizableImage = Image.extend({
         
         // Update attributes using transaction
         const pos = getPos();
-        if (pos !== undefined) {
-          const tr = node.editor?.state.tr;
-          if (tr) {
-            tr.setNodeAttribute(pos, 'width', clampedWidth);
-          }
+        if (pos !== undefined && editor) {
+          const tr = editor.state.tr;
+          tr.setNodeAttribute(pos, 'width', clampedWidth);
+          editor.view.dispatch(tr);
         }
       });
       
