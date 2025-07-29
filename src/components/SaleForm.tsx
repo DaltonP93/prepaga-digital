@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -50,7 +51,7 @@ interface SaleFormData {
 export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
   const { data: clients = [] } = useClients();
   const { data: plans = [] } = usePlans();
-  const { data: templates = [] } = useTemplates();
+  const { templates = [] } = useTemplates();
   const { profile } = useSimpleAuthContext();
   const createSale = useCreateSale();
   const updateSale = useUpdateSale();
