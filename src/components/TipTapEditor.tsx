@@ -1,4 +1,3 @@
-
 import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -31,11 +30,11 @@ import {
   ChevronDown,
   Maximize2,
   Minimize2,
-  DropdownMenu,
+  ChevronDown as DropdownIcon,
   CheckSquare,
-  RadioButton,
+  Circle as RadioIcon,
   QrCode,
-  Barcode3
+  Barcode
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTemplatePlaceholders } from '@/hooks/useTemplatePlaceholders';
@@ -110,7 +109,7 @@ const ResizableImage = Image.extend({
   },
 
   addNodeView() {
-    return ({ node, updateAttributes }) => {
+    return ({ node, getPos }) => {
       const container = document.createElement('div');
       container.className = 'image-container relative inline-block group';
       
@@ -143,7 +142,15 @@ const ResizableImage = Image.extend({
         const clampedWidth = Math.max(50, Math.min(800, width));
         
         img.style.width = `${clampedWidth}px`;
-        updateAttributes({ width: clampedWidth });
+        
+        // Update attributes using transaction
+        const pos = getPos();
+        if (pos !== undefined) {
+          const tr = node.editor?.state.tr;
+          if (tr) {
+            tr.setNodeAttribute(pos, 'width', clampedWidth);
+          }
+        }
       });
       
       document.addEventListener('mouseup', () => {
@@ -586,7 +593,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
                   onClick={insertDropdown}
                   className="h-8 px-2 text-xs"
                 >
-                  <DropdownMenu className="h-4 w-4 mr-1" />
+                  <DropdownIcon className="h-4 w-4 mr-1" />
                   Lista
                 </Button>
                 <Button
@@ -604,7 +611,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
                   onClick={insertRadioButton}
                   className="h-8 px-2 text-xs"
                 >
-                  <RadioButton className="h-4 w-4 mr-1" />
+                  <RadioIcon className="h-4 w-4 mr-1" />
                   Radio
                 </Button>
                 <Button
@@ -622,7 +629,7 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
                   onClick={insertBarcode}
                   className="h-8 px-2 text-xs"
                 >
-                  <Barcode3 className="h-4 w-4 mr-1" />
+                  <Barcode className="h-4 w-4 mr-1" />
                   Código
                 </Button>
               </div>
