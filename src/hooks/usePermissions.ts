@@ -32,22 +32,16 @@ export const useAvailablePermissions = () => {
   return useQuery({
     queryKey: ['available-permissions'],
     queryFn: async (): Promise<Permission[]> => {
-      const { data, error } = await supabase
-        .rpc('get_user_permissions', { user_id: 'dummy' });
-
-      if (error) {
-        console.warn('Permissions table not ready yet, using defaults');
-        return [
-          { id: '1', permission_key: 'dashboard.view', permission_name: 'Ver Dashboard', category: 'dashboard', is_active: true },
-          { id: '2', permission_key: 'sales.view', permission_name: 'Ver Ventas', category: 'sales', is_active: true },
-          { id: '3', permission_key: 'sales.create', permission_name: 'Crear Ventas', category: 'sales', is_active: true },
-          { id: '4', permission_key: 'sales.edit', permission_name: 'Editar Ventas', category: 'sales', is_active: true },
-          { id: '5', permission_key: 'clients.view', permission_name: 'Ver Clientes', category: 'clients', is_active: true },
-          { id: '6', permission_key: 'plans.view', permission_name: 'Ver Planes', category: 'plans', is_active: true },
-          { id: '7', permission_key: 'users.view', permission_name: 'Ver Usuarios', category: 'admin', is_active: true },
-        ];
-      }
-      return [];
+      console.warn('Permissions table not ready yet, using defaults');
+      return [
+        { id: '1', permission_key: 'dashboard.view', permission_name: 'Ver Dashboard', category: 'dashboard', is_active: true },
+        { id: '2', permission_key: 'sales.view', permission_name: 'Ver Ventas', category: 'sales', is_active: true },
+        { id: '3', permission_key: 'sales.create', permission_name: 'Crear Ventas', category: 'sales', is_active: true },
+        { id: '4', permission_key: 'sales.edit', permission_name: 'Editar Ventas', category: 'sales', is_active: true },
+        { id: '5', permission_key: 'clients.view', permission_name: 'Ver Clientes', category: 'clients', is_active: true },
+        { id: '6', permission_key: 'plans.view', permission_name: 'Ver Planes', category: 'plans', is_active: true },
+        { id: '7', permission_key: 'users.view', permission_name: 'Ver Usuarios', category: 'admin', is_active: true },
+      ];
     },
   });
 };

@@ -71,7 +71,15 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
         });
         toast.success('Usuario actualizado exitosamente');
       } else {
-        await createUser.mutateAsync(data);
+        // For create user, password is required
+        if (!data.password) {
+          toast.error('La contraseña es requerida');
+          return;
+        }
+        await createUser.mutateAsync({
+          ...data,
+          password: data.password
+        });
         toast.success('Usuario creado exitosamente');
       }
       onOpenChange(false);

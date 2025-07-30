@@ -14,6 +14,8 @@ import {
 
 interface SimpleLayoutProps {
   children: ReactNode;
+  title?: string;
+  description?: string;
 }
 
 export function SimpleLayout({ children }: SimpleLayoutProps) {
