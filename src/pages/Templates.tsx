@@ -21,7 +21,7 @@ type Template = Database['public']['Tables']['templates']['Row'];
 
 const Templates = () => {
   const navigate = useNavigate();
-  const { data: templates = [], isLoading } = useTemplates();
+  const { templates = [], isLoading } = useTemplates();
   const deleteTemplate = useDeleteTemplate();
   const { profile } = useSimpleAuthContext();
   
@@ -61,6 +61,10 @@ const Templates = () => {
     return ['super_admin', 'admin', 'gestor'].includes(profile?.role || '');
   };
 
+  const handleOpenInNewTabChange = (checked: boolean | "indeterminate") => {
+    setOpenInNewTab(checked === true);
+  };
+
   if (isLoading) {
     return (
       <Layout title="Gestión de Templates" description="Administrar plantillas de documentos">
@@ -89,7 +93,7 @@ const Templates = () => {
               <Checkbox 
                 id="openInNewTab"
                 checked={openInNewTab}
-                onCheckedChange={setOpenInNewTab}
+                onCheckedChange={handleOpenInNewTabChange}
               />
               <label htmlFor="openInNewTab" className="text-sm">
                 Abrir en nueva pestaña
