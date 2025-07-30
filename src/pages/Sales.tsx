@@ -155,7 +155,7 @@ const Sales = () => {
                       {sale.plans?.name || 'Sin plan'}
                     </TableCell>
                     <TableCell>
-                      ${Number(sale.total_amount).toLocaleString('es-PY')}
+                      ₲{Number(sale.total_amount).toLocaleString('es-PY')}
                     </TableCell>
                     <TableCell>
                       <Badge variant={getStatusBadgeVariant(sale.status)} className="gap-1">
@@ -172,6 +172,7 @@ const Sales = () => {
                           variant="outline"
                           size="sm"
                           onClick={() => navigate(`/sales/${sale.id}`)}
+                          title="Ver detalle de la venta"
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -179,6 +180,7 @@ const Sales = () => {
                           variant="outline"
                           size="sm"
                           onClick={() => handleEditSale(sale)}
+                          title="Editar venta"
                         >
                           <Edit3 className="h-4 w-4" />
                         </Button>
@@ -189,6 +191,7 @@ const Sales = () => {
                             size="sm"
                             onClick={() => handleGenerateQuestionnaireLink(sale.id)}
                             disabled={generateQuestionnaireLink.isPending}
+                            title="Generar enlace de cuestionario"
                           >
                             <FileText className="h-4 w-4" />
                           </Button>
@@ -199,6 +202,7 @@ const Sales = () => {
                           size="sm"
                           onClick={() => handleGenerateSignatureLink(sale.id)}
                           disabled={generateSignatureLink.isPending}
+                          title="Generar enlace de firma"
                         >
                           <PenTool className="h-4 w-4" />
                         </Button>
@@ -210,6 +214,7 @@ const Sales = () => {
                                 variant="outline"
                                 size="sm"
                                 className="text-destructive hover:text-destructive"
+                                title="Eliminar venta"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>

@@ -1,256 +1,276 @@
-import { useState, useEffect } from "react";
+
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Plus, 
-  Search, 
-  Edit, 
-  Trash2, 
-  Eye, 
-  Copy, 
-  Filter,
-  FileText,
-  ExternalLink,
-  History
-} from "lucide-react";
-import { useTemplates, useDeleteTemplate } from "@/hooks/useTemplates";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Plus, Eye, Edit3, Trash2, Filter, Search, ExternalLink } from "lucide-react";
 import { TemplateForm } from "@/components/TemplateForm";
-import { useToast } from "@/hooks/use-toast";
+import { useTemplates, useDeleteTemplate } from "@/hooks/useTemplates";
 import { Database } from "@/integrations/supabase/types";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 
-type Template = Database['public']['Tables']['templates']['Row'] & {
-  company?: { name: string } | null;
-  creator?: { first_name: string; last_name: string } | null;
-  question_count?: number;
-};
+type Template = Database['public']['Tables']['templates']['Row'];
 
-export default function Templates() {
-  const { templates, isLoading } = useTemplates();
+const Templates = () => {
+  const navigate = useNavigate();
+  const { data: templates = [], isLoading } = useTemplates();
   const deleteTemplate = useDeleteTemplate();
-  const { toast } = useToast();
+  const { profile } = useSimpleAuthContext();
   
+  const [showTemplateForm, setShowTemplateForm] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
-  const [formOpen, setFormOpen] = useState(false);
-  const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [showFilters, setShowFilters] = useState(false);
   const [openInNewTab, setOpenInNewTab] = useState(false);
 
-  useEffect(() => {
-    if (deleteTemplate.isSuccess) {
-      toast({
-        title: "Template eliminado",
-        description: "El template ha sido eliminado exitosamente.",
-      });
-    }
-
-    if (deleteTemplate.isError) {
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar el template. Intente nuevamente.",
-        variant: "destructive",
-      });
-    }
-  }, [deleteTemplate.isSuccess, deleteTemplate.isError, toast]);
-
-  const filteredTemplates = templates?.filter((template) =>
-    template.name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const handleEdit = (template: Template) => {
-    setSelectedTemplate(template);
-    setFormMode('edit');
-    setFormOpen(true);
-  };
-
-  const handleDelete = async (template: Template) => {
-    if (window.confirm(`¿Está seguro que desea eliminar el template "${template.name}"?`)) {
-      try {
-        await deleteTemplate.mutateAsync(template.id);
-        toast({
-          title: "Template eliminado",
-          description: `El template "${template.name}" ha sido eliminado exitosamente.`,
-        });
-      } catch (error) {
-        console.error('Error deleting template:', error);
-        toast({
-          title: "Error",
-          description: "No se pudo eliminar el template. Intente nuevamente.",
-          variant: "destructive",
-        });
-      }
-    }
-  };
-
-  const handleCreateNew = () => {
-    setSelectedTemplate(null);
-    setFormMode('create');
+  const handleEditTemplate = (template: Template) => {
     if (openInNewTab) {
-      // Open in new tab
-      const newTab = window.open('', '_blank');
-      if (newTab) {
-        newTab.document.write(`
-          <html>
-            <head>
-              <title>Nuevo Template</title>
-              <link rel="stylesheet" href="/src/index.css">
-            </head>
-            <body>
-              <div id="template-form-root"></div>
-              <script type="module">
-                import { TemplateForm } from '/src/components/TemplateForm.tsx';
-                // This would need proper React setup in new tab
-              </script>
-            </body>
-          </html>
-        `);
-        newTab.document.close();
-      }
+      window.open(`/templates/edit/${template.id}`, '_blank');
     } else {
-      setFormOpen(true);
+      setEditingTemplate(template);
+      setShowTemplateForm(true);
     }
   };
 
-  const handleOpenInNewTab = (template: Template) => {
-    const url = `/templates/edit/${template.id}`;
-    window.open(url, '_blank', 'width=1200,height=800');
+  const handleDeleteTemplate = async (templateId: string) => {
+    await deleteTemplate.mutateAsync(templateId);
+  };
+
+  const handleCloseForm = () => {
+    setShowTemplateForm(false);
+    setEditingTemplate(null);
+  };
+
+  const filteredTemplates = templates.filter(template => {
+    const matchesSearch = template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         template.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = typeFilter === "all" || template.template_type === typeFilter;
+    return matchesSearch && matchesType;
+  });
+
+  const canDeleteTemplate = (template: Template) => {
+    return ['super_admin', 'admin', 'gestor'].includes(profile?.role || '');
   };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Cargando templates...</div>
-      </div>
+      <Layout title="Gestión de Templates" description="Administrar plantillas de documentos">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+        </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Templates</h1>
-          <p className="text-muted-foreground">Gestiona los templates de documentos</p>
+    <Layout 
+      title="Gestión de Templates" 
+      description="Administrar plantillas de documentos"
+    >
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">Templates</h2>
+            <p className="text-muted-foreground">
+              Gestiona las plantillas de documentos del sistema
+            </p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="openInNewTab"
+                checked={openInNewTab}
+                onCheckedChange={setOpenInNewTab}
+              />
+              <label htmlFor="openInNewTab" className="text-sm">
+                Abrir en nueva pestaña
+              </label>
+            </div>
+            <Button onClick={() => setShowTemplateForm(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nuevo Template
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={openInNewTab}
-              onChange={(e) => setOpenInNewTab(e.target.checked)}
-              className="rounded"
-            />
-            Abrir en nueva pestaña
-          </label>
-          <Button onClick={handleCreateNew} className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Nuevo Template
-          </Button>
-        </div>
-      </div>
 
-      {/* Search and Filter */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar templates..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Button variant="outline" size="sm">
-          <Filter className="h-4 w-4 mr-2" />
-          Filtros
-        </Button>
-      </div>
-
-      {/* Templates Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredTemplates.map((template) => (
-          <Card key={template.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="flex-1 min-w-0">
-                  <CardTitle className="text-lg truncate">{template.name}</CardTitle>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="secondary" className="text-xs">
-                      v{template.version || 1}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      {template.question_count || 0} preguntas
-                    </span>
+        {/* Filtros */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Filtros de Búsqueda</CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                Filtros
+              </Button>
+            </div>
+          </CardHeader>
+          {showFilters && (
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Buscar templates...</label>
+                  <div className="relative">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar por nombre o descripción"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-8"
+                    />
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleOpenInNewTab(template)}
-                    className="h-8 w-8 p-0"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleEdit(template)}
-                    className="h-8 w-8 p-0"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(template)}
-                    className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
-                    disabled={deleteTemplate.isPending}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Tipo de Template</label>
+                  <Select value={typeFilter} onValueChange={setTypeFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Filtrar por tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los tipos</SelectItem>
+                      <SelectItem value="contract">Contrato</SelectItem>
+                      <SelectItem value="document">Documento</SelectItem>
+                      <SelectItem value="form">Formulario</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                {template.description || "Sin descripción"}
-              </p>
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>
-                  {template.creator?.first_name} {template.creator?.last_name}
-                </span>
-                <span>
-                  {new Date(template.created_at!).toLocaleDateString()}
-                </span>
-              </div>
             </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {filteredTemplates.length === 0 && (
-        <div className="text-center py-12">
-          <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-medium mb-2">No hay templates</h3>
-          <p className="text-muted-foreground mb-4">
-            {searchTerm ? 'No se encontraron templates que coincidan con tu búsqueda.' : 'Comienza creando tu primer template.'}
-          </p>
-          {!searchTerm && (
-            <Button onClick={handleCreateNew}>
-              <Plus className="h-4 w-4 mr-2" />
-              Crear Template
-            </Button>
           )}
-        </div>
-      )}
+        </Card>
 
-      <TemplateForm
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        template={selectedTemplate}
-      />
-    </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredTemplates.map((template) => (
+            <Card key={template.id} className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <CardTitle className="text-lg">{template.name}</CardTitle>
+                    <CardDescription className="mt-1">
+                      {template.description || 'Sin descripción'}
+                    </CardDescription>
+                  </div>
+                  <div className="flex space-x-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/templates/${template.id}`)}
+                      title="Ver template"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEditTemplate(template)}
+                      title="Editar template"
+                    >
+                      <Edit3 className="h-4 w-4" />
+                    </Button>
+                    {openInNewTab && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(`/templates/edit/${template.id}`, '_blank')}
+                        title="Abrir en nueva pestaña"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {canDeleteTemplate(template) && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            title="Eliminar template"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>¿Eliminar template?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta acción no se puede deshacer. Se eliminará permanentemente el template "{template.name}".
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteTemplate(template.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Eliminar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Versión:</span>
+                    <Badge variant="outline">v{template.version}</Badge>
+                  </div>
+                  {template.template_type && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Tipo:</span>
+                      <Badge variant="secondary">{template.template_type}</Badge>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Estado:</span>
+                    <Badge variant={template.active ? "default" : "secondary"}>
+                      {template.active ? "Activo" : "Inactivo"}
+                    </Badge>
+                  </div>
+                  {template.created_at && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Creado:</span>
+                      <span>{format(new Date(template.created_at), 'dd/MM/yyyy', { locale: es })}</span>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {filteredTemplates.length === 0 && (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">
+              {searchTerm || typeFilter !== "all" 
+                ? "No se encontraron templates que coincidan con los filtros." 
+                : "No hay templates registrados"}
+            </p>
+          </div>
+        )}
+
+        <TemplateForm
+          open={showTemplateForm}
+          onOpenChange={handleCloseForm}
+          template={editingTemplate}
+        />
+      </div>
+    </Layout>
   );
-}
+};
+
+export default Templates;

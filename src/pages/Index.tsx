@@ -15,7 +15,7 @@ const Index = () => {
 
   if (isLoading) {
     return (
-      <SimpleLayout title="Dashboard" description="Resumen general del sistema">
+      <SimpleLayout>
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
         </div>
@@ -25,7 +25,7 @@ const Index = () => {
 
   if (error) {
     return (
-      <SimpleLayout title="Dashboard" description="Resumen general del sistema">
+      <SimpleLayout>
         <div className="text-center py-8">
           <p className="text-red-500">Error al cargar datos del dashboard</p>
         </div>
@@ -44,11 +44,18 @@ const Index = () => {
   const isGrowthPositive = (growth: number) => growth > 0;
 
   return (
-    <SimpleLayout 
-      title={`¡Bienvenido, ${profile?.first_name || 'Usuario'}!`} 
-      description="Resumen general del sistema"
-    >
+    <SimpleLayout>
       <div className="space-y-6">
+        {/* Título de bienvenida */}
+        <div className="text-center py-8">
+          <h1 className="text-3xl font-bold mb-4">
+            ¡Bienvenido al sistema, {profile?.first_name || 'Usuario'}!
+          </h1>
+          <p className="text-muted-foreground">
+            Sistema de Firma Digital - Panel de control principal
+          </p>
+        </div>
+
         {/* Estadísticas principales */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
@@ -57,7 +64,7 @@ const Index = () => {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${stats?.totalRevenue?.toLocaleString('es-PY') || 0}</div>
+              <div className="text-2xl font-bold">₲{stats?.totalRevenue?.toLocaleString('es-PY') || 0}</div>
               <div className="flex items-center text-xs text-muted-foreground">
                 {isGrowthPositive(stats?.salesGrowth || 0) ? (
                   <TrendingUp className="h-3 w-3 mr-1 text-green-500" />
@@ -227,7 +234,7 @@ const Index = () => {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="font-medium">${sale.total_amount?.toLocaleString('es-PY') || 0}</p>
+                      <p className="font-medium">₲{sale.total_amount?.toLocaleString('es-PY') || 0}</p>
                       <Badge variant={sale.status === 'completado' ? 'default' : 'secondary'}>
                         {sale.status}
                       </Badge>
