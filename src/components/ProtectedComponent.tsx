@@ -1,34 +1,38 @@
 
-import React from 'react';
+import { ReactNode } from 'react';
 import { useHasPermission } from '@/hooks/usePermissions';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 
 interface ProtectedComponentProps {
-  permission: string;
-  children: React.ReactNode;
-  fallback?: React.ReactNode;
+  children: ReactNode;
+  permission?: string;
+  role?: string;
+  fallback?: ReactNode;
 }
 
-export const ProtectedComponent: React.FC<ProtectedComponentProps> = ({
-  permission,
-  children,
-  fallback = null
-}) => {
+export function ProtectedComponent({ 
+  children, 
+  permission, 
+  role, 
+  fallback = null 
+}: ProtectedComponentProps) {
   const { profile } = useSimpleAuthContext();
-  const { data: hasPermission, isLoading } = useHasPermission(permission);
+  const { data: hasPermission } = useHasPermission(permission || '');
 
-  // Super admins tienen acceso a todo
+  // Super admin can access everything
   if (profile?.role === 'super_admin') {
     return <>{children}</>;
   }
 
-  if (isLoading) {
-    return null; // O un skeleton/loading si prefieres
+  // Check role if specified
+  if (role && profile?.role !== role) {
+    return <>{fallback}</>;
   }
 
-  if (!hasPermission) {
+  // Check permission if specified
+  if (permission && !hasPermission) {
     return <>{fallback}</>;
   }
 
   return <>{children}</>;
-};
+}

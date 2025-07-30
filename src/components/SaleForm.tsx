@@ -17,6 +17,7 @@ import { useClients } from "@/hooks/useClients";
 import { usePlans } from "@/hooks/usePlans";
 import { useTemplates } from "@/hooks/useTemplates";
 import { useCreateSale, useUpdateSale } from "@/hooks/useSales";
+import { useCompanies } from "@/hooks/useCompanies";
 import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 import { Database } from "@/integrations/supabase/types";
 import { toast } from "sonner";
@@ -32,6 +33,7 @@ interface SaleFormProps {
 interface SaleFormData {
   client_id: string;
   plan_id: string;
+  company_id: string;
   template_ids: string[];
   total_amount: number;
   notes?: string;
@@ -51,6 +53,7 @@ interface SaleFormData {
 export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
   const { data: clients = [] } = useClients();
   const { data: plans = [] } = usePlans();
+  const { data: companies = [] } = useCompanies();
   const { templates = [] } = useTemplates();
   const { profile } = useSimpleAuthContext();
   const createSale = useCreateSale();
@@ -63,6 +66,7 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
     defaultValues: {
       client_id: sale?.client_id || "",
       plan_id: sale?.plan_id || "",
+      company_id: sale?.company_id || profile?.company_id || "",
       template_ids: [],
       total_amount: sale?.total_amount || 0,
       notes: sale?.notes || "",
@@ -82,33 +86,96 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
 
   const selectedPlan = plans.find(plan => plan.id === watch("plan_id"));
 
+  // Reset form when sale changes
+  useEffect(() => {
+    if (sale) {
+      reset({
+        client_id: sale.client_id || "",
+        plan_id: sale.plan_id || "",
+        company_id: sale.company_id || "",
+        template_ids: sale.template_id ? [sale.template_id] : [],
+        total_amount: Number(sale.total_amount) || 0,
+        notes: sale.notes || "",
+        workplace: sale.workplace || "",
+        profession: sale.profession || "",
+        work_phone: sale.work_phone || "",
+        work_address: sale.work_address || "",
+        signature_modality: sale.signature_modality || "",
+        maternity_bonus: sale.maternity_bonus || false,
+        immediate_validity: sale.immediate_validity || false,
+        leads_id: sale.leads_id || "",
+        pediatrician: sale.pediatrician || "",
+        birth_place: sale.birth_place || "",
+        contract_number: sale.contract_number || "",
+      });
+      setSelectedTemplates(sale.template_id ? [sale.template_id] : []);
+    } else {
+      reset({
+        client_id: "",
+        plan_id: "",
+        company_id: profile?.company_id || "",
+        template_ids: [],
+        total_amount: 0,
+        notes: "",
+        workplace: "",
+        profession: "",
+        work_phone: "",
+        work_address: "",
+        signature_modality: "",
+        maternity_bonus: false,
+        immediate_validity: false,
+        leads_id: "",
+        pediatrician: "",
+        birth_place: "",
+        contract_number: "",
+      });
+      setSelectedTemplates([]);
+    }
+  }, [sale, profile?.company_id, reset]);
+
   useEffect(() => {
     if (selectedPlan) {
-      setValue("total_amount", Number(selectedPlan.price));
+      setValue("total_amount", Number(selectedPlan.price) || 0);
     }
   }, [selectedPlan, setValue]);
 
   const onSubmit = async (data: SaleFormData) => {
     try {
+      const saleData = {
+        client_id: data.client_id,
+        plan_id: data.plan_id,
+        company_id: data.company_id,
+        total_amount: Number(data.total_amount),
+        template_id: selectedTemplates.length > 0 ? selectedTemplates[0] : null,
+        notes: data.notes || null,
+        workplace: data.workplace || null,
+        profession: data.profession || null,
+        work_phone: data.work_phone || null,
+        work_address: data.work_address || null,
+        signature_modality: data.signature_modality || null,
+        maternity_bonus: data.maternity_bonus || false,
+        immediate_validity: data.immediate_validity || false,
+        leads_id: data.leads_id || null,
+        pediatrician: data.pediatrician || null,
+        birth_place: data.birth_place || null,
+        contract_number: data.contract_number || null,
+      };
+
       if (isEditing && sale) {
-        await updateSale.mutateAsync({
-          id: sale.id,
-          ...data,
-          template_id: selectedTemplates.length > 0 ? selectedTemplates[0] : null,
-        });
+        await updateSale.mutateAsync({ id: sale.id, ...saleData });
         toast.success('Venta actualizada exitosamente');
       } else {
         await createSale.mutateAsync({
-          ...data,
-          template_id: selectedTemplates.length > 0 ? selectedTemplates[0] : null,
-          company_id: profile?.company_id,
+          ...saleData,
           salesperson_id: profile?.id,
           status: 'borrador',
         });
         toast.success('Venta creada exitosamente');
       }
+      
       onOpenChange(false);
       reset();
+      setSelectedTemplates([]);
     } catch (error) {
       console.error("Error saving sale:", error);
       toast.error('Error al guardar la venta');
@@ -119,18 +186,22 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
     setValue("plan_id", planId);
     const plan = plans.find(p => p.id === planId);
     if (plan) {
-      setValue("total_amount", Number(plan.price));
+      setValue("total_amount", Number(plan.price) || 0);
     }
   };
 
   const handleTemplateAdd = (templateId: string) => {
     if (!selectedTemplates.includes(templateId)) {
-      setSelectedTemplates([...selectedTemplates, templateId]);
+      const newTemplates = [...selectedTemplates, templateId];
+      setSelectedTemplates(newTemplates);
+      setValue("template_ids", newTemplates);
     }
   };
 
   const handleTemplateRemove = (templateId: string) => {
-    setSelectedTemplates(selectedTemplates.filter(id => id !== templateId));
+    const newTemplates = selectedTemplates.filter(id => id !== templateId);
+    setSelectedTemplates(newTemplates);
+    setValue("template_ids", newTemplates);
   };
 
   return (
@@ -153,7 +224,7 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
             
             <TabsContent value="basic" className="space-y-4">
               <div className="space-y-2">
-                <Label>Cliente</Label>
+                <Label>Cliente *</Label>
                 <Select value={watch("client_id")} onValueChange={(value) => setValue("client_id", value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar cliente" />
@@ -172,7 +243,7 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
               </div>
 
               <div className="space-y-2">
-                <Label>Plan</Label>
+                <Label>Plan *</Label>
                 <Select value={watch("plan_id")} onValueChange={handlePlanChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar plan" />
@@ -191,7 +262,26 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="total_amount">Monto Total (Gs.)</Label>
+                <Label>Empresa *</Label>
+                <Select value={watch("company_id")} onValueChange={(value) => setValue("company_id", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar empresa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.company_id && (
+                  <span className="text-sm text-red-500">La empresa es requerida</span>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="total_amount">Monto Total (Gs.) *</Label>
                 <Input
                   id="total_amount"
                   type="number"
@@ -331,7 +421,7 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
 
               <div className="space-y-2">
                 <Label>Modalidad de Firma</Label>
-                <Select value={watch("signature_modality")} onValueChange={(value) => setValue("signature_modality", value)}>
+                <Select value={watch("signature_modality") || ""} onValueChange={(value) => setValue("signature_modality", value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar modalidad" />
                   </SelectTrigger>

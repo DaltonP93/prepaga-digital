@@ -90,11 +90,10 @@ export function AppSidebar() {
       title: "Mi Perfil",
       url: "/profile",
       icon: User,
-      visible: true, // Todos pueden ver su perfil
+      visible: true,
     },
   ].filter(item => item.visible);
 
-  // Admin specific items
   const adminItems: MainNavItem[] = [
     {
       title: "Usuarios",
