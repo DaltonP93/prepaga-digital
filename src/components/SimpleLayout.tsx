@@ -5,6 +5,7 @@ import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 import { LogOut, User, Menu, X } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useState } from "react";
+import { useRoutePermissions } from "@/hooks/useRoutePermissions";
 import { 
   LayoutDashboard, 
   Users, 
@@ -26,29 +27,11 @@ interface SimpleLayoutProps {
   children: React.ReactNode;
 }
 
-const navigationItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Ventas", url: "/sales", icon: ShoppingBag },
-  { title: "Clientes", url: "/clients", icon: Users },
-  { title: "Planes", url: "/plans", icon: CreditCard },
-  { title: "Documentos", url: "/documents", icon: FileText },
-  { title: "Templates", url: "/templates", icon: FileImage },
-  { title: "Flujo de Firmas", url: "/signature-workflow", icon: Workflow },
-  { title: "Analytics", url: "/analytics", icon: BarChart3 },
-  { title: "Mi Perfil", url: "/profile", icon: User },
-];
-
-const adminItems = [
-  { title: "Usuarios", url: "/users", icon: UserCog },
-  { title: "Empresas", url: "/companies", icon: Building2 },
-  { title: "Auditoría", url: "/audit", icon: Shield },
-  { title: "Configuración", url: "/experience", icon: Settings },
-];
-
 export const SimpleLayout = ({ title, description, children }: SimpleLayoutProps) => {
   const { user, profile, signOut } = useSimpleAuthContext();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const permissions = useRoutePermissions();
 
   const handleSignOut = async () => {
     try {
@@ -58,8 +41,92 @@ export const SimpleLayout = ({ title, description, children }: SimpleLayoutProps
     }
   };
 
-  const isSuperAdmin = profile?.role === 'super_admin';
-  const allNavigationItems = [...navigationItems, ...(isSuperAdmin ? adminItems : [])];
+  // Construir navegación basada en permisos
+  const navigationItems = [
+    {
+      title: "Dashboard",
+      url: "/",
+      icon: LayoutDashboard,
+      permission: permissions.canViewDashboard
+    },
+    {
+      title: "Ventas",
+      url: "/sales",
+      icon: ShoppingBag,
+      permission: permissions.canViewSales
+    },
+    {
+      title: "Clientes",
+      url: "/clients",
+      icon: Users,
+      permission: permissions.canViewClients
+    },
+    {
+      title: "Planes",
+      url: "/plans",
+      icon: CreditCard,
+      permission: permissions.canViewPlans
+    },
+    {
+      title: "Documentos",
+      url: "/documents",
+      icon: FileText,
+      permission: permissions.canViewDocuments
+    },
+    {
+      title: "Templates",
+      url: "/templates",
+      icon: FileImage,
+      permission: permissions.canViewTemplates
+    },
+    {
+      title: "Flujo de Firmas",
+      url: "/signature-workflow",
+      icon: Workflow,
+      permission: permissions.canViewDocuments
+    },
+    {
+      title: "Analytics",
+      url: "/analytics",
+      icon: BarChart3,
+      permission: permissions.canViewAnalytics
+    },
+    {
+      title: "Mi Perfil",
+      url: "/profile",
+      icon: User,
+      permission: true // Todos pueden ver su perfil
+    },
+  ].filter(item => item.permission);
+
+  const adminItems = [
+    {
+      title: "Usuarios",
+      url: "/users",
+      icon: UserCog,
+      permission: permissions.canViewUsers
+    },
+    {
+      title: "Empresas",
+      url: "/companies",
+      icon: Building2,
+      permission: permissions.canViewCompanies
+    },
+    {
+      title: "Auditoría",
+      url: "/audit",
+      icon: Shield,
+      permission: permissions.canViewAudit
+    },
+    {
+      title: "Configuración",
+      url: "/experience",
+      icon: Settings,
+      permission: permissions.canViewExperience
+    },
+  ].filter(item => item.permission);
+
+  const allNavigationItems = [...navigationItems, ...adminItems];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 to-secondary/5 flex">

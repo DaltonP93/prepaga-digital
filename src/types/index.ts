@@ -1,10 +1,10 @@
-
 import { LucideIcon } from 'lucide-react';
 
 export interface MainNavItem {
   title: string;
   url: string;
-  icon: LucideIcon;
+  icon: any;
+  visible?: boolean;
 }
 
 export interface User {

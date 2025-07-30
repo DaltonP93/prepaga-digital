@@ -31,87 +31,98 @@ import {
 
 import { MainNavItem } from "@/types";
 import { LogoutButton } from './LogoutButton';
+import { useRoutePermissions } from '@/hooks/useRoutePermissions';
 
-interface AppSidebarProps {
-  isSuperAdmin?: boolean;
-}
-
-export function AppSidebar({ isSuperAdmin = false }: AppSidebarProps) {
+export function AppSidebar() {
   const location = useLocation();
+  const permissions = useRoutePermissions();
   
   const menuItems: MainNavItem[] = [
     {
       title: "Dashboard",
       url: "/",
       icon: LayoutDashboard,
+      visible: permissions.canViewDashboard,
     },
     {
       title: "Ventas",
       url: "/sales",
       icon: ShoppingBag,
+      visible: permissions.canViewSales,
     },
     {
       title: "Clientes",
       url: "/clients",
       icon: Users,
+      visible: permissions.canViewClients,
     },
     {
       title: "Planes",
       url: "/plans",
       icon: CreditCard,
+      visible: permissions.canViewPlans,
     },
     {
       title: "Documentos",
       url: "/documents",
       icon: FileText,
+      visible: permissions.canViewDocuments,
     },
     {
       title: "Templates",
       url: "/templates",
       icon: FileImage,
+      visible: permissions.canViewTemplates,
     },
     {
       title: "Flujo de Firmas",
       url: "/signature-workflow",
       icon: Workflow,
+      visible: permissions.canViewDocuments,
     },
     {
       title: "Analytics", 
       url: "/analytics",
       icon: BarChart3,
+      visible: permissions.canViewAnalytics,
     },
     {
       title: "Mi Perfil",
       url: "/profile",
       icon: User,
+      visible: true, // Todos pueden ver su perfil
     },
-  ];
+  ].filter(item => item.visible);
 
   // Admin specific items
-  if (isSuperAdmin) {
-    menuItems.push(
-      {
-        title: "Usuarios",
-        url: "/users",
-        icon: UserCog,
-      },
-      {
-        title: "Empresas",
-        url: "/companies",
-        icon: Building2,
-      },
-      {
-        title: "Auditoría",
-        url: "/audit",
-        icon: Shield,
-      },
-      {
-        title: "Configuración",
-        url: "/experience",
-        icon: Settings,
-      }
-    );
-  }
+  const adminItems: MainNavItem[] = [
+    {
+      title: "Usuarios",
+      url: "/users",
+      icon: UserCog,
+      visible: permissions.canViewUsers,
+    },
+    {
+      title: "Empresas",
+      url: "/companies",
+      icon: Building2,
+      visible: permissions.canViewCompanies,
+    },
+    {
+      title: "Auditoría",
+      url: "/audit",
+      icon: Shield,
+      visible: permissions.canViewAudit,
+    },
+    {
+      title: "Configuración",
+      url: "/experience",
+      icon: Settings,
+      visible: permissions.canViewExperience,
+    }
+  ].filter(item => item.visible);
+
+  const allMenuItems = [...menuItems, ...adminItems];
 
   return (
     <Sidebar>
@@ -125,7 +136,7 @@ export function AppSidebar({ isSuperAdmin = false }: AppSidebarProps) {
           <SidebarGroupLabel>Navegación</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {allMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={location.pathname === item.url}>
                     <Link to={item.url}>
