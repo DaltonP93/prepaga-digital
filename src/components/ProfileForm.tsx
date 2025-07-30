@@ -1,151 +1,161 @@
 
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
-import { useProfile } from '@/hooks/useProfile';
-import { useProfileCompletion } from '@/hooks/useProfileCompletion';
-import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
-export const ProfileForm = () => {
-  const { profile, user } = useSimpleAuthContext();
-  const { updateProfile, isUpdating } = useProfile();
-  const { isComplete } = useProfileCompletion();
-  const navigate = useNavigate();
-  const [firstName, setFirstName] = useState(profile?.first_name || '');
-  const [lastName, setLastName] = useState(profile?.last_name || '');
-  const [phone, setPhone] = useState(profile?.phone || '');
+interface ProfileFormData {
+  first_name: string;
+  last_name: string;
+  phone: string;
+  address: string;
+  city: string;
+  country: string;
+  postal_code: string;
+}
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    console.log('📝 Submitting profile form with data:', {
-      first_name: firstName.trim(),
-      last_name: lastName.trim(),
-      phone: phone.trim() || null,
-    });
-    
-    const wasIncomplete = !isComplete;
-    
-    // Store the data in a variable and call updateProfile
-    const profileData = {
-      first_name: firstName.trim(),
-      last_name: lastName.trim(),
-      phone: phone.trim() || null,
-    };
-    
-    updateProfile(profileData);
+export function ProfileForm() {
+  const { profile, refreshProfile } = useSimpleAuthContext();
+  const [loading, setLoading] = useState(false);
 
-    // If profile was incomplete and now might be complete, redirect to dashboard
-    if (wasIncomplete && firstName.trim() && lastName.trim()) {
-      setTimeout(() => {
-        navigate('/');
-      }, 1000);
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<ProfileFormData>({
+    defaultValues: {
+      first_name: "",
+      last_name: "",
+      phone: "",
+      address: "",
+      city: "",
+      country: "",
+      postal_code: "",
+    }
+  });
+
+  useEffect(() => {
+    if (profile) {
+      reset({
+        first_name: profile.first_name || "",
+        last_name: profile.last_name || "",
+        phone: profile.phone || "",
+        address: profile.address || "",
+        city: profile.city || "",
+        country: profile.country || "",
+        postal_code: profile.postal_code || "",
+      });
+    }
+  }, [profile, reset]);
+
+  const onSubmit = async (data: ProfileFormData) => {
+    if (!profile?.id) return;
+
+    try {
+      setLoading(true);
+
+      const { error } = await supabase
+        .from('profiles')
+        .update(data)
+        .eq('id', profile.id);
+
+      if (error) throw error;
+
+      await refreshProfile();
+      toast.success('Perfil actualizado exitosamente');
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast.error('Error al actualizar el perfil');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getInitials = () => {
-    const first = firstName || profile?.first_name || '';
-    const last = lastName || profile?.last_name || '';
-    return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase();
-  };
-
   return (
-    <Card className="w-full max-w-2xl">
+    <Card>
       <CardHeader>
-        <CardTitle>Mi Perfil</CardTitle>
-        {!isComplete && (
-          <p className="text-sm text-muted-foreground">
-            Completa tu información personal para continuar
-          </p>
-        )}
+        <CardTitle>Información Personal</CardTitle>
+        <CardDescription>
+          Actualiza tu información personal aquí
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Avatar Section */}
-          <div className="flex items-center space-x-4">
-            <Avatar className="h-20 w-20">
-              <AvatarImage src={profile?.avatar_url || ''} />
-              <AvatarFallback className="text-lg">{getInitials()}</AvatarFallback>
-            </Avatar>
-            <div>
-              <Button type="button" variant="outline" size="sm">
-                Cambiar Foto
-              </Button>
-              <p className="text-sm text-muted-foreground mt-1">
-                JPG, PNG o GIF. Máximo 10MB.
-              </p>
-            </div>
-          </div>
-
-          {/* Personal Information */}
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="firstName">Nombre</Label>
+            <div className="space-y-2">
+              <Label htmlFor="first_name">Nombre</Label>
               <Input
-                id="firstName"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                required
+                id="first_name"
+                {...register("first_name", { required: "El nombre es requerido" })}
               />
+              {errors.first_name && (
+                <span className="text-sm text-red-500">{errors.first_name.message}</span>
+              )}
             </div>
-            <div>
-              <Label htmlFor="lastName">Apellido</Label>
+
+            <div className="space-y-2">
+              <Label htmlFor="last_name">Apellido</Label>
               <Input
-                id="lastName"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                required
+                id="last_name"
+                {...register("last_name", { required: "El apellido es requerido" })}
               />
+              {errors.last_name && (
+                <span className="text-sm text-red-500">{errors.last_name.message}</span>
+              )}
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={user?.email || ''}
-              disabled
-              className="bg-muted"
-            />
-            <p className="text-sm text-muted-foreground mt-1">
-              El email no se puede cambiar
-            </p>
-          </div>
-
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="phone">Teléfono</Label>
             <Input
               id="phone"
               type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+34 666 777 888"
+              {...register("phone")}
             />
           </div>
 
-          <div>
-            <Label>Rol</Label>
+          <div className="space-y-2">
+            <Label htmlFor="address">Dirección</Label>
             <Input
-              value={profile?.role || 'vendedor'}
-              disabled
-              className="bg-muted"
+              id="address"
+              {...register("address")}
             />
-            <p className="text-sm text-muted-foreground mt-1">
-              El rol es asignado por el administrador
-            </p>
           </div>
 
-          <Button type="submit" disabled={isUpdating}>
-            {isUpdating ? 'Guardando...' : 'Guardar Cambios'}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="city">Ciudad</Label>
+              <Input
+                id="city"
+                {...register("city")}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="country">País</Label>
+              <Input
+                id="country"
+                {...register("country")}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="postal_code">Código Postal</Label>
+              <Input
+                id="postal_code"
+                {...register("postal_code")}
+              />
+            </div>
+          </div>
+
+          <Button type="submit" disabled={loading} className="w-full">
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Actualizar Perfil
           </Button>
         </form>
       </CardContent>
     </Card>
   );
-};
+}
