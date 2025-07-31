@@ -17,12 +17,14 @@ export const useSignatureByToken = (token: string) => {
     queryFn: async () => {
       if (!token) throw new Error('Token is required');
 
+      console.log('Fetching signature data for token:', token);
+
       const { data: sale, error } = await supabase
         .from('sales')
         .select(`
           *,
           clients:client_id(first_name, last_name, email, phone, dni),
-          plans:plan_id(name, price, description, coverage_details),
+          plans:plan_id(name, price, description),
           profiles:salesperson_id(first_name, last_name, email),
           documents:documents(*)
         `)
@@ -30,10 +32,16 @@ export const useSignatureByToken = (token: string) => {
         .gt('signature_expires_at', new Date().toISOString())
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching signature data:', error);
+        throw error;
+      }
+      
+      console.log('Signature data fetched successfully:', sale);
       return sale as Sale;
     },
     enabled: !!token,
+    retry: 2,
   });
 };
 
@@ -51,7 +59,6 @@ export const useCreateSignature = () => {
       documentId: string; 
       signatureData: string; 
     }) => {
-      // Get IP and user agent
       const userAgent = navigator.userAgent;
       
       const { data, error } = await supabase
@@ -96,7 +103,7 @@ export const useCompleteSignature = () => {
         .from('sales')
         .update({
           status: 'firmado',
-          signature_token: null, // Invalidate the token
+          signature_token: null,
         })
         .eq('id', saleId)
         .select()
@@ -115,7 +122,6 @@ export const useCompleteSignature = () => {
   });
 };
 
-// Export the useSignature hook properly
 export const useSignature = () => {
   const { toast } = useToast();
 
@@ -131,10 +137,32 @@ export const useSignature = () => {
     }) => {
       console.log('Submitting signature with token:', token);
       
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Get sale by token first
+      const { data: sale, error: saleError } = await supabase
+        .from('sales')
+        .select('id')
+        .eq('signature_token', token)
+        .single();
+
+      if (saleError || !sale) {
+        throw new Error('Token inválido o expirado');
+      }
+
+      // Create signature record
+      const { data, error } = await supabase
+        .from('signatures')
+        .insert({
+          sale_id: sale.id,
+          signature_data: signature,
+          user_agent: deviceInfo.userAgent,
+          status: 'firmado',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
       
-      return { success: true };
+      return { success: true, data };
     },
     onSuccess: () => {
       toast({
@@ -143,9 +171,10 @@ export const useSignature = () => {
       });
     },
     onError: (error: any) => {
+      console.error('Error submitting signature:', error);
       toast({
         title: "Error",
-        description: "No se pudo enviar la firma. Inténtelo nuevamente.",
+        description: error.message || "No se pudo enviar la firma. Inténtelo nuevamente.",
         variant: "destructive",
       });
     },

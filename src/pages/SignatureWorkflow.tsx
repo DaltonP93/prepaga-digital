@@ -13,11 +13,12 @@ import {
   Clock, 
   CheckCircle, 
   AlertCircle,
-  Search 
+  Search,
+  Loader2
 } from "lucide-react";
 
 export default function SignatureWorkflow() {
-  const { data: sales, isLoading } = useSales();
+  const { data: sales, isLoading, error } = useSales();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
@@ -61,7 +62,33 @@ export default function SignatureWorkflow() {
     return (
       <Layout title="Flujo de Firmas" description="Gestiona el proceso de firmas digitales de contratos">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+            <p className="text-lg">Cargando flujo de firmas...</p>
+            <p className="text-sm text-muted-foreground">Por favor espere</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error) {
+    return (
+      <Layout title="Flujo de Firmas" description="Gestiona el proceso de firmas digitales de contratos">
+        <div className="flex items-center justify-center h-64">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-center text-red-600">Error</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center">
+              <p className="text-sm text-muted-foreground mb-4">
+                No se pudieron cargar los datos del flujo de firmas.
+              </p>
+              <p className="text-xs text-red-500">
+                {error?.message || 'Error desconocido'}
+              </p>
+            </CardContent>
+          </Card>
         </div>
       </Layout>
     );

@@ -1,45 +1,46 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
-type TemplateQuestion = Tables<"template_questions">;
-type TemplateQuestionInsert = TablesInsert<"template_questions">;
-type TemplateQuestionUpdate = TablesUpdate<"template_questions">;
-type TemplateQuestionOption = Tables<"template_question_options">;
-type TemplateQuestionOptionInsert = TablesInsert<"template_question_options">;
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 export const useTemplateQuestions = (templateId?: string) => {
+  const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch questions for a template
-  const { data: questions, isLoading } = useQuery({
-    queryKey: ["template-questions", templateId],
+  const { data: questions, isLoading, error } = useQuery({
+    queryKey: ['template-questions', templateId],
     queryFn: async () => {
       if (!templateId) return [];
+
+      console.log('Fetching questions for template:', templateId);
       
       const { data, error } = await supabase
-        .from("template_questions")
+        .from('template_questions')
         .select(`
           *,
           template_question_options(*)
         `)
-        .eq("template_id", templateId)
-        .eq("is_active", true)
-        .order("order_index", { ascending: true });
+        .eq('template_id', templateId)
+        .eq('is_active', true)
+        .order('order_index', { ascending: true });
 
-      if (error) throw error;
-      return data;
+      if (error) {
+        console.error('Error fetching template questions:', error);
+        throw error;
+      }
+
+      console.log('Template questions fetched:', data?.length || 0);
+      return data || [];
     },
     enabled: !!templateId,
+    retry: 2,
   });
 
-  // Create question mutation
-  const createQuestionMutation = useMutation({
-    mutationFn: async (question: TemplateQuestionInsert) => {
+  const createQuestion = useMutation({
+    mutationFn: async (questionData: any) => {
       const { data, error } = await supabase
-        .from("template_questions")
-        .insert(question)
+        .from('template_questions')
+        .insert(questionData)
         .select()
         .single();
 
@@ -47,21 +48,28 @@ export const useTemplateQuestions = (templateId?: string) => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["template-questions"] });
-      toast.success("Pregunta creada exitosamente");
+      queryClient.invalidateQueries({ queryKey: ['template-questions', templateId] });
+      toast({
+        title: 'Pregunta creada',
+        description: 'La pregunta se ha creado exitosamente.',
+      });
     },
     onError: (error: any) => {
-      toast.error(error.message || "Error al crear la pregunta");
+      console.error('Error creating question:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo crear la pregunta.',
+        variant: 'destructive',
+      });
     },
   });
 
-  // Update question mutation
-  const updateQuestionMutation = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: TemplateQuestionUpdate }) => {
+  const updateQuestion = useMutation({
+    mutationFn: async ({ id, ...updates }: any) => {
       const { data, error } = await supabase
-        .from("template_questions")
+        .from('template_questions')
         .update(updates)
-        .eq("id", id)
+        .eq('id', id)
         .select()
         .single();
 
@@ -69,105 +77,57 @@ export const useTemplateQuestions = (templateId?: string) => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["template-questions"] });
-      toast.success("Pregunta actualizada exitosamente");
+      queryClient.invalidateQueries({ queryKey: ['template-questions', templateId] });
+      toast({
+        title: 'Pregunta actualizada',
+        description: 'La pregunta se ha actualizado exitosamente.',
+      });
     },
     onError: (error: any) => {
-      toast.error(error.message || "Error al actualizar la pregunta");
+      console.error('Error updating question:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo actualizar la pregunta.',
+        variant: 'destructive',
+      });
     },
   });
 
-  // Delete question mutation
-  const deleteQuestionMutation = useMutation({
-    mutationFn: async (id: string) => {
+  const deleteQuestion = useMutation({
+    mutationFn: async (questionId: string) => {
       const { error } = await supabase
-        .from("template_questions")
+        .from('template_questions')
         .delete()
-        .eq("id", id);
+        .eq('id', questionId);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["template-questions"] });
-      toast.success("Pregunta eliminada exitosamente");
+      queryClient.invalidateQueries({ queryKey: ['template-questions', templateId] });
+      toast({
+        title: 'Pregunta eliminada',
+        description: 'La pregunta se ha eliminado exitosamente.',
+      });
     },
     onError: (error: any) => {
-      toast.error(error.message || "Error al eliminar la pregunta");
-    },
-  });
-
-  // Create question option mutation
-  const createOptionMutation = useMutation({
-    mutationFn: async (option: TemplateQuestionOptionInsert) => {
-      const { data, error } = await supabase
-        .from("template_question_options")
-        .insert(option)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["template-questions"] });
-      toast.success("Opción creada exitosamente");
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Error al crear la opción");
-    },
-  });
-
-  // Delete question option mutation
-  const deleteOptionMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("template_question_options")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["template-questions"] });
-      toast.success("Opción eliminada exitosamente");
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Error al eliminar la opción");
-    },
-  });
-
-  // Reorder questions mutation
-  const reorderQuestionsMutation = useMutation({
-    mutationFn: async (questions: { id: string; order_index: number }[]) => {
-      const updates = questions.map(({ id, order_index }) => 
-        supabase
-          .from("template_questions")
-          .update({ order_index })
-          .eq("id", id)
-      );
-
-      await Promise.all(updates);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["template-questions"] });
-      toast.success("Orden actualizado exitosamente");
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Error al actualizar el orden");
+      console.error('Error deleting question:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo eliminar la pregunta.',
+        variant: 'destructive',
+      });
     },
   });
 
   return {
-    questions: questions || [],
+    questions,
     isLoading,
-    createQuestion: createQuestionMutation.mutateAsync,
-    updateQuestion: updateQuestionMutation.mutateAsync,
-    deleteQuestion: deleteQuestionMutation.mutateAsync,
-    createOption: createOptionMutation.mutateAsync,
-    deleteOption: deleteOptionMutation.mutateAsync,
-    reorderQuestions: reorderQuestionsMutation.mutateAsync,
-    isCreating: createQuestionMutation.isPending,
-    isUpdating: updateQuestionMutation.isPending,
-    isDeleting: deleteQuestionMutation.isPending,
+    error,
+    createQuestion: createQuestion.mutate,
+    updateQuestion: updateQuestion.mutate,
+    deleteQuestion: deleteQuestion.mutate,
+    isCreating: createQuestion.isPending,
+    isUpdating: updateQuestion.isPending,
+    isDeleting: deleteQuestion.isPending,
   };
 };

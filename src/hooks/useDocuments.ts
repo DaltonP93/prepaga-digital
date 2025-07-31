@@ -12,17 +12,18 @@ export const useDocuments = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: documents, isLoading } = useQuery({
+  const { data: documents, isLoading, error } = useQuery({
     queryKey: ["documents"],
     queryFn: async () => {
       console.log("Fetching documents...");
+      
       const { data, error } = await supabase
         .from("documents")
         .select(`
           *,
-          sale:sales(id, status),
-          plan:plans(name, company:companies(name)),
-          template:templates(name)
+          sales:sale_id(id, status, contract_number),
+          plans:plan_id(name),
+          templates:template_id(name)
         `)
         .order("created_at", { ascending: false });
 
@@ -31,9 +32,11 @@ export const useDocuments = () => {
         throw error;
       }
 
-      console.log("Documents fetched:", data);
+      console.log("Documents fetched:", data?.length || 0);
       return data;
     },
+    retry: 2,
+    refetchOnWindowFocus: false,
   });
 
   const createDocumentMutation = useMutation({
@@ -136,6 +139,7 @@ export const useDocuments = () => {
   return {
     documents,
     isLoading,
+    error,
     createDocument: createDocumentMutation.mutate,
     updateDocument: updateDocumentMutation.mutate,
     deleteDocument: deleteDocumentMutation.mutate,
