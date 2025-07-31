@@ -54,12 +54,12 @@ const Documents = () => {
   }) || [];
 
   const handlePreviewDocument = (document: any) => {
-    if (document.sale) {
+    if (document.sales) {
       const context = createTemplateContext(
-        document.sale.clients,
-        document.sale.plans,
-        document.sale.companies,
-        document.sale
+        document.sales.clients,
+        document.sales.plans,
+        document.sales.companies,
+        document.sales
       );
       const processedContent = interpolateTemplate(document.content || '', context);
       
@@ -81,20 +81,20 @@ const Documents = () => {
   };
 
   const handleDownloadPDF = async (document: any) => {
-    if (document.sale) {
+    if (document.sales) {
       const context = createTemplateContext(
-        document.sale.clients,
-        document.sale.plans,
-        document.sale.companies,
-        document.sale
+        document.sales.clients,
+        document.sales.plans,
+        document.sales.companies,
+        document.sales
       );
       
       const pdfData = {
         content: interpolateTemplate(document.content || '', context),
         signatures: [], // Add signatures if available
-        client: document.sale.clients,
-        plan: document.sale.plans,
-        company: document.sale.companies,
+        client: document.sales.clients,
+        plan: document.sales.plans,
+        company: document.sales.companies,
       };
       
       const htmlContent = generatePDFContent(pdfData);
@@ -193,10 +193,10 @@ const Documents = () => {
                         {document.document_type || "Sin tipo"}
                       </TableCell>
                       <TableCell>
-                        {document.plan?.name || "Todos"}
+                        {document.plans?.name || "Todos"}
                       </TableCell>
                       <TableCell>
-                        {document.template?.name || "Sin template"}
+                        {document.templates?.name || "Sin template"}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">

@@ -119,13 +119,103 @@ export const useTemplateQuestions = (templateId?: string) => {
     },
   });
 
+  const createOption = useMutation({
+    mutationFn: async (optionData: any) => {
+      const { data, error } = await supabase
+        .from('template_question_options')
+        .insert(optionData)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['template-questions', templateId] });
+      toast({
+        title: 'Opción creada',
+        description: 'La opción se ha creado exitosamente.',
+      });
+    },
+    onError: (error: any) => {
+      console.error('Error creating option:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo crear la opción.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const deleteOption = useMutation({
+    mutationFn: async (optionId: string) => {
+      const { error } = await supabase
+        .from('template_question_options')
+        .delete()
+        .eq('id', optionId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['template-questions', templateId] });
+      toast({
+        title: 'Opción eliminada',
+        description: 'La opción se ha eliminado exitosamente.',
+      });
+    },
+    onError: (error: any) => {
+      console.error('Error deleting option:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo eliminar la opción.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const reorderQuestions = useMutation({
+    mutationFn: async (reorderedQuestions: { id: string; order_index: number }[]) => {
+      const updates = reorderedQuestions.map(({ id, order_index }) =>
+        supabase
+          .from('template_questions')
+          .update({ order_index })
+          .eq('id', id)
+      );
+
+      const results = await Promise.all(updates);
+      const errors = results.filter(result => result.error);
+      
+      if (errors.length > 0) {
+        throw new Error('Error reordering questions');
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['template-questions', templateId] });
+      toast({
+        title: 'Orden actualizado',
+        description: 'El orden de las preguntas se ha actualizado.',
+      });
+    },
+    onError: (error: any) => {
+      console.error('Error reordering questions:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo actualizar el orden.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   return {
     questions,
     isLoading,
     error,
-    createQuestion: createQuestion.mutate,
+    createQuestion: createQuestion.mutateAsync,
     updateQuestion: updateQuestion.mutate,
     deleteQuestion: deleteQuestion.mutate,
+    createOption: createOption.mutateAsync,
+    deleteOption: deleteOption.mutate,
+    reorderQuestions: reorderQuestions.mutate,
     isCreating: createQuestion.isPending,
     isUpdating: updateQuestion.isPending,
     isDeleting: deleteQuestion.isPending,
