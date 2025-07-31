@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
-import { supabase } from "@/integrations/supabase/client";
+import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
@@ -21,7 +20,7 @@ interface ProfileFormData {
 }
 
 export function ProfileForm() {
-  const { profile, refreshProfile } = useSimpleAuthContext();
+  const { profile, updateProfile, isUpdating } = useProfile();
   const [loading, setLoading] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<ProfileFormData>({
@@ -42,10 +41,11 @@ export function ProfileForm() {
         first_name: profile.first_name || "",
         last_name: profile.last_name || "",
         phone: profile.phone || "",
-        address: profile.address || "",
-        city: profile.city || "",
-        country: profile.country || "",
-        postal_code: profile.postal_code || "",
+        // Handle potential missing address fields safely
+        address: (profile as any).address || "",
+        city: (profile as any).city || "",
+        country: (profile as any).country || "",
+        postal_code: (profile as any).postal_code || "",
       });
     }
   }, [profile, reset]);
@@ -55,15 +55,7 @@ export function ProfileForm() {
 
     try {
       setLoading(true);
-
-      const { error } = await supabase
-        .from('profiles')
-        .update(data)
-        .eq('id', profile.id);
-
-      if (error) throw error;
-
-      await refreshProfile();
+      updateProfile(data);
       toast.success('Perfil actualizado exitosamente');
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -150,8 +142,8 @@ export function ProfileForm() {
             </div>
           </div>
 
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <Button type="submit" disabled={loading || isUpdating} className="w-full">
+            {(loading || isUpdating) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Actualizar Perfil
           </Button>
         </form>

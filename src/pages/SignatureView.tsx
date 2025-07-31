@@ -6,44 +6,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Loader2, FileText, User, Calendar, DollarSign } from 'lucide-react';
 import { SignatureCanvas } from '@/components/SignatureCanvas';
-import { useSignature } from '@/hooks/useSignature';
+import { useSignature, useSignatureByToken } from '@/hooks/useSignature';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const SignatureView = () => {
   const { token } = useParams<{ token: string }>();
   const [signature, setSignature] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [saleData, setSaleData] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-
+  
+  const { data: saleData, isLoading, error } = useSignatureByToken(token || '');
   const { submitSignature, isSubmitting } = useSignature();
-
-  useEffect(() => {
-    const fetchSaleData = async () => {
-      if (!token) {
-        setError('Token de firma inválido');
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const response = await fetch(`/api/signature/${token}`);
-        if (!response.ok) {
-          throw new Error('No se pudo cargar los datos de la venta');
-        }
-        const data = await response.json();
-        setSaleData(data);
-      } catch (err) {
-        console.error('Error fetching sale data:', err);
-        setError('Error al cargar los datos de la venta');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchSaleData();
-  }, [token]);
 
   const handleSubmitSignature = async () => {
     if (!signature || !token) return;
@@ -84,7 +56,7 @@ const SignatureView = () => {
             <CardHeader>
               <CardTitle className="text-center text-red-600">Error</CardTitle>
               <CardDescription className="text-center">
-                {error || 'No se pudo cargar el documento'}
+                {error?.message || 'No se pudo cargar el documento'}
               </CardDescription>
             </CardHeader>
             <CardContent className="text-center">
@@ -124,7 +96,7 @@ const SignatureView = () => {
                   <div>
                     <p className="font-medium">Cliente</p>
                     <p className="text-sm text-muted-foreground">
-                      {saleData.client?.first_name} {saleData.client?.last_name}
+                      {saleData.clients?.first_name} {saleData.clients?.last_name}
                     </p>
                   </div>
                 </div>
@@ -133,7 +105,7 @@ const SignatureView = () => {
                   <div>
                     <p className="font-medium">Plan</p>
                     <p className="text-sm text-muted-foreground">
-                      {saleData.plan?.name}
+                      {saleData.plans?.name}
                     </p>
                   </div>
                 </div>

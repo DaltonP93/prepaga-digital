@@ -114,3 +114,48 @@ export const useCompleteSignature = () => {
     },
   });
 };
+
+// Add the missing useSignature hook
+export const useSignature = () => {
+  const { toast } = useToast();
+
+  const submitSignature = useMutation({
+    mutationFn: async ({ 
+      token, 
+      signature, 
+      deviceInfo 
+    }: { 
+      token: string; 
+      signature: string; 
+      deviceInfo: any; 
+    }) => {
+      // Here we would normally call an API to submit the signature
+      // For now, let's simulate the process
+      console.log('Submitting signature with token:', token);
+      
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // For now, just return success
+      return { success: true };
+    },
+    onSuccess: () => {
+      toast({
+        title: "Firma enviada",
+        description: "Su firma ha sido enviada exitosamente.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: "No se pudo enviar la firma. Inténtelo nuevamente.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  return {
+    submitSignature,
+    isSubmitting: submitSignature.isPending,
+  };
+};
