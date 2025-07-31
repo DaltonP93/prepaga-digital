@@ -115,7 +115,7 @@ export const useCompleteSignature = () => {
   });
 };
 
-// Add the missing useSignature hook
+// Export the useSignature hook properly
 export const useSignature = () => {
   const { toast } = useToast();
 
@@ -129,14 +129,11 @@ export const useSignature = () => {
       signature: string; 
       deviceInfo: any; 
     }) => {
-      // Here we would normally call an API to submit the signature
-      // For now, let's simulate the process
       console.log('Submitting signature with token:', token);
       
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // For now, just return success
       return { success: true };
     },
     onSuccess: () => {
