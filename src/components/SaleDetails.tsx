@@ -9,16 +9,16 @@ interface SaleDetailsProps {
 
 export const SaleDetails: React.FC<SaleDetailsProps> = ({ sale }) => {
   const getStatusBadge = (status: string) => {
-    const statusColors = {
+    const statusColors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
       'borrador': 'default',
       'enviado': 'secondary',
-      'firmado': 'default',
+      'firmado': 'outline',
       'completado': 'default',
       'cancelado': 'destructive'
     };
 
     return (
-      <Badge variant={statusColors[status as keyof typeof statusColors] || 'default'}>
+      <Badge variant={statusColors[status] || 'default'}>
         {status?.charAt(0).toUpperCase() + status?.slice(1)}
       </Badge>
     );

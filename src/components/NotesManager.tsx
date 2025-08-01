@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Trash2, Plus, Edit2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -97,7 +96,7 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ saleId }) => {
 
   const handleEdit = (note: any) => {
     setEditingNote(note);
-    setContent(note.content);
+    setContent(note.note);
     setShowForm(true);
   };
 
@@ -107,11 +106,12 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ saleId }) => {
 
     const noteData = {
       sale_id: saleId,
-      content: content.trim()
+      note: content.trim(),
+      user_id: supabase.auth.getUser().then(({ data }) => data.user?.id)
     };
 
     if (editingNote) {
-      updateNote.mutate({ id: editingNote.id, ...noteData });
+      updateNote.mutate({ id: editingNote.id, note: content.trim() });
     } else {
       createNote.mutate(noteData);
     }
@@ -180,7 +180,7 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ saleId }) => {
                 <CardContent className="pt-4">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <p className="text-sm">{note.content}</p>
+                      <p className="text-sm">{note.note}</p>
                       <p className="text-xs text-muted-foreground mt-2">
                         {new Date(note.created_at).toLocaleString()}
                       </p>

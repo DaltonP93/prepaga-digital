@@ -19,9 +19,9 @@ interface RequirementsManagerProps {
 export const RequirementsManager: React.FC<RequirementsManagerProps> = ({ saleId }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingRequirement, setEditingRequirement] = useState<any>(null);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [completed, setCompleted] = useState(false);
+  const [requirementName, setRequirementName] = useState('');
+  const [notes, setNotes] = useState('');
+  const [isCompleted, setIsCompleted] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -94,30 +94,30 @@ export const RequirementsManager: React.FC<RequirementsManagerProps> = ({ saleId
   });
 
   const resetForm = () => {
-    setTitle('');
-    setDescription('');
-    setCompleted(false);
+    setRequirementName('');
+    setNotes('');
+    setIsCompleted(false);
     setShowForm(false);
     setEditingRequirement(null);
   };
 
   const handleEdit = (requirement: any) => {
     setEditingRequirement(requirement);
-    setTitle(requirement.title);
-    setDescription(requirement.description || '');
-    setCompleted(requirement.completed || false);
+    setRequirementName(requirement.requirement_name);
+    setNotes(requirement.notes || '');
+    setIsCompleted(requirement.is_completed || false);
     setShowForm(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title) return;
+    if (!requirementName) return;
 
     const requirementData = {
       sale_id: saleId,
-      title,
-      description,
-      completed
+      requirement_name: requirementName,
+      notes,
+      is_completed: isCompleted
     };
 
     if (editingRequirement) {
@@ -161,29 +161,29 @@ export const RequirementsManager: React.FC<RequirementsManagerProps> = ({ saleId
             </h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="title">Título</Label>
+                <Label htmlFor="title">Nombre del Requisito</Label>
                 <Input
                   id="title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Título del requisito"
+                  value={requirementName}
+                  onChange={(e) => setRequirementName(e.target.value)}
+                  placeholder="Nombre del requisito"
                   required
                 />
               </div>
               <div>
-                <Label htmlFor="description">Descripción</Label>
+                <Label htmlFor="description">Notas</Label>
                 <Textarea
                   id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Descripción detallada del requisito"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Notas adicionales del requisito"
                 />
               </div>
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="completed"
-                  checked={completed}
-                  onCheckedChange={setCompleted}
+                  checked={isCompleted}
+                  onCheckedChange={(checked) => setIsCompleted(checked === true)}
                 />
                 <Label htmlFor="completed">Completado</Label>
               </div>
@@ -203,8 +203,8 @@ export const RequirementsManager: React.FC<RequirementsManagerProps> = ({ saleId
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Título</TableHead>
-                <TableHead>Descripción</TableHead>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Notas</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Fecha</TableHead>
                 <TableHead>Acciones</TableHead>
@@ -213,10 +213,10 @@ export const RequirementsManager: React.FC<RequirementsManagerProps> = ({ saleId
             <TableBody>
               {requirements.map((requirement) => (
                 <TableRow key={requirement.id}>
-                  <TableCell>{requirement.title}</TableCell>
-                  <TableCell>{requirement.description || '-'}</TableCell>
+                  <TableCell>{requirement.requirement_name}</TableCell>
+                  <TableCell>{requirement.notes || '-'}</TableCell>
                   <TableCell>
-                    {requirement.completed ? (
+                    {requirement.is_completed ? (
                       <span className="text-green-600">Completado</span>
                     ) : (
                       <span className="text-yellow-600">Pendiente</span>

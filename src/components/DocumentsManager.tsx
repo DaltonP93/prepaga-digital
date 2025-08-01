@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Trash2, Plus, Download } from 'lucide-react';
-import { useDocuments, useCreateDocument, useDeleteDocument } from '@/hooks/useDocuments';
+import { useDocuments } from '@/hooks/useDocuments';
 
 interface DocumentsManagerProps {
   saleId: string;
@@ -17,32 +17,28 @@ export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) =>
   const [name, setName] = useState('');
   const [file, setFile] = useState<File | null>(null);
 
-  const { data: documents = [], isLoading } = useDocuments(saleId);
-  const createDocument = useCreateDocument();
-  const deleteDocument = useDeleteDocument();
+  const { documents, isLoading, createDocument, deleteDocument, isCreating, isDeleting } = useDocuments();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !file) return;
 
-    createDocument.mutate({
+    createDocument({
       sale_id: saleId,
       name,
-      file_name: file.name,
-      content_type: file.type,
-      file_data: file
-    }, {
-      onSuccess: () => {
-        setName('');
-        setFile(null);
-        setShowForm(false);
-      }
+      document_type: file.type,
+      content: '',
+      file_url: '',
     });
+
+    setName('');
+    setFile(null);
+    setShowForm(false);
   };
 
   const handleDelete = (id: string) => {
     if (confirm('¿Está seguro de que desea eliminar este documento?')) {
-      deleteDocument.mutate(id);
+      deleteDocument(id);
     }
   };
 
@@ -94,7 +90,7 @@ export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) =>
                 <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={createDocument.isPending}>
+                <Button type="submit" disabled={isCreating}>
                   Subir Documento
                 </Button>
               </div>
@@ -102,7 +98,7 @@ export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) =>
           </div>
         )}
 
-        {documents.length > 0 ? (
+        {documents && documents.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -116,7 +112,7 @@ export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) =>
               {documents.map((document) => (
                 <TableRow key={document.id}>
                   <TableCell>{document.name}</TableCell>
-                  <TableCell>{document.content_type}</TableCell>
+                  <TableCell>{document.document_type}</TableCell>
                   <TableCell>
                     {new Date(document.created_at).toLocaleDateString()}
                   </TableCell>
@@ -129,6 +125,7 @@ export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) =>
                         variant="destructive"
                         size="sm"
                         onClick={() => handleDelete(document.id)}
+                        disabled={isDeleting}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
