@@ -3,7 +3,17 @@ import React from 'react';
 import { useSales } from '@/hooks/useSales';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { CheckCircle, Clock, AlertCircle, FileText, Send, Eye } from 'lucide-react';
+import { 
+  CheckCircle, 
+  Clock, 
+  AlertCircle, 
+  FileText, 
+  Send, 
+  Eye, 
+  Ban, 
+  RefreshCw,
+  XCircle
+} from 'lucide-react';
 
 interface DocumentTrackingPanelProps {
   saleId: string;
@@ -69,6 +79,9 @@ export const DocumentTrackingPanel: React.FC<DocumentTrackingPanelProps> = ({ sa
   };
 
   const statusInfo = getStatusInfo(sale.status || 'borrador');
+  const isTokenRevoked = sale.token_revoked === true;
+  const isTokenExpired = sale.signature_expires_at && new Date(sale.signature_expires_at) < new Date();
+  const hasActiveToken = sale.signature_token && !isTokenRevoked && !isTokenExpired;
 
   return (
     <div className="space-y-4">
@@ -83,6 +96,24 @@ export const DocumentTrackingPanel: React.FC<DocumentTrackingPanelProps> = ({ sa
                 <Badge className={statusInfo.color}>
                   {statusInfo.label}
                 </Badge>
+                {isTokenRevoked && (
+                  <Badge variant="destructive" className="flex items-center gap-1">
+                    <Ban className="h-3 w-3" />
+                    Token Revocado
+                  </Badge>
+                )}
+                {!isTokenRevoked && isTokenExpired && (
+                  <Badge variant="outline" className="flex items-center gap-1">
+                    <XCircle className="h-3 w-3" />
+                    Token Expirado
+                  </Badge>
+                )}
+                {hasActiveToken && (
+                  <Badge variant="outline" className="flex items-center gap-1 bg-green-50 text-green-700">
+                    <CheckCircle className="h-3 w-3" />
+                    Token Activo
+                  </Badge>
+                )}
               </div>
               <p className="text-sm text-muted-foreground">
                 {statusInfo.description}
@@ -107,8 +138,19 @@ export const DocumentTrackingPanel: React.FC<DocumentTrackingPanelProps> = ({ sa
 
         {sale.signature_expires_at && (
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Vence el:</span>
-            <span>{new Date(sale.signature_expires_at).toLocaleDateString()}</span>
+            <span className="text-muted-foreground">Token vence el:</span>
+            <span className={isTokenExpired ? 'text-red-600 font-medium' : ''}>
+              {new Date(sale.signature_expires_at).toLocaleDateString()}
+            </span>
+          </div>
+        )}
+
+        {isTokenRevoked && sale.token_revoked_at && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Token revocado el:</span>
+            <span className="text-red-600 font-medium">
+              {new Date(sale.token_revoked_at).toLocaleDateString()}
+            </span>
           </div>
         )}
 
@@ -121,8 +163,36 @@ export const DocumentTrackingPanel: React.FC<DocumentTrackingPanelProps> = ({ sa
 
         {sale.signature_token && (
           <div className="flex items-center gap-2 text-sm">
-            <Eye className="h-4 w-4 text-muted-foreground" />
-            <span className="text-muted-foreground">Token de firma generado</span>
+            {hasActiveToken ? (
+              <>
+                <Eye className="h-4 w-4 text-green-600" />
+                <span className="text-green-600">Token de firma activo</span>
+              </>
+            ) : isTokenRevoked ? (
+              <>
+                <Ban className="h-4 w-4 text-red-600" />
+                <span className="text-red-600">Token de firma revocado</span>
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4 text-orange-600" />
+                <span className="text-orange-600">Token requiere renovación</span>
+              </>
+            )}
+          </div>
+        )}
+
+        {sale.contract_number && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Número de contrato:</span>
+            <span className="font-mono text-xs">{sale.contract_number}</span>
+          </div>
+        )}
+
+        {sale.request_number && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Número de solicitud:</span>
+            <span className="font-mono text-xs">{sale.request_number}</span>
           </div>
         )}
       </div>

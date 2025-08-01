@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
@@ -148,11 +149,11 @@ export const useGenerateQuestionnaireLink = () => {
         throw new Error('Esta venta no tiene un cuestionario asociado. Asigne un template primero.');
       }
 
-      // Generate or reuse existing token
+      // Generate or reuse existing token (only if not revoked)
       let token = sale.signature_token;
       let expiresAtString = sale.signature_expires_at;
 
-      if (!token || !expiresAtString || new Date(expiresAtString) < new Date()) {
+      if (!token || !expiresAtString || new Date(expiresAtString) < new Date() || sale.token_revoked) {
         token = crypto.randomUUID();
         const expiresAtDate = new Date();
         expiresAtDate.setDate(expiresAtDate.getDate() + 7); // Expires in 7 days
@@ -163,7 +164,10 @@ export const useGenerateQuestionnaireLink = () => {
           .update({
             signature_token: token,
             signature_expires_at: expiresAtString,
-            status: 'enviado'
+            status: 'enviado',
+            token_revoked: false,
+            token_revoked_at: null,
+            token_revoked_by: null
           })
           .eq('id', saleId);
 
@@ -201,7 +205,7 @@ export const useGenerateSignatureLink = () => {
 
   return useMutation({
     mutationFn: async (saleId: string) => {
-      // Check if questionnaire needs to be completed first
+      // Check if questionnaire needs to be completed first and validate token status
       const { data: sale, error: saleError } = await supabase
         .from('sales')
         .select(`
@@ -222,31 +226,46 @@ export const useGenerateSignatureLink = () => {
         throw new Error('El cliente debe completar el cuestionario antes de firmar. Genere y envíe primero el enlace del cuestionario.');
       }
 
-      const token = crypto.randomUUID();
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7); // Expires in 7 days
+      // Check if current token is revoked or expired
+      const needsNewToken = !sale.signature_token || 
+                           sale.token_revoked === true || 
+                           (sale.signature_expires_at && new Date(sale.signature_expires_at) < new Date());
 
-      const { data: updatedSale, error } = await supabase
-        .from('sales')
-        .update({
-          signature_token: token,
-          signature_expires_at: expiresAt.toISOString(),
-          status: 'enviado'
-        })
-        .eq('id', saleId)
-        .select(`
-          *,
-          clients:client_id(first_name, last_name, email, phone),
-          plans:plan_id(name, price),
-          profiles:salesperson_id(first_name, last_name, email)
-        `)
-        .single();
+      let token = sale.signature_token;
+      let expiresAt = sale.signature_expires_at;
 
-      if (error) throw error;
+      if (needsNewToken) {
+        token = crypto.randomUUID();
+        const expiresAtDate = new Date();
+        expiresAtDate.setDate(expiresAtDate.getDate() + 7); // Expires in 7 days
+        expiresAt = expiresAtDate.toISOString();
+
+        const { data: updatedSale, error } = await supabase
+          .from('sales')
+          .update({
+            signature_token: token,
+            signature_expires_at: expiresAt,
+            status: 'enviado',
+            token_revoked: false,
+            token_revoked_at: null,
+            token_revoked_by: null
+          })
+          .eq('id', saleId)
+          .select(`
+            *,
+            clients:client_id(first_name, last_name, email, phone),
+            plans:plan_id(name, price),
+            profiles:salesperson_id(first_name, last_name, email)
+          `)
+          .single();
+
+        if (error) throw error;
+        sale = updatedSale;
+      }
       
       const signatureUrl = `${window.location.origin}/signature/${token}`;
       
-      return { sale: updatedSale, signatureUrl };
+      return { sale, signatureUrl };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
@@ -263,6 +282,39 @@ export const useGenerateSignatureLink = () => {
       toast({
         title: "Error",
         description: error.message || "No se pudo generar el enlace de firma.",
+        variant: "destructive",
+      });
+    },
+  });
+};
+
+export const useRevokeSignatureToken = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ saleId, reason }: { saleId: string; reason: string }) => {
+      const { error } = await supabase.rpc('revoke_signature_token', {
+        p_sale_id: saleId,
+        p_reason: reason
+      });
+
+      if (error) throw error;
+      
+      return { saleId, reason };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      
+      toast({
+        title: "Token revocado",
+        description: "El token de firma ha sido revocado exitosamente.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo revocar el token de firma.",
         variant: "destructive",
       });
     },
@@ -293,7 +345,11 @@ export const useValidateSaleForSignature = () => {
         hasTemplate: !!sale.template_id,
         hasQuestionnaireResponses: sale.template_responses && sale.template_responses.length > 0,
         readyForQuestionnaire: !!sale.client_id && !!sale.plan_id && !!sale.template_id,
-        readyForSignature: !!sale.client_id && !!sale.plan_id && (!sale.template_id || (sale.template_responses && sale.template_responses.length > 0))
+        readyForSignature: !!sale.client_id && !!sale.plan_id && (!sale.template_id || (sale.template_responses && sale.template_responses.length > 0)),
+        tokenIsValid: sale.signature_token && !sale.token_revoked && 
+                     sale.signature_expires_at && new Date(sale.signature_expires_at) > new Date(),
+        tokenRevoked: sale.token_revoked === true,
+        tokenExpired: sale.signature_expires_at && new Date(sale.signature_expires_at) < new Date()
       };
 
       return { sale, validation };

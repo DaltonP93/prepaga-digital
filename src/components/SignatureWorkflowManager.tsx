@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +7,16 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Clock, CheckCircle, XCircle, Copy } from "lucide-react";
+import { 
+  Send, 
+  Clock, 
+  CheckCircle, 
+  XCircle, 
+  Copy, 
+  AlertTriangle,
+  RefreshCw,
+  Ban
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface SignatureWorkflowManagerProps {
@@ -14,16 +24,24 @@ interface SignatureWorkflowManagerProps {
   currentStatus?: string;
   signatureToken?: string;
   signatureExpiresAt?: string;
+  tokenRevoked?: boolean;
+  tokenRevokedAt?: string;
+  tokenRevokedBy?: string;
 }
 
 export const SignatureWorkflowManager = ({
   saleId,
   currentStatus,
   signatureToken,
-  signatureExpiresAt
+  signatureExpiresAt,
+  tokenRevoked,
+  tokenRevokedAt,
+  tokenRevokedBy
 }: SignatureWorkflowManagerProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isRevoking, setIsRevoking] = useState(false);
   const [expirationHours, setExpirationHours] = useState(72);
+  const [revocationReason, setRevocationReason] = useState("");
   const { toast } = useToast();
 
   const generateSignatureLink = async () => {
@@ -38,7 +56,10 @@ export const SignatureWorkflowManager = ({
         .update({
           signature_token: token,
           signature_expires_at: expiresAt.toISOString(),
-          status: "enviado"
+          status: "enviado",
+          token_revoked: false,
+          token_revoked_at: null,
+          token_revoked_by: null
         })
         .eq("id", saleId);
 
@@ -60,6 +81,45 @@ export const SignatureWorkflowManager = ({
       });
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const revokeSignatureToken = async () => {
+    if (!revocationReason.trim()) {
+      toast({
+        title: "Error",
+        description: "Por favor ingresa una razón para la revocación",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsRevoking(true);
+    try {
+      const { error } = await supabase.rpc('revoke_signature_token', {
+        p_sale_id: saleId,
+        p_reason: revocationReason
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Token revocado",
+        description: "El token de firma ha sido revocado exitosamente",
+      });
+
+      setRevocationReason("");
+      window.location.reload();
+      
+    } catch (error) {
+      console.error("Error revoking token:", error);
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo revocar el token",
+        variant: "destructive"
+      });
+    } finally {
+      setIsRevoking(false);
     }
   };
 
@@ -93,6 +153,8 @@ export const SignatureWorkflowManager = ({
   };
 
   const isExpired = signatureExpiresAt && new Date(signatureExpiresAt) < new Date();
+  const isTokenRevoked = tokenRevoked === true;
+  const canUseToken = signatureToken && !isExpired && !isTokenRevoked;
   const signatureLink = signatureToken ? `${window.location.origin}/signature/${signatureToken}` : null;
 
   return (
@@ -100,11 +162,17 @@ export const SignatureWorkflowManager = ({
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>Gestión de Firmas</span>
-          {getStatusBadge(currentStatus)}
+          <div className="flex items-center gap-2">
+            {getStatusBadge(currentStatus)}
+            {isTokenRevoked && <Badge variant="destructive" className="flex items-center gap-1">
+              <Ban className="h-3 w-3" />
+              Token Revocado
+            </Badge>}
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {!signatureToken ? (
+        {!signatureToken || isTokenRevoked ? (
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="expiration">Horas de expiración</Label>
@@ -122,8 +190,17 @@ export const SignatureWorkflowManager = ({
               disabled={isGenerating}
               className="w-full"
             >
-              <Send className="h-4 w-4 mr-2" />
-              {isGenerating ? "Generando..." : "Generar Enlace de Firma"}
+              {isTokenRevoked ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  {isGenerating ? "Regenerando..." : "Regenerar Enlace de Firma"}
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  {isGenerating ? "Generando..." : "Generar Enlace de Firma"}
+                </>
+              )}
             </Button>
           </div>
         ) : (
@@ -134,7 +211,12 @@ export const SignatureWorkflowManager = ({
             </div>
             
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={copySignatureLink}>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={copySignatureLink}
+                disabled={!canUseToken}
+              >
                 <Copy className="h-4 w-4 mr-2" />
                 Copiar Enlace
               </Button>
@@ -147,18 +229,54 @@ export const SignatureWorkflowManager = ({
                   {isExpired ? "Expiró" : "Expira"} el{" "}
                   {new Date(signatureExpiresAt).toLocaleString()}
                 </span>
-                {isExpired && <XCircle className="h-4 w-4 text-red-500" />}
-                {!isExpired && <CheckCircle className="h-4 w-4 text-green-500" />}
+                {isExpired ? (
+                  <XCircle className="h-4 w-4 text-red-500" />
+                ) : (
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                )}
               </div>
             )}
 
-            {isExpired && (
+            {isExpired && !isTokenRevoked && (
               <Alert>
                 <XCircle className="h-4 w-4" />
                 <AlertDescription>
                   El enlace de firma ha expirado. Genera un nuevo enlace para continuar.
                 </AlertDescription>
               </Alert>
+            )}
+
+            {isTokenRevoked && (
+              <Alert variant="destructive">
+                <Ban className="h-4 w-4" />
+                <AlertDescription>
+                  Token revocado {tokenRevokedAt && `el ${new Date(tokenRevokedAt).toLocaleString()}`}.
+                  El enlace ya no es válido.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {canUseToken && (
+              <div className="space-y-3 pt-4 border-t">
+                <Label htmlFor="revocation-reason" className="text-sm font-medium text-red-600">
+                  Revocar token de firma
+                </Label>
+                <Input
+                  id="revocation-reason"
+                  placeholder="Razón para revocar el token..."
+                  value={revocationReason}
+                  onChange={(e) => setRevocationReason(e.target.value)}
+                />
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  onClick={revokeSignatureToken}
+                  disabled={isRevoking || !revocationReason.trim()}
+                >
+                  <Ban className="h-4 w-4 mr-2" />
+                  {isRevoking ? "Revocando..." : "Revocar Token"}
+                </Button>
+              </div>
             )}
           </div>
         )}

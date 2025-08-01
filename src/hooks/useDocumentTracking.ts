@@ -21,16 +21,30 @@ interface DocumentTrackingRecord {
   created_at: string;
 }
 
+interface TokenValidationRecord {
+  sale_id: string;
+  token: string;
+  is_valid: boolean;
+  is_revoked: boolean;
+  is_expired: boolean;
+  revoked_at?: string;
+  revoked_by?: string;
+  expires_at: string;
+  validation_timestamp: string;
+}
+
 export const useDocumentTracking = (saleId?: string) => {
   const queryClient = useQueryClient();
 
   const { data: trackingRecords, isLoading } = useQuery({
     queryKey: ['document-tracking', saleId],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from('document_tracking')
+      if (!saleId) return [];
+      
+      const { data, error } = await supabase
+        .from('document_access_logs')
         .select('*')
-        .eq('sale_id', saleId!)
+        .eq('document_id', saleId) // Assuming document_id can reference sales
         .order('access_time', { ascending: false });
 
       if (error) throw error;
@@ -39,20 +53,68 @@ export const useDocumentTracking = (saleId?: string) => {
     enabled: !!saleId,
   });
 
+  const validateToken = useMutation({
+    mutationFn: async (token: string) => {
+      const { data: sale, error } = await supabase
+        .from('sales')
+        .select(`
+          id,
+          signature_token,
+          signature_expires_at,
+          token_revoked,
+          token_revoked_at,
+          token_revoked_by,
+          status
+        `)
+        .eq('signature_token', token)
+        .single();
+
+      if (error || !sale) {
+        throw new Error('Token inválido');
+      }
+
+      const now = new Date();
+      const expiresAt = new Date(sale.signature_expires_at || '');
+      const isExpired = expiresAt < now;
+      const isRevoked = sale.token_revoked === true;
+
+      const validation: TokenValidationRecord = {
+        sale_id: sale.id,
+        token,
+        is_valid: !isExpired && !isRevoked,
+        is_revoked: isRevoked,
+        is_expired: isExpired,
+        revoked_at: sale.token_revoked_at || undefined,
+        revoked_by: sale.token_revoked_by || undefined,
+        expires_at: sale.signature_expires_at || '',
+        validation_timestamp: now.toISOString()
+      };
+
+      return validation;
+    },
+  });
+
   const createTrackingRecord = useMutation({
     mutationFn: async (record: Omit<DocumentTrackingRecord, 'id' | 'access_time' | 'created_at'>) => {
       // Detectar información del dispositivo
       const userAgent = navigator.userAgent;
       const deviceInfo = getDeviceInfo(userAgent);
       
-      const { data, error } = await (supabase as any)
-        .from('document_tracking')
+      const { data, error } = await supabase
+        .from('document_access_logs')
         .insert({
-          ...record,
+          document_id: record.sale_id, // Using sale_id as document reference
+          action: record.action,
           user_agent: userAgent,
           device_type: deviceInfo.type,
-          device_os: deviceInfo.os,
-          browser: deviceInfo.browser,
+          session_id: record.metadata?.session_id,
+          metadata: {
+            ...record.metadata,
+            device_os: deviceInfo.os,
+            browser: deviceInfo.browser,
+            progress_percentage: record.progress_percentage,
+            time_spent_seconds: record.time_spent_seconds
+          },
           ip_address: await getClientIP(),
         })
         .select()
@@ -74,7 +136,7 @@ export const useDocumentTracking = (saleId?: string) => {
     const totalSigned = trackingRecords.filter(r => r.action === 'signed').length;
     const uniqueDevices = new Set(trackingRecords.map(r => r.device_type)).size;
     const averageProgress = trackingRecords.length > 0 
-      ? trackingRecords.reduce((sum, r) => sum + r.progress_percentage, 0) / trackingRecords.length 
+      ? trackingRecords.reduce((sum, r) => sum + (r.progress_percentage || 0), 0) / trackingRecords.length 
       : 0;
 
     return {
@@ -91,11 +153,13 @@ export const useDocumentTracking = (saleId?: string) => {
     isLoading,
     createTrackingRecord: createTrackingRecord.mutate,
     isCreating: createTrackingRecord.isPending,
+    validateToken: validateToken.mutate,
+    isValidating: validateToken.isPending,
     stats: getStats(),
   };
 };
 
-// Funciones utilitarias
+// Funciones utilitarias mejoradas
 function getDeviceInfo(userAgent: string) {
   const isMobile = /Mobile|Android|iPhone|iPad/i.test(userAgent);
   const isTablet = /iPad|Tablet/i.test(userAgent);
@@ -105,17 +169,19 @@ function getDeviceInfo(userAgent: string) {
   else if (isMobile) type = 'mobile';
 
   let os = 'Unknown';
-  if (/Windows/i.test(userAgent)) os = 'Windows';
-  else if (/Mac/i.test(userAgent)) os = 'macOS';
+  if (/Windows NT 10/i.test(userAgent)) os = 'Windows 10';
+  else if (/Windows NT/i.test(userAgent)) os = 'Windows';
+  else if (/Mac OS X/i.test(userAgent)) os = 'macOS';
   else if (/Linux/i.test(userAgent)) os = 'Linux';
   else if (/Android/i.test(userAgent)) os = 'Android';
-  else if (/iOS|iPhone|iPad/i.test(userAgent)) os = 'iOS';
+  else if (/iPhone|iPad/i.test(userAgent)) os = 'iOS';
 
   let browser = 'Unknown';
-  if (/Chrome/i.test(userAgent)) browser = 'Chrome';
+  if (/Chrome/i.test(userAgent) && !/Edge|Edg/i.test(userAgent)) browser = 'Chrome';
   else if (/Firefox/i.test(userAgent)) browser = 'Firefox';
-  else if (/Safari/i.test(userAgent)) browser = 'Safari';
-  else if (/Edge/i.test(userAgent)) browser = 'Edge';
+  else if (/Safari/i.test(userAgent) && !/Chrome/i.test(userAgent)) browser = 'Safari';
+  else if (/Edge|Edg/i.test(userAgent)) browser = 'Edge';
+  else if (/Opera|OPR/i.test(userAgent)) browser = 'Opera';
 
   return { type, os, browser };
 }
