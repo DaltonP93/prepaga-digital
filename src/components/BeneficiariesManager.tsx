@@ -62,9 +62,16 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
   };
 
   const onSubmit = (data: BeneficiaryFormData) => {
+    // Ensure required fields are present
+    if (!data.first_name || !data.last_name || !data.relationship) {
+      return;
+    }
+
     const beneficiaryData = {
-      ...data,
       sale_id: saleId,
+      first_name: data.first_name,
+      last_name: data.last_name,
+      relationship: data.relationship,
       birth_date: data.birth_date || null,
       amount: data.amount || 0,
       email: data.email || null,
