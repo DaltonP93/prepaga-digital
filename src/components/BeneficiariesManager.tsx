@@ -1,374 +1,305 @@
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, Edit } from "lucide-react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Trash2, Plus, Edit2 } from 'lucide-react';
+import { useBeneficiaries, useCreateBeneficiary, useUpdateBeneficiary, useDeleteBeneficiary } from '@/hooks/useBeneficiaries';
 
-interface BeneficiaryFormData {
-  first_name: string;
-  last_name: string;
-  dni: string;
-  relationship: string;
-  phone: string;
-  email: string;
-  birth_date: string;
-  amount: number;
-}
+const beneficiarySchema = z.object({
+  first_name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
+  last_name: z.string().min(2, 'El apellido debe tener al menos 2 caracteres'),
+  dni: z.string().optional(),
+  email: z.string().email('Email inválido').optional().or(z.literal('')),
+  phone: z.string().optional(),
+  relationship: z.string().min(1, 'La relación es requerida'),
+  birth_date: z.string().optional(),
+  amount: z.number().min(0, 'El monto debe ser mayor o igual a 0').optional(),
+});
+
+type BeneficiaryFormData = z.infer<typeof beneficiarySchema>;
 
 interface BeneficiariesManagerProps {
   saleId: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
 }
 
-export function BeneficiariesManager({ saleId, open, onOpenChange }: BeneficiariesManagerProps) {
-  const [selectedBeneficiary, setSelectedBeneficiary] = useState<any>(null);
+export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ saleId }) => {
   const [showForm, setShowForm] = useState(false);
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const [editingBeneficiary, setEditingBeneficiary] = useState<any>(null);
 
-  const { data: beneficiaries, isLoading } = useQuery({
-    queryKey: ['beneficiaries', saleId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('beneficiaries')
-        .select('*')
-        .eq('sale_id', saleId)
-        .order('created_at', { ascending: true });
+  const { data: beneficiaries = [], isLoading } = useBeneficiaries(saleId);
+  const createBeneficiary = useCreateBeneficiary();
+  const updateBeneficiary = useUpdateBeneficiary();
+  const deleteBeneficiary = useDeleteBeneficiary();
 
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!saleId && open,
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    formState: { errors },
+  } = useForm<BeneficiaryFormData>({
+    resolver: zodResolver(beneficiarySchema),
   });
-
-  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<BeneficiaryFormData>({
-    defaultValues: {
-      first_name: '',
-      last_name: '',
-      dni: '',
-      relationship: '',
-      phone: '',
-      email: '',
-      birth_date: '',
-      amount: 0,
-    }
-  });
-
-  const createBeneficiary = useMutation({
-    mutationFn: async (data: BeneficiaryFormData) => {
-      const { error } = await supabase
-        .from('beneficiaries')
-        .insert([{
-          sale_id: saleId,
-          ...data,
-        }]);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['beneficiaries', saleId] });
-      queryClient.invalidateQueries({ queryKey: ['sales'] });
-      toast({
-        title: "Beneficiario agregado",
-        description: "El beneficiario ha sido agregado exitosamente.",
-      });
-      setShowForm(false);
-      reset();
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "No se pudo agregar el beneficiario.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const updateBeneficiary = useMutation({
-    mutationFn: async (data: BeneficiaryFormData) => {
-      const { error } = await supabase
-        .from('beneficiaries')
-        .update(data)
-        .eq('id', selectedBeneficiary.id);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['beneficiaries', saleId] });
-      queryClient.invalidateQueries({ queryKey: ['sales'] });
-      toast({
-        title: "Beneficiario actualizado",
-        description: "Los cambios han sido guardados exitosamente.",
-      });
-      setShowForm(false);
-      setSelectedBeneficiary(null);
-      reset();
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "No se pudo actualizar el beneficiario.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const deleteBeneficiary = useMutation({
-    mutationFn: async (beneficiaryId: string) => {
-      const { error } = await supabase
-        .from('beneficiaries')
-        .delete()
-        .eq('id', beneficiaryId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['beneficiaries', saleId] });
-      queryClient.invalidateQueries({ queryKey: ['sales'] });
-      toast({
-        title: "Beneficiario eliminado",
-        description: "El beneficiario ha sido eliminado exitosamente.",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "No se pudo eliminar el beneficiario.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const onSubmit = async (data: BeneficiaryFormData) => {
-    if (selectedBeneficiary) {
-      await updateBeneficiary.mutateAsync(data);
-    } else {
-      await createBeneficiary.mutateAsync(data);
-    }
-  };
 
   const handleEdit = (beneficiary: any) => {
-    setSelectedBeneficiary(beneficiary);
+    setEditingBeneficiary(beneficiary);
     setValue('first_name', beneficiary.first_name);
     setValue('last_name', beneficiary.last_name);
-    setValue('dni', beneficiary.dni);
+    setValue('dni', beneficiary.dni || '');
+    setValue('email', beneficiary.email || '');
+    setValue('phone', beneficiary.phone || '');
     setValue('relationship', beneficiary.relationship);
-    setValue('phone', beneficiary.phone);
-    setValue('email', beneficiary.email);
-    setValue('birth_date', beneficiary.birth_date);
+    setValue('birth_date', beneficiary.birth_date || '');
     setValue('amount', beneficiary.amount || 0);
     setShowForm(true);
   };
 
-  const handleAdd = () => {
-    setSelectedBeneficiary(null);
-    reset();
-    setShowForm(true);
+  const onSubmit = (data: BeneficiaryFormData) => {
+    const beneficiaryData = {
+      ...data,
+      sale_id: saleId,
+      birth_date: data.birth_date || null,
+      amount: data.amount || 0,
+      email: data.email || null,
+      phone: data.phone || null,
+      dni: data.dni || null,
+    };
+
+    if (editingBeneficiary) {
+      updateBeneficiary.mutate(
+        { id: editingBeneficiary.id, ...beneficiaryData },
+        {
+          onSuccess: () => {
+            reset();
+            setShowForm(false);
+            setEditingBeneficiary(null);
+          },
+        }
+      );
+    } else {
+      createBeneficiary.mutate(beneficiaryData, {
+        onSuccess: () => {
+          reset();
+          setShowForm(false);
+        },
+      });
+    }
   };
 
+  const handleCancel = () => {
+    reset();
+    setShowForm(false);
+    setEditingBeneficiary(null);
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm('¿Está seguro de que desea eliminar este beneficiario?')) {
+      deleteBeneficiary.mutate(id);
+    }
+  };
+
+  if (isLoading) {
+    return <div>Cargando beneficiarios...</div>;
+  }
+
   return (
-    <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Gestión de Beneficiarios</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Beneficiarios</h3>
-              <Button onClick={handleAdd}>
-                <Plus className="h-4 w-4 mr-2" />
-                Agregar Beneficiario
-              </Button>
-            </div>
-
-            {isLoading ? (
-              <div className="text-center py-8">Cargando beneficiarios...</div>
-            ) : beneficiaries && beneficiaries.length > 0 ? (
-              <div className="grid gap-4">
-                {beneficiaries.map((beneficiary) => (
-                  <Card key={beneficiary.id}>
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-start">
-                        <div className="space-y-1">
-                          <h4 className="font-medium">
-                            {beneficiary.first_name} {beneficiary.last_name}
-                          </h4>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <span>DNI: {beneficiary.dni}</span>
-                            <Badge variant="outline">{beneficiary.relationship}</Badge>
-                            {(beneficiary.amount || 0) > 0 && (
-                              <span>Monto: ${Number(beneficiary.amount || 0).toLocaleString()}</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <span>Email: {beneficiary.email}</span>
-                            <span>Teléfono: {beneficiary.phone}</span>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEdit(beneficiary)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => deleteBeneficiary.mutate(beneficiary.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+    <Card>
+      <CardHeader>
+        <div className="flex justify-between items-center">
+          <div>
+            <CardTitle>Beneficiarios</CardTitle>
+            <CardDescription>
+              Gestiona los beneficiarios de esta venta
+            </CardDescription>
+          </div>
+          <Button onClick={() => setShowForm(true)} disabled={showForm}>
+            <Plus className="h-4 w-4 mr-2" />
+            Agregar Beneficiario
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {showForm && (
+          <div className="border p-4 rounded-lg bg-muted/50">
+            <h3 className="font-semibold mb-4">
+              {editingBeneficiary ? 'Editar' : 'Nuevo'} Beneficiario
+            </h3>
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="first_name">Nombre *</Label>
+                  <Input
+                    id="first_name"
+                    {...register('first_name')}
+                    placeholder="Nombre del beneficiario"
+                  />
+                  {errors.first_name && (
+                    <p className="text-red-500 text-sm">{errors.first_name.message}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="last_name">Apellido *</Label>
+                  <Input
+                    id="last_name"
+                    {...register('last_name')}
+                    placeholder="Apellido del beneficiario"
+                  />
+                  {errors.last_name && (
+                    <p className="text-red-500 text-sm">{errors.last_name.message}</p>
+                  )}
+                </div>
               </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">No hay beneficiarios agregados</p>
-                <Button onClick={handleAdd} className="mt-4">
-                  Agregar primer beneficiario
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="dni">DNI/CI</Label>
+                  <Input
+                    id="dni"
+                    {...register('dni')}
+                    placeholder="Documento de identidad"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="relationship">Relación *</Label>
+                  <Select onValueChange={(value) => setValue('relationship', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar relación" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="conyuge">Cónyuge</SelectItem>
+                      <SelectItem value="hijo">Hijo/a</SelectItem>
+                      <SelectItem value="padre">Padre</SelectItem>
+                      <SelectItem value="madre">Madre</SelectItem>
+                      <SelectItem value="hermano">Hermano/a</SelectItem>
+                      <SelectItem value="otro">Otro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.relationship && (
+                    <p className="text-red-500 text-sm">{errors.relationship.message}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    {...register('email')}
+                    placeholder="Email del beneficiario"
+                  />
+                  {errors.email && (
+                    <p className="text-red-500 text-sm">{errors.email.message}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="phone">Teléfono</Label>
+                  <Input
+                    id="phone"
+                    {...register('phone')}
+                    placeholder="Teléfono del beneficiario"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="birth_date">Fecha de Nacimiento</Label>
+                  <Input
+                    id="birth_date"
+                    type="date"
+                    {...register('birth_date')}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="amount">Monto de Cobertura</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    step="0.01"
+                    {...register('amount', { valueAsNumber: true })}
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2">
+                <Button type="button" variant="outline" onClick={handleCancel}>
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createBeneficiary.isPending || updateBeneficiary.isPending}
+                >
+                  {editingBeneficiary ? 'Actualizar' : 'Crear'} Beneficiario
                 </Button>
               </div>
-            )}
+            </form>
           </div>
-        </DialogContent>
-      </Dialog>
+        )}
 
-      {/* Form Dialog */}
-      <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedBeneficiary ? 'Editar Beneficiario' : 'Nuevo Beneficiario'}
-            </DialogTitle>
-          </DialogHeader>
-
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="first_name">Nombre</Label>
-                <Input
-                  id="first_name"
-                  {...register("first_name", { required: "El nombre es requerido" })}
-                />
-                {errors.first_name && (
-                  <span className="text-sm text-red-500">{errors.first_name.message}</span>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="last_name">Apellido</Label>
-                <Input
-                  id="last_name"
-                  {...register("last_name", { required: "El apellido es requerido" })}
-                />
-                {errors.last_name && (
-                  <span className="text-sm text-red-500">{errors.last_name.message}</span>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="dni">DNI</Label>
-                <Input
-                  id="dni"
-                  {...register("dni")}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="relationship">Relación</Label>
-                <Select
-                  value={selectedBeneficiary?.relationship || ''}
-                  onValueChange={(value) => setValue('relationship', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar relación" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="hijo">Hijo/a</SelectItem>
-                    <SelectItem value="padre">Padre</SelectItem>
-                    <SelectItem value="madre">Madre</SelectItem>
-                    <SelectItem value="esposo">Esposo/a</SelectItem>
-                    <SelectItem value="hermano">Hermano/a</SelectItem>
-                    <SelectItem value="otro">Otro</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="phone">Teléfono</Label>
-                <Input
-                  id="phone"
-                  {...register("phone")}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  {...register("email")}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="birth_date">Fecha de Nacimiento</Label>
-                <Input
-                  id="birth_date"
-                  type="date"
-                  {...register("birth_date")}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="amount">Monto Asignado</Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  step="0.01"
-                  {...register("amount")}
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
-                Cancelar
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={createBeneficiary.isPending || updateBeneficiary.isPending}
-              >
-                {(createBeneficiary.isPending || updateBeneficiary.isPending) ? "Guardando..." : "Guardar"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </>
+        {beneficiaries.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nombre</TableHead>
+                <TableHead>DNI</TableHead>
+                <TableHead>Relación</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Teléfono</TableHead>
+                <TableHead>Monto</TableHead>
+                <TableHead>Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {beneficiaries.map((beneficiary) => (
+                <TableRow key={beneficiary.id}>
+                  <TableCell>
+                    {beneficiary.first_name} {beneficiary.last_name}
+                  </TableCell>
+                  <TableCell>{beneficiary.dni || '-'}</TableCell>
+                  <TableCell>{beneficiary.relationship}</TableCell>
+                  <TableCell>{beneficiary.email || '-'}</TableCell>
+                  <TableCell>{beneficiary.phone || '-'}</TableCell>
+                  <TableCell>
+                    {beneficiary.amount ? `$${beneficiary.amount.toLocaleString()}` : '-'}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEdit(beneficiary)}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDelete(beneficiary.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <p className="text-muted-foreground text-center py-4">
+            No hay beneficiarios agregados
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
-}
+};

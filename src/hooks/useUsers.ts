@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
-type ProfileInsert = Database['public']['Tables']['profiles']['Insert'];
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];
 
 interface CreateUserParams {
@@ -15,7 +14,7 @@ interface CreateUserParams {
   last_name: string;
   phone?: string;
   role: 'super_admin' | 'admin' | 'gestor' | 'vendedor';
-  company_id: string;
+  company_id?: string;
 }
 
 export const useUsers = () => {
@@ -43,56 +42,29 @@ export const useCreateUser = () => {
     mutationFn: async (userData: CreateUserParams) => {
       console.log('Creating user with data:', userData);
       
-      // 1. Crear usuario en auth.users usando admin API
-      const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-        email: userData.email,
-        password: userData.password,
-        email_confirm: true,
-        user_metadata: {
-          first_name: userData.first_name,
-          last_name: userData.last_name,
-          role: userData.role,
-          company_id: userData.company_id,
-        }
-      });
-
-      if (authError) {
-        console.error('Auth error:', authError);
-        throw authError;
-      }
-
-      if (!authUser.user) {
-        throw new Error('No se pudo crear el usuario en el sistema de autenticación');
-      }
-
-      // 2. Crear/actualizar perfil en profiles
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: authUser.user.id,
+      // Call the create-user edge function
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
           email: userData.email,
+          password: userData.password,
           first_name: userData.first_name,
           last_name: userData.last_name,
           phone: userData.phone,
           role: userData.role,
           company_id: userData.company_id,
-          active: true,
-        })
-        .select()
-        .single();
+        },
+      });
 
-      if (profileError) {
-        console.error('Profile error:', profileError);
-        // Intentar limpiar el usuario de auth si falla el perfil
-        try {
-          await supabase.auth.admin.deleteUser(authUser.user.id);
-        } catch (cleanupError) {
-          console.error('Error cleaning up auth user:', cleanupError);
-        }
-        throw profileError;
+      if (error) {
+        console.error('Error from edge function:', error);
+        throw new Error(error.message || 'Error al crear usuario');
       }
 
-      return profileData;
+      if (!data.success) {
+        throw new Error(data.error || 'Error al crear usuario');
+      }
+
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -100,7 +72,7 @@ export const useCreateUser = () => {
     },
     onError: (error: any) => {
       console.error('Error creating user:', error);
-      toast.error(error.message || 'No se pudo crear el usuario');
+      toast.error(error.message || 'Error al crear usuario');
     },
   });
 };
@@ -136,29 +108,38 @@ export const useDeleteUser = () => {
 
   return useMutation({
     mutationFn: async (userId: string) => {
-      // Primero eliminar el perfil
+      // First deactivate the profile
       const { error: profileError } = await supabase
         .from('profiles')
-        .delete()
+        .update({ active: false })
         .eq('id', userId);
 
       if (profileError) throw profileError;
-
-      // Luego eliminar el usuario de auth (solo super admin puede hacer esto)
-      const { error: authError } = await supabase.auth.admin.deleteUser(userId);
-      
-      if (authError) {
-        console.error('Error deleting auth user:', authError);
-        // No lanzar error aquí ya que el perfil ya fue eliminado
-      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast.success('Usuario eliminado exitosamente');
+      toast.success('Usuario desactivado exitosamente');
     },
     onError: (error: any) => {
-      console.error('Error deleting user:', error);
-      toast.error(error.message || 'No se pudo eliminar el usuario');
+      console.error('Error deactivating user:', error);
+      toast.error(error.message || 'No se pudo desactivar el usuario');
     },
+  });
+};
+
+// Hook to get countries for dropdown
+export const useCountries = () => {
+  return useQuery({
+    queryKey: ['countries'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('countries')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 10 * 60 * 1000, // 10 minutes cache
   });
 };

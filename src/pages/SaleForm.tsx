@@ -14,6 +14,7 @@ import { useCreateSale, useUpdateSale, useSales } from '@/hooks/useSales';
 import { useClients } from '@/hooks/useClients';
 import { usePlans } from '@/hooks/usePlans';
 import { useCompanies } from '@/hooks/useCompanies';
+import { useProfile } from '@/hooks/useProfile';
 import { Loader2, Plus } from 'lucide-react';
 
 interface SaleFormData {
@@ -29,6 +30,7 @@ const SaleForm = () => {
   const { id } = useParams<{ id: string }>();
   const isEditing = Boolean(id);
 
+  const { profile } = useProfile();
   const createSale = useCreateSale();
   const updateSale = useUpdateSale();
   const { data: sales } = useSales();
@@ -44,7 +46,7 @@ const SaleForm = () => {
     defaultValues: {
       client_id: '',
       plan_id: '',
-      company_id: '',
+      company_id: profile?.company_id || '',
       total_amount: 0,
       notes: ''
     }
@@ -58,6 +60,12 @@ const SaleForm = () => {
       setValue('total_amount', selectedPlan.price || 0);
     }
   }, [selectedPlan, setValue]);
+
+  useEffect(() => {
+    if (profile?.company_id) {
+      setValue('company_id', profile.company_id);
+    }
+  }, [profile, setValue]);
 
   useEffect(() => {
     if (isEditing && id && sales) {
@@ -78,21 +86,24 @@ const SaleForm = () => {
     try {
       setLoading(true);
       
+      const saleData = {
+        ...data,
+        salesperson_id: profile?.id,
+        status: 'borrador' as const
+      };
+      
       if (isEditing && id) {
-        await updateSale.mutateAsync({ id, ...data });
+        await updateSale.mutateAsync({ id, ...saleData });
         toast.success('Venta actualizada exitosamente');
       } else {
-        await createSale.mutateAsync({
-          ...data,
-          status: 'borrador'
-        });
+        await createSale.mutateAsync(saleData);
         toast.success('Venta creada exitosamente');
       }
       
       navigate('/sales');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving sale:', error);
-      toast.error('Error al guardar la venta');
+      toast.error(error.message || 'Error al guardar la venta');
     } finally {
       setLoading(false);
     }
@@ -205,29 +216,6 @@ const SaleForm = () => {
                 )}
               </div>
 
-              {/* Company Selection */}
-              <div className="space-y-2">
-                <Label htmlFor="company_id">Empresa *</Label>
-                <Select
-                  value={watch('company_id')}
-                  onValueChange={(value) => setValue('company_id', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar empresa" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {companies?.map((company) => (
-                      <SelectItem key={company.id} value={company.id}>
-                        {company.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.company_id && (
-                  <p className="text-sm text-red-500">Empresa es requerida</p>
-                )}
-              </div>
-
               {/* Total Amount */}
               <div className="space-y-2">
                 <Label htmlFor="total_amount">Monto Total *</Label>
@@ -237,6 +225,7 @@ const SaleForm = () => {
                   step="0.01"
                   {...register('total_amount', { 
                     required: 'El monto es requerido',
+                    valueAsNumber: true,
                     min: { value: 0, message: 'El monto debe ser mayor a 0' }
                   })}
                   placeholder="0.00"

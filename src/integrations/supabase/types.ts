@@ -383,6 +383,27 @@ export type Database = {
           },
         ]
       }
+      countries: {
+        Row: {
+          code: string
+          created_at: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       dashboard_widgets: {
         Row: {
           created_at: string
@@ -780,8 +801,11 @@ export type Database = {
       profiles: {
         Row: {
           active: boolean | null
+          address: string | null
           avatar_url: string | null
+          city: string | null
           company_id: string | null
+          country: string | null
           created_at: string | null
           email: string
           first_name: string | null
@@ -789,12 +813,17 @@ export type Database = {
           last_name: string | null
           phone: string | null
           role: Database["public"]["Enums"]["user_role"]
+          theme_preference: string | null
           updated_at: string | null
+          zip_code: string | null
         }
         Insert: {
           active?: boolean | null
+          address?: string | null
           avatar_url?: string | null
+          city?: string | null
           company_id?: string | null
+          country?: string | null
           created_at?: string | null
           email: string
           first_name?: string | null
@@ -802,12 +831,17 @@ export type Database = {
           last_name?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          theme_preference?: string | null
           updated_at?: string | null
+          zip_code?: string | null
         }
         Update: {
           active?: boolean | null
+          address?: string | null
           avatar_url?: string | null
+          city?: string | null
           company_id?: string | null
+          country?: string | null
           created_at?: string | null
           email?: string
           first_name?: string | null
@@ -815,7 +849,9 @@ export type Database = {
           last_name?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          theme_preference?: string | null
           updated_at?: string | null
+          zip_code?: string | null
         }
         Relationships: [
           {

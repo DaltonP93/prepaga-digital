@@ -11,11 +11,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from '@/hooks/use-toast';
 import { ProfileCompletionBanner } from '@/components/ProfileCompletionBanner';
 import { SecuritySettings } from '@/components/SecuritySettings';
 import NotificationSettings from '@/components/NotificationSettings';
 import { ProfileLogoutButton } from '@/components/ProfileLogoutButton';
+import { useCountries } from '@/hooks/useUsers';
 
 interface Profile {
   id: string;
@@ -25,10 +28,10 @@ interface Profile {
   address?: string;
   city?: string;
   country?: string;
-  zip_code?: string;
   avatar_url?: string;
   company_id?: string;
   email?: string;
+  theme_preference?: string;
 }
 
 const profileSchema = z.object({
@@ -37,19 +40,21 @@ const profileSchema = z.object({
   phone: z.string().min(9, { message: "El teléfono debe tener al menos 9 caracteres." }),
   address: z.string().min(5, { message: "La dirección debe tener al menos 5 caracteres." }),
   city: z.string().min(3, { message: "La ciudad debe tener al menos 3 caracteres." }),
-  country: z.string().min(3, { message: "El país debe tener al menos 3 caracteres." }),
-  zip_code: z.string().min(4, { message: "El código postal debe tener al menos 4 caracteres." }),
+  country: z.string().min(2, { message: "Debe seleccionar un país." }),
 });
 
 const Profile = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const { toast } = useToast();
+  const { data: countries } = useCountries();
 
   const {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema),
@@ -87,10 +92,10 @@ const Profile = () => {
       setValue('first_name', profileData.first_name || '');
       setValue('last_name', profileData.last_name || '');
       setValue('phone', profileData.phone || '');
-      setValue('address', (profileData as any).address || '');
-      setValue('city', (profileData as any).city || '');
-      setValue('country', (profileData as any).country || '');
-      setValue('zip_code', (profileData as any).zip_code || '');
+      setValue('address', profileData.address || '');
+      setValue('city', profileData.city || '');
+      setValue('country', profileData.country || '');
+      setIsDarkMode(profileData.theme_preference === 'dark');
       setIsLoadingProfile(false);
     }
   }, [profileData, setValue]);
@@ -122,8 +127,39 @@ const Profile = () => {
     },
   });
 
+  const updateThemeMutation = useMutation({
+    mutationFn: async (theme: string) => {
+      if (!user) throw new Error('User not found');
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ theme_preference: theme })
+        .eq('id', user.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Tema actualizado",
+        description: "La preferencia de tema ha sido actualizada.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: z.infer<typeof profileSchema>) => {
     updateProfileMutation.mutate(data);
+  };
+
+  const handleThemeChange = (isDark: boolean) => {
+    setIsDarkMode(isDark);
+    updateThemeMutation.mutate(isDark ? 'dark' : 'light');
   };
 
   return (
@@ -209,7 +245,7 @@ const Profile = () => {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="city">Ciudad</Label>
                       <Input
@@ -224,26 +260,20 @@ const Profile = () => {
                     </div>
                     <div>
                       <Label htmlFor="country">País</Label>
-                      <Input
-                        id="country"
-                        type="text"
-                        placeholder="Tu país"
-                        {...register("country")}
-                      />
+                      <Select value={watch('country')} onValueChange={(value) => setValue('country', value)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar país" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {countries?.map((country) => (
+                            <SelectItem key={country.id} value={country.code}>
+                              {country.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       {errors.country && (
                         <p className="text-red-500 text-sm">{errors.country.message}</p>
-                      )}
-                    </div>
-                    <div>
-                      <Label htmlFor="zip_code">Código Postal</Label>
-                      <Input
-                        id="zip_code"
-                        type="text"
-                        placeholder="Tu código postal"
-                        {...register("zip_code")}
-                      />
-                      {errors.zip_code && (
-                        <p className="text-red-500 text-sm">{errors.zip_code.message}</p>
                       )}
                     </div>
                   </div>
@@ -269,10 +299,25 @@ const Profile = () => {
               <CardHeader>
                 <CardTitle>Preferencias</CardTitle>
                 <CardDescription>
-                  Configura tus preferencias aquí.
+                  Configura tus preferencias de la aplicación.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="grid gap-4">
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="theme">Tema Oscuro</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Activa el tema oscuro para una mejor experiencia visual
+                    </p>
+                  </div>
+                  <Switch
+                    id="theme"
+                    checked={isDarkMode}
+                    onCheckedChange={handleThemeChange}
+                    disabled={updateThemeMutation.isPending}
+                  />
+                </div>
+                
                 <div>
                   <Label htmlFor="language">Idioma</Label>
                   <Input
@@ -281,17 +326,11 @@ const Profile = () => {
                     placeholder="Idioma"
                     disabled
                     defaultValue="Español"
+                    className="mt-2"
                   />
-                </div>
-                <div>
-                  <Label htmlFor="theme">Tema</Label>
-                  <Input
-                    id="theme"
-                    type="text"
-                    placeholder="Tema"
-                    disabled
-                    defaultValue="Claro"
-                  />
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Próximamente disponible
+                  </p>
                 </div>
               </CardContent>
             </Card>
