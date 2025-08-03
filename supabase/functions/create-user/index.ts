@@ -127,7 +127,7 @@ serve(async (req) => {
 
     console.log('Auth user created, creating profile...');
 
-    // Create profile directly using insert
+    // Create profile directly using insert without specifying role type
     const { error: profileInsertError } = await supabaseAdmin
       .from('profiles')
       .insert({
@@ -135,7 +135,7 @@ serve(async (req) => {
         email: email,
         first_name,
         last_name,
-        role: role,
+        role: role, // Let the database handle the type conversion
         company_id: company_id || null,
         active: true
       });

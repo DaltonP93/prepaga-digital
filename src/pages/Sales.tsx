@@ -1,263 +1,170 @@
 
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { Layout } from "@/components/Layout";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { 
-  Plus, 
-  Eye, 
-  Edit3, 
-  Trash2,
-  FileText, 
-  Send, 
-  PenTool,
-  CheckCircle2,
-  Clock,
-  XCircle,
-  AlertCircle
-} from "lucide-react";
-import { SaleForm } from "@/components/SaleForm";
-import { useSales, useDeleteSale, useGenerateQuestionnaireLink, useGenerateSignatureLink } from "@/hooks/useSales";
-import { Database } from "@/integrations/supabase/types";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
-import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
-
-type Sale = Database['public']['Tables']['sales']['Row'];
+import React from 'react';
+import { Layout } from '@/components/Layout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Plus, Eye, Edit, FileText, User, Calendar } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useSales } from '@/hooks/useSales';
+import { SalesActionButtons } from '@/components/SalesActionButtons';
 
 const Sales = () => {
-  const navigate = useNavigate();
-  const { data: sales = [], isLoading } = useSales();
-  const deleteSale = useDeleteSale();
-  const generateQuestionnaireLink = useGenerateQuestionnaireLink();
-  const generateSignatureLink = useGenerateSignatureLink();
-  const { profile } = useSimpleAuthContext();
-  
-  const [showSaleForm, setShowSaleForm] = useState(false);
-  const [editingSale, setEditingSale] = useState<Sale | null>(null);
-
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case 'firmado': return 'default';
-      case 'enviado': return 'secondary';
-      case 'borrador': return 'outline';
-      case 'cancelado': return 'destructive';
-      default: return 'outline';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'firmado': return <CheckCircle2 className="w-3 h-3" />;
-      case 'enviado': return <Send className="w-3 h-3" />;
-      case 'borrador': return <Clock className="w-3 h-3" />;
-      case 'cancelado': return <XCircle className="w-3 h-3" />;
-      default: return <AlertCircle className="w-3 h-3" />;
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'firmado': return 'Firmado';
-      case 'enviado': return 'Enviado';
-      case 'borrador': return 'Borrador';
-      case 'cancelado': return 'Cancelado';
-      default: return status;
-    }
-  };
-
-  const handleEditSale = (sale: Sale) => {
-    setEditingSale(sale);
-    setShowSaleForm(true);
-  };
-
-  const handleDeleteSale = async (saleId: string) => {
-    await deleteSale.mutateAsync(saleId);
-  };
-
-  const handleCloseForm = () => {
-    setShowSaleForm(false);
-    setEditingSale(null);
-  };
-
-  const handleGenerateQuestionnaireLink = async (saleId: string) => {
-    await generateQuestionnaireLink.mutateAsync(saleId);
-  };
-
-  const handleGenerateSignatureLink = async (saleId: string) => {
-    await generateSignatureLink.mutateAsync(saleId);
-  };
-
-  const canDeleteSale = (sale: Sale) => {
-    // Solo super_admin y admin pueden eliminar, y solo si la venta está en borrador
-    return ['super_admin', 'admin'].includes(profile?.role || '') && sale.status === 'borrador';
-  };
+  const { data: sales, isLoading } = useSales();
 
   if (isLoading) {
     return (
-      <Layout title="Gestión de Ventas" description="Administrar ventas y contratos del sistema">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+      <Layout title="Ventas" description="Gestión de ventas y contratos">
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h1 className="text-3xl font-bold tracking-tight">Ventas</h1>
+            <Skeleton className="h-10 w-32" />
+          </div>
+          <div className="grid gap-6">
+            {[1, 2, 3].map((i) => (
+              <Card key={i}>
+                <CardHeader>
+                  <Skeleton className="h-6 w-1/3" />
+                  <Skeleton className="h-4 w-2/3" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-20 w-full" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       </Layout>
     );
   }
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'borrador': return 'bg-gray-100 text-gray-800';
+      case 'enviado': return 'bg-blue-100 text-blue-800';
+      case 'firmado': return 'bg-green-100 text-green-800';
+      case 'completado': return 'bg-purple-100 text-purple-800';
+      case 'cancelado': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   return (
-    <Layout 
-      title="Gestión de Ventas" 
-      description="Administrar ventas y contratos del sistema"
-    >
+    <Layout title="Ventas" description="Gestión de ventas y contratos">
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">Ventas</h2>
+            <h1 className="text-3xl font-bold tracking-tight">Ventas</h1>
             <p className="text-muted-foreground">
-              Gestiona las ventas y contratos del sistema
+              Gestiona las ventas y su proceso de firma
             </p>
           </div>
-          <Button onClick={() => navigate('/sales/new')}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nueva Venta
+          <Button asChild>
+            <Link to="/new-sale">
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva Venta
+            </Link>
           </Button>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Lista de Ventas</CardTitle>
-            <CardDescription>
-              {sales.length} venta{sales.length !== 1 ? 's' : ''} registrada{sales.length !== 1 ? 's' : ''}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Plan</TableHead>
-                  <TableHead>Monto</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sales.map((sale) => (
-                  <TableRow key={sale.id}>
-                    <TableCell className="font-medium">
-                      {sale.clients ? `${sale.clients.first_name} ${sale.clients.last_name}` : 'Sin cliente'}
-                    </TableCell>
-                    <TableCell>
-                      {sale.plans?.name || 'Sin plan'}
-                    </TableCell>
-                    <TableCell>
-                      ₲{Number(sale.total_amount).toLocaleString('es-PY')}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusBadgeVariant(sale.status)} className="gap-1">
-                        {getStatusIcon(sale.status)}
-                        {getStatusLabel(sale.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {sale.created_at ? format(new Date(sale.created_at), 'dd/MM/yyyy', { locale: es }) : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/sales/${sale.id}`)}
-                          title="Ver detalle de la venta"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditSale(sale)}
-                          title="Editar venta"
-                        >
-                          <Edit3 className="h-4 w-4" />
-                        </Button>
-                        
-                        {sale.template_id && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleGenerateQuestionnaireLink(sale.id)}
-                            disabled={generateQuestionnaireLink.isPending}
-                            title="Generar enlace de cuestionario"
-                          >
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                        )}
-                        
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleGenerateSignatureLink(sale.id)}
-                          disabled={generateSignatureLink.isPending}
-                          title="Generar enlace de firma"
-                        >
-                          <PenTool className="h-4 w-4" />
-                        </Button>
-
-                        {canDeleteSale(sale) && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-destructive hover:text-destructive"
-                                title="Eliminar venta"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>¿Eliminar venta?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Esta acción no se puede deshacer. Se eliminará permanentemente la venta.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDeleteSale(sale.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                >
-                                  Eliminar
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-
-            {sales.length === 0 && (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">No hay ventas registradas</p>
+        {sales && sales.length === 0 ? (
+          <Card>
+            <CardContent className="py-12">
+              <div className="text-center">
+                <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No hay ventas aún</h3>
+                <p className="text-muted-foreground mb-4">
+                  Crea tu primera venta para comenzar
+                </p>
+                <Button asChild>
+                  <Link to="/new-sale">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Crear Primera Venta
+                  </Link>
+                </Button>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-6">
+            {sales?.map((sale) => (
+              <Card key={sale.id}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <CardTitle className="text-lg">
+                        {sale.clients?.first_name} {sale.clients?.last_name}
+                      </CardTitle>
+                      <Badge className={getStatusColor(sale.status)}>
+                        {sale.status}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="outline" asChild>
+                        <Link to={`/sales/${sale.id}`}>
+                          <Eye className="h-4 w-4 mr-1" />
+                          Ver
+                        </Link>
+                      </Button>
+                      <Button size="sm" variant="outline" asChild>
+                        <Link to={`/sales/${sale.id}/edit`}>
+                          <Edit className="h-4 w-4 mr-1" />
+                          Editar
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Información básica */}
+                    <div className="lg:col-span-2 space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">Cliente:</span>
+                          <span>{sale.clients?.email}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">Fecha:</span>
+                          <span>{new Date(sale.sale_date || '').toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">Plan:</span>
+                          <span>{sale.plans?.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Monto:</span>
+                          <span>{Number(sale.total_amount || 0).toLocaleString()} Gs.</span>
+                        </div>
+                      </div>
 
-        <SaleForm
-          open={showSaleForm}
-          onOpenChange={handleCloseForm}
-          sale={editingSale}
-        />
+                      {sale.contract_number && (
+                        <div className="text-xs text-muted-foreground">
+                          <span className="font-medium">Contrato:</span> {sale.contract_number}
+                        </div>
+                      )}
+
+                      {sale.request_number && (
+                        <div className="text-xs text-muted-foreground">
+                          <span className="font-medium">Solicitud:</span> {sale.request_number}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Acciones de firma */}
+                    <div className="lg:col-span-1">
+                      <SalesActionButtons sale={sale} />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </Layout>
   );
