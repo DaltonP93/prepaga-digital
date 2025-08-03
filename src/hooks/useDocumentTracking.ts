@@ -4,21 +4,14 @@ import { supabase } from '@/integrations/supabase/client';
 
 interface DocumentTrackingRecord {
   id: string;
-  sale_id: string;
-  document_type: string;
+  document_id: string;
+  action: string;
   access_time: string;
   ip_address?: string;
   user_agent?: string;
   device_type?: string;
-  device_os?: string;
-  browser?: string;
-  action: string;
-  progress_percentage: number;
-  time_spent_seconds: number;
-  country?: string;
-  city?: string;
+  session_id?: string;
   metadata: any;
-  created_at: string;
 }
 
 interface TokenValidationRecord {
@@ -61,9 +54,6 @@ export const useDocumentTracking = (saleId?: string) => {
           id,
           signature_token,
           signature_expires_at,
-          token_revoked,
-          token_revoked_at,
-          token_revoked_by,
           status
         `)
         .eq('signature_token', token)
@@ -76,16 +66,13 @@ export const useDocumentTracking = (saleId?: string) => {
       const now = new Date();
       const expiresAt = new Date(sale.signature_expires_at || '');
       const isExpired = expiresAt < now;
-      const isRevoked = sale.token_revoked === true;
 
       const validation: TokenValidationRecord = {
         sale_id: sale.id,
         token,
-        is_valid: !isExpired && !isRevoked,
-        is_revoked: isRevoked,
+        is_valid: !isExpired,
+        is_revoked: false,
         is_expired: isExpired,
-        revoked_at: sale.token_revoked_at || undefined,
-        revoked_by: sale.token_revoked_by || undefined,
         expires_at: sale.signature_expires_at || '',
         validation_timestamp: now.toISOString()
       };
@@ -95,7 +82,7 @@ export const useDocumentTracking = (saleId?: string) => {
   });
 
   const createTrackingRecord = useMutation({
-    mutationFn: async (record: Omit<DocumentTrackingRecord, 'id' | 'access_time' | 'created_at'>) => {
+    mutationFn: async (record: Omit<DocumentTrackingRecord, 'id' | 'access_time'>) => {
       // Detectar información del dispositivo
       const userAgent = navigator.userAgent;
       const deviceInfo = getDeviceInfo(userAgent);
@@ -103,17 +90,15 @@ export const useDocumentTracking = (saleId?: string) => {
       const { data, error } = await supabase
         .from('document_access_logs')
         .insert({
-          document_id: record.sale_id, // Using sale_id as document reference
+          document_id: record.document_id,
           action: record.action,
           user_agent: userAgent,
           device_type: deviceInfo.type,
-          session_id: record.metadata?.session_id,
+          session_id: record.session_id,
           metadata: {
             ...record.metadata,
             device_os: deviceInfo.os,
-            browser: deviceInfo.browser,
-            progress_percentage: record.progress_percentage,
-            time_spent_seconds: record.time_spent_seconds
+            browser: deviceInfo.browser
           },
           ip_address: await getClientIP(),
         })
@@ -135,16 +120,12 @@ export const useDocumentTracking = (saleId?: string) => {
     const totalCompleted = trackingRecords.filter(r => r.action === 'completed').length;
     const totalSigned = trackingRecords.filter(r => r.action === 'signed').length;
     const uniqueDevices = new Set(trackingRecords.map(r => r.device_type)).size;
-    const averageProgress = trackingRecords.length > 0 
-      ? trackingRecords.reduce((sum, r) => sum + (r.progress_percentage || 0), 0) / trackingRecords.length 
-      : 0;
 
     return {
       totalViews,
       totalCompleted,
       totalSigned,
       uniqueDevices,
-      averageProgress,
     };
   };
 

@@ -79,9 +79,8 @@ export const DocumentTrackingPanel: React.FC<DocumentTrackingPanelProps> = ({ sa
   };
 
   const statusInfo = getStatusInfo(sale.status || 'borrador');
-  const isTokenRevoked = sale.token_revoked === true;
   const isTokenExpired = sale.signature_expires_at && new Date(sale.signature_expires_at) < new Date();
-  const hasActiveToken = sale.signature_token && !isTokenRevoked && !isTokenExpired;
+  const hasActiveToken = sale.signature_token && !isTokenExpired;
 
   return (
     <div className="space-y-4">
@@ -96,13 +95,7 @@ export const DocumentTrackingPanel: React.FC<DocumentTrackingPanelProps> = ({ sa
                 <Badge className={statusInfo.color}>
                   {statusInfo.label}
                 </Badge>
-                {isTokenRevoked && (
-                  <Badge variant="destructive" className="flex items-center gap-1">
-                    <Ban className="h-3 w-3" />
-                    Token Revocado
-                  </Badge>
-                )}
-                {!isTokenRevoked && isTokenExpired && (
+                {!isTokenExpired && (
                   <Badge variant="outline" className="flex items-center gap-1">
                     <XCircle className="h-3 w-3" />
                     Token Expirado
@@ -145,15 +138,6 @@ export const DocumentTrackingPanel: React.FC<DocumentTrackingPanelProps> = ({ sa
           </div>
         )}
 
-        {isTokenRevoked && sale.token_revoked_at && (
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Token revocado el:</span>
-            <span className="text-red-600 font-medium">
-              {new Date(sale.token_revoked_at).toLocaleDateString()}
-            </span>
-          </div>
-        )}
-
         {sale.template_id && (
           <div className="flex items-center gap-2 text-sm">
             <FileText className="h-4 w-4 text-muted-foreground" />
@@ -167,11 +151,6 @@ export const DocumentTrackingPanel: React.FC<DocumentTrackingPanelProps> = ({ sa
               <>
                 <Eye className="h-4 w-4 text-green-600" />
                 <span className="text-green-600">Token de firma activo</span>
-              </>
-            ) : isTokenRevoked ? (
-              <>
-                <Ban className="h-4 w-4 text-red-600" />
-                <span className="text-red-600">Token de firma revocado</span>
               </>
             ) : (
               <>

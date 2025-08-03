@@ -56,10 +56,7 @@ export const SignatureWorkflowManager = ({
         .update({
           signature_token: token,
           signature_expires_at: expiresAt.toISOString(),
-          status: "enviado",
-          token_revoked: false,
-          token_revoked_at: null,
-          token_revoked_by: null
+          status: "enviado"
         })
         .eq("id", saleId);
 
@@ -96,10 +93,16 @@ export const SignatureWorkflowManager = ({
 
     setIsRevoking(true);
     try {
-      const { error } = await supabase.rpc('revoke_signature_token', {
-        p_sale_id: saleId,
-        p_reason: revocationReason
-      });
+      const { data: user } = await supabase.auth.getUser();
+      
+      const { error } = await supabase
+        .from('sales')
+        .update({
+          token_revoked: true,
+          token_revoked_at: new Date().toISOString(),
+          token_revoked_by: user.user?.id
+        })
+        .eq('id', saleId);
 
       if (error) throw error;
 
@@ -115,7 +118,7 @@ export const SignatureWorkflowManager = ({
       console.error("Error revoking token:", error);
       toast({
         title: "Error",
-        description: error.message || "No se pudo revocar el token",
+        description: "No se pudo revocar el token",
         variant: "destructive"
       });
     } finally {
