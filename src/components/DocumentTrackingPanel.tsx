@@ -79,8 +79,12 @@ export const DocumentTrackingPanel: React.FC<DocumentTrackingPanelProps> = ({ sa
   };
 
   const statusInfo = getStatusInfo(sale.status || 'borrador');
+  
+  // Safely access token properties using type assertions
+  const saleWithTokenInfo = sale as any;
   const isTokenExpired = sale.signature_expires_at && new Date(sale.signature_expires_at) < new Date();
-  const hasActiveToken = sale.signature_token && !isTokenExpired;
+  const isTokenRevoked = saleWithTokenInfo.token_revoked === true;
+  const hasActiveToken = sale.signature_token && !isTokenExpired && !isTokenRevoked;
 
   return (
     <div className="space-y-4">
@@ -95,10 +99,16 @@ export const DocumentTrackingPanel: React.FC<DocumentTrackingPanelProps> = ({ sa
                 <Badge className={statusInfo.color}>
                   {statusInfo.label}
                 </Badge>
-                {!isTokenExpired && (
+                {isTokenExpired && (
                   <Badge variant="outline" className="flex items-center gap-1">
                     <XCircle className="h-3 w-3" />
                     Token Expirado
+                  </Badge>
+                )}
+                {isTokenRevoked && (
+                  <Badge variant="destructive" className="flex items-center gap-1">
+                    <Ban className="h-3 w-3" />
+                    Token Revocado
                   </Badge>
                 )}
                 {hasActiveToken && (
@@ -172,6 +182,15 @@ export const DocumentTrackingPanel: React.FC<DocumentTrackingPanelProps> = ({ sa
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Número de solicitud:</span>
             <span className="font-mono text-xs">{sale.request_number}</span>
+          </div>
+        )}
+
+        {saleWithTokenInfo.token_revoked_at && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Token revocado el:</span>
+            <span className="text-red-600 font-medium">
+              {new Date(saleWithTokenInfo.token_revoked_at).toLocaleDateString()}
+            </span>
           </div>
         )}
       </div>
