@@ -1,13 +1,13 @@
 
 import { Navigate, useLocation } from "react-router-dom";
-import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
+import { useAuthContext } from "@/components/AuthProvider";
 
 interface RequireAuthProps {
   children: React.ReactNode;
 }
 
 function RequireAuth({ children }: RequireAuthProps) {
-  const { user, loading } = useSimpleAuthContext();
+  const { user, loading } = useAuthContext();
   const location = useLocation();
 
   console.log('🛡️ RequireAuth:', { 
