@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
+import { useAuthContext } from '@/components/AuthProvider';
 import { Navigate } from 'react-router-dom';
 
 interface SimpleProtectedRouteProps {
@@ -8,7 +8,7 @@ interface SimpleProtectedRouteProps {
 }
 
 export const SimpleProtectedRoute: React.FC<SimpleProtectedRouteProps> = ({ children }) => {
-  const { user, loading } = useSimpleAuthContext();
+  const { user, loading } = useAuthContext();
 
   if (loading) {
     return (
