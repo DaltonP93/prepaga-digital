@@ -6,7 +6,7 @@ interface RequireAuthProps {
   children: React.ReactNode;
 }
 
-export default function RequireAuth({ children }: RequireAuthProps) {
+function RequireAuth({ children }: RequireAuthProps) {
   const { user, loading } = useSimpleAuthContext();
   const location = useLocation();
 
@@ -36,3 +36,5 @@ export default function RequireAuth({ children }: RequireAuthProps) {
   console.log('✅ RequireAuth: Acceso permitido');
   return <>{children}</>;
 }
+
+export default RequireAuth;
