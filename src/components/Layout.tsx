@@ -3,7 +3,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
-import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
+import { useAuthContext } from '@/components/AuthProvider';
 import { Loader2 } from "lucide-react";
 import NotificationCenter from '@/components/NotificationCenter';
 import DashboardCustomizer from '@/components/DashboardCustomizer';
@@ -15,7 +15,7 @@ interface LayoutProps {
 }
 
 export function Layout({ children, title, description }: LayoutProps) {
-  const { profile, loading } = useSimpleAuthContext();
+  const { profile, loading } = useAuthContext();
   
   if (loading) {
     return (

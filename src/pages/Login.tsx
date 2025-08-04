@@ -2,10 +2,10 @@
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { SimpleLoginForm } from '@/components/SimpleLoginForm';
-import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
+import { useAuthContext } from '@/components/AuthProvider';
 
 const Login = () => {
-  const { user, loading } = useSimpleAuthContext();
+  const { user, loading } = useAuthContext();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -19,7 +19,7 @@ const Login = () => {
   useEffect(() => {
     // Si el usuario está autenticado, redirigir inmediatamente
     if (user && !loading) {
-      const from = location.state?.from?.pathname || '/';
+      const from = location.state?.from?.pathname || '/dashboard';
       console.log('✅ Login: Usuario autenticado, navegando a:', from);
       navigate(from, { replace: true });
     }
