@@ -35,13 +35,13 @@ export const useCombinedRequest = () => {
 
       if (clientError) throw clientError;
 
-      // 2. Crear venta
+      // 2. Crear venta - using correct property names from sales table schema
       const { data: sale, error: saleError } = await supabase
         .from('sales')
         .insert({
           client_id: client.id,
           plan_id: data.plan_id,
-          status: 'pendiente_firma',
+          status: 'borrador', // Using the correct default status from schema
           signature_token: generateSignatureToken(),
           signature_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 días
         })
