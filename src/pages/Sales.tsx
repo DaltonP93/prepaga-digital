@@ -1,3 +1,4 @@
+
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
@@ -6,7 +7,7 @@ import { useSales } from '@/hooks/useSales';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils';
-import { RequireAuth } from '@/components/RequireAuth';
+import RequireAuth from '@/components/RequireAuth';
 
 const Sales = () => {
   const { data: sales, isLoading } = useSales();
@@ -59,8 +60,8 @@ const Sales = () => {
                           {formatCurrency(sale.total_amount || 0)}
                         </div>
                         <Badge variant={
-                          sale.status === 'completado' ? 'default' :
-                          sale.status === 'en_proceso' ? 'secondary' :
+                          sale.status === 'firmado' ? 'default' :
+                          sale.status === 'enviado' ? 'secondary' :
                           'outline'
                         }>
                           {sale.status}
