@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
+import { useAuthContext } from '@/components/AuthProvider';
 import { toast } from 'sonner';
 import { Eye, EyeOff, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -14,7 +14,7 @@ export const SimpleLoginForm = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const { signIn } = useSimpleAuthContext();
+  const { signIn } = useAuthContext();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
