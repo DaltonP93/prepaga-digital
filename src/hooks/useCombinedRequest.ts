@@ -29,7 +29,7 @@ export const useCombinedRequest = () => {
       // 1. Crear cliente
       const { data: client, error: clientError } = await supabase
         .from('clients')
-        .insert([data.personal])
+        .insert(data.personal)
         .select()
         .single();
 
@@ -38,13 +38,13 @@ export const useCombinedRequest = () => {
       // 2. Crear venta
       const { data: sale, error: saleError } = await supabase
         .from('sales')
-        .insert([{
+        .insert({
           client_id: client.id,
           plan_id: data.plan_id,
           status: 'pendiente_firma',
           signature_token: generateSignatureToken(),
           signature_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 días
-        }])
+        })
         .select()
         .single();
 
@@ -71,11 +71,11 @@ export const useCombinedRequest = () => {
       if (data.signature) {
         const { error: signatureError } = await supabase
           .from('signatures')
-          .insert([{
+          .insert({
             sale_id: sale.id,
             signature_data: data.signature,
             status: 'firmado',
-          }]);
+          });
 
         if (signatureError) throw signatureError;
       }

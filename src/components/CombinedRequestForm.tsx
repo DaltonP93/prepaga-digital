@@ -7,10 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SignatureCanvas } from '@/components/SignatureCanvas';
-import { useClients } from '@/hooks/useClients';
+import { useCreateClient } from '@/hooks/useClients';
 import { usePlans } from '@/hooks/usePlans';
 import { useTemplateQuestions } from '@/hooks/useTemplateQuestions';
 import { usePDFGeneration } from '@/hooks/usePDFGeneration';
+import { useCombinedRequest } from '@/hooks/useCombinedRequest';
 import { CheckCircle, User, FileText, Signature } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -45,7 +46,7 @@ export const CombinedRequestForm = ({ onComplete }: { onComplete?: () => void })
   const { data: plans } = usePlans();
   const { questions } = useTemplateQuestions('default-health-template');
   const { generatePDF, isGenerating } = usePDFGeneration();
-  const { createClient } = useClients();
+  const { processCombinedRequest, isProcessing } = useCombinedRequest();
 
   const validateTab = (tab: string): boolean => {
     switch (tab) {
@@ -83,6 +84,20 @@ export const CombinedRequestForm = ({ onComplete }: { onComplete?: () => void })
       ...prev,
       health: { ...prev.health, [questionId]: value }
     }));
+  };
+
+  const handleSubmitRequest = async () => {
+    if (!validateTab('signature')) {
+      toast.error('Complete todos los campos antes de enviar');
+      return;
+    }
+
+    const result = await processCombinedRequest(formData);
+    
+    if (result.success) {
+      toast.success('Solicitud procesada exitosamente');
+      onComplete?.();
+    }
   };
 
   const generateCombinedPDF = async () => {
@@ -350,13 +365,22 @@ export const CombinedRequestForm = ({ onComplete }: { onComplete?: () => void })
                 height={200}
               />
 
-              <Button 
-                onClick={generateCombinedPDF}
-                disabled={!validateTab('signature') || isGenerating}
-                className="mt-4"
-              >
-                {isGenerating ? 'Generando documento...' : 'Generar Documento Final'}
-              </Button>
+              <div className="flex gap-4 mt-4">
+                <Button 
+                  onClick={generateCombinedPDF}
+                  disabled={!validateTab('signature') || isGenerating}
+                  variant="outline"
+                >
+                  {isGenerating ? 'Generando vista previa...' : 'Vista Previa PDF'}
+                </Button>
+                
+                <Button 
+                  onClick={handleSubmitRequest}
+                  disabled={!validateTab('signature') || isProcessing}
+                >
+                  {isProcessing ? 'Procesando solicitud...' : 'Enviar Solicitud'}
+                </Button>
+              </div>
             </div>
           </TabsContent>
         </Tabs>
