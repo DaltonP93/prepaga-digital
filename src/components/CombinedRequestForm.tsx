@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +13,8 @@ import { usePDFGeneration } from '@/hooks/usePDFGeneration';
 import { useCombinedRequest } from '@/hooks/useCombinedRequest';
 import { CheckCircle, User, FileText, Signature } from 'lucide-react';
 import { toast } from 'sonner';
+import { HybridPDFControls } from '@/components/HybridPDFControls';
+import { useHybridPDFGeneration } from '@/hooks/useHybridPDFGeneration';
 
 interface FormData {
   personal: {
@@ -47,6 +48,7 @@ export const CombinedRequestForm = ({ onComplete }: { onComplete?: () => void })
   const { questions } = useTemplateQuestions('default-health-template');
   const { generatePDF, isGenerating } = usePDFGeneration();
   const { processCombinedRequest, isProcessing } = useCombinedRequest();
+  const { generatePDF: generateHybridPDF } = useHybridPDFGeneration();
 
   const validateTab = (tab: string): boolean => {
     switch (tab) {
@@ -103,95 +105,25 @@ export const CombinedRequestForm = ({ onComplete }: { onComplete?: () => void })
   const generateCombinedPDF = async () => {
     const selectedPlan = plans?.find(p => p.id === formData.plan_id);
     
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>Contrato y Declaración Jurada</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
-            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
-            .section { margin: 30px 0; }
-            .signature-section { margin-top: 50px; border-top: 1px solid #ccc; padding-top: 30px; }
-            .signature-image { max-width: 200px; height: auto; border: 1px solid #ccc; }
-            .two-column { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-            .question { margin: 15px 0; padding: 10px; background: #f9f9f9; border-left: 3px solid #007bff; }
-            .contract-terms { font-size: 12px; color: #555; margin-top: 20px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>CONTRATO DE SEGURO DE SALUD</h1>
-            <h2>DECLARACIÓN JURADA INTEGRADA</h2>
-            <p><strong>Fecha:</strong> ${new Date().toLocaleDateString('es-ES')}</p>
-          </div>
+    const pdfData = {
+      personal: formData.personal,
+      health: formData.health,
+      plan: selectedPlan ? {
+        name: selectedPlan.name,
+        price: Number(selectedPlan.price || 0),
+        description: selectedPlan.description
+      } : undefined,
+      signature: formData.signature,
+    };
 
-          <div class="section">
-            <h2>I. INFORMACIÓN DEL SOLICITANTE</h2>
-            <div class="two-column">
-              <div>
-                <p><strong>Nombre:</strong> ${formData.personal.first_name} ${formData.personal.last_name}</p>
-                <p><strong>DNI:</strong> ${formData.personal.dni}</p>
-              </div>
-              <div>
-                <p><strong>Email:</strong> ${formData.personal.email}</p>
-                <p><strong>Teléfono:</strong> ${formData.personal.phone}</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="section">
-            <h2>II. PLAN CONTRATADO</h2>
-            <p><strong>Plan:</strong> ${selectedPlan?.name || 'Plan seleccionado'}</p>
-            <p><strong>Precio:</strong> ${selectedPlan?.price ? `$${Number(selectedPlan.price).toLocaleString()}` : 'Precio del plan'}</p>
-            <p><strong>Descripción:</strong> ${selectedPlan?.description || 'Descripción del plan'}</p>
-          </div>
-
-          <div class="section">
-            <h2>III. DECLARACIÓN JURADA DE SALUD</h2>
-            ${questions?.map((q, index) => `
-              <div class="question">
-                <p><strong>Pregunta ${index + 1}:</strong> ${q.question_text}</p>
-                <p><strong>Respuesta:</strong> ${formData.health[q.id] || 'Sin respuesta'}</p>
-              </div>
-            `).join('') || '<p>No hay preguntas disponibles</p>'}
-          </div>
-
-          <div class="signature-section">
-            <h2>IV. FIRMA DIGITAL</h2>
-            <p><strong>Firmado el:</strong> ${new Date().toLocaleString('es-ES')}</p>
-            <div>
-              <p><strong>Firma:</strong></p>
-              ${formData.signature ? `<img src="${formData.signature}" alt="Firma" class="signature-image" />` : '<p>Sin firma</p>'}
-            </div>
-            <p style="margin-top: 20px; font-style: italic;">
-              Al firmar este documento, acepto los términos y condiciones del plan seleccionado 
-              y declaro que toda la información proporcionada es veraz.
-            </p>
-          </div>
-
-          <div class="contract-terms">
-            <h3>TÉRMINOS Y CONDICIONES</h3>
-            <p>1. El presente contrato tiene vigencia a partir de la fecha de firma.</p>
-            <p>2. La información de la declaración jurada es de carácter confidencial.</p>
-            <p>3. Cualquier falsedad en los datos puede resultar en la anulación del contrato.</p>
-            <p>4. Este documento ha sido generado digitalmente y es válido sin firma manuscrita adicional.</p>
-          </div>
-        </body>
-      </html>
-    `;
-
-    const pdfBlob = await generatePDF({
-      htmlContent,
+    const result = await generateHybridPDF({
+      ...pdfData,
       filename: `contrato-${formData.personal.first_name}-${formData.personal.last_name}`,
-      clientData: formData.personal,
-      templateData: { name: 'Contrato Integrado' }
+      saleId: undefined, // Se agregará cuando se procese la solicitud
     });
 
-    if (pdfBlob) {
+    if (result) {
       toast.success('Documento generado exitosamente');
-      onComplete?.();
     }
   };
 
@@ -365,18 +297,26 @@ export const CombinedRequestForm = ({ onComplete }: { onComplete?: () => void })
                 height={200}
               />
 
-              <div className="flex gap-4 mt-4">
-                <Button 
-                  onClick={generateCombinedPDF}
-                  disabled={!validateTab('signature') || isGenerating}
-                  variant="outline"
-                >
-                  {isGenerating ? 'Generando vista previa...' : 'Vista Previa PDF'}
-                </Button>
-                
+              <div className="mt-6">
+                <HybridPDFControls
+                  personal={formData.personal}
+                  health={formData.health}
+                  plan={plans?.find(p => p.id === formData.plan_id) ? {
+                    name: plans.find(p => p.id === formData.plan_id)!.name,
+                    price: Number(plans.find(p => p.id === formData.plan_id)!.price || 0),
+                    description: plans.find(p => p.id === formData.plan_id)!.description
+                  } : undefined}
+                  signature={formData.signature}
+                  filename={`contrato-${formData.personal.first_name}-${formData.personal.last_name}`}
+                  disabled={!validateTab('signature')}
+                />
+              </div>
+
+              <div className="mt-4">
                 <Button 
                   onClick={handleSubmitRequest}
                   disabled={!validateTab('signature') || isProcessing}
+                  className="w-full"
                 >
                   {isProcessing ? 'Procesando solicitud...' : 'Enviar Solicitud'}
                 </Button>
