@@ -1,4 +1,5 @@
 
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -43,7 +44,7 @@ export const useCombinedRequest = () => {
           plan_id: data.plan_id,
           status: 'borrador', // Using the correct default status from schema
           signature_token: generateSignatureToken(),
-          signature_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 días
+          signature_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // Convert to string
         })
         .select()
         .single();
@@ -110,3 +111,4 @@ export const useCombinedRequest = () => {
     isProcessing,
   };
 };
+
