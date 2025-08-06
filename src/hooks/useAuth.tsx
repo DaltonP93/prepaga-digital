@@ -33,6 +33,10 @@ export const useAuth = (): AuthContextType => {
   const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
     try {
       console.log('🔍 Fetching profile for user:', userId);
+      console.log('📊 Supabase client status:', { 
+        hasClient: !!supabase,
+        url: supabase?.supabaseUrl
+      });
       
       const { data, error } = await supabase
         .from('profiles')
@@ -40,8 +44,15 @@ export const useAuth = (): AuthContextType => {
         .eq('id', userId)
         .maybeSingle();
 
+      console.log('📋 Profile query result:', { 
+        data: data ? 'Profile found' : 'No profile', 
+        error: error ? error.message : 'No error',
+        userId 
+      });
+
       if (error) {
         console.error('❌ Error fetching profile:', error);
+        setLoadingStage('error');
         return null;
       }
 
@@ -49,6 +60,7 @@ export const useAuth = (): AuthContextType => {
       return data;
     } catch (error) {
       console.error('❌ Failed to fetch profile:', error);
+      setLoadingStage('error');
       return null;
     }
   }, []);
@@ -105,7 +117,8 @@ export const useAuth = (): AuthContextType => {
         console.log('📊 Current session:', { 
           hasSession: !!currentSession, 
           hasUser: !!currentSession?.user,
-          userId: currentSession?.user?.id 
+          userId: currentSession?.user?.id,
+          isExpired: currentSession ? new Date(currentSession.expires_at! * 1000) < new Date() : 'N/A'
         });
         
         if (mounted) {
@@ -115,11 +128,15 @@ export const useAuth = (): AuthContextType => {
           
           // Load profile if user exists
           if (currentSession?.user) {
+            console.log('👤 Loading profile for user:', currentSession.user.id);
             setLoadingStage('loading_profile');
             const userProfile = await fetchProfile(currentSession.user.id);
             if (mounted) {
               setProfile(userProfile);
+              console.log('✅ Profile loaded, setting stage to ready');
             }
+          } else {
+            console.log('ℹ️ No user session, setting stage to ready');
           }
           
           setLoadingProgress(100);
@@ -161,6 +178,7 @@ export const useAuth = (): AuthContextType => {
         setUser(newSession?.user ?? null);
 
         if (event === 'SIGNED_OUT') {
+          console.log('👋 User signed out');
           setProfile(null);
           setLoadingStage('ready');
           setLoading(false);
@@ -174,6 +192,7 @@ export const useAuth = (): AuthContextType => {
           
           setLoadingStage('ready');
           setLoading(false);
+          console.log('🎉 Sign-in process completed');
         }
       }
     );
