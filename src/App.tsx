@@ -4,8 +4,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "@/components/AuthProvider";
-import RequireAuth from "@/components/RequireAuth";
+import { SimpleAuthProvider } from "@/components/SimpleAuthProvider";
+import { SimpleProtectedRoute } from "@/components/SimpleProtectedRoute";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Lazy loading de componentes principales
@@ -19,7 +19,7 @@ const Plans = lazy(() => import("@/pages/Plans"));
 const Templates = lazy(() => import("@/pages/Templates"));
 const Users = lazy(() => import("@/pages/Users"));
 const Companies = lazy(() => import("@/pages/Companies"));
-const Login = lazy(() => import("@/pages/Login"));
+const SimpleLogin = lazy(() => import("@/pages/SimpleLogin"));
 const Register = lazy(() => import("@/pages/Register"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Settings = lazy(() => import("@/pages/Settings"));
@@ -58,38 +58,98 @@ const AppSkeleton = () => (
 const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
+      <SimpleAuthProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
           <Suspense fallback={<AppSkeleton />}>
             <Routes>
               {/* Rutas públicas */}
-              <Route path="/login" element={<Login />} />
+              <Route path="/login" element={<SimpleLogin />} />
               <Route path="/register" element={<Register />} />
               <Route path="/signature/:token" element={<SignatureView />} />
               <Route path="/questionnaire/:token" element={<QuestionnaireView />} />
               
               {/* Rutas protegidas */}
-              <Route path="/" element={<RequireAuth><Dashboard /></RequireAuth>} />
-              <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
-              <Route path="/sales" element={<RequireAuth><Sales /></RequireAuth>} />
-              <Route path="/sales/new" element={<RequireAuth><NewSale /></RequireAuth>} />
-              <Route path="/sales/:id" element={<RequireAuth><SaleDetail /></RequireAuth>} />
-              <Route path="/request/new" element={<RequireAuth><CombinedRequest /></RequireAuth>} />
-              <Route path="/clients" element={<RequireAuth><Clients /></RequireAuth>} />
-              <Route path="/plans" element={<RequireAuth><Plans /></RequireAuth>} />
-              <Route path="/templates" element={<RequireAuth><Templates /></RequireAuth>} />
-              <Route path="/users" element={<RequireAuth><Users /></RequireAuth>} />
-              <Route path="/companies" element={<RequireAuth><Companies /></RequireAuth>} />
-              <Route path="/documents" element={<RequireAuth><Documents /></RequireAuth>} />
-              <Route path="/analytics" element={<RequireAuth><Analytics /></RequireAuth>} />
-              <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
-              <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
+              <Route path="/" element={
+                <SimpleProtectedRoute>
+                  <Dashboard />
+                </SimpleProtectedRoute>
+              } />
+              <Route path="/dashboard" element={
+                <SimpleProtectedRoute>
+                  <Dashboard />
+                </SimpleProtectedRoute>
+              } />
+              <Route path="/sales" element={
+                <SimpleProtectedRoute>
+                  <Sales />
+                </SimpleProtectedRoute>
+              } />
+              <Route path="/sales/new" element={
+                <SimpleProtectedRoute>
+                  <NewSale />
+                </SimpleProtectedRoute>
+              } />
+              <Route path="/sales/:id" element={
+                <SimpleProtectedRoute>
+                  <SaleDetail />
+                </SimpleProtectedRoute>
+              } />
+              <Route path="/request/new" element={
+                <SimpleProtectedRoute>
+                  <CombinedRequest />
+                </SimpleProtectedRoute>
+              } />
+              <Route path="/clients" element={
+                <SimpleProtectedRoute>
+                  <Clients />
+                </SimpleProtectedRoute>
+              } />
+              <Route path="/plans" element={
+                <SimpleProtectedRoute>
+                  <Plans />
+                </SimpleProtectedRoute>
+              } />
+              <Route path="/templates" element={
+                <SimpleProtectedRoute>
+                  <Templates />
+                </SimpleProtectedRoute>
+              } />
+              <Route path="/users" element={
+                <SimpleProtectedRoute>
+                  <Users />
+                </SimpleProtectedRoute>
+              } />
+              <Route path="/companies" element={
+                <SimpleProtectedRoute>
+                  <Companies />
+                </SimpleProtectedRoute>
+              } />
+              <Route path="/documents" element={
+                <SimpleProtectedRoute>
+                  <Documents />
+                </SimpleProtectedRoute>
+              } />
+              <Route path="/analytics" element={
+                <SimpleProtectedRoute>
+                  <Analytics />
+                </SimpleProtectedRoute>
+              } />
+              <Route path="/profile" element={
+                <SimpleProtectedRoute>
+                  <Profile />
+                </SimpleProtectedRoute>
+              } />
+              <Route path="/settings" element={
+                <SimpleProtectedRoute>
+                  <Settings />
+                </SimpleProtectedRoute>
+              } />
             </Routes>
           </Suspense>
         </BrowserRouter>
-      </AuthProvider>
+      </SimpleAuthProvider>
     </QueryClientProvider>
   );
 };
