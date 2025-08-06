@@ -154,7 +154,7 @@ export const useAsyncFeedback = () => {
         .then(resolve)
         .catch(reject);
     });
-  }, [showFeedback]);
+  }, []);
 
   return { executeWithFeedback };
 };
