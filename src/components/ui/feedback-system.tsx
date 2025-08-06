@@ -122,8 +122,6 @@ export interface AsyncOperationOptions<T> extends FeedbackOptions {
 }
 
 export const useAsyncFeedback = () => {
-  const { showFeedback } = useFeedback();
-
   const executeWithFeedback = useCallback(async <T>(
     asyncOperation: () => Promise<T>,
     options: AsyncOperationOptions<T> = {}
