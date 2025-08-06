@@ -1,7 +1,7 @@
 
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { SimpleLoginForm } from '@/components/SimpleLoginForm';
+import { LoginForm } from '@/components/LoginForm';
 import { useAuthContext } from '@/components/AuthProvider';
 
 const Login = () => {
@@ -25,7 +25,7 @@ const Login = () => {
     }
   }, [user, loading, navigate, location.state]);
 
-  // Mostrar loading mientras se verifica la autenticación inicial
+  // Mostrar loading solo durante verificación inicial
   if (loading) {
     console.log('⏳ Login: Mostrando loading...');
     return (
@@ -41,12 +41,19 @@ const Login = () => {
   // Si hay usuario, no mostrar nada (navegación en progreso)
   if (user) {
     console.log('🔄 Login: Usuario presente, navegación en progreso...');
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+          <p className="text-sm text-muted-foreground">Redirigiendo...</p>
+        </div>
+      </div>
+    );
   }
 
   // Mostrar formulario de login solo si no hay usuario
   console.log('📋 Login: Mostrando formulario de login');
-  return <SimpleLoginForm />;
+  return <LoginForm />;
 };
 
 export default Login;

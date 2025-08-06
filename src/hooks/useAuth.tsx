@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -32,9 +32,7 @@ export const useAuth = (): AuthContextType => {
   const [loadingProgress, setLoadingProgress] = useState(0);
   
   const { toast } = useToast();
-  const isInitializedRef = useRef(false);
 
-  // Simplified profile fetching
   const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
     try {
       console.log('🔍 Fetching profile for user:', userId);
@@ -60,7 +58,6 @@ export const useAuth = (): AuthContextType => {
 
   const refreshProfile = useCallback(async () => {
     if (!user) return;
-    
     console.log('🔄 Refreshing profile...');
     const freshProfile = await fetchProfile(user.id);
     setProfile(freshProfile);
@@ -68,7 +65,6 @@ export const useAuth = (): AuthContextType => {
 
   const forceRefreshProfile = useCallback(async () => {
     if (!user) return;
-    
     console.log('🔄 Force refreshing profile...');
     const freshProfile = await fetchProfile(user.id);
     setProfile(freshProfile);
@@ -100,24 +96,10 @@ export const useAuth = (): AuthContextType => {
     }
   }, [toast]);
 
-  // Monitor connection status
+  // Initialize auth state - SIMPLIFIED VERSION
   useEffect(() => {
-    const handleOnline = () => setConnectionStatus('connected');
-    const handleOffline = () => setConnectionStatus('disconnected');
+    let mounted = true;
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  // Initialize auth state - SIMPLIFIED
-  useEffect(() => {
-    if (isInitializedRef.current) return;
-    
     const initializeAuth = async () => {
       try {
         console.log('🚀 Initializing auth...');
@@ -126,7 +108,7 @@ export const useAuth = (): AuthContextType => {
         
         // Get current session
         const { data: { session: currentSession } } = await supabase.auth.getSession();
-        setLoadingProgress(30);
+        setLoadingProgress(50);
         
         console.log('📊 Current session:', { 
           hasSession: !!currentSession, 
@@ -134,38 +116,44 @@ export const useAuth = (): AuthContextType => {
           userId: currentSession?.user?.id 
         });
         
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-        setLoadingProgress(50);
-        
-        // Load profile if user exists
-        if (currentSession?.user) {
-          setLoadingStage('loading_profile');
-          setLoadingProgress(60);
+        if (mounted) {
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
+          setLoadingProgress(80);
           
-          const userProfile = await fetchProfile(currentSession.user.id);
-          setProfile(userProfile);
+          // Load profile if user exists
+          if (currentSession?.user) {
+            setLoadingStage('loading_profile');
+            const userProfile = await fetchProfile(currentSession.user.id);
+            if (mounted) {
+              setProfile(userProfile);
+            }
+          }
+          
           setLoadingProgress(100);
+          setLoadingStage('ready');
+          setLoading(false);
         }
         
-        setLoadingStage('ready');
-        setLoading(false);
-        
-        isInitializedRef.current = true;
         console.log('✅ Auth initialization complete');
       } catch (error) {
         console.error('❌ Error initializing auth:', error);
-        setLoadingStage('ready');
-        setLoading(false);
-        setLoadingProgress(0);
-        isInitializedRef.current = true;
+        if (mounted) {
+          setLoadingStage('ready');
+          setLoading(false);
+          setLoadingProgress(0);
+        }
       }
     };
 
     initializeAuth();
+
+    return () => {
+      mounted = false;
+    };
   }, [fetchProfile]);
 
-  // Listen for auth changes - SIMPLIFIED
+  // Listen for auth changes - SIMPLIFIED VERSION
   useEffect(() => {
     console.log('👂 Setting up auth state listener...');
     
@@ -195,12 +183,6 @@ export const useAuth = (): AuthContextType => {
           
           setLoadingStage('ready');
           setLoading(false);
-        } else if (event === 'TOKEN_REFRESHED' && newSession?.user) {
-          if (!profile) {
-            console.log('🔄 Token refreshed, loading profile if missing');
-            const userProfile = await fetchProfile(newSession.user.id);
-            setProfile(userProfile);
-          }
         }
       }
     );
@@ -209,7 +191,7 @@ export const useAuth = (): AuthContextType => {
       console.log('🔇 Unsubscribing from auth state changes');
       subscription.unsubscribe();
     };
-  }, [fetchProfile, profile]);
+  }, [fetchProfile]);
 
   return {
     user,

@@ -1,237 +1,160 @@
 
-import { useState, createContext, useContext, useCallback } from 'react';
-import { CheckCircle, XCircle, AlertCircle, Info, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { toast, Toaster } from 'sonner';
 
-type ToastType = 'success' | 'error' | 'warning' | 'info';
+export type FeedbackType = 'success' | 'error' | 'warning' | 'info';
+export type FeedbackPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top-center' | 'bottom-center';
 
-interface Toast {
-  id: string;
-  type: ToastType;
-  title: string;
-  message?: string;
+export interface FeedbackOptions {
   duration?: number;
   action?: {
     label: string;
     onClick: () => void;
   };
+  description?: string;
 }
 
-interface FeedbackContextType {
-  showToast: (toast: Omit<Toast, 'id'>) => void;
-  showSuccess: (title: string, message?: string) => void;
-  showError: (title: string, message?: string) => void;
-  showWarning: (title: string, message?: string) => void;
-  showInfo: (title: string, message?: string) => void;
-  dismissToast: (id: string) => void;
+export interface FeedbackContextType {
+  showFeedback: (type: FeedbackType, message: string, options?: FeedbackOptions) => void;
+  showSuccess: (message: string, options?: FeedbackOptions) => void;
+  showError: (message: string, options?: FeedbackOptions) => void;
+  showWarning: (message: string, options?: FeedbackOptions) => void;
+  showInfo: (message: string, options?: FeedbackOptions) => void;
 }
 
 const FeedbackContext = createContext<FeedbackContextType | undefined>(undefined);
 
-export const useFeedback = () => {
+export interface FeedbackProviderProps {
+  children: ReactNode;
+  position?: FeedbackPosition;
+  expand?: boolean;
+  richColors?: boolean;
+}
+
+export const FeedbackProvider: React.FC<FeedbackProviderProps> = ({ 
+  children, 
+  position = 'top-right',
+  expand = true,
+  richColors = true 
+}) => {
+  const showFeedback = useCallback((type: FeedbackType, message: string, options?: FeedbackOptions) => {
+    const toastOptions = {
+      duration: options?.duration || 4000,
+      action: options?.action,
+      description: options?.description,
+    };
+
+    switch (type) {
+      case 'success':
+        toast.success(message, toastOptions);
+        break;
+      case 'error':
+        toast.error(message, toastOptions);
+        break;
+      case 'warning':
+        toast.warning(message, toastOptions);
+        break;
+      case 'info':
+        toast.info(message, toastOptions);
+        break;
+      default:
+        toast(message, toastOptions);
+    }
+  }, []);
+
+  const showSuccess = useCallback((message: string, options?: FeedbackOptions) => {
+    showFeedback('success', message, options);
+  }, [showFeedback]);
+
+  const showError = useCallback((message: string, options?: FeedbackOptions) => {
+    showFeedback('error', message, options);
+  }, [showFeedback]);
+
+  const showWarning = useCallback((message: string, options?: FeedbackOptions) => {
+    showFeedback('warning', message, options);
+  }, [showFeedback]);
+
+  const showInfo = useCallback((message: string, options?: FeedbackOptions) => {
+    showFeedback('info', message, options);
+  }, [showFeedback]);
+
+  const contextValue: FeedbackContextType = {
+    showFeedback,
+    showSuccess,
+    showError,
+    showWarning,
+    showInfo,
+  };
+
+  return (
+    <FeedbackContext.Provider value={contextValue}>
+      {children}
+      <Toaster
+        position={position}
+        expand={expand}
+        richColors={richColors}
+        closeButton
+        toastOptions={{
+          style: {
+            background: 'hsl(var(--background))',
+            color: 'hsl(var(--foreground))',
+            border: '1px solid hsl(var(--border))',
+          },
+        }}
+      />
+    </FeedbackContext.Provider>
+  );
+};
+
+export const useFeedback = (): FeedbackContextType => {
   const context = useContext(FeedbackContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useFeedback must be used within a FeedbackProvider');
   }
   return context;
 };
 
-interface FeedbackProviderProps {
-  children: React.ReactNode;
-  position?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'top-center' | 'bottom-center';
+export interface AsyncOperationOptions<T> extends FeedbackOptions {
+  loadingMessage?: string;
+  successMessage?: string;
+  errorMessage?: string;
+  transform?: (result: T) => string;
 }
 
-export const FeedbackProvider = ({ 
-  children, 
-  position = 'top-right' 
-}: FeedbackProviderProps) => {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-
-  const showToast = useCallback((toast: Omit<Toast, 'id'>) => {
-    const id = Date.now().toString();
-    const newToast: Toast = {
-      ...toast,
-      id,
-      duration: toast.duration || 5000,
-    };
-
-    setToasts(prev => [...prev, newToast]);
-
-    // Auto dismiss
-    if (newToast.duration && newToast.duration > 0) {
-      setTimeout(() => {
-        dismissToast(id);
-      }, newToast.duration);
-    }
-  }, []);
-
-  const dismissToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id));
-  }, []);
-
-  const showSuccess = useCallback((title: string, message?: string) => {
-    showToast({ type: 'success', title, message });
-  }, [showToast]);
-
-  const showError = useCallback((title: string, message?: string) => {
-    showToast({ type: 'error', title, message, duration: 8000 });
-  }, [showToast]);
-
-  const showWarning = useCallback((title: string, message?: string) => {
-    showToast({ type: 'warning', title, message, duration: 6000 });
-  }, [showToast]);
-
-  const showInfo = useCallback((title: string, message?: string) => {
-    showToast({ type: 'info', title, message });
-  }, [showToast]);
-
-  const getPositionClasses = () => {
-    switch (position) {
-      case 'top-right':
-        return 'top-4 right-4';
-      case 'top-left':
-        return 'top-4 left-4';
-      case 'bottom-right':
-        return 'bottom-4 right-4';
-      case 'bottom-left':
-        return 'bottom-4 left-4';
-      case 'top-center':
-        return 'top-4 left-1/2 transform -translate-x-1/2';
-      case 'bottom-center':
-        return 'bottom-4 left-1/2 transform -translate-x-1/2';
-      default:
-        return 'top-4 right-4';
-    }
-  };
-
-  return (
-    <FeedbackContext.Provider value={{
-      showToast,
-      showSuccess,
-      showError,
-      showWarning,
-      showInfo,
-      dismissToast,
-    }}>
-      {children}
-      
-      {/* Toast Container */}
-      <div className={cn("fixed z-50 space-y-2", getPositionClasses())}>
-        {toasts.map(toast => (
-          <ToastComponent
-            key={toast.id}
-            toast={toast}
-            onDismiss={() => dismissToast(toast.id)}
-          />
-        ))}
-      </div>
-    </FeedbackContext.Provider>
-  );
-};
-
-interface ToastComponentProps {
-  toast: Toast;
-  onDismiss: () => void;
-}
-
-const ToastComponent = ({ toast, onDismiss }: ToastComponentProps) => {
-  const getIcon = () => {
-    switch (toast.type) {
-      case 'success':
-        return <CheckCircle className="h-5 w-5 text-green-600" />;
-      case 'error':
-        return <XCircle className="h-5 w-5 text-red-600" />;
-      case 'warning':
-        return <AlertCircle className="h-5 w-5 text-amber-600" />;
-      case 'info':
-        return <Info className="h-5 w-5 text-blue-600" />;
-    }
-  };
-
-  const getColorClasses = () => {
-    switch (toast.type) {
-      case 'success':
-        return 'border-green-200 bg-green-50';
-      case 'error':
-        return 'border-red-200 bg-red-50';
-      case 'warning':
-        return 'border-amber-200 bg-amber-50';
-      case 'info':
-        return 'border-blue-200 bg-blue-50';
-    }
-  };
-
-  return (
-    <div className={cn(
-      "max-w-sm w-full border rounded-lg shadow-lg p-4 animate-in slide-in-from-right-full",
-      getColorClasses()
-    )}>
-      <div className="flex items-start space-x-3">
-        {getIcon()}
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900">
-            {toast.title}
-          </p>
-          {toast.message && (
-            <p className="text-sm text-gray-700 mt-1">
-              {toast.message}
-            </p>
-          )}
-          {toast.action && (
-            <button
-              onClick={toast.action.onClick}
-              className="mt-2 text-sm font-medium text-blue-600 hover:text-blue-500"
-            >
-              {toast.action.label}
-            </button>
-          )}
-        </div>
-        <button
-          onClick={onDismiss}
-          className="text-gray-400 hover:text-gray-600"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-    </div>
-  );
-};
-
-// Hook para operaciones asíncronas con feedback automático
 export const useAsyncFeedback = () => {
-  const { showSuccess, showError } = useFeedback();
+  const { showFeedback } = useFeedback();
 
   const executeWithFeedback = useCallback(async <T>(
-    operation: () => Promise<T>,
-    options: {
-      loadingMessage?: string;
-      successMessage?: string;
-      errorMessage?: string;
-      successTitle?: string;
-      errorTitle?: string;
-    } = {}
-  ): Promise<T | null> => {
+    asyncOperation: () => Promise<T>,
+    options: AsyncOperationOptions<T> = {}
+  ): Promise<T> => {
     const {
-      successMessage,
-      errorMessage,
-      successTitle = 'Éxito',
-      errorTitle = 'Error'
+      loadingMessage = 'Procesando...',
+      successMessage = 'Operación completada exitosamente',
+      errorMessage = 'Ocurrió un error durante la operación',
+      transform,
+      ...feedbackOptions
     } = options;
 
-    try {
-      const result = await operation();
-      
-      if (successMessage) {
-        showSuccess(successTitle, successMessage);
-      }
-      
-      return result;
-    } catch (error: any) {
-      const message = errorMessage || error.message || 'Ocurrió un error inesperado';
-      showError(errorTitle, message);
-      return null;
-    }
-  }, [showSuccess, showError]);
+    return new Promise((resolve, reject) => {
+      toast.promise(
+        asyncOperation(),
+        {
+          loading: loadingMessage,
+          success: (result: T) => {
+            return transform ? transform(result) : successMessage;
+          },
+          error: (error: Error) => {
+            return error.message || errorMessage;
+          },
+        }
+      );
+
+      asyncOperation()
+        .then(resolve)
+        .catch(reject);
+    });
+  }, [showFeedback]);
 
   return { executeWithFeedback };
 };
