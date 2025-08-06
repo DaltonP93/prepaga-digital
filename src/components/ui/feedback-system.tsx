@@ -131,7 +131,7 @@ export const useAsyncFeedback = () => {
     const errorMessage = options.errorMessage || 'Ocurrió un error durante la operación';
     const transform = options.transform;
 
-    const toastPromise = toast.promise(
+    return toast.promise(
       asyncOperation(),
       {
         loading: loadingMessage,
@@ -143,8 +143,6 @@ export const useAsyncFeedback = () => {
         },
       }
     );
-
-    return toastPromise;
   }, []);
 
   return { executeWithFeedback };
