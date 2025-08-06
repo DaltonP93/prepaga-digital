@@ -2,11 +2,9 @@
 import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/components/AuthProvider";
-import { FeedbackProvider } from "@/components/ui/feedback-system";
 import RequireAuth from "@/components/RequireAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -60,42 +58,38 @@ const AppSkeleton = () => (
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AuthProvider>
-          <FeedbackProvider position="top-right">
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <Suspense fallback={<AppSkeleton />}>
-                <Routes>
-                  {/* Rutas públicas */}
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/register" element={<Register />} />
-                  <Route path="/signature/:token" element={<SignatureView />} />
-                  <Route path="/questionnaire/:token" element={<QuestionnaireView />} />
-                  
-                  {/* Rutas protegidas */}
-                  <Route path="/" element={<RequireAuth><Dashboard /></RequireAuth>} />
-                  <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
-                  <Route path="/sales" element={<RequireAuth><Sales /></RequireAuth>} />
-                  <Route path="/sales/new" element={<RequireAuth><NewSale /></RequireAuth>} />
-                  <Route path="/sales/:id" element={<RequireAuth><SaleDetail /></RequireAuth>} />
-                  <Route path="/request/new" element={<RequireAuth><CombinedRequest /></RequireAuth>} />
-                  <Route path="/clients" element={<RequireAuth><Clients /></RequireAuth>} />
-                  <Route path="/plans" element={<RequireAuth><Plans /></RequireAuth>} />
-                  <Route path="/templates" element={<RequireAuth><Templates /></RequireAuth>} />
-                  <Route path="/users" element={<RequireAuth><Users /></RequireAuth>} />
-                  <Route path="/companies" element={<RequireAuth><Companies /></RequireAuth>} />
-                  <Route path="/documents" element={<RequireAuth><Documents /></RequireAuth>} />
-                  <Route path="/analytics" element={<RequireAuth><Analytics /></RequireAuth>} />
-                  <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
-                  <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
-                </Routes>
-              </Suspense>
-            </BrowserRouter>
-          </FeedbackProvider>
-        </AuthProvider>
-      </TooltipProvider>
+      <AuthProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Suspense fallback={<AppSkeleton />}>
+            <Routes>
+              {/* Rutas públicas */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/signature/:token" element={<SignatureView />} />
+              <Route path="/questionnaire/:token" element={<QuestionnaireView />} />
+              
+              {/* Rutas protegidas */}
+              <Route path="/" element={<RequireAuth><Dashboard /></RequireAuth>} />
+              <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
+              <Route path="/sales" element={<RequireAuth><Sales /></RequireAuth>} />
+              <Route path="/sales/new" element={<RequireAuth><NewSale /></RequireAuth>} />
+              <Route path="/sales/:id" element={<RequireAuth><SaleDetail /></RequireAuth>} />
+              <Route path="/request/new" element={<RequireAuth><CombinedRequest /></RequireAuth>} />
+              <Route path="/clients" element={<RequireAuth><Clients /></RequireAuth>} />
+              <Route path="/plans" element={<RequireAuth><Plans /></RequireAuth>} />
+              <Route path="/templates" element={<RequireAuth><Templates /></RequireAuth>} />
+              <Route path="/users" element={<RequireAuth><Users /></RequireAuth>} />
+              <Route path="/companies" element={<RequireAuth><Companies /></RequireAuth>} />
+              <Route path="/documents" element={<RequireAuth><Documents /></RequireAuth>} />
+              <Route path="/analytics" element={<RequireAuth><Analytics /></RequireAuth>} />
+              <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
+              <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
+      </AuthProvider>
     </QueryClientProvider>
   );
 };

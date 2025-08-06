@@ -2,7 +2,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
 import { Tables } from "@/integrations/supabase/types";
 
 type Profile = Tables<"profiles">;
@@ -26,12 +25,10 @@ export const useAuth = (): AuthContextType => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'reconnecting'>('connected');
-  const [lastActivity, setLastActivity] = useState(new Date());
+  const [connectionStatus] = useState<'connected' | 'disconnected' | 'reconnecting'>('connected');
+  const [lastActivity] = useState(new Date());
   const [loadingStage, setLoadingStage] = useState<'initializing' | 'loading_profile' | 'retrying' | 'ready' | 'error'>('initializing');
   const [loadingProgress, setLoadingProgress] = useState(0);
-  
-  const { toast } = useToast();
 
   const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
     try {
@@ -79,11 +76,6 @@ export const useAuth = (): AuthContextType => {
       
       if (error) {
         console.error('Error signing out:', error);
-        toast({
-          title: "Error al cerrar sesión",
-          description: "Hubo un problema al cerrar la sesión.",
-          variant: "destructive",
-        });
       }
     } catch (error) {
       console.error('Unexpected error during sign out:', error);
@@ -94,9 +86,9 @@ export const useAuth = (): AuthContextType => {
       setLoading(false);
       setLoadingStage('ready');
     }
-  }, [toast]);
+  }, []);
 
-  // Initialize auth state - SIMPLIFIED VERSION
+  // Initialize auth state
   useEffect(() => {
     let mounted = true;
 
@@ -104,7 +96,7 @@ export const useAuth = (): AuthContextType => {
       try {
         console.log('🚀 Initializing auth...');
         setLoadingStage('initializing');
-        setLoadingProgress(10);
+        setLoadingProgress(25);
         
         // Get current session
         const { data: { session: currentSession } } = await supabase.auth.getSession();
@@ -119,7 +111,7 @@ export const useAuth = (): AuthContextType => {
         if (mounted) {
           setSession(currentSession);
           setUser(currentSession?.user ?? null);
-          setLoadingProgress(80);
+          setLoadingProgress(75);
           
           // Load profile if user exists
           if (currentSession?.user) {
@@ -139,7 +131,7 @@ export const useAuth = (): AuthContextType => {
       } catch (error) {
         console.error('❌ Error initializing auth:', error);
         if (mounted) {
-          setLoadingStage('ready');
+          setLoadingStage('error');
           setLoading(false);
           setLoadingProgress(0);
         }
@@ -153,7 +145,7 @@ export const useAuth = (): AuthContextType => {
     };
   }, [fetchProfile]);
 
-  // Listen for auth changes - SIMPLIFIED VERSION
+  // Listen for auth changes
   useEffect(() => {
     console.log('👂 Setting up auth state listener...');
     
@@ -165,7 +157,6 @@ export const useAuth = (): AuthContextType => {
           userId: newSession?.user?.id 
         });
         
-        setLastActivity(new Date());
         setSession(newSession);
         setUser(newSession?.user ?? null);
 
