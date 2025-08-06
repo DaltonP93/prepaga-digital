@@ -130,28 +130,23 @@ export const useAsyncFeedback = () => {
       loadingMessage = 'Procesando...',
       successMessage = 'Operación completada exitosamente',
       errorMessage = 'Ocurrió un error durante la operación',
-      transform,
-      ...feedbackOptions
+      transform
     } = options;
 
-    return new Promise((resolve, reject) => {
-      toast.promise(
-        asyncOperation(),
-        {
-          loading: loadingMessage,
-          success: (result: T) => {
-            return transform ? transform(result) : successMessage;
-          },
-          error: (error: Error) => {
-            return error.message || errorMessage;
-          },
-        }
-      );
+    const toastPromise = toast.promise(
+      asyncOperation(),
+      {
+        loading: loadingMessage,
+        success: (result: T) => {
+          return transform ? transform(result) : successMessage;
+        },
+        error: (error: Error) => {
+          return error.message || errorMessage;
+        },
+      }
+    );
 
-      asyncOperation()
-        .then(resolve)
-        .catch(reject);
-    });
+    return toastPromise;
   }, []);
 
   return { executeWithFeedback };
