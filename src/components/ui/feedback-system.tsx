@@ -126,12 +126,10 @@ export const useAsyncFeedback = () => {
     asyncOperation: () => Promise<T>,
     options: AsyncOperationOptions<T> = {}
   ): Promise<T> => {
-    const {
-      loadingMessage = 'Procesando...',
-      successMessage = 'Operación completada exitosamente',
-      errorMessage = 'Ocurrió un error durante la operación',
-      transform
-    } = options;
+    const loadingMessage = options.loadingMessage || 'Procesando...';
+    const successMessage = options.successMessage || 'Operación completada exitosamente';
+    const errorMessage = options.errorMessage || 'Ocurrió un error durante la operación';
+    const transform = options.transform;
 
     const toastPromise = toast.promise(
       asyncOperation(),
