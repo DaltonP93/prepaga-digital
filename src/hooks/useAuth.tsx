@@ -34,8 +34,7 @@ export const useAuth = (): AuthContextType => {
     try {
       console.log('🔍 Fetching profile for user:', userId);
       console.log('📊 Supabase client status:', { 
-        hasClient: !!supabase,
-        url: supabase?.supabaseUrl
+        hasClient: !!supabase
       });
       
       const { data, error } = await supabase
