@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { useAuthContext } from "@/components/AuthProvider";
+import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, RefreshCw } from "lucide-react";
@@ -12,22 +12,21 @@ interface RequireAuthProps {
 }
 
 const RequireAuth = ({ children }: RequireAuthProps) => {
-  const { user, loading, loadingStage, forceRefreshProfile } = useAuthContext();
+  const { user, loading } = useSimpleAuthContext();
   const location = useLocation();
   const [showTimeout, setShowTimeout] = useState(false);
 
   console.log('🔒 RequireAuth: Verificando acceso', { 
     user: !!user, 
-    loading, 
-    loadingStage,
+    loading,
     pathname: location.pathname 
   });
 
   // Timeout de seguridad para evitar carga infinita
   useEffect(() => {
-    if (loadingStage === 'loading_profile') {
+    if (loading) {
       const timeoutId = setTimeout(() => {
-        console.log('⚠️ RequireAuth: Timeout en carga de perfil');
+        console.log('⚠️ RequireAuth: Timeout en carga');
         setShowTimeout(true);
       }, 10000); // 10 segundos
 
@@ -35,7 +34,7 @@ const RequireAuth = ({ children }: RequireAuthProps) => {
     } else {
       setShowTimeout(false);
     }
-  }, [loadingStage]);
+  }, [loading]);
 
   // Si hay timeout, mostrar opción de reintentar
   if (showTimeout) {
@@ -46,15 +45,15 @@ const RequireAuth = ({ children }: RequireAuthProps) => {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Problema de carga</AlertTitle>
             <AlertDescription>
-              La carga de tu perfil está tardando más de lo esperado. 
-              Puedes intentar refrescar o cerrar sesión para comenzar de nuevo.
+              La carga está tardando más de lo esperado. 
+              Puedes intentar refrescar o ir al login.
             </AlertDescription>
           </Alert>
           <div className="flex gap-2">
             <Button 
               onClick={() => {
                 setShowTimeout(false);
-                forceRefreshProfile();
+                window.location.reload();
               }}
               className="flex-1"
             >
@@ -75,17 +74,15 @@ const RequireAuth = ({ children }: RequireAuthProps) => {
   }
 
   // Mostrar loading mientras se inicializa la autenticación
-  if (loading || loadingStage === 'initializing' || loadingStage === 'loading_profile') {
-    console.log('⏳ RequireAuth: Mostrando loading...', { loading, loadingStage });
+  if (loading) {
+    console.log('⏳ RequireAuth: Mostrando loading...', { loading });
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="space-y-4 w-full max-w-md mx-auto p-4">
           <div className="text-center mb-4">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
             <p className="text-sm text-muted-foreground">
-              {loadingStage === 'initializing' ? 'Inicializando...' :
-               loadingStage === 'loading_profile' ? 'Cargando perfil...' :
-               'Cargando aplicación...'}
+              Cargando aplicación...
             </p>
           </div>
           <Skeleton className="h-8 w-3/4 mx-auto" />
