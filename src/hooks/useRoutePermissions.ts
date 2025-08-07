@@ -1,9 +1,9 @@
 
 import { useHasPermission } from './usePermissions';
-import { useAuthContext } from '@/components/AuthProvider';
+import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 
 export const useRoutePermissions = () => {
-  const { profile } = useAuthContext();
+  const { profile } = useSimpleAuthContext();
   
   // For now, return basic permissions based on role
   const isSuperAdmin = profile?.role === 'super_admin';
