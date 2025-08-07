@@ -33,9 +33,6 @@ export const useAuth = (): AuthContextType => {
   const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
     try {
       console.log('🔍 Fetching profile for user:', userId);
-      console.log('📊 Supabase client status:', { 
-        hasClient: !!supabase
-      });
       
       const { data, error } = await supabase
         .from('profiles')
@@ -51,7 +48,6 @@ export const useAuth = (): AuthContextType => {
 
       if (error) {
         console.error('❌ Error fetching profile:', error);
-        setLoadingStage('error');
         return null;
       }
 
@@ -59,7 +55,6 @@ export const useAuth = (): AuthContextType => {
       return data;
     } catch (error) {
       console.error('❌ Failed to fetch profile:', error);
-      setLoadingStage('error');
       return null;
     }
   }, []);
@@ -102,6 +97,7 @@ export const useAuth = (): AuthContextType => {
   // Initialize auth state
   useEffect(() => {
     let mounted = true;
+    let timeoutId: NodeJS.Timeout;
 
     const initializeAuth = async () => {
       try {
@@ -109,39 +105,65 @@ export const useAuth = (): AuthContextType => {
         setLoadingStage('initializing');
         setLoadingProgress(25);
         
-        // Get current session
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
-        setLoadingProgress(50);
-        
-        console.log('📊 Current session:', { 
-          hasSession: !!currentSession, 
-          hasUser: !!currentSession?.user,
-          userId: currentSession?.user?.id,
-          isExpired: currentSession ? new Date(currentSession.expires_at! * 1000) < new Date() : 'N/A'
+        // Add timeout to prevent indefinite loading
+        const authTimeout = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('Auth initialization timeout')), 10000);
         });
-        
-        if (mounted) {
-          setSession(currentSession);
-          setUser(currentSession?.user ?? null);
-          setLoadingProgress(75);
+
+        const authInitialization = (async () => {
+          // Get current session
+          const { data: { session: currentSession } } = await supabase.auth.getSession();
+          setLoadingProgress(50);
           
-          // Load profile if user exists
-          if (currentSession?.user) {
-            console.log('👤 Loading profile for user:', currentSession.user.id);
-            setLoadingStage('loading_profile');
-            const userProfile = await fetchProfile(currentSession.user.id);
-            if (mounted) {
-              setProfile(userProfile);
-              console.log('✅ Profile loaded, setting stage to ready');
+          console.log('📊 Current session:', { 
+            hasSession: !!currentSession, 
+            hasUser: !!currentSession?.user,
+            userId: currentSession?.user?.id,
+            isExpired: currentSession ? new Date(currentSession.expires_at! * 1000) < new Date() : 'N/A'
+          });
+          
+          if (mounted) {
+            setSession(currentSession);
+            setUser(currentSession?.user ?? null);
+            setLoadingProgress(75);
+            
+            // Load profile if user exists
+            if (currentSession?.user) {
+              console.log('👤 Loading profile for user:', currentSession.user.id);
+              setLoadingStage('loading_profile');
+              
+              // Add timeout for profile loading
+              const profileTimeout = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Profile loading timeout')), 5000);
+              });
+              
+              try {
+                const userProfile = await Promise.race([
+                  fetchProfile(currentSession.user.id),
+                  profileTimeout
+                ]) as Profile | null;
+                
+                if (mounted) {
+                  setProfile(userProfile);
+                  console.log('✅ Profile loaded, setting stage to ready');
+                }
+              } catch (profileError) {
+                console.warn('⚠️ Profile loading failed, continuing without profile:', profileError);
+                if (mounted) {
+                  setProfile(null);
+                }
+              }
+            } else {
+              console.log('ℹ️ No user session, setting stage to ready');
             }
-          } else {
-            console.log('ℹ️ No user session, setting stage to ready');
+            
+            setLoadingProgress(100);
+            setLoadingStage('ready');
+            setLoading(false);
           }
-          
-          setLoadingProgress(100);
-          setLoadingStage('ready');
-          setLoading(false);
-        }
+        })();
+
+        await Promise.race([authInitialization, authTimeout]);
         
         console.log('✅ Auth initialization complete');
       } catch (error) {
@@ -151,6 +173,8 @@ export const useAuth = (): AuthContextType => {
           setLoading(false);
           setLoadingProgress(0);
         }
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
       }
     };
 
@@ -158,6 +182,7 @@ export const useAuth = (): AuthContextType => {
 
     return () => {
       mounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
     };
   }, [fetchProfile]);
 
@@ -186,8 +211,19 @@ export const useAuth = (): AuthContextType => {
           setLoadingStage('loading_profile');
           setLoading(true);
           
-          const userProfile = await fetchProfile(newSession.user.id);
-          setProfile(userProfile);
+          try {
+            const userProfile = await Promise.race([
+              fetchProfile(newSession.user.id),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Profile timeout')), 5000)
+              )
+            ]) as Profile | null;
+            
+            setProfile(userProfile);
+          } catch (error) {
+            console.warn('⚠️ Profile loading failed after sign in:', error);
+            setProfile(null);
+          }
           
           setLoadingStage('ready');
           setLoading(false);

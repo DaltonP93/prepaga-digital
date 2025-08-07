@@ -35,23 +35,32 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
     pathname: location.pathname
   });
 
+  // Show loading only during initial auth check - with timeout protection
+  if (loading && loadingStage === 'initializing') {
+    console.log('🛡️ ProtectedRoute: Mostrando loading inicial');
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+          <p className="text-sm text-muted-foreground">Cargando aplicación...</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {loadingStage === 'loading_profile' ? 'Cargando perfil...' : 'Inicializando...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // If loading stage is error, redirect to login
+  if (loadingStage === 'error') {
+    console.log('🛡️ ProtectedRoute: Error en carga, redirigiendo a login');
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
   // Redirect to login if not authenticated
   if (!user) {
     console.log('🛡️ ProtectedRoute: No hay usuario, redirigiendo a login');
     return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  // Show loading only during initial auth check
-  if (loading && loadingStage === 'initializing') {
-    console.log('🛡️ ProtectedRoute: Mostrando loading inicial');
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-          <p className="text-sm text-muted-foreground">Cargando aplicación...</p>
-        </div>
-      </div>
-    );
   }
 
   // Check role permissions if required and profile exists
@@ -59,7 +68,7 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
     if (!requiredRole.includes(profile.role)) {
       console.log('🛡️ ProtectedRoute: Rol no autorizado');
       return (
-        <div className="min-h-screen flex items-center justify-center">
+        <div className="min-h-screen flex items-center justify-center bg-background">
           <div className="text-center">
             <h2 className="text-xl font-semibold mb-2">Acceso Denegado</h2>
             <p className="text-muted-foreground">No tienes permisos para acceder a esta página.</p>
