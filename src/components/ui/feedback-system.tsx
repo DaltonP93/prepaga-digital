@@ -1,98 +1,138 @@
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { useState } from 'react';
+import { Button } from './button';
+import { Card, CardContent, CardHeader, CardTitle } from './card';
+import { Textarea } from './textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
 import { toast } from 'sonner';
+import { MessageCircle, X } from 'lucide-react';
 
-interface FeedbackContextType {
-  showSuccess: (message: string) => void;
-  showError: (message: string) => void;
-  showInfo: (message: string) => void;
-  showWarning: (message: string) => void;
-  showLoading: (message: string) => Promise<() => void>;
+interface FeedbackData {
+  type: 'bug' | 'feature' | 'improvement' | 'other';
+  message: string;
+  page?: string;
+  userAgent?: string;
 }
 
-const FeedbackContext = createContext<FeedbackContextType | undefined>(undefined);
+interface FeedbackSystemProps {
+  onSubmit?: (feedback: FeedbackData) => void;
+}
 
-export const FeedbackProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const showSuccess = useCallback((message: string) => {
-    toast.success(message);
-  }, []);
+export const FeedbackSystem: React.FC<FeedbackSystemProps> = ({ onSubmit }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [type, setType] = useState<FeedbackData['type']>('bug');
+  const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const showError = useCallback((message: string) => {
-    toast.error(message);
-  }, []);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!message.trim()) {
+      toast.error('Por favor ingresa tu comentario');
+      return;
+    }
 
-  const showInfo = useCallback((message: string) => {
-    toast.info(message);
-  }, []);
+    setIsSubmitting(true);
 
-  const showWarning = useCallback((message: string) => {
-    toast.warning(message);
-  }, []);
-
-  const showLoading = useCallback(async (message: string): Promise<() => void> => {
-    const toastId = toast.loading(message);
-    return () => toast.dismiss(toastId);
-  }, []);
-
-  const contextValue: FeedbackContextType = {
-    showSuccess,
-    showError,
-    showInfo,
-    showWarning,
-    showLoading,
-  };
-
-  return (
-    <FeedbackContext.Provider value={contextValue}>
-      {children}
-    </FeedbackContext.Provider>
-  );
-};
-
-export const useFeedback = (): FeedbackContextType => {
-  const context = useContext(FeedbackContext);
-  if (!context) {
-    throw new Error('useFeedback must be used within a FeedbackProvider');
-  }
-  return context;
-};
-
-// Hook simplificado para operaciones asíncronas
-export const useAsyncFeedback = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const feedback = useFeedback();
-
-  const executeAsync = useCallback(async <T>(
-    operation: () => Promise<T>,
-    options: {
-      loadingMessage?: string;
-      successMessage?: string;
-      errorMessage?: string;
-    } = {}
-  ): Promise<T | null> => {
-    const {
-      loadingMessage = 'Procesando...',
-      successMessage = 'Operación completada',
-      errorMessage = 'Error en la operación'
-    } = options;
-
-    setIsLoading(true);
-    const dismissLoading = await feedback.showLoading(loadingMessage);
+    const feedbackData: FeedbackData = {
+      type,
+      message: message.trim(),
+      page: window.location.pathname,
+      userAgent: navigator.userAgent,
+    };
 
     try {
-      const result = await operation();
-      dismissLoading();
-      feedback.showSuccess(successMessage);
-      return result;
+      if (onSubmit) {
+        await onSubmit(feedbackData);
+      } else {
+        // Default behavior - just show success
+        console.log('Feedback submitted:', feedbackData);
+      }
+      
+      toast.success('¡Gracias por tu comentario!');
+      setMessage('');
+      setType('bug');
+      setIsOpen(false);
     } catch (error) {
-      dismissLoading();
-      feedback.showError(errorMessage);
-      console.error('Async operation failed:', error);
-      return null;
+      console.error('Error submitting feedback:', error);
+      toast.error('Error al enviar comentario');
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
-  }, [feedback]);
+  };
 
-  return { executeAsync, isLoading };
+  if (!isOpen) {
+    return (
+      <Button
+        onClick={() => setIsOpen(true)}
+        variant="outline"
+        size="sm"
+        className="fixed bottom-4 right-4 z-50"
+      >
+        <MessageCircle className="w-4 h-4 mr-2" />
+        Feedback
+      </Button>
+    );
+  }
+
+  return (
+    <Card className="fixed bottom-4 right-4 z-50 w-80">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">Enviar Comentario</CardTitle>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsOpen(false)}
+          className="h-8 w-8 p-0"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <Select value={type} onValueChange={(value: FeedbackData['type']) => setType(value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Tipo de comentario" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="bug">Reportar Error</SelectItem>
+                <SelectItem value="feature">Nueva Funcionalidad</SelectItem>
+                <SelectItem value="improvement">Mejora</SelectItem>
+                <SelectItem value="other">Otro</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div>
+            <Textarea
+              placeholder="Describe tu comentario..."
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className="min-h-[80px] text-sm"
+            />
+          </div>
+          
+          <div className="flex gap-2">
+            <Button
+              type="submit"
+              size="sm"
+              disabled={isSubmitting || !message.trim()}
+              className="flex-1"
+            >
+              {isSubmitting ? 'Enviando...' : 'Enviar'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsOpen(false)}
+            >
+              Cancelar
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
 };

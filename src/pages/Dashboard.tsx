@@ -1,10 +1,10 @@
 
 import { Layout } from '@/components/Layout';
 import DashboardWidgets from '@/components/DashboardWidgets';
-import { useAuthContext } from '@/components/AuthProvider';
+import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 
 const Dashboard = () => {
-  const { user, loading } = useAuthContext();
+  const { user, loading } = useSimpleAuthContext();
 
   console.log('📊 Dashboard: Estado actual', { 
     user: !!user, 
