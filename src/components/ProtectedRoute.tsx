@@ -35,8 +35,8 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
     pathname: location.pathname
   });
 
-  // Show loading only during initial auth check - with timeout protection
-  if (loading && loadingStage === 'initializing') {
+  // Show loading during initial auth check and profile loading
+  if (loading && (loadingStage === 'initializing' || loadingStage === 'loading_profile')) {
     console.log('🛡️ ProtectedRoute: Mostrando loading inicial');
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
