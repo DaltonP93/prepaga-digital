@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDocuments } from "@/hooks/useDocuments";
-import { SearchAndFilters } from "@/components/SearchAndFilters";
+import { SearchAndFilters, FilterOptions } from "@/components/SearchAndFilters";
 import { DocumentsManager } from "@/components/DocumentsManager";
 import { DocumentPreview } from "@/components/DocumentPreview";
 import { Plus } from "lucide-react";
@@ -11,12 +11,13 @@ import { useToast } from "@/hooks/use-toast";
 
 const Documents: React.FC = () => {
   const { toast } = useToast();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<FilterOptions>({
+    search: "",
     status: "",
-    dateFrom: "",
-    dateTo: "",
-    type: "",
+    dateFrom: undefined,
+    dateTo: undefined,
+    company: "",
+    plan: "",
   });
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -50,21 +51,13 @@ const Documents: React.FC = () => {
     setSelectedDocument(null);
   };
 
-  const handleSearch = (term: string) => {
-    setSearchTerm(term);
-  };
-
-  const handleFilterChange = (newFilters: any) => {
-    setFilters(newFilters);
-  };
-
   const filteredDocuments = documents?.filter((doc: any) => {
-    const matchesSearch = !searchTerm || 
-      doc.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.content?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = !filters.search || 
+      doc.name?.toLowerCase().includes(filters.search.toLowerCase()) ||
+      doc.content?.toLowerCase().includes(filters.search.toLowerCase());
 
     const matchesStatus = !filters.status || doc.status === filters.status;
-    const matchesType = !filters.type || doc.type === filters.type;
+    const matchesType = !filters.company || doc.type === filters.company;
 
     return matchesSearch && matchesStatus && matchesType;
   }) || [];
@@ -98,32 +91,26 @@ const Documents: React.FC = () => {
 
       {/* Search and Filters */}
       <SearchAndFilters
-        onSearch={handleSearch}
-        onFilterChange={handleFilterChange}
-        placeholder="Buscar documentos..."
-        showDateFilter={true}
-        customFilters={[
-          {
-            key: "status",
-            label: "Estado",
-            options: [
-              { value: "", label: "Todos los estados" },
-              { value: "draft", label: "Borrador" },
-              { value: "published", label: "Publicado" },
-              { value: "archived", label: "Archivado" },
-            ],
-          },
-          {
-            key: "type",
-            label: "Tipo",
-            options: [
-              { value: "", label: "Todos los tipos" },
-              { value: "contract", label: "Contrato" },
-              { value: "policy", label: "Póliza" },
-              { value: "report", label: "Reporte" },
-            ],
-          },
+        filters={filters}
+        onFiltersChange={setFilters}
+        statusOptions={[
+          { value: "draft", label: "Borrador" },
+          { value: "published", label: "Publicado" },
+          { value: "archived", label: "Archivado" },
         ]}
+        companyOptions={[
+          { value: "contract", label: "Contrato" },
+          { value: "policy", label: "Póliza" },
+          { value: "report", label: "Reporte" },
+        ]}
+        planOptions={[]}
+        showExport={true}
+        onExport={() => {
+          toast({
+            title: "Exportando",
+            description: "Preparando la exportación de documentos...",
+          });
+        }}
       />
 
       {/* Main Content */}
@@ -134,13 +121,49 @@ const Documents: React.FC = () => {
             <CardTitle>Lista de Documentos ({filteredDocuments.length})</CardTitle>
           </CardHeader>
           <CardContent>
-            <DocumentsManager
-              documents={filteredDocuments}
-              onDocumentSelect={setSelectedDocument}
-              onDocumentUpdate={handleDocumentUpdated}
-              onDocumentDelete={handleDocumentDeleted}
-              selectedDocument={selectedDocument}
-            />
+            {filteredDocuments.length > 0 ? (
+              <div className="space-y-4">
+                {filteredDocuments.map((doc: any) => (
+                  <div
+                    key={doc.id}
+                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                      selectedDocument?.id === doc.id
+                        ? "border-primary bg-primary/5"
+                        : "hover:border-primary/50"
+                    }`}
+                    onClick={() => setSelectedDocument(doc)}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-medium">{doc.name}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {doc.document_type}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(doc.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm('¿Está seguro de que desea eliminar este documento?')) {
+                            deleteDocument(doc.id);
+                          }
+                        }}
+                      >
+                        Eliminar
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-center py-8">
+                No hay documentos disponibles
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -176,8 +199,8 @@ const Documents: React.FC = () => {
               <DocumentPreview
                 content={selectedDocument.content || ""}
                 dynamicFields={selectedDocument.dynamic_fields || []}
-                templateType={selectedDocument.type || "document"}
-                templateName={selectedDocument.title || "documento"}
+                templateType={selectedDocument.document_type || "document"}
+                templateName={selectedDocument.name || "documento"}
               />
             ) : (
               <div className="text-center py-8 text-muted-foreground">
