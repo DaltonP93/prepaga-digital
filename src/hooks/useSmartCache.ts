@@ -1,6 +1,5 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 const MEMORY_CACHE = new Map();
@@ -121,43 +120,4 @@ export const useSmartCache = <T>(
     invalidateCache,
     isFromCache: !loading && data !== null
   };
-};
-
-// Hook específico para consultas de Supabase optimizadas
-export const useOptimizedQuery = <T>(
-  table: string,
-  query: string,
-  filters?: Record<string, any>,
-  options?: CacheOptions & { page?: number; pageSize?: number }
-) => {
-  const { page = 1, pageSize = 50, ...cacheOptions } = options || {};
-  
-  const fetchFn = useCallback(async (): Promise<T> => {
-    let queryBuilder = supabase.from(table).select(query);
-    
-    // Aplicar filtros
-    if (filters) {
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
-          queryBuilder = queryBuilder.eq(key, value);
-        }
-      });
-    }
-    
-    // Aplicar paginación
-    if (pageSize > 0) {
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
-      queryBuilder = queryBuilder.range(from, to);
-    }
-    
-    const { data, error } = await queryBuilder;
-    
-    if (error) throw error;
-    return data as T;
-  }, [table, query, filters, page, pageSize]);
-
-  const cacheKey = `${table}_${query}_${JSON.stringify(filters)}_${page}_${pageSize}`;
-  
-  return useSmartCache(cacheKey, fetchFn, cacheOptions);
 };

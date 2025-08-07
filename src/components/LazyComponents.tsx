@@ -4,21 +4,16 @@ import { Skeleton, TableSkeleton, CardSkeleton, FormSkeleton, DashboardSkeleton 
 
 // Lazy loaded components para reducir el bundle inicial
 export const LazyPdfViewer = lazy(() => import('./PDFPreview').then(module => ({ default: module.PDFPreview })));
-export const LazyContractEditor = lazy(() => import('./TipTapEditor'));
-export const LazyAnalyticsDashboard = lazy(() => import('./AdvancedAnalytics'));
-export const LazyReportsManager = lazy(() => import('./ReportsManager'));
-export const LazyDocumentForm = lazy(() => import('./DocumentForm'));
-export const LazySignatureCanvas = lazy(() => import('./SignatureCanvas'));
-export const LazyDynamicQuestionnaire = lazy(() => import('./DynamicQuestionnaire'));
-export const LazyFileUpload = lazy(() => import('./FileUpload'));
-export const LazyImageManager = lazy(() => import('./ImageManager'));
+export const LazyContractEditor = lazy(() => import('./TipTapEditor').then(module => ({ default: module.default || module })));
+export const LazyAnalyticsDashboard = lazy(() => import('./AdvancedAnalytics').then(module => ({ default: module.default || module })));
+export const LazyReportsManager = lazy(() => import('./ReportsManager').then(module => ({ default: module.default || module })));
+export const LazyDocumentForm = lazy(() => import('./DocumentForm').then(module => ({ default: module.default || module })));
+export const LazySignatureCanvas = lazy(() => import('./SignatureCanvas').then(module => ({ default: module.SignatureCanvas })));
+export const LazyDynamicQuestionnaire = lazy(() => import('./DynamicQuestionnaire').then(module => ({ default: module.default || module })));
+export const LazyFileUpload = lazy(() => import('./FileUpload').then(module => ({ default: module.FileUpload })));
+export const LazyImageManager = lazy(() => import('./ImageManager').then(module => ({ default: module.default || module })));
 
 // Wrappers con Suspense para facilitar el uso
-interface LazyWrapperProps {
-  children: React.ReactNode;
-  fallback?: React.ReactNode;
-}
-
 export const PdfViewerWrapper = ({ fallback = <CardSkeleton /> }: { fallback?: React.ReactNode }) => (
   <Suspense fallback={fallback}>
     <LazyPdfViewer />
