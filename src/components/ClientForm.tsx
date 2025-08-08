@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useCreateClient, useUpdateClient } from "@/hooks/useClients";
 import { Database } from "@/integrations/supabase/types";
+import { useEffect } from "react";
 
 type Client = Database['public']['Tables']['clients']['Row'];
 
@@ -34,19 +35,40 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
   const updateClient = useUpdateClient();
   const isEditing = !!client;
 
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<ClientFormData>({
-    defaultValues: {
-      first_name: client?.first_name || "",
-      last_name: client?.last_name || "",
-      email: client?.email || "",
-      phone: client?.phone || "",
-      dni: client?.dni || "",
-      birth_date: client?.birth_date || "",
-      address: client?.address || "",
-      neighborhood: (client as any)?.neighborhood || "",
-      marital_status: (client as any)?.marital_status || "",
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<ClientFormData>();
+
+  // Reset form when client data changes or dialog opens
+  useEffect(() => {
+    if (open) {
+      if (client) {
+        // Editing mode - populate with client data
+        reset({
+          first_name: client.first_name || "",
+          last_name: client.last_name || "",
+          email: client.email || "",
+          phone: client.phone || "",
+          dni: client.dni || "",
+          birth_date: client.birth_date || "",
+          address: client.address || "",
+          neighborhood: client.neighborhood || "",
+          marital_status: client.marital_status || "",
+        });
+      } else {
+        // Creating mode - clear form
+        reset({
+          first_name: "",
+          last_name: "",
+          email: "",
+          phone: "",
+          dni: "",
+          birth_date: "",
+          address: "",
+          neighborhood: "",
+          marital_status: "",
+        });
+      }
     }
-  });
+  }, [client, open, reset]);
 
   const onSubmit = async (data: ClientFormData) => {
     try {
@@ -68,7 +90,6 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
         await createClient.mutateAsync(finalData);
       }
       onOpenChange(false);
-      reset();
     } catch (error) {
       console.error("Error saving client:", error);
     }

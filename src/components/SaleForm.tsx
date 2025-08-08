@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -62,76 +61,66 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
 
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
 
-  const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<SaleFormData>({
-    defaultValues: {
-      client_id: sale?.client_id || "",
-      plan_id: sale?.plan_id || "",
-      company_id: sale?.company_id || profile?.company_id || "",
-      template_ids: [],
-      total_amount: sale?.total_amount || 0,
-      notes: sale?.notes || "",
-      workplace: sale?.workplace || "",
-      profession: sale?.profession || "",
-      work_phone: sale?.work_phone || "",
-      work_address: sale?.work_address || "",
-      signature_modality: sale?.signature_modality || "",
-      maternity_bonus: sale?.maternity_bonus || false,
-      immediate_validity: sale?.immediate_validity || false,
-      leads_id: sale?.leads_id || "",
-      pediatrician: sale?.pediatrician || "",
-      birth_place: sale?.birth_place || "",
-      contract_number: sale?.contract_number || "",
-    }
-  });
+  const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<SaleFormData>();
 
   const selectedPlan = plans.find(plan => plan.id === watch("plan_id"));
 
-  // Reset form when sale changes
+  // Reset form when sale changes or dialog opens
   useEffect(() => {
-    if (sale) {
-      reset({
-        client_id: sale.client_id || "",
-        plan_id: sale.plan_id || "",
-        company_id: sale.company_id || "",
-        template_ids: sale.template_id ? [sale.template_id] : [],
-        total_amount: Number(sale.total_amount) || 0,
-        notes: sale.notes || "",
-        workplace: sale.workplace || "",
-        profession: sale.profession || "",
-        work_phone: sale.work_phone || "",
-        work_address: sale.work_address || "",
-        signature_modality: sale.signature_modality || "",
-        maternity_bonus: sale.maternity_bonus || false,
-        immediate_validity: sale.immediate_validity || false,
-        leads_id: sale.leads_id || "",
-        pediatrician: sale.pediatrician || "",
-        birth_place: sale.birth_place || "",
-        contract_number: sale.contract_number || "",
-      });
-      setSelectedTemplates(sale.template_id ? [sale.template_id] : []);
-    } else {
-      reset({
-        client_id: "",
-        plan_id: "",
-        company_id: profile?.company_id || "",
-        template_ids: [],
-        total_amount: 0,
-        notes: "",
-        workplace: "",
-        profession: "",
-        work_phone: "",
-        work_address: "",
-        signature_modality: "",
-        maternity_bonus: false,
-        immediate_validity: false,
-        leads_id: "",
-        pediatrician: "",
-        birth_place: "",
-        contract_number: "",
-      });
-      setSelectedTemplates([]);
+    if (open) {
+      if (sale) {
+        // Editing mode - populate with sale data
+        console.log('Loading sale data for editing:', sale);
+        
+        const formData = {
+          client_id: sale.client_id || "",
+          plan_id: sale.plan_id || "",
+          company_id: sale.company_id || profile?.company_id || "",
+          template_ids: sale.template_id ? [sale.template_id] : [],
+          total_amount: Number(sale.total_amount) || 0,
+          notes: sale.notes || "",
+          workplace: sale.workplace || "",
+          profession: sale.profession || "",
+          work_phone: sale.work_phone || "",
+          work_address: sale.work_address || "",
+          signature_modality: sale.signature_modality || "",
+          maternity_bonus: sale.maternity_bonus || false,
+          immediate_validity: sale.immediate_validity || false,
+          leads_id: sale.leads_id || "",
+          pediatrician: sale.pediatrician || "",
+          birth_place: sale.birth_place || "",
+          contract_number: sale.contract_number || "",
+        };
+        
+        reset(formData);
+        setSelectedTemplates(sale.template_id ? [sale.template_id] : []);
+      } else {
+        // Creating mode - clear form
+        const formData = {
+          client_id: "",
+          plan_id: "",
+          company_id: profile?.company_id || "",
+          template_ids: [],
+          total_amount: 0,
+          notes: "",
+          workplace: "",
+          profession: "",
+          work_phone: "",
+          work_address: "",
+          signature_modality: "",
+          maternity_bonus: false,
+          immediate_validity: false,
+          leads_id: "",
+          pediatrician: "",
+          birth_place: "",
+          contract_number: "",
+        };
+        
+        reset(formData);
+        setSelectedTemplates([]);
+      }
     }
-  }, [sale, profile?.company_id, reset]);
+  }, [sale, open, profile?.company_id, reset]);
 
   useEffect(() => {
     if (selectedPlan) {
@@ -162,9 +151,11 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
       };
 
       if (isEditing && sale) {
+        console.log('Updating sale with data:', { id: sale.id, ...saleData });
         await updateSale.mutateAsync({ id: sale.id, ...saleData });
         toast.success('Venta actualizada exitosamente');
       } else {
+        console.log('Creating new sale with data:', saleData);
         await createSale.mutateAsync({
           ...saleData,
           salesperson_id: profile?.id,
@@ -174,8 +165,6 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
       }
       
       onOpenChange(false);
-      reset();
-      setSelectedTemplates([]);
     } catch (error) {
       console.error("Error saving sale:", error);
       toast.error('Error al guardar la venta');
@@ -311,6 +300,7 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
               </div>
             </TabsContent>
 
+            
             <TabsContent value="templates" className="space-y-4">
               <Card>
                 <CardHeader>
