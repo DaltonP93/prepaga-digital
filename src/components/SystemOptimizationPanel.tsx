@@ -17,27 +17,40 @@ export const SystemOptimizationPanel = () => {
   const cleanTestData = async () => {
     setIsCleaningTestData(true);
     try {
-      // Eliminar datos de prueba específicos
-      const testDataQueries = [
-        supabase.from('sales').delete().ilike('client_name', '%test%'),
-        supabase.from('sales').delete().ilike('client_name', '%prueba%'),
-        supabase.from('sales').delete().ilike('client_name', '%ejemplo%'),
-        supabase.from('clients').delete().ilike('first_name', '%test%'),
-        supabase.from('clients').delete().ilike('first_name', '%prueba%'),
-        supabase.from('clients').delete().ilike('first_name', '%ejemplo%'),
-        supabase.from('templates').delete().ilike('name', '%test%'),
-        supabase.from('templates').delete().ilike('name', '%prueba%'),
-        supabase.from('templates').delete().ilike('name', '%ejemplo%'),
-      ];
-
-      const results = await Promise.allSettled(testDataQueries);
-      
       let deletedCount = 0;
-      results.forEach((result, index) => {
-        if (result.status === 'fulfilled' && result.value.data) {
-          deletedCount += result.value.data.length;
-        }
-      });
+
+      // Eliminar datos de prueba de ventas
+      const { data: salesData, error: salesError } = await supabase
+        .from('sales')
+        .delete()
+        .or('client_name.ilike.%test%,client_name.ilike.%prueba%,client_name.ilike.%ejemplo%')
+        .select();
+
+      if (!salesError && salesData) {
+        deletedCount += salesData.length;
+      }
+
+      // Eliminar datos de prueba de clientes
+      const { data: clientsData, error: clientsError } = await supabase
+        .from('clients')
+        .delete()
+        .or('first_name.ilike.%test%,first_name.ilike.%prueba%,first_name.ilike.%ejemplo%')
+        .select();
+
+      if (!clientsError && clientsData) {
+        deletedCount += clientsData.length;
+      }
+
+      // Eliminar datos de prueba de templates
+      const { data: templatesData, error: templatesError } = await supabase
+        .from('templates')
+        .delete()
+        .or('name.ilike.%test%,name.ilike.%prueba%,name.ilike.%ejemplo%')
+        .select();
+
+      if (!templatesError && templatesData) {
+        deletedCount += templatesData.length;
+      }
 
       toast.success(`Se eliminaron ${deletedCount} registros de datos de prueba`);
     } catch (error) {
