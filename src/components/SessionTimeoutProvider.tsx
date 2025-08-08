@@ -8,26 +8,64 @@ interface SessionTimeoutContextType {
   resetTimeout: () => void;
 }
 
+interface SessionConfig {
+  enabled: boolean;
+  timeoutMinutes: number;
+  warningMinutes: number;
+  showWarnings: boolean;
+  clearDataOnTimeout: boolean;
+}
+
 const SessionTimeoutContext = createContext<SessionTimeoutContextType | undefined>(undefined);
 
 interface SessionTimeoutProviderProps {
   children: ReactNode;
-  timeoutMinutes?: number;
-  warningMinutes?: number;
 }
 
-export const SessionTimeoutProvider = ({ 
-  children, 
-  timeoutMinutes = 240, // 4 horas por defecto
-  warningMinutes = 10   // 10 minutos de aviso
-}: SessionTimeoutProviderProps) => {
+export const SessionTimeoutProvider = ({ children }: SessionTimeoutProviderProps) => {
   const [lastActivity, setLastActivity] = useState(new Date());
   const [showWarning, setShowWarning] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
+  const [config, setConfig] = useState<SessionConfig>({
+    enabled: true,
+    timeoutMinutes: 30,
+    warningMinutes: 5,
+    showWarnings: true,
+    clearDataOnTimeout: true
+  });
+  
   const { user, signOut } = useSimpleAuthContext();
 
   // Solo activar en producción
   const isProduction = window.location.hostname !== 'localhost' && !window.location.hostname.includes('lovableproject.com');
+
+  // Cargar configuración
+  useEffect(() => {
+    const loadConfig = () => {
+      const savedConfig = localStorage.getItem('session-config');
+      if (savedConfig) {
+        try {
+          const parsedConfig = JSON.parse(savedConfig);
+          setConfig(parsedConfig);
+        } catch (error) {
+          console.error('Error loading session config:', error);
+        }
+      }
+    };
+
+    loadConfig();
+
+    // Escuchar cambios en la configuración
+    const handleConfigUpdate = (event: CustomEvent) => {
+      setConfig(event.detail);
+    };
+
+    window.addEventListener('session-config-updated', handleConfigUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('session-config-updated', handleConfigUpdate as EventListener);
+    };
+  }, []);
 
   const resetTimeout = () => {
     console.log('🔄 Session timeout reset');
@@ -36,8 +74,11 @@ export const SessionTimeoutProvider = ({
   };
 
   useEffect(() => {
-    if (!user || !isProduction) {
-      console.log('⏰ Session timeout disabled:', !user ? 'no user' : 'development mode');
+    if (!user || !isProduction || !config.enabled) {
+      console.log('⏰ Session timeout disabled:', 
+        !user ? 'no user' : 
+        !isProduction ? 'development mode' : 
+        'disabled in config');
       return;
     }
 
@@ -56,10 +97,10 @@ export const SessionTimeoutProvider = ({
         document.removeEventListener(event, handleActivity, true);
       });
     };
-  }, [user, isProduction]);
+  }, [user, isProduction, config.enabled]);
 
   useEffect(() => {
-    if (!user || !isProduction) return;
+    if (!user || !isProduction || !config.enabled) return;
 
     const interval = setInterval(() => {
       const now = new Date();
@@ -67,13 +108,17 @@ export const SessionTimeoutProvider = ({
 
       console.log(`⏰ Session check: ${Math.round(timeSinceLastActivity)} minutes since last activity`);
 
-      if (timeSinceLastActivity >= timeoutMinutes) {
+      if (timeSinceLastActivity >= config.timeoutMinutes) {
         console.log('🚪 Auto logout due to inactivity');
         signOut();
-        localStorage.clear();
-        sessionStorage.clear();
-      } else if (timeSinceLastActivity >= timeoutMinutes - warningMinutes) {
-        const remaining = Math.ceil(timeoutMinutes - timeSinceLastActivity);
+        
+        // Limpiar datos si está configurado
+        if (config.clearDataOnTimeout) {
+          localStorage.clear();
+          sessionStorage.clear();
+        }
+      } else if (config.showWarnings && timeSinceLastActivity >= config.timeoutMinutes - config.warningMinutes) {
+        const remaining = Math.ceil(config.timeoutMinutes - timeSinceLastActivity);
         console.log(`⚠️ Session warning: ${remaining} minutes remaining`);
         setTimeLeft(remaining);
         setShowWarning(true);
@@ -81,7 +126,7 @@ export const SessionTimeoutProvider = ({
     }, 60000); // Verificar cada minuto
 
     return () => clearInterval(interval);
-  }, [lastActivity, timeoutMinutes, warningMinutes, user, signOut, isProduction]);
+  }, [lastActivity, config, user, signOut, isProduction]);
 
   const handleExtendSession = () => {
     console.log('✅ Session extended by user');
@@ -91,14 +136,17 @@ export const SessionTimeoutProvider = ({
   const handleLogoutNow = () => {
     console.log('🚪 Manual logout from timeout dialog');
     signOut();
-    localStorage.clear();
-    sessionStorage.clear();
+    
+    if (config.clearDataOnTimeout) {
+      localStorage.clear();
+      sessionStorage.clear();
+    }
   };
 
   return (
     <SessionTimeoutContext.Provider value={{ lastActivity, resetTimeout }}>
       {children}
-      {isProduction && (
+      {isProduction && config.enabled && (
         <SessionTimeoutDialog
           open={showWarning}
           timeLeft={timeLeft}
