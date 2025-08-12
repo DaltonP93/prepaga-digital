@@ -21,21 +21,21 @@ const SimpleAuditDashboard = () => {
   const handleReject = (saleId: string) => {
     updateSaleStatus.mutate({
       saleId,
-      status: 'rechazado',
+      status: 'cancelado',
       notes: 'Rechazado por auditor'
     });
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'pendiente':
-        return <Badge variant="outline" className="text-yellow-600"><Clock className="w-3 h-3 mr-1" />Pendiente</Badge>;
+      case 'borrador':
+        return <Badge variant="outline" className="text-yellow-600"><Clock className="w-3 h-3 mr-1" />Borrador</Badge>;
       case 'enviado':
         return <Badge variant="outline" className="text-blue-600"><AlertCircle className="w-3 h-3 mr-1" />Enviado</Badge>;
       case 'completado':
         return <Badge variant="outline" className="text-green-600"><CheckCircle className="w-3 h-3 mr-1" />Completado</Badge>;
-      case 'rechazado':
-        return <Badge variant="outline" className="text-red-600"><XCircle className="w-3 h-3 mr-1" />Rechazado</Badge>;
+      case 'cancelado':
+        return <Badge variant="outline" className="text-red-600"><XCircle className="w-3 h-3 mr-1" />Cancelado</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -61,11 +61,11 @@ const SimpleAuditDashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Pendientes</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Borradores</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {sales?.filter(sale => sale.status === 'pendiente').length || 0}
+              {sales?.filter(sale => sale.status === 'borrador').length || 0}
             </div>
           </CardContent>
         </Card>
