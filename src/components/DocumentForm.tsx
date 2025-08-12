@@ -1,347 +1,113 @@
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-  FormDescription,
-} from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useDocuments } from "@/hooks/useDocuments";
-import { useTemplates } from "@/hooks/useTemplates";
-import { usePlans } from "@/hooks/usePlans";
-import { Plus, Edit } from "lucide-react";
-import { Tables } from "@/integrations/supabase/types";
-import { FileUpload } from "@/components/FileUpload";
-
-const documentSchema = z.object({
-  name: z.string().min(1, "El nombre es obligatorio"),
-  document_type: z.string().optional(),
-  content: z.string().optional(),
-  file_url: z.string().optional(),
-  template_id: z.string().optional(),
-  plan_id: z.string().optional(),
-  is_required: z.boolean().default(true),
-  order_index: z.number().min(0).default(0),
-});
-
-type DocumentFormData = z.infer<typeof documentSchema>;
-type Document = Tables<"documents">;
+import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface DocumentFormProps {
-  document?: Document;
-  trigger?: React.ReactNode;
+  onSubmit: (documentData: any) => void;
+  onCancel: () => void;
+  initialData?: any;
 }
 
-export const DocumentForm = ({ document, trigger }: DocumentFormProps) => {
-  const [open, setOpen] = useState(false);
-  const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
-  const { createDocument, updateDocument, isCreating, isUpdating } = useDocuments();
-  const { templates } = useTemplates();
-  const { data: plans } = usePlans();
-
-  const form = useForm<DocumentFormData>({
-    resolver: zodResolver(documentSchema),
-    defaultValues: {
-      name: document?.name || "",
-      document_type: document?.document_type || "",
-      content: document?.content || "",
-      file_url: document?.file_url || "",
-      template_id: document?.template_id || "",
-      plan_id: document?.plan_id || "",
-      is_required: document?.is_required ?? true,
-      order_index: document?.order_index || 0,
-    },
+export const DocumentForm: React.FC<DocumentFormProps> = ({ 
+  onSubmit, 
+  onCancel, 
+  initialData 
+}) => {
+  const [formData, setFormData] = useState({
+    name: initialData?.name || '',
+    document_type: initialData?.document_type || 'contract',
+    content: initialData?.content || '',
+    ...initialData
   });
 
-  const handleFileUploadComplete = (url: string) => {
-    setUploadedFileUrl(url);
-    form.setValue("file_url", url);
-  };
-
-  const onSubmit = async (data: DocumentFormData) => {
-    try {
-      // Convert special values back to null
-      const templateId = data.template_id === "__none__" ? null : data.template_id;
-      const planId = data.plan_id === "__all__" ? null : data.plan_id;
-      
-      const finalData = {
-        ...data,
-        file_url: uploadedFileUrl || data.file_url || null,
-        template_id: templateId,
-        plan_id: planId,
-      };
-
-      if (document) {
-        await updateDocument({
-          id: document.id,
-          updates: {
-            name: finalData.name,
-            document_type: finalData.document_type || null,
-            content: finalData.content || null,
-            file_url: finalData.file_url,
-            template_id: finalData.template_id,
-            plan_id: finalData.plan_id,
-            is_required: finalData.is_required,
-            order_index: finalData.order_index,
-          },
-        });
-      } else {
-        await createDocument({
-          name: finalData.name,
-          document_type: finalData.document_type || null,
-          content: finalData.content || null,
-          file_url: finalData.file_url,
-          template_id: finalData.template_id,
-          plan_id: finalData.plan_id,
-          is_required: finalData.is_required,
-          order_index: finalData.order_index,
-        });
-      }
-      
-      form.reset();
-      setUploadedFileUrl(null);
-      setOpen(false);
-    } catch (error) {
-      console.error("Error saving document:", error);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.name.trim()) {
+      alert('El nombre del documento es requerido');
+      return;
     }
+
+    onSubmit({
+      ...formData,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
   };
 
-  const defaultTrigger = document ? (
-    <Button variant="ghost" size="sm">
-      <Edit className="h-4 w-4" />
-    </Button>
-  ) : (
-    <Button>
-      <Plus className="h-4 w-4 mr-2" />
-      Nuevo Documento
-    </Button>
-  );
+  const handleChange = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || defaultTrigger}
-      </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {document ? "Editar Documento" : "Crear Nuevo Documento"}
-          </DialogTitle>
-        </DialogHeader>
-        
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nombre</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Nombre del documento" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="document_type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tipo de Documento</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="PDF, Formulario, etc." />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="template_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Template</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar template" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="__none__">Sin template</SelectItem>
-                        {templates?.map((template) => (
-                          <SelectItem key={template.id} value={template.id}>
-                            {template.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="plan_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Plan</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar plan" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="__all__">Todos los planes</SelectItem>
-                        {plans?.map((plan) => (
-                          <SelectItem key={plan.id} value={plan.id}>
-                            {plan.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <FormLabel>Archivo del Documento</FormLabel>
-              <FileUpload
-                bucket="documents"
-                accept=".pdf,.doc,.docx,.txt"
-                maxSize={10}
-                onUploadComplete={handleFileUploadComplete}
-              />
-              {uploadedFileUrl && (
-                <p className="text-sm text-green-600">
-                  ✓ Archivo subido correctamente
-                </p>
-              )}
-            </div>
-
-            <FormField
-              control={form.control}
-              name="content"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Contenido del Template</FormLabel>
-                  <FormControl>
-                    <Textarea 
-                      {...field} 
-                      placeholder="Contenido del documento con variables como {{cliente.nombre}}..."
-                      className="min-h-32"
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Usa variables como: {'{'}{'{'}{'}'}cliente.nombre{'}'}{'}'}{'}'}, {'{'}{'{'}{'}'}plan.precio{'}'}{'}'}{'}'}, etc.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          {initialData ? 'Editar Documento' : 'Crear Nuevo Documento'}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="name">Nombre del Documento</Label>
+            <Input
+              id="name"
+              type="text"
+              value={formData.name}
+              onChange={(e) => handleChange('name', e.target.value)}
+              placeholder="Ingrese el nombre del documento"
+              required
             />
+          </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="order_index"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Orden</FormLabel>
-                    <FormControl>
-                      <Input 
-                        {...field} 
-                        type="number"
-                        min="0"
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Orden de aparición del documento
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          <div>
+            <Label htmlFor="document_type">Tipo de Documento</Label>
+            <Select 
+              value={formData.document_type} 
+              onValueChange={(value) => handleChange('document_type', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona el tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="contract">Contrato</SelectItem>
+                <SelectItem value="policy">Póliza</SelectItem>
+                <SelectItem value="declaration">Declaración</SelectItem>
+                <SelectItem value="report">Reporte</SelectItem>
+                <SelectItem value="certificate">Certificado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-              <FormField
-                control={form.control}
-                name="is_required"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Obligatorio</FormLabel>
-                      <FormDescription>
-                        Este documento es requerido
-                      </FormDescription>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </div>
+          <div>
+            <Label htmlFor="content">Contenido</Label>
+            <Textarea
+              id="content"
+              value={formData.content}
+              onChange={(e) => handleChange('content', e.target.value)}
+              placeholder="Ingrese el contenido del documento"
+              rows={8}
+            />
+          </div>
 
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  form.reset();
-                  setUploadedFileUrl(null);
-                  setOpen(false);
-                }}
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                disabled={isCreating || isUpdating}
-              >
-                {document ? "Actualizar" : "Crear"}
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancelar
+            </Button>
+            <Button type="submit">
+              {initialData ? 'Actualizar' : 'Crear'} Documento
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 };

@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDocuments } from "@/hooks/useDocuments";
 import { SearchAndFilters, FilterOptions } from "@/components/SearchAndFilters";
-import { DocumentsManager } from "@/components/DocumentsManager";
 import { DocumentPreview } from "@/components/DocumentPreview";
 import { Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { DocumentForm } from "@/components/DocumentForm";
 
 const Documents: React.FC = () => {
   const { toast } = useToast();
@@ -26,6 +26,7 @@ const Documents: React.FC = () => {
 
   const handleCreateDocument = () => {
     setShowCreateForm(true);
+    setSelectedDocument(null);
   };
 
   const handleDocumentCreated = (document: any) => {
@@ -57,7 +58,7 @@ const Documents: React.FC = () => {
       doc.content?.toLowerCase().includes(filters.search.toLowerCase());
 
     const matchesStatus = !filters.status || doc.status === filters.status;
-    const matchesType = !filters.company || doc.type === filters.company;
+    const matchesType = !filters.company || doc.document_type === filters.company;
 
     return matchesSearch && matchesStatus && matchesType;
   }) || [];
@@ -131,7 +132,10 @@ const Documents: React.FC = () => {
                         ? "border-primary bg-primary/5"
                         : "hover:border-primary/50"
                     }`}
-                    onClick={() => setSelectedDocument(doc)}
+                    onClick={() => {
+                      setSelectedDocument(doc);
+                      setShowCreateForm(false);
+                    }}
                   >
                     <div className="flex justify-between items-start">
                       <div>
@@ -180,21 +184,13 @@ const Documents: React.FC = () => {
           </CardHeader>
           <CardContent>
             {showCreateForm ? (
-              <div className="space-y-4">
-                <div className="p-4 border rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    Formulario de creación de documento será implementado aquí.
-                  </p>
-                  <div className="flex gap-2 mt-4">
-                    <Button onClick={() => setShowCreateForm(false)} variant="outline">
-                      Cancelar
-                    </Button>
-                    <Button onClick={() => handleDocumentCreated({})}>
-                      Crear Documento
-                    </Button>
-                  </div>
-                </div>
-              </div>
+              <DocumentForm
+                onSubmit={(documentData) => {
+                  createDocument(documentData);
+                  handleDocumentCreated(documentData);
+                }}
+                onCancel={() => setShowCreateForm(false)}
+              />
             ) : selectedDocument ? (
               <DocumentPreview
                 content={selectedDocument.content || ""}
