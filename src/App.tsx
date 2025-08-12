@@ -6,7 +6,7 @@ import { Toaster } from '@/components/ui/sonner';
 import { SimpleAuthProvider } from '@/components/SimpleAuthProvider';
 import { SessionTimeoutProvider } from '@/components/SessionTimeoutProvider';
 import MainLayout from '@/layouts/MainLayout';
-import SimpleProtectedRoute from '@/components/SimpleProtectedRoute';
+import { SimpleProtectedRoute } from '@/components/SimpleProtectedRoute';
 
 // Lazy load pages
 import Index from '@/pages/Index';
