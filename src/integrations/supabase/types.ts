@@ -70,6 +70,51 @@ export type Database = {
           },
         ]
       }
+      audit_processes: {
+        Row: {
+          auditor_id: string
+          created_at: string | null
+          id: string
+          notes: string | null
+          sale_id: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          auditor_id: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          sale_id: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          auditor_id?: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          sale_id?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_processes_auditor_id_fkey"
+            columns: ["auditor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_processes_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       auth_attempts: {
         Row: {
           attempted_at: string
@@ -383,6 +428,62 @@ export type Database = {
           },
         ]
       }
+      company_ui_settings: {
+        Row: {
+          accent_color: string | null
+          border_radius: string | null
+          company_id: string
+          created_at: string | null
+          custom_css: string | null
+          dark_mode: boolean | null
+          favicon: string | null
+          font_family: string | null
+          id: string
+          primary_color: string | null
+          secondary_color: string | null
+          shadows: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          accent_color?: string | null
+          border_radius?: string | null
+          company_id: string
+          created_at?: string | null
+          custom_css?: string | null
+          dark_mode?: boolean | null
+          favicon?: string | null
+          font_family?: string | null
+          id?: string
+          primary_color?: string | null
+          secondary_color?: string | null
+          shadows?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          accent_color?: string | null
+          border_radius?: string | null
+          company_id?: string
+          created_at?: string | null
+          custom_css?: string | null
+          dark_mode?: boolean | null
+          favicon?: string | null
+          font_family?: string | null
+          id?: string
+          primary_color?: string | null
+          secondary_color?: string | null
+          shadows?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_ui_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       countries: {
         Row: {
           code: string
@@ -678,6 +779,51 @@ export type Database = {
         }
         Relationships: []
       }
+      information_requests: {
+        Row: {
+          audit_process_id: string
+          completed_at: string | null
+          created_at: string | null
+          description: string
+          id: string
+          requested_by: string
+          status: string | null
+        }
+        Insert: {
+          audit_process_id: string
+          completed_at?: string | null
+          created_at?: string | null
+          description: string
+          id?: string
+          requested_by: string
+          status?: string | null
+        }
+        Update: {
+          audit_process_id?: string
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string
+          id?: string
+          requested_by?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "information_requests_audit_process_id_fkey"
+            columns: ["audit_process_id"]
+            isOneToOne: false
+            referencedRelation: "audit_processes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "information_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           action_url: string | null
@@ -794,6 +940,51 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      process_traces: {
+        Row: {
+          action: string
+          client_action: boolean | null
+          created_at: string | null
+          details: Json | null
+          id: string
+          performed_by: string | null
+          sale_id: string
+        }
+        Insert: {
+          action: string
+          client_action?: boolean | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          performed_by?: string | null
+          sale_id: string
+        }
+        Update: {
+          action?: string
+          client_action?: boolean | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          performed_by?: string | null
+          sale_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "process_traces_performed_by_fkey"
+            columns: ["performed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "process_traces_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
             referencedColumns: ["id"]
           },
         ]
@@ -1762,6 +1953,63 @@ export type Database = {
             columns: ["parent_template_id"]
             isOneToOne: false
             referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_notifications: {
+        Row: {
+          api_response: Json | null
+          created_by: string | null
+          id: string
+          message_content: string
+          notification_url: string
+          opened_at: string | null
+          recipient_phone: string
+          sale_id: string
+          sent_at: string | null
+          signed_at: string | null
+          status: string | null
+        }
+        Insert: {
+          api_response?: Json | null
+          created_by?: string | null
+          id?: string
+          message_content: string
+          notification_url: string
+          opened_at?: string | null
+          recipient_phone: string
+          sale_id: string
+          sent_at?: string | null
+          signed_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          api_response?: Json | null
+          created_by?: string | null
+          id?: string
+          message_content?: string
+          notification_url?: string
+          opened_at?: string | null
+          recipient_phone?: string
+          sale_id?: string
+          sent_at?: string | null
+          signed_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_notifications_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_notifications_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
             referencedColumns: ["id"]
           },
         ]

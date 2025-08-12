@@ -16,10 +16,6 @@ interface CompanyUISettings {
   accent_color: string;
   favicon: string;
   custom_css: string;
-  login_background_url?: string;
-  login_logo_url?: string;
-  login_title: string;
-  login_subtitle: string;
   created_at: string;
   updated_at: string;
 }

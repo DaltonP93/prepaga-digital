@@ -1,7 +1,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 interface WhatsAppNotification {
   id: string;
@@ -9,19 +9,12 @@ interface WhatsAppNotification {
   recipient_phone: string;
   message_content: string;
   sent_at: string;
-  status: 'pending' | 'sent' | 'delivered' | 'read' | 'failed';
+  status: string;
   notification_url: string;
   opened_at?: string;
   signed_at?: string;
   api_response?: any;
   created_by?: string;
-  sale?: {
-    id: string;
-    clients?: {
-      first_name: string;
-      last_name: string;
-    };
-  };
 }
 
 export const useWhatsAppNotifications = (saleId?: string) => {
@@ -30,14 +23,8 @@ export const useWhatsAppNotifications = (saleId?: string) => {
     queryFn: async () => {
       let query = supabase
         .from('whatsapp_notifications')
-        .select(`
-          *,
-          sale:sales(
-            id,
-            clients:client_id(first_name, last_name)
-          )
-        `)
-        .order('created_at', { ascending: false });
+        .select('*')
+        .order('sent_at', { ascending: false });
 
       if (saleId) {
         query = query.eq('sale_id', saleId);
@@ -46,47 +33,32 @@ export const useWhatsAppNotifications = (saleId?: string) => {
       const { data, error } = await query;
 
       if (error) throw error;
-      return data as WhatsAppNotification[];
+      return data as WhatsAppNotification[] || [];
     },
+    enabled: !!saleId,
   });
 };
 
 export const useSendWhatsAppNotification = () => {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ 
       saleId, 
       recipientPhone, 
-      messageContent,
-      notificationType = 'signature'
+      messageContent, 
+      notificationType 
     }: { 
       saleId: string; 
       recipientPhone: string; 
-      messageContent: string;
-      notificationType?: 'signature' | 'questionnaire' | 'general';
+      messageContent: string; 
+      notificationType: string;
     }) => {
       const { data: user } = await supabase.auth.getUser();
-      if (!user.user) throw new Error('Usuario no autenticado');
+      
+      // Generate notification URL
+      const notificationUrl = `${window.location.origin}/signature/${saleId}`;
 
-      // Generar token único para seguimiento
-      const trackingToken = crypto.randomUUID();
-      const baseUrl = window.location.origin;
-      let notificationUrl;
-
-      switch (notificationType) {
-        case 'questionnaire':
-          notificationUrl = `${baseUrl}/questionnaire/${trackingToken}`;
-          break;
-        case 'signature':
-          notificationUrl = `${baseUrl}/signature/${trackingToken}`;
-          break;
-        default:
-          notificationUrl = `${baseUrl}/track/${trackingToken}`;
-      }
-
-      // Guardar notificación en base de datos
       const { data, error } = await supabase
         .from('whatsapp_notifications')
         .insert({
@@ -94,96 +66,67 @@ export const useSendWhatsAppNotification = () => {
           recipient_phone: recipientPhone,
           message_content: messageContent,
           notification_url: notificationUrl,
-          status: 'pending',
-          created_by: user.user.id
+          status: 'sent',
+          created_by: user.user?.id || null
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      // Aquí se integraría con la API de WhatsApp (Chatrace u otra)
-      // Por ahora simulamos el envío exitoso
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Actualizar estado a enviado
-      await supabase
-        .from('whatsapp_notifications')
-        .update({ 
-          status: 'sent',
-          api_response: { 
-            message_id: `wa_${Date.now()}`,
-            timestamp: new Date().toISOString()
-          }
-        })
-        .eq('id', data.id);
-
-      // Registrar en trazabilidad
-      await supabase
-        .from('process_traces')
-        .insert({
-          sale_id: saleId,
-          action: 'whatsapp_sent',
-          performed_by: user.user.id,
-          details: { 
-            notification_id: data.id,
-            notification_type: notificationType,
-            recipient_phone: recipientPhone
-          }
-        });
+      // Here you would integrate with actual WhatsApp API
+      // For now, we'll just simulate success
+      console.log('WhatsApp notification sent:', {
+        phone: recipientPhone,
+        message: messageContent,
+        url: notificationUrl
+      });
 
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-notifications'] });
-      toast({
-        title: "Mensaje enviado",
-        description: "El mensaje de WhatsApp ha sido enviado exitosamente.",
-      });
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-notifications', variables.saleId] });
+      toast.success('Notificación WhatsApp enviada correctamente');
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "No se pudo enviar el mensaje de WhatsApp.",
-        variant: "destructive",
-      });
+      console.error('Error sending WhatsApp notification:', error);
+      toast.error('Error al enviar notificación WhatsApp');
     },
   });
 };
 
-export const useTrackNotificationOpening = () => {
+export const useUpdateNotificationStatus = () => {
+  const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: async (token: string) => {
+    mutationFn: async ({ 
+      notificationId, 
+      status, 
+      openedAt, 
+      signedAt 
+    }: { 
+      notificationId: string; 
+      status: string; 
+      openedAt?: string; 
+      signedAt?: string; 
+    }) => {
+      const updateData: any = { status };
+      
+      if (openedAt) updateData.opened_at = openedAt;
+      if (signedAt) updateData.signed_at = signedAt;
+
       const { data, error } = await supabase
         .from('whatsapp_notifications')
-        .select('*')
-        .eq('notification_url', token)
+        .update(updateData)
+        .eq('id', notificationId)
+        .select()
         .single();
 
       if (error) throw error;
-
-      // Marcar como abierto si no se ha hecho antes
-      if (!data.opened_at) {
-        await supabase
-          .from('whatsapp_notifications')
-          .update({ 
-            opened_at: new Date().toISOString(),
-            status: 'read'
-          })
-          .eq('id', data.id);
-
-        // Registrar en trazabilidad
-        await supabase
-          .from('process_traces')
-          .insert({
-            sale_id: data.sale_id,
-            action: 'notification_opened',
-            client_action: true,
-            details: { notification_id: data.id }
-          });
-      }
-
       return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-notifications'] });
     },
   });
 };

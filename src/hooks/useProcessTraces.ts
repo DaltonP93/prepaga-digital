@@ -1,5 +1,5 @@
 
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ProcessTrace {
@@ -8,9 +8,9 @@ interface ProcessTrace {
   action: string;
   performed_by?: string;
   client_action: boolean;
-  details: any;
+  details?: any;
   created_at: string;
-  performed_by_user?: {
+  user?: {
     first_name: string;
     last_name: string;
     role: string;
@@ -25,7 +25,7 @@ export const useProcessTraces = (saleId: string) => {
         .from('process_traces')
         .select(`
           *,
-          performed_by_user:profiles!performed_by(
+          user:profiles!performed_by(
             first_name,
             last_name,
             role
@@ -35,35 +35,32 @@ export const useProcessTraces = (saleId: string) => {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      return data as ProcessTrace[];
+      return data || [];
     },
     enabled: !!saleId,
   });
 };
 
-export const useCreateProcessTrace = () => {
+export const useCreateTrace = () => {
+  const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: async ({
-      saleId,
-      action,
-      performedBy,
-      clientAction = false,
-      details = {}
-    }: {
-      saleId: string;
-      action: string;
-      performedBy?: string;
-      clientAction?: boolean;
+    mutationFn: async ({ saleId, action, details, clientAction = false }: { 
+      saleId: string; 
+      action: string; 
       details?: any;
+      clientAction?: boolean;
     }) => {
+      const { data: user } = await supabase.auth.getUser();
+      
       const { data, error } = await supabase
         .from('process_traces')
         .insert({
           sale_id: saleId,
           action,
-          performed_by: performedBy,
+          performed_by: user.user?.id || null,
           client_action: clientAction,
-          details
+          details: details || {}
         })
         .select()
         .single();
@@ -71,53 +68,8 @@ export const useCreateProcessTrace = () => {
       if (error) throw error;
       return data;
     },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['process-traces', variables.saleId] });
+    },
   });
-};
-
-// Funciones utilitarias para crear trazas específicas
-export const useTraceActions = () => {
-  const createTrace = useCreateProcessTrace();
-
-  const traceDocumentOpened = (saleId: string, documentType: string) => {
-    return createTrace.mutate({
-      saleId,
-      action: 'document_opened',
-      clientAction: true,
-      details: { document_type: documentType }
-    });
-  };
-
-  const traceFormSubmitted = (saleId: string, formType: string, responseCount: number) => {
-    return createTrace.mutate({
-      saleId,
-      action: 'form_submitted',
-      clientAction: true,
-      details: { form_type: formType, response_count: responseCount }
-    });
-  };
-
-  const traceContractSigned = (saleId: string, signatureData: any) => {
-    return createTrace.mutate({
-      saleId,
-      action: 'contract_signed',
-      clientAction: true,
-      details: { signature_timestamp: new Date().toISOString(), ...signatureData }
-    });
-  };
-
-  const traceAuditDecision = (saleId: string, decision: string, notes?: string) => {
-    return createTrace.mutate({
-      saleId,
-      action: `audit_${decision}`,
-      clientAction: false,
-      details: { decision, notes }
-    });
-  };
-
-  return {
-    traceDocumentOpened,
-    traceFormSubmitted,
-    traceContractSigned,
-    traceAuditDecision
-  };
 };

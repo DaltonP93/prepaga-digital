@@ -31,7 +31,7 @@ export const useUpdateSaleStatus = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ saleId, status, notes }: { saleId: string; status: string; notes?: string }) => {
+    mutationFn: async ({ saleId, status, notes }: { saleId: string; status: 'completado' | 'cancelado'; notes?: string }) => {
       const { data, error } = await supabase
         .from('sales')
         .update({ 
