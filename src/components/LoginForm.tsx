@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { Eye, EyeOff } from 'lucide-react';
 import { ForgotPasswordDialog } from './ForgotPasswordDialog';
 import { Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 
 export const LoginForm = () => {
   const [email, setEmail] = useState('');
@@ -20,6 +20,7 @@ export const LoginForm = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   
+  const { signIn } = useSimpleAuthContext();
   const { 
     loginAttempts, 
     isBlocked, 
@@ -43,27 +44,7 @@ export const LoginForm = () => {
     try {
       console.log('🔑 LoginForm: Iniciando proceso de login...');
       
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        console.error('❌ LoginForm: Error en login:', error);
-        let errorMessage = 'Error al iniciar sesión';
-        
-        if (error.message.includes('Invalid login credentials')) {
-          errorMessage = 'Credenciales incorrectas. Verifica tu email y contraseña.';
-        } else if (error.message.includes('Email not confirmed')) {
-          errorMessage = 'Por favor confirma tu email antes de iniciar sesión.';
-        } else if (error.message.includes('Too many requests')) {
-          errorMessage = 'Demasiados intentos. Espera unos minutos antes de volver a intentar.';
-        }
-        
-        const result = recordFailedAttempt();
-        toast.error(result.message || errorMessage);
-        return;
-      }
+      await signIn(email, password);
       
       console.log('✅ LoginForm: Login exitoso');
       resetAttempts();
@@ -72,7 +53,7 @@ export const LoginForm = () => {
     } catch (error: any) {
       console.error('❌ LoginForm: Error en login:', error);
       const result = recordFailedAttempt();
-      toast.error(result.message);
+      toast.error(result.message || error.message || 'Error al iniciar sesión');
     } finally {
       setIsLoggingIn(false);
     }
