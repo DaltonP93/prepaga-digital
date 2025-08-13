@@ -27,6 +27,8 @@ import Experience from '@/pages/Experience';
 import TemplateDetail from '@/pages/TemplateDetail';
 import TemplateEdit from '@/pages/TemplateEdit';
 import SaleDetail from '@/pages/SaleDetail';
+import SaleEdit from '@/pages/SaleEdit';
+import QuestionnaireView from '@/pages/QuestionnaireView';
 import NotFound from '@/pages/NotFound';
 import SignatureView from '@/pages/SignatureView';
 
@@ -51,6 +53,8 @@ function App() {
                 {/* Public routes */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/sign/:token" element={<SignatureView />} />
+                <Route path="/signature/:token" element={<SignatureWorkflow />} />
+                <Route path="/questionnaire/:token" element={<QuestionnaireView />} />
                 
                 {/* Protected routes with sidebar */}
                 <Route path="/" element={
@@ -62,6 +66,7 @@ function App() {
                   <Route path="dashboard" element={<Dashboard />} />
                   <Route path="sales" element={<Sales />} />
                   <Route path="sales/:id" element={<SaleDetail />} />
+                  <Route path="sales/:id/edit" element={<SaleEdit />} />
                   <Route path="clients" element={<Clients />} />
                   <Route path="plans" element={<Plans />} />
                   <Route path="documents" element={<Documents />} />

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, Navigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +30,9 @@ const SignatureWorkflow = () => {
   useEffect(() => {
     if (token) {
       loadSaleByToken(token);
+    } else {
+      // If no token, this might be accessed from protected route
+      setLoading(false);
     }
   }, [token]);
 
@@ -96,6 +98,31 @@ const SignatureWorkflow = () => {
     }
   };
 
+  // If accessed without token from protected route, show workflow management interface
+  if (!token && !loading) {
+    return (
+      <div className="container mx-auto py-6">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-2">Gestión de Flujos de Firma</h1>
+          <p className="text-muted-foreground">
+            Administre los procesos de firma digital de las ventas.
+          </p>
+        </div>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Flujos de Firma Activos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              Aquí podrá ver y administrar los flujos de firma en curso.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const handleStepComplete = async () => {
     if (!sale) return;
 
@@ -140,9 +167,19 @@ const SignatureWorkflow = () => {
     }
   };
 
-  if (!token) {
-    return <Navigate to="/404" replace />;
-  }
+  const getStatusBadge = (status: SaleStatus) => {
+    const statusConfig = {
+      borrador: { label: 'Borrador', variant: 'secondary' as const },
+      pendiente: { label: 'Pendiente', variant: 'secondary' as const },
+      enviado: { label: 'Enviado', variant: 'default' as const },
+      firmado: { label: 'Firmado', variant: 'default' as const },
+      completado: { label: 'Completado', variant: 'default' as const },
+      cancelado: { label: 'Cancelado', variant: 'destructive' as const },
+      en_auditoria: { label: 'En Auditoría', variant: 'secondary' as const },
+    };
+    const config = statusConfig[status] || statusConfig.borrador;
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
 
   if (loading) {
     return (
@@ -155,7 +192,7 @@ const SignatureWorkflow = () => {
     );
   }
 
-  if (!sale) {
+  if (token && !sale) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Card className="w-full max-w-md">
@@ -175,21 +212,10 @@ const SignatureWorkflow = () => {
     );
   }
 
-  const getStatusBadge = (status: SaleStatus) => {
-    const statusConfig = {
-      borrador: { label: 'Borrador', variant: 'secondary' as const },
-      pendiente: { label: 'Pendiente', variant: 'secondary' as const },
-      enviado: { label: 'Enviado', variant: 'default' as const },
-      firmado: { label: 'Firmado', variant: 'default' as const },
-      completado: { label: 'Completado', variant: 'default' as const },
-      cancelado: { label: 'Cancelado', variant: 'destructive' as const },
-      en_auditoria: { label: 'En Auditoría', variant: 'secondary' as const },
-    };
-    const config = statusConfig[status] || statusConfig.borrador;
-    return <Badge variant={config.variant}>{config.label}</Badge>;
-  };
+  if (!token || !sale) {
+    return <Navigate to="/404" replace />;
+  }
 
-  // Simple placeholder components for missing dependencies
   const DocumentPreview = ({ saleId }: { saleId: string }) => (
     <div className="p-4 border rounded-lg">
       <p className="text-muted-foreground">Documentos para la venta: {saleId}</p>
