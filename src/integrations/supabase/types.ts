@@ -2074,6 +2074,8 @@ export type Database = {
         | "firmado"
         | "completado"
         | "cancelado"
+        | "pendiente"
+        | "en_auditoria"
       user_role: "super_admin" | "admin" | "gestor" | "vendedor"
     }
     CompositeTypes: {
@@ -2209,6 +2211,8 @@ export const Constants = {
         "firmado",
         "completado",
         "cancelado",
+        "pendiente",
+        "en_auditoria",
       ],
       user_role: ["super_admin", "admin", "gestor", "vendedor"],
     },

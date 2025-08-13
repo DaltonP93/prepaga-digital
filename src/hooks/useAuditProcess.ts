@@ -75,10 +75,10 @@ export const useCreateAuditProcess = () => {
 
       if (error) throw error;
 
-      // Update sale status
+      // Update sale status to en_auditoria instead of enviado
       await supabase
         .from('sales')
-        .update({ status: 'enviado' })
+        .update({ status: 'en_auditoria' })
         .eq('id', saleId);
 
       // Create process trace

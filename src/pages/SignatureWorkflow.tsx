@@ -1,302 +1,284 @@
 
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { FileSignature, Users, CheckCircle, Clock, Send, Eye, AlertTriangle } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import React, { useState, useEffect } from "react";
+import { useParams, Navigate } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Clock, CheckCircle, XCircle, FileText } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import SignatureCanvas from "@/components/SignatureCanvas";
+import DocumentPreview from "@/components/DocumentPreview";
+import QuestionnaireView from "@/pages/QuestionnaireView";
+
+interface Sale {
+  id: string;
+  status: 'borrador' | 'pendiente' | 'enviado' | 'firmado' | 'completado' | 'cancelado' | 'en_auditoria';
+  signature_token: string;
+  signature_expires_at: string;
+  client_id: string;
+  clients: {
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+}
 
 const SignatureWorkflow = () => {
+  const { token } = useParams<{ token: string }>();
   const { toast } = useToast();
-  const [selectedSale, setSelectedSale] = useState<any>(null);
+  const [sale, setSale] = useState<Sale | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
-  // Fetch signature workflow data
-  const { data: signatureData, isLoading, refetch } = useQuery({
-    queryKey: ['signature-workflow'],
-    queryFn: async () => {
-      console.log('Fetching signature workflow data...');
-      
-      const { data: sales, error } = await supabase
-        .from('sales')
-        .select(`
-          *,
-          clients:client_id(first_name, last_name, phone, email),
-          plans:plan_id(name),
-          profiles:salesperson_id(first_name, last_name),
-          whatsapp_notifications(*),
-          signatures(*)
-        `)
-        .in('status', ['pendiente', 'enviado', 'firmado'])
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching signature workflow:', error);
-        throw error;
+  useEffect(() => {
+    const fetchSale = async () => {
+      if (!token) {
+        setError("Token de firma no válido");
+        setLoading(false);
+        return;
       }
 
-      console.log('Signature workflow data:', sales);
-      return sales || [];
-    },
-  });
+      try {
+        const { data, error } = await supabase
+          .from('sales')
+          .select(`
+            id,
+            status,
+            signature_token,
+            signature_expires_at,
+            client_id,
+            clients!inner (
+              first_name,
+              last_name,
+              email
+            )
+          `)
+          .eq('signature_token', token)
+          .single();
 
-  const sendWhatsAppNotification = async (saleId: string, clientPhone: string) => {
+        if (error) throw error;
+
+        if (!data) {
+          setError("Venta no encontrada");
+          setLoading(false);
+          return;
+        }
+
+        // Check if token is expired
+        if (new Date(data.signature_expires_at) < new Date()) {
+          setError("El enlace de firma ha expirado");
+          setLoading(false);
+          return;
+        }
+
+        setSale(data);
+        
+        // Determine current step based on sale status
+        if (data.status === 'borrador') {
+          setCurrentStep(0);
+        } else if (data.status === 'enviado') {
+          setCurrentStep(1);
+        } else if (data.status === 'firmado') {
+          setCurrentStep(2);
+        }
+        
+      } catch (error: any) {
+        console.error('Error fetching sale:', error);
+        setError(error.message || "Error al cargar la información de la venta");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSale();
+  }, [token]);
+
+  const handleStepComplete = async () => {
+    if (!sale) return;
+
     try {
-      const token = `sign_${saleId}_${Date.now()}`;
-      const notificationUrl = `${window.location.origin}/sign/${token}`;
+      let newStatus: Sale['status'] = sale.status;
       
+      if (currentStep === 0) {
+        newStatus = 'enviado';
+      } else if (currentStep === 1) {
+        newStatus = 'firmado';
+      }
+
       const { error } = await supabase
-        .from('whatsapp_notifications')
-        .insert({
-          sale_id: saleId,
-          recipient_phone: clientPhone,
-          message_content: 'Tienes un documento para firmar. Haz clic en el enlace para continuar.',
-          notification_url: notificationUrl,
-          status: 'sent'
-        });
+        .from('sales')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', sale.id);
 
       if (error) throw error;
 
-      // Update sale status
-      await supabase
-        .from('sales')
-        .update({ status: 'enviado' })
-        .eq('id', saleId);
+      setSale({ ...sale, status: newStatus });
+      
+      if (currentStep < 2) {
+        setCurrentStep(currentStep + 1);
+      }
 
       toast({
-        title: 'Notificación enviada',
-        description: 'Se ha enviado la notificación por WhatsApp al cliente.',
+        title: "Paso completado",
+        description: "Has avanzado al siguiente paso del proceso de firma.",
       });
 
-      refetch();
-    } catch (error) {
-      console.error('Error sending notification:', error);
+    } catch (error: any) {
       toast({
-        title: 'Error',
-        description: 'No se pudo enviar la notificación.',
-        variant: 'destructive',
+        title: "Error",
+        description: error.message || "No se pudo completar el paso.",
+        variant: "destructive",
       });
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'pendiente':
-        return <Badge variant="outline" className="text-yellow-600"><Clock className="h-3 w-3 mr-1" />Pendiente</Badge>;
-      case 'enviado':
-        return <Badge variant="outline" className="text-blue-600"><Send className="h-3 w-3 mr-1" />Enviado</Badge>;
-      case 'firmado':
-        return <Badge variant="outline" className="text-green-600"><CheckCircle className="h-3 w-3 mr-1" />Firmado</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
-
-  const stats = {
-    pendientes: signatureData?.filter(s => s.status === 'pendiente').length || 0,
-    enviados: signatureData?.filter(s => s.status === 'enviado').length || 0,
-    firmados: signatureData?.filter(s => s.status === 'firmado').length || 0,
-    total: signatureData?.length || 0,
-  };
-
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded mb-4"></div>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-6">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-24 bg-gray-200 rounded"></div>
-            ))}
-          </div>
-          <div className="h-64 bg-gray-200 rounded"></div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <p className="text-muted-foreground">Cargando proceso de firma...</p>
         </div>
       </div>
     );
   }
 
+  if (error || !sale) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2 text-destructive">
+              <XCircle className="h-5 w-5" />
+              <span>Error</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <Button onClick={() => window.close()} variant="outline" className="w-full">
+              Cerrar
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const getStatusBadge = (status: Sale['status']) => {
+    const statusConfig = {
+      borrador: { label: 'Borrador', variant: 'secondary' as const },
+      pendiente: { label: 'Pendiente', variant: 'secondary' as const },
+      enviado: { label: 'Enviado', variant: 'default' as const },
+      firmado: { label: 'Firmado', variant: 'default' as const },
+      completado: { label: 'Completado', variant: 'default' as const },
+      cancelado: { label: 'Cancelado', variant: 'destructive' as const },
+      en_auditoria: { label: 'En Auditoría', variant: 'secondary' as const }
+    };
+
+    const config = statusConfig[status];
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const steps = [
+    {
+      title: "Cuestionario",
+      description: "Complete la información requerida",
+      icon: <FileText className="h-5 w-5" />,
+      component: <QuestionnaireView saleId={sale.id} />,
+      completed: sale.status !== 'borrador'
+    },
+    {
+      title: "Revisión de Documentos",  
+      description: "Revise los documentos generados",
+      icon: <FileText className="h-5 w-5" />,
+      component: <DocumentPreview saleId={sale.id} />,
+      completed: sale.status === 'firmado' || sale.status === 'completado'
+    },
+    {
+      title: "Firma Digital",
+      description: "Firme digitalmente los documentos",
+      icon: <CheckCircle className="h-5 w-5" />,
+      component: <SignatureCanvas saleId={sale.id} onSignatureComplete={handleStepComplete} />,
+      completed: sale.status === 'firmado' || sale.status === 'completado'
+    }
+  ];
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Flujo de Firmas</h1>
-        <p className="text-muted-foreground">
-          Gestiona el proceso de firma de documentos de manera eficiente
-        </p>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Pendientes de Envío
-            </CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.pendientes}</div>
-            <p className="text-xs text-muted-foreground">
-              Documentos listos para enviar
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Enviados
-            </CardTitle>
-            <Send className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.enviados}</div>
-            <p className="text-xs text-muted-foreground">
-              Esperando firma del cliente
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Firmados
-            </CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.firmados}</div>
-            <p className="text-xs text-muted-foreground">
-              Proceso completado
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Activos
-            </CardTitle>
-            <FileSignature className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground">
-              En proceso de firma
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Documentos en Proceso de Firma</CardTitle>
-          <CardDescription>
-            Gestiona el envío y seguimiento de documentos para firma digital
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {signatureData && signatureData.length > 0 ? (
-            <div className="space-y-4">
-              {signatureData.map((sale: any) => (
-                <div key={sale.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-4">
-                      <div>
-                        <h3 className="font-medium">
-                          {sale.clients?.first_name} {sale.clients?.last_name}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          Plan: {sale.plans?.name} | Vendedor: {sale.profiles?.first_name} {sale.profiles?.last_name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Contrato: {sale.contract_number} | Fecha: {new Date(sale.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    {getStatusBadge(sale.status)}
-                    {sale.status === 'pendiente' && sale.clients?.phone && (
-                      <Button
-                        size="sm"
-                        onClick={() => sendWhatsAppNotification(sale.id, sale.clients.phone)}
-                        className="flex items-center gap-2"
-                      >
-                        <Send className="h-4 w-4" />
-                        Enviar WhatsApp
-                      </Button>
-                    )}
-                    {sale.status === 'enviado' && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setSelectedSale(sale)}
-                        className="flex items-center gap-2"
-                      >
-                        <Eye className="h-4 w-4" />
-                        Ver Estado
-                      </Button>
-                    )}
-                    {sale.status === 'firmado' && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex items-center gap-2"
-                      >
-                        <CheckCircle className="h-4 w-4" />
-                        Descargar
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <FileSignature className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">
-                No hay documentos en proceso
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                Los documentos pendientes de firma aparecerán aquí.
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {selectedSale && (
+    <div className="min-h-screen bg-background p-4">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Header */}
         <Card>
           <CardHeader>
-            <CardTitle>Seguimiento de Notificación</CardTitle>
-            <CardDescription>
-              Estado del proceso de firma para {selectedSale.clients?.first_name} {selectedSale.clients?.last_name}
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Proceso de Firma Digital</CardTitle>
+                <p className="text-muted-foreground">
+                  Cliente: {sale.clients.first_name} {sale.clients.last_name}
+                </p>
+              </div>
+              {getStatusBadge(sale.status)}
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {selectedSale.whatsapp_notifications?.map((notification: any) => (
-                <div key={notification.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <div>
-                    <p className="font-medium">Notificación WhatsApp</p>
-                    <p className="text-sm text-muted-foreground">
-                      Enviado: {new Date(notification.sent_at).toLocaleString()}
-                    </p>
-                    {notification.opened_at && (
-                      <p className="text-sm text-green-600">
-                        Abierto: {new Date(notification.opened_at).toLocaleString()}
-                      </p>
-                    )}
+        </Card>
+
+        {/* Progress Steps */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center space-x-4 mb-6">
+              {steps.map((step, index) => (
+                <React.Fragment key={index}>
+                  <div className={`flex items-center space-x-2 ${
+                    index === currentStep ? 'text-primary' : 
+                    step.completed ? 'text-green-600' : 'text-muted-foreground'
+                  }`}>
+                    <div className={`p-2 rounded-full border-2 ${
+                      index === currentStep ? 'border-primary bg-primary/10' :
+                      step.completed ? 'border-green-600 bg-green-100' : 'border-muted'
+                    }`}>
+                      {step.completed ? <CheckCircle className="h-4 w-4" /> : step.icon}
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">{step.title}</p>
+                      <p className="text-xs text-muted-foreground">{step.description}</p>
+                    </div>
                   </div>
-                  <Badge variant={notification.status === 'sent' ? 'default' : 'secondary'}>
-                    {notification.status}
-                  </Badge>
-                </div>
+                  {index < steps.length - 1 && (
+                    <div className={`flex-1 h-px ${
+                      step.completed ? 'bg-green-600' : 'bg-muted'
+                    }`} />
+                  )}
+                </React.Fragment>
               ))}
             </div>
           </CardContent>
         </Card>
-      )}
+
+        {/* Current Step Content */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              {steps[currentStep]?.icon}
+              <span>{steps[currentStep]?.title}</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {steps[currentStep]?.component}
+            
+            {currentStep < 2 && !steps[currentStep].completed && (
+              <div className="mt-6 flex justify-end">
+                <Button onClick={handleStepComplete}>
+                  Continuar al siguiente paso
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
