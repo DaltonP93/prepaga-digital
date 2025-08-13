@@ -2,6 +2,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import type { Database } from '@/integrations/supabase/types';
+
+type SaleStatus = Database['public']['Enums']['sale_status'];
 
 interface AuditProcess {
   id: string;
@@ -78,7 +81,7 @@ export const useCreateAuditProcess = () => {
       // Update sale status to en_auditoria instead of enviado
       await supabase
         .from('sales')
-        .update({ status: 'en_auditoria' })
+        .update({ status: 'en_auditoria' as SaleStatus })
         .eq('id', saleId);
 
       // Create process trace
@@ -125,7 +128,7 @@ export const useUpdateAuditProcess = () => {
 
       // Get the sale_id to update sale status
       const auditProcess = data as AuditProcess;
-      let saleStatus = 'enviado';
+      let saleStatus: SaleStatus = 'enviado';
       
       if (status === 'approved') {
         saleStatus = 'completado';

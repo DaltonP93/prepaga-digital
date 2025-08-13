@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, Navigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,13 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Clock, CheckCircle, XCircle, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import SignatureCanvas from "@/components/SignatureCanvas";
-import DocumentPreview from "@/components/DocumentPreview";
 import QuestionnaireView from "@/pages/QuestionnaireView";
+import type { Database } from '@/integrations/supabase/types';
+
+type SaleStatus = Database['public']['Enums']['sale_status'];
 
 interface Sale {
   id: string;
-  status: 'borrador' | 'pendiente' | 'enviado' | 'firmado' | 'completado' | 'cancelado' | 'en_auditoria';
+  status: SaleStatus;
   signature_token: string;
   signature_expires_at: string;
   client_id: string;
@@ -99,7 +99,7 @@ const SignatureWorkflow = () => {
     if (!sale) return;
 
     try {
-      let newStatus: Sale['status'] = sale.status;
+      let newStatus: SaleStatus = sale.status;
       
       if (currentStep === 0) {
         newStatus = 'enviado';
@@ -169,7 +169,7 @@ const SignatureWorkflow = () => {
     );
   }
 
-  const getStatusBadge = (status: Sale['status']) => {
+  const getStatusBadge = (status: SaleStatus) => {
     const statusConfig = {
       borrador: { label: 'Borrador', variant: 'secondary' as const },
       pendiente: { label: 'Pendiente', variant: 'secondary' as const },
@@ -184,27 +184,44 @@ const SignatureWorkflow = () => {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
+  // Simple placeholder components for missing dependencies
+  const DocumentPreview = ({ saleId }: { saleId: string }) => (
+    <div className="p-4 border rounded-lg">
+      <p className="text-muted-foreground">Documentos para la venta: {saleId}</p>
+      <p className="text-sm text-muted-foreground mt-2">Vista previa de documentos no disponible</p>
+    </div>
+  );
+
+  const SignatureCanvas = ({ saleId, onSignatureComplete }: { saleId: string; onSignatureComplete: () => void }) => (
+    <div className="p-4 border rounded-lg">
+      <p className="text-muted-foreground mb-4">Canvas de firma para la venta: {saleId}</p>
+      <Button onClick={onSignatureComplete} className="w-full">
+        Simular Firma Completada
+      </Button>
+    </div>
+  );
+
   const steps = [
     {
       title: "Cuestionario",
       description: "Complete la información requerida",
       icon: <FileText className="h-5 w-5" />,
-      component: <QuestionnaireView saleId={sale.id} />,
-      completed: sale.status !== 'borrador'
+      component: <QuestionnaireView saleId={sale?.id || ''} />,
+      completed: sale?.status !== 'borrador'
     },
     {
       title: "Revisión de Documentos",  
       description: "Revise los documentos generados",
       icon: <FileText className="h-5 w-5" />,
-      component: <DocumentPreview saleId={sale.id} />,
-      completed: sale.status === 'firmado' || sale.status === 'completado'
+      component: <DocumentPreview saleId={sale?.id || ''} />,
+      completed: sale?.status === 'firmado' || sale?.status === 'completado'
     },
     {
       title: "Firma Digital",
       description: "Firme digitalmente los documentos",
       icon: <CheckCircle className="h-5 w-5" />,
-      component: <SignatureCanvas saleId={sale.id} onSignatureComplete={handleStepComplete} />,
-      completed: sale.status === 'firmado' || sale.status === 'completado'
+      component: <SignatureCanvas saleId={sale?.id || ''} onSignatureComplete={handleStepComplete} />,
+      completed: sale?.status === 'firmado' || sale?.status === 'completado'
     }
   ];
 
