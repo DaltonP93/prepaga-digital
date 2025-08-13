@@ -1,7 +1,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuthContext } from '@/components/AuthProvider';
+import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 
 interface CompanyBranding {
   login_background_url?: string;
@@ -14,7 +14,7 @@ interface CompanyBranding {
 }
 
 export const useCompanyBranding = (companyId?: string) => {
-  const { profile } = useAuthContext();
+  const { profile } = useSimpleAuthContext();
   const targetCompanyId = companyId || profile?.company_id;
 
   return useQuery({
