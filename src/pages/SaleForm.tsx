@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,7 +13,7 @@ import { useCreateSale, useUpdateSale, useSales } from '@/hooks/useSales';
 import { useClients } from '@/hooks/useClients';
 import { usePlans } from '@/hooks/usePlans';
 import { useCompanies } from '@/hooks/useCompanies';
-import { useProfile } from '@/hooks/useProfile';
+import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { Loader2, Plus } from 'lucide-react';
 
 interface SaleFormData {
@@ -30,7 +29,7 @@ const SaleForm = () => {
   const { id } = useParams<{ id: string }>();
   const isEditing = Boolean(id);
 
-  const { profile } = useProfile();
+  const { profile } = useSimpleAuthContext();
   const createSale = useCreateSale();
   const updateSale = useUpdateSale();
   const { data: sales } = useSales();
@@ -120,20 +119,24 @@ const SaleForm = () => {
 
   if (clientsLoading || plansLoading || companiesLoading) {
     return (
-      <Layout title="Cargando..." description="Cargando datos del formulario">
+      <div className="space-y-6">
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
-      </Layout>
+      </div>
     );
   }
 
   return (
-    <Layout 
-      title={isEditing ? 'Editar Venta' : 'Nueva Venta'} 
-      description={isEditing ? 'Modificar los datos de la venta' : 'Crear una nueva venta'}
-    >
-      <div className="max-w-2xl mx-auto">
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">{isEditing ? 'Editar Venta' : 'Nueva Venta'}</h1>
+        <p className="text-muted-foreground">
+          {isEditing ? 'Modificar los datos de la venta' : 'Crear una nueva venta'}
+        </p>
+      </div>
+
+      <div className="max-w-2xl">
         <Card>
           <CardHeader>
             <CardTitle>{isEditing ? 'Editar Venta' : 'Nueva Venta'}</CardTitle>
@@ -206,7 +209,7 @@ const SaleForm = () => {
                     </div>
                     {filteredPlans.map((plan) => (
                       <SelectItem key={plan.id} value={plan.id}>
-                        {plan.name} - ${plan.price?.toLocaleString('es-PY')}
+                        {plan.name} - Gs. {plan.price?.toLocaleString('es-PY')}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -264,7 +267,7 @@ const SaleForm = () => {
           </CardContent>
         </Card>
       </div>
-    </Layout>
+    </div>
   );
 };
 

@@ -6,13 +6,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-// Default currency formatter - will be overridden by company settings
+// Default currency formatter for Paraguay
 export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('es-PY', {
-    style: 'currency',
-    currency: 'PYG',
+  const formattedAmount = amount.toLocaleString('es-PY', {
     minimumFractionDigits: 0,
-  }).format(amount);
+    maximumFractionDigits: 0,
+  });
+  return `Gs. ${formattedAmount}`;
 }
 
 // Custom currency formatter that accepts settings

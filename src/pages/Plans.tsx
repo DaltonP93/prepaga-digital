@@ -15,7 +15,7 @@ const Plans = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingPlan, setEditingPlan] = useState(null);
   const { profile } = useSimpleAuthContext();
-  const { settings: currencySettings, formatCurrency } = useCurrencySettings();
+  const { formatCurrency } = useCurrencySettings();
   const queryClient = useQueryClient();
 
   const { data: plans, isLoading } = useQuery({
@@ -92,13 +92,6 @@ const Plans = () => {
             Nuevo Plan
           </Button>
         )}
-      </div>
-
-      <div>
-        <h2 className="text-2xl font-bold mb-4">Planes Disponibles</h2>
-        <p className="text-muted-foreground mb-6">
-          Gestiona los planes de seguro disponibles
-        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

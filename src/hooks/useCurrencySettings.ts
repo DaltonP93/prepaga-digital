@@ -2,7 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useAuthContext } from '@/components/AuthProvider';
+import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 
 interface CurrencySettings {
   id: string;
@@ -19,7 +19,7 @@ interface CurrencySettings {
 
 export const useCurrencySettings = () => {
   const queryClient = useQueryClient();
-  const { profile } = useAuthContext();
+  const { profile } = useSimpleAuthContext();
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ['currency-settings', profile?.company_id],
@@ -74,12 +74,12 @@ export const useCurrencySettings = () => {
 
   const formatCurrency = (amount: number): string => {
     if (!settings) {
-      // Default to Paraguayan Guarani format
-      return new Intl.NumberFormat('es-PY', {
-        style: 'currency',
-        currency: 'PYG',
+      // Default to Paraguayan Guarani format with "Gs." prefix
+      const formattedAmount = amount.toLocaleString('es-PY', {
         minimumFractionDigits: 0,
-      }).format(amount);
+        maximumFractionDigits: 0,
+      });
+      return `Gs. ${formattedAmount}`;
     }
 
     const { currency_symbol, currency_position, decimal_places, thousands_separator, decimal_separator } = settings;

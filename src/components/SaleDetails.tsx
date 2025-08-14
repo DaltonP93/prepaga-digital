@@ -2,16 +2,19 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useCurrencySettings } from '@/hooks/useCurrencySettings';
 
 interface SaleDetailsProps {
   sale: any;
 }
 
 export const SaleDetails: React.FC<SaleDetailsProps> = ({ sale }) => {
+  const { formatCurrency } = useCurrencySettings();
+
   const getStatusBadge = (status: string) => {
     const statusColors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
       'borrador': 'default',
-      'enviado': 'secondary',
+      'enviado': 'secondary', 
       'firmado': 'outline',
       'completado': 'default',
       'cancelado': 'destructive'
@@ -80,7 +83,7 @@ export const SaleDetails: React.FC<SaleDetailsProps> = ({ sale }) => {
           <div>
             <label className="text-sm font-medium text-muted-foreground">Precio</label>
             <p className="text-sm">
-              {sale.plans?.price ? `$${sale.plans.price.toLocaleString()}` : 'No definido'}
+              {sale.plans?.price ? formatCurrency(sale.plans.price) : 'No definido'}
             </p>
           </div>
           <div>
