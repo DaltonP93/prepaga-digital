@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -377,6 +377,53 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      company_currency_settings: {
+        Row: {
+          company_id: string
+          created_at: string
+          currency_code: string
+          currency_position: string
+          currency_symbol: string
+          decimal_places: number
+          decimal_separator: string
+          id: string
+          thousands_separator: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          currency_code?: string
+          currency_position?: string
+          currency_symbol?: string
+          decimal_places?: number
+          decimal_separator?: string
+          id?: string
+          thousands_separator?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          currency_code?: string
+          currency_position?: string
+          currency_symbol?: string
+          decimal_places?: number
+          decimal_separator?: string
+          id?: string
+          thousands_separator?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_currency_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       company_settings: {
         Row: {
@@ -2025,12 +2072,12 @@ export type Database = {
       }
       create_user_profile: {
         Args: {
-          user_id: string
-          user_email: string
+          company_id?: string
           first_name: string
           last_name: string
+          user_email: string
+          user_id: string
           user_role?: Database["public"]["Enums"]["user_role"]
-          company_id?: string
         }
         Returns: string
       }
@@ -2044,21 +2091,21 @@ export type Database = {
       }
       log_audit: {
         Args: {
-          p_table_name: string
           p_action: string
-          p_record_id?: string
-          p_old_values?: Json
-          p_new_values?: Json
           p_ip_address?: unknown
-          p_user_agent?: string
-          p_session_id?: string
-          p_request_path?: string
+          p_new_values?: Json
+          p_old_values?: Json
+          p_record_id?: string
           p_request_method?: string
+          p_request_path?: string
+          p_session_id?: string
+          p_table_name: string
+          p_user_agent?: string
         }
         Returns: string
       }
       update_template_workflow_state: {
-        Args: { p_template_id: string; p_new_state: string; p_notes?: string }
+        Args: { p_new_state: string; p_notes?: string; p_template_id: string }
         Returns: string
       }
       validate_reset_token: {

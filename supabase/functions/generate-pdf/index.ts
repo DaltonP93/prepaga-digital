@@ -14,16 +14,28 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
+    const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    )
 
-    const { templateId, dynamicFields = [], data = {} } = await req.json();
-    
-    if (!templateId) {
+    let requestBody;
+    try {
+      const text = await req.text();
+      console.log('Raw request body:', text);
+      
+      if (!text || text.trim() === '') {
+        throw new Error('Empty request body');
+      }
+      
+      requestBody = JSON.parse(text);
+    } catch (parseError) {
+      console.error('JSON parsing error:', parseError);
       return new Response(
-        JSON.stringify({ error: 'Template ID is required' }), 
+        JSON.stringify({ 
+          error: 'Invalid JSON in request body',
+          details: parseError.message 
+        }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -31,21 +43,35 @@ serve(async (req) => {
       );
     }
 
-    console.log('Generating PDF for template:', templateId);
-    console.log('Dynamic fields:', dynamicFields);
-    console.log('Data:', data);
+    const { templateId, saleId, responseData = {} } = requestBody;
 
-    // Fetch template from database
-    const { data: template, error: templateError } = await supabase
+    console.log('Generating PDF with data:', { templateId, saleId, responseData });
+
+    // Validate required fields
+    if (!templateId) {
+      return new Response(
+        JSON.stringify({ error: 'Template ID is required' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // Fetch template data
+    const { data: template, error: templateError } = await supabaseClient
       .from('templates')
       .select('*')
       .eq('id', templateId)
       .single();
 
     if (templateError || !template) {
-      console.error('Template not found:', templateError);
+      console.error('Template fetch error:', templateError);
       return new Response(
-        JSON.stringify({ error: 'Template not found' }), 
+        JSON.stringify({ 
+          error: 'Template not found',
+          details: templateError?.message 
+        }),
         { 
           status: 404, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -53,92 +79,98 @@ serve(async (req) => {
       );
     }
 
-    // Process template content with dynamic fields
-    let processedContent = template.static_content || '';
+    // Fetch sale data if saleId provided
+    let saleData = null;
+    if (saleId) {
+      const { data: sale, error: saleError } = await supabaseClient
+        .from('sales')
+        .select(`
+          *,
+          clients(*),
+          plans(*),
+          salesperson:profiles!sales_salesperson_id_fkey(*)
+        `)
+        .eq('id', saleId)
+        .single();
+
+      if (saleError) {
+        console.error('Sale fetch error:', saleError);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Sale not found',
+            details: saleError.message 
+          }),
+          { 
+            status: 404, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
+      saleData = sale;
+    }
+
+    // Process template content and replace variables
+    let processedContent = template.content || '';
     
-    // Replace placeholders with actual data
-    dynamicFields.forEach((field: any) => {
-      const placeholder = `{${field.name}}`;
-      const value = data[field.name] || field.defaultValue || '';
-      processedContent = processedContent.replace(new RegExp(placeholder, 'g'), value);
-    });
+    // Replace template variables with actual data
+    if (saleData) {
+      const replacements = {
+        '{{client_name}}': `${saleData.clients?.first_name || ''} ${saleData.clients?.last_name || ''}`.trim(),
+        '{{client_email}}': saleData.clients?.email || '',
+        '{{client_phone}}': saleData.clients?.phone || '',
+        '{{plan_name}}': saleData.plans?.name || '',
+        '{{plan_price}}': saleData.plans?.price?.toString() || '0',
+        '{{total_amount}}': saleData.total_amount?.toString() || '0',
+        '{{contract_number}}': saleData.contract_number || '',
+        '{{request_number}}': saleData.request_number || '',
+        '{{salesperson_name}}': `${saleData.salesperson?.first_name || ''} ${saleData.salesperson?.last_name || ''}`.trim(),
+        '{{sale_date}}': new Date(saleData.sale_date || saleData.created_at).toLocaleDateString('es-ES'),
+      };
 
-    // Basic HTML template for PDF generation
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <title>${template.name}</title>
-          <style>
-            body { 
-              font-family: Arial, sans-serif; 
-              margin: 40px; 
-              line-height: 1.6; 
-            }
-            .header { 
-              text-align: center; 
-              margin-bottom: 30px; 
-              border-bottom: 2px solid #333; 
-              padding-bottom: 20px; 
-            }
-            .content { 
-              margin: 20px 0; 
-            }
-            .footer { 
-              margin-top: 40px; 
-              text-align: center; 
-              font-size: 12px; 
-              color: #666; 
-            }
-            .field-value {
-              background-color: #f0f0f0;
-              padding: 2px 4px;
-              border-radius: 3px;
-              font-weight: bold;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>${template.name}</h1>
-            <p>Tipo: ${template.template_type || 'Documento'}</p>
-          </div>
-          <div class="content">
-            ${processedContent}
-          </div>
-          <div class="footer">
-            <p>Generado el: ${new Date().toLocaleDateString()}</p>
-            <p>Campos procesados: ${dynamicFields.length}</p>
-          </div>
-        </body>
-      </html>
-    `;
+      for (const [placeholder, value] of Object.entries(replacements)) {
+        processedContent = processedContent.replace(new RegExp(placeholder, 'g'), value);
+      }
+    }
 
-    console.log('Generated HTML content length:', htmlContent.length);
+    // Replace response data variables
+    for (const [key, value] of Object.entries(responseData)) {
+      const placeholder = `{{${key}}}`;
+      processedContent = processedContent.replace(new RegExp(placeholder, 'g'), String(value));
+    }
 
-    // For now, return the HTML content as a response
-    // In a real implementation, you would use a library like Puppeteer to generate PDF
+    console.log('Processed content length:', processedContent.length);
+
+    // For now, return the processed HTML content
+    // In a real implementation, you would convert this to PDF using a library like Puppeteer
+    const result = {
+      success: true,
+      templateId,
+      saleId,
+      processedContent,
+      contentPreview: processedContent.substring(0, 500) + (processedContent.length > 500 ? '...' : ''),
+      message: 'PDF generation processed successfully (HTML content returned for now)'
+    };
+
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        html: htmlContent,
-        fieldsProcessed: dynamicFields.length,
-        templateName: template.name 
-      }), 
+      JSON.stringify(result),
       { 
+        status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
 
   } catch (error) {
-    console.error('Error generating PDF:', error);
+    console.error('Unexpected error in generate-pdf function:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error.message }), 
+      JSON.stringify({ 
+        error: 'Internal server error',
+        details: error.message 
+      }),
       { 
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
   }
-});
+})

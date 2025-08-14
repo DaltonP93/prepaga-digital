@@ -14,164 +14,186 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Create user function called');
-    
-    const supabaseAdmin = createClient(
+    const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const authHeader = req.headers.get('Authorization')!
-    if (!authHeader) {
-      console.error('No authorization header');
-      return new Response(JSON.stringify({ error: 'Authorization header required' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    let requestBody;
+    try {
+      const text = await req.text();
+      console.log('Raw request body:', text);
+      
+      if (!text || text.trim() === '') {
+        throw new Error('Empty request body');
+      }
+      
+      requestBody = JSON.parse(text);
+    } catch (parseError) {
+      console.error('JSON parsing error:', parseError);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid JSON in request body',
+          details: parseError.message 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
-    const token = authHeader.replace('Bearer ', '')
-    
-    console.log('Verifying auth token...');
-    
-    // Verify the user making the request
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
-    if (authError || !user) {
-      console.error('Auth error:', authError);
-      return new Response(JSON.stringify({ error: 'Unauthorized: Invalid token' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
+    const { email, password, firstName, lastName, role = 'vendedor', companyId } = requestBody;
 
-    console.log('Auth verified, checking permissions...');
-
-    // Check if user has permission to create users
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (profileError || !profile) {
-      console.error('Profile error:', profileError);
-      return new Response(JSON.stringify({ error: 'User profile not found' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (!['super_admin', 'admin'].includes(profile.role)) {
-      console.error('Insufficient permissions:', profile.role);
-      return new Response(JSON.stringify({ error: 'Insufficient permissions' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    console.log('Permissions verified, parsing request body...');
-
-    const requestBody = await req.json();
-    const { email, password, first_name, last_name, role, company_id } = requestBody;
-
-    console.log('Request data received:', { email, first_name, last_name, role, company_id });
+    console.log('Creating user with data:', { email, firstName, lastName, role, companyId });
 
     // Validate required fields
-    if (!email || !password || !first_name || !last_name || !role) {
-      console.error('Missing required fields:', { email: !!email, password: !!password, first_name: !!first_name, last_name: !!last_name, role: !!role });
-      return new Response(JSON.stringify({ 
-        error: 'Missing required fields',
-        details: 'email, password, first_name, last_name, and role are required'
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    if (!email || !password || !firstName || !lastName) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Missing required fields: email, password, firstName, lastName are required' 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
-    // Validate role
-    const validRoles = ['super_admin', 'admin', 'gestor', 'vendedor'];
-    if (!validRoles.includes(role)) {
-      return new Response(JSON.stringify({ 
-        error: 'Invalid role provided',
-        details: `Role must be one of: ${validRoles.join(', ')}`
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid email format' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
-    console.log('Creating user with data:', { email, first_name, last_name, role, company_id });
-
-    // Create user with admin privileges
-    const { data: authData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+    // Create user in Supabase Auth
+    const { data: authData, error: authError } = await supabaseClient.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
       user_metadata: {
-        first_name,
-        last_name,
-        role
+        first_name: firstName,
+        last_name: lastName,
+        role: role
       }
     });
 
-    if (createError) {
-      console.error('Error creating auth user:', createError);
-      return new Response(JSON.stringify({ 
-        error: 'Failed to create user: ' + createError.message,
-        details: createError
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    if (authError) {
+      console.error('Auth creation error:', authError);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to create user account',
+          details: authError.message 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
-    console.log('Auth user created, creating profile...');
-
-    // Create profile directly using insert without specifying role type
-    const { error: profileInsertError } = await supabaseAdmin
-      .from('profiles')
-      .insert({
-        id: authData.user.id,
-        email: email,
-        first_name,
-        last_name,
-        role: role, // Let the database handle the type conversion
-        company_id: company_id || null,
-        active: true
-      });
-
-    if (profileInsertError) {
-      console.error('Error creating profile:', profileInsertError);
-      // If profile creation fails, we should delete the auth user
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-      return new Response(JSON.stringify({ 
-        error: 'Failed to create user profile: ' + profileInsertError.message, 
-        details: profileInsertError 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    if (!authData.user) {
+      return new Response(
+        JSON.stringify({ error: 'User creation failed - no user data returned' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
-    console.log('User created successfully');
+    console.log('Auth user created:', authData.user.id);
 
-    return new Response(JSON.stringify({ 
-      success: true, 
-      user: authData.user,
-      message: 'User created successfully'
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    // Create profile using the database function
+    try {
+      const { data: profileData, error: profileError } = await supabaseClient
+        .rpc('create_user_profile', {
+          user_id: authData.user.id,
+          user_email: email,
+          first_name: firstName,
+          last_name: lastName,
+          user_role: role,
+          company_id: companyId || null
+        });
+
+      if (profileError) {
+        console.error('Profile creation error:', profileError);
+        
+        // If profile creation fails, try to clean up the auth user
+        try {
+          await supabaseClient.auth.admin.deleteUser(authData.user.id);
+        } catch (cleanupError) {
+          console.error('Failed to cleanup auth user:', cleanupError);
+        }
+        
+        return new Response(
+          JSON.stringify({ 
+            error: 'Failed to create user profile',
+            details: profileError.message 
+          }),
+          { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
+      console.log('Profile created successfully:', profileData);
+
+      return new Response(
+        JSON.stringify({ 
+          success: true,
+          user: {
+            id: authData.user.id,
+            email: authData.user.email,
+            profile_id: profileData
+          }
+        }),
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+
+    } catch (profileError) {
+      console.error('Unexpected profile creation error:', profileError);
+      
+      // Clean up auth user
+      try {
+        await supabaseClient.auth.admin.deleteUser(authData.user.id);
+      } catch (cleanupError) {
+        console.error('Failed to cleanup auth user:', cleanupError);
+      }
+      
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to create user profile',
+          details: profileError.message 
+        }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
 
   } catch (error) {
-    console.error('Edge function error:', error);
-    return new Response(JSON.stringify({ 
-      error: 'Internal server error: ' + error.message,
-      details: error 
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    console.error('Unexpected error in create-user function:', error);
+    return new Response(
+      JSON.stringify({ 
+        error: 'Internal server error',
+        details: error.message 
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
   }
 })
