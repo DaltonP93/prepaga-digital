@@ -1,73 +1,176 @@
-# Welcome to your Lovable project
+# Proyecto Prepaga Digital
 
-## Project info
+> Sistema digital para gestión de usuarios, afiliados y servicios de prepagas médicas. Backend en Node.js + Express, base de datos en Supabase.
 
-**URL**: https://lovable.dev/projects/8c2da356-71bf-472b-a39e-2298129c2aa9
+![Node.js](https://img.shields.io/badge/Node.js-18+-green)
+![Express](https://img.shields.io/badge/Express.js-4.x-blue)
+![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-FBCA2B)
+![License](https://img.shields.io/badge/License-MIT-purple)
 
-## How can I edit this code?
+### 🎯 Descripción
+Este sistema permite gestionar usuarios, autenticación, afiliados y servicios médicos en una prepaga digital. Está construido con buenas prácticas de arquitectura, seguridad y escalabilidad.
 
-There are several ways of editing your application.
+---
 
-**Use Lovable**
+## 🚀 Funcionalidades
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/8c2da356-71bf-472b-a39e-2298129c2aa9) and start prompting.
+- ✅ Registro e inicio de sesión seguro (JWT + bcrypt)
+- ✅ Conexión con Supabase como base de datos
+- ✅ API RESTful bien estructurada (MVC)
+- ✅ Validación de datos
+- ✅ Variables de entorno
+- ✅ Logging básico
+- ✅ Listo para contenerizar con Docker
 
-Changes made via Lovable will be committed automatically to this repo.
+---
 
-**Use your preferred IDE**
+## 🛠️ Tecnologías
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- **Backend**: Node.js + Express
+- **Base de datos**: [Supabase](https://supabase.com) (PostgreSQL)
+- **Autenticación**: JWT
+- **Seguridad**: bcrypt, CORS, body-parser
+- **Logging**: console (extensible a Winston)
+- **Desarrollo**: Nodemon, ESLint (opcional)
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+---
 
-Follow these steps:
+## 📦 Instalación
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### 1. Clonar el repositorio
+```bash
+git clone https://github.com/DaltonP93/prepaga-digital.git
+cd prepaga-digital
+```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### 2. Instalar dependencias
+```bash
+npm install
+```
 
-# Step 3: Install the necessary dependencies.
-npm i
+### 3. Crear archivo `.env`
+Crea un archivo `.env` en la raíz del proyecto:
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```env
+PORT=3000
+NODE_ENV=development
+
+# Supabase
+SUPABASE_URL=https://tu-proyecto.supabase.co
+SUPABASE_KEY=tu_clave_anonima_o_service_role
+
+# JWT
+JWT_SECRET=clave-secreta-muy-segura-cambia-esto-en-produccion
+
+# CORS (opcional)
+CORS_ORIGIN=http://localhost:5173
+```
+
+### 4. Ejecutar en desarrollo
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+El servidor correrá en `http://localhost:3000`
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+---
 
-**Use GitHub Codespaces**
+## 🗂️ Estructura del proyecto
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```
+prepaga-digital/
+├── src/
+│   ├── controllers/
+│   ├── routes/
+│   ├── services/
+│   ├── utils/
+│   └── app.js
+├── .env
+├── .gitignore
+├── package.json
+├── README.md
+└── server.js
+```
 
-## What technologies are used for this project?
+---
 
-This project is built with:
+## 🔐 Endpoints de API
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+| Método | Ruta               | Descripción                     |
+|--------|--------------------|---------------------------------|
+| POST   | `/api/auth/register` | Registrar nuevo usuario         |
+| POST   | `/api/auth/login`    | Iniciar sesión                  |
+| GET    | `/api/users`         | Listar usuarios (protegido)     |
 
-## How can I deploy this project?
+> Todos los endpoints `/api/*` requieren JWT para acceso protegido.
 
-Simply open [Lovable](https://lovable.dev/projects/8c2da356-71bf-472b-a39e-2298129c2aa9) and click on Share -> Publish.
+---
 
-## Can I connect a custom domain to my Lovable project?
+## 🐳 Docker (opcional)
 
-Yes, you can!
+Crea un `Dockerfile`:
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+```Dockerfile
+FROM node:18-alpine
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+
+EXPOSE 3000
+
+CMD ["npm", "run", "start"]
+```
+
+Construir:
+```bash
+docker build -t prepaga-digital .
+docker run -p 3000:3000 --env-file .env prepaga-digital
+```
+
+---
+
+## 🌐 Despliegue recomendado
+
+- **Backend**: Railway, Render, o AWS
+- **Frontend**: Vercel, Netlify
+- **Base de datos**: Supabase (ya configurado)
+
+---
+
+## 📝 Licencia
+
+MIT © [DaltonP93](https://github.com/DaltonP93)
+```
+
+---
+
+## 📁 2. Estructura de carpetas recomendada
+
+Crea esta estructura dentro de `src/`:
+
+```
+src/
+├── controllers/
+│   └── authController.js
+│   └── userController.js
+├── routes/
+│   └── authRoutes.js
+│   └── userRoutes.js
+├── services/
+│   └── authService.js
+│   └── userService.js
+├── utils/
+│   └── db.js          (cliente Supabase)
+│   └── authMiddleware.js (proteger rutas)
+│   └── logger.js      (opcional)
+├── app.js             (configuración Express)
+└── server.js          (punto de entrada)
+```
+
+---
+
+## 🎉 ¡Listo!
