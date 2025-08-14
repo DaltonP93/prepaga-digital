@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, FileText, Users, Send } from 'lucide-react';
 import { useSales } from '@/hooks/useSales';
 import { useCurrencySettings } from '@/hooks/useCurrencySettings';
-import { useAuthContext } from '@/components/AuthProvider';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 
 const SignatureWorkflow = () => {
@@ -16,13 +15,11 @@ const SignatureWorkflow = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   
-  // Try both auth contexts to handle both protected and public access
-  const authContext = useAuthContext();
-  const simpleAuthContext = useSimpleAuthContext();
-  const profile = authContext?.profile || simpleAuthContext?.profile;
+  // Use only SimpleAuthContext since that's what's available in the app
+  const { profile } = useSimpleAuthContext();
   
   const { data: sales = [], isLoading } = useSales();
-  const { formatCurrency } = useCurrencySettings();
+  const { settings, formatCurrency } = useCurrencySettings();
   
   const [selectedSale, setSelectedSale] = useState<any>(null);
 
