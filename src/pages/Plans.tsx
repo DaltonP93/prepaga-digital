@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -70,99 +69,104 @@ const Plans = () => {
 
   if (isLoading) {
     return (
-      <Layout title="Planes" description="Gestión de planes de seguro">
+      <div className="space-y-6">
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
-      </Layout>
+      </div>
     );
   }
 
   return (
-    <Layout title="Planes" description="Gestión de planes de seguro">
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold">Planes Disponibles</h2>
-            <p className="text-muted-foreground">
-              Gestiona los planes de seguro disponibles
-            </p>
-          </div>
-          {isAdmin && (
-            <Button onClick={() => setShowForm(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Nuevo Plan
-            </Button>
-          )}
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Planes</h1>
+          <p className="text-muted-foreground">
+            Gestión de planes de seguro
+          </p>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {plans?.map((plan) => (
-            <Card key={plan.id} className="relative">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle>{plan.name}</CardTitle>
-                    <CardDescription>{plan.description}</CardDescription>
-                  </div>
-                  {isAdmin && (
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(plan)}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(plan.id)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="text-center">
-                    <div className="text-3xl font-bold">
-                      {formatCurrency(plan.price)}
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant={plan.active ? 'default' : 'secondary'}>
-                      {plan.active ? 'Activo' : 'Inactivo'}
-                    </Badge>
-                  </div>
-
-                  {plan.coverage_details && (
-                    <div>
-                      <h4 className="font-medium mb-2">Detalles de Cobertura:</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {plan.coverage_details}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {showForm && (
-          <PlanForm
-            open={showForm}
-            onOpenChange={handleCloseForm}
-            plan={editingPlan}
-          />
+        {isAdmin && (
+          <Button onClick={() => setShowForm(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Nuevo Plan
+          </Button>
         )}
       </div>
-    </Layout>
+
+      <div>
+        <h2 className="text-2xl font-bold mb-4">Planes Disponibles</h2>
+        <p className="text-muted-foreground mb-6">
+          Gestiona los planes de seguro disponibles
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {plans?.map((plan) => (
+          <Card key={plan.id} className="relative">
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle>{plan.name}</CardTitle>
+                  <CardDescription>{plan.description}</CardDescription>
+                </div>
+                {isAdmin && (
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEdit(plan)}
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(plan.id)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="text-center">
+                  <div className="text-3xl font-bold">
+                    {formatCurrency(plan.price)}
+                  </div>
+                </div>
+                
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant={plan.active ? 'default' : 'secondary'}>
+                    {plan.active ? 'Activo' : 'Inactivo'}
+                  </Badge>
+                </div>
+
+                {plan.coverage_details && (
+                  <div>
+                    <h4 className="font-medium mb-2">Detalles de Cobertura:</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {plan.coverage_details}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {showForm && (
+        <PlanForm
+          open={showForm}
+          onOpenChange={handleCloseForm}
+          plan={editingPlan}
+        />
+      )}
+    </div>
   );
 };
 
