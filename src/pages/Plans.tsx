@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { PlanForm } from '@/components/PlanForm';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatCurrency } from '@/lib/utils';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { useCurrencySettings } from '@/hooks/useCurrencySettings';
 
@@ -17,7 +16,7 @@ const Plans = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingPlan, setEditingPlan] = useState(null);
   const { profile } = useSimpleAuthContext();
-  const { data: currencySettings } = useCurrencySettings();
+  const { settings: currencySettings, formatCurrency } = useCurrencySettings();
   const queryClient = useQueryClient();
 
   const { data: plans, isLoading } = useQuery({
@@ -131,10 +130,7 @@ const Plans = () => {
                 <div className="space-y-4">
                   <div className="text-center">
                     <div className="text-3xl font-bold">
-                      {formatCurrency(plan.price, currencySettings)}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      por {plan.billing_period === 'monthly' ? 'mes' : 'año'}
+                      {formatCurrency(plan.price)}
                     </div>
                   </div>
                   
@@ -142,22 +138,14 @@ const Plans = () => {
                     <Badge variant={plan.active ? 'default' : 'secondary'}>
                       {plan.active ? 'Activo' : 'Inactivo'}
                     </Badge>
-                    <Badge variant="outline">
-                      {plan.billing_period === 'monthly' ? 'Mensual' : 'Anual'}
-                    </Badge>
                   </div>
 
-                  {plan.features && plan.features.length > 0 && (
+                  {plan.coverage_details && (
                     <div>
-                      <h4 className="font-medium mb-2">Características:</h4>
-                      <ul className="text-sm text-muted-foreground space-y-1">
-                        {plan.features.map((feature: string, index: number) => (
-                          <li key={index} className="flex items-center gap-2">
-                            <div className="w-1 h-1 bg-primary rounded-full"></div>
-                            {feature}
-                          </li>
-                        ))}
-                      </ul>
+                      <h4 className="font-medium mb-2">Detalles de Cobertura:</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {plan.coverage_details}
+                      </p>
                     </div>
                   )}
                 </div>
