@@ -21,23 +21,35 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  console.log('🔐 SimpleAuthProvider: Estado actual', { 
+    user: !!user, 
+    loading,
+    email: user?.email 
+  });
+
   useEffect(() => {
     let mounted = true;
 
     const initAuth = async () => {
       try {
+        console.log('🚀 SimpleAuthProvider: Inicializando auth...');
+        
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Error getting session:', error);
+          console.error('❌ SimpleAuthProvider: Error getting session:', error);
         } else if (session?.user && mounted) {
+          console.log('✅ SimpleAuthProvider: Sesión encontrada');
           setUser(session.user);
           await fetchProfile(session.user.id);
+        } else {
+          console.log('ℹ️ SimpleAuthProvider: No hay sesión activa');
         }
       } catch (error) {
-        console.error('Error initializing auth:', error);
+        console.error('❌ SimpleAuthProvider: Error initializing auth:', error);
       } finally {
         if (mounted) {
+          console.log('✅ SimpleAuthProvider: Inicialización completa, loading = false');
           setLoading(false);
         }
       }
@@ -45,6 +57,8 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     const fetchProfile = async (userId: string) => {
       try {
+        console.log('👤 SimpleAuthProvider: Obteniendo perfil para:', userId);
+        
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
@@ -52,12 +66,13 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           .maybeSingle();
 
         if (error) {
-          console.error('Error fetching profile:', error);
+          console.error('❌ SimpleAuthProvider: Error fetching profile:', error);
         } else if (data && mounted) {
+          console.log('✅ SimpleAuthProvider: Perfil obtenido:', data);
           setProfile(data);
         }
       } catch (error) {
-        console.error('Error fetching profile:', error);
+        console.error('❌ SimpleAuthProvider: Error fetching profile:', error);
       }
     };
 
@@ -67,10 +82,17 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       async (event, session) => {
         if (!mounted) return;
 
+        console.log('🔄 SimpleAuthProvider: Auth state change:', event, { 
+          hasSession: !!session,
+          hasUser: !!session?.user 
+        });
+
         if (event === 'SIGNED_IN' && session?.user) {
+          console.log('✅ SimpleAuthProvider: Usuario logueado');
           setUser(session.user);
           await fetchProfile(session.user.id);
         } else if (event === 'SIGNED_OUT') {
+          console.log('👋 SimpleAuthProvider: Usuario deslogueado');
           setUser(null);
           setProfile(null);
           // Limpiar storage
@@ -81,6 +103,7 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
 
     return () => {
+      console.log('🔇 SimpleAuthProvider: Cleanup');
       mounted = false;
       subscription.unsubscribe();
     };
@@ -88,12 +111,15 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const signIn = async (email: string, password: string) => {
     try {
+      console.log('🔐 SimpleAuthProvider: Iniciando signIn para:', email);
+      
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
+        console.error('❌ SimpleAuthProvider: Error en signIn:', error);
         if (error.message.includes('Invalid login credentials')) {
           throw new Error('Credenciales incorrectas. Verifica tu email y contraseña.');
         } else if (error.message.includes('Email not confirmed')) {
@@ -101,14 +127,18 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         }
         throw error;
       }
+      
+      console.log('✅ SimpleAuthProvider: SignIn exitoso');
     } catch (error) {
-      console.error('Error signing in:', error);
+      console.error('❌ SimpleAuthProvider: Error signing in:', error);
       throw error;
     }
   };
 
   const signOut = async () => {
     try {
+      console.log('🚪 SimpleAuthProvider: Cerrando sesión...');
+      
       // Limpiar storage primero
       localStorage.clear();
       sessionStorage.clear();
@@ -116,10 +146,12 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       // Cerrar sesión en Supabase
       await supabase.auth.signOut();
       
+      console.log('✅ SimpleAuthProvider: Sesión cerrada');
+      
       // Redirigir
       window.location.href = '/login';
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('❌ SimpleAuthProvider: Error signing out:', error);
       // Forzar redirect incluso si hay error
       window.location.href = '/login';
     }

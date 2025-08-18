@@ -41,6 +41,8 @@ const queryClient = new QueryClient({
 });
 
 function App() {
+  console.log('🚀 App: Iniciando aplicación');
+  
   return (
     <QueryClientProvider client={queryClient}>
       <SimpleAuthProvider>
@@ -56,13 +58,19 @@ function App() {
             {/* Public signature route */}
             <Route path="/signature/:token" element={<SignatureView />} />
             
-            {/* Protected routes with main layout */}
+            {/* Root route - redirect to dashboard if authenticated */}
             <Route path="/" element={
+              <SimpleProtectedRoute>
+                <Navigate to="/dashboard" replace />
+              </SimpleProtectedRoute>
+            } />
+            
+            {/* Protected routes with main layout */}
+            <Route path="/*" element={
               <SimpleProtectedRoute>
                 <MainLayout />
               </SimpleProtectedRoute>
             }>
-              <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<SimpleDashboard />} />
               <Route path="sales" element={<Sales />} />
               <Route path="sales/new" element={<NewSale />} />
