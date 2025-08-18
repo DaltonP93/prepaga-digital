@@ -1,11 +1,14 @@
 
 import React from 'react';
-import { Outlet } from 'react-router-dom';
 
-export default function PublicLayout() {
+interface PublicLayoutProps {
+  children: React.ReactNode;
+}
+
+export default function PublicLayout({ children }: PublicLayoutProps) {
   return (
     <div className="min-h-screen bg-gray-50">
-      <Outlet />
+      {children}
     </div>
   );
 }
