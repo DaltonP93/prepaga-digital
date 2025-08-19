@@ -60,6 +60,70 @@ const TOOLS: Tool[] = [
   { id: 'phone', label: 'Teléfono', icon: Phone, description: 'Campo de teléfono' },
 ];
 
+// Define proper types for properties
+interface SignatureProperties {
+  width: number;
+  height: number;
+}
+
+interface TextProperties {
+  fontSize: number;
+  fontFamily: string;
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+}
+
+interface ImageProperties {
+  width: number;
+  height: number;
+}
+
+interface CheckboxProperties {
+  label: string;
+  required: boolean;
+}
+
+interface SelectProperties {
+  label: string;
+  options: string[];
+  required: boolean;
+}
+
+interface RadioProperties {
+  label: string;
+  options: string[];
+  required: boolean;
+}
+
+interface DateProperties {
+  label: string;
+  format: string;
+}
+
+interface PhoneProperties {
+  label: string;
+  format: string;
+}
+
+interface NumberProperties {
+  label: string;
+  min: number;
+  max: number;
+}
+
+interface Properties {
+  signature: SignatureProperties;
+  text: TextProperties;
+  image: ImageProperties;
+  checkbox: CheckboxProperties;
+  select: SelectProperties;
+  radio: RadioProperties;
+  date: DateProperties;
+  phone: PhoneProperties;
+  number: NumberProperties;
+}
+
 export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
   content,
   onContentChange,
@@ -71,7 +135,7 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
   const [selectedTool, setSelectedTool] = useState<string>('signature');
   const [zoom, setZoom] = useState(100);
   const [editorAPI, setEditorAPI] = useState<TipTapEditorAPI | null>(null);
-  const [properties, setProperties] = useState({
+  const [properties, setProperties] = useState<Properties>({
     signature: { width: 200, height: 80 },
     text: { fontSize: 12, fontFamily: 'Arial', bold: false, italic: false, underline: false },
     image: { width: 150, height: 150 },
@@ -155,7 +219,11 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
     setZoom(prev => Math.max(50, Math.min(200, prev + delta)));
   }, []);
 
-  const updateProperty = useCallback((toolId: string, prop: string, value: any) => {
+  const updateProperty = useCallback(<T extends keyof Properties, K extends keyof Properties[T]>(
+    toolId: T,
+    prop: K,
+    value: Properties[T][K]
+  ) => {
     setProperties(prev => ({
       ...prev,
       [toolId]: {
@@ -165,7 +233,10 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
     }));
   }, []);
 
-  const currentToolProps = properties[selectedTool as keyof typeof properties];
+  // Helper function to get typed properties
+  const getPropertiesForTool = <T extends keyof Properties>(toolId: T): Properties[T] => {
+    return properties[toolId];
+  };
   
   const assignedFields = useMemo(() => {
     const fields = [];
@@ -266,7 +337,7 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
                   <Label className="text-xs">Ancho</Label>
                   <Input
                     type="number"
-                    value={currentToolProps?.width || 200}
+                    value={getPropertiesForTool('signature').width}
                     onChange={(e) => updateProperty('signature', 'width', parseInt(e.target.value))}
                     className="h-8"
                   />
@@ -275,7 +346,7 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
                   <Label className="text-xs">Alto</Label>
                   <Input
                     type="number"
-                    value={currentToolProps?.height || 80}
+                    value={getPropertiesForTool('signature').height}
                     onChange={(e) => updateProperty('signature', 'height', parseInt(e.target.value))}
                     className="h-8"
                   />
@@ -288,7 +359,7 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
                 <div>
                   <Label className="text-xs">Tamaño de fuente</Label>
                   <Select
-                    value={currentToolProps?.fontSize?.toString() || '12'}
+                    value={getPropertiesForTool('text').fontSize.toString()}
                     onValueChange={(value) => updateProperty('text', 'fontSize', parseInt(value))}
                   >
                     <SelectTrigger className="h-8">
@@ -308,22 +379,22 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
                 <div className="flex space-x-2">
                   <Button
                     size="sm"
-                    variant={currentToolProps?.bold ? "default" : "outline"}
-                    onClick={() => updateProperty('text', 'bold', !currentToolProps?.bold)}
+                    variant={getPropertiesForTool('text').bold ? "default" : "outline"}
+                    onClick={() => updateProperty('text', 'bold', !getPropertiesForTool('text').bold)}
                   >
                     <strong>B</strong>
                   </Button>
                   <Button
                     size="sm"
-                    variant={currentToolProps?.italic ? "default" : "outline"}
-                    onClick={() => updateProperty('text', 'italic', !currentToolProps?.italic)}
+                    variant={getPropertiesForTool('text').italic ? "default" : "outline"}
+                    onClick={() => updateProperty('text', 'italic', !getPropertiesForTool('text').italic)}
                   >
                     <em>I</em>
                   </Button>
                   <Button
                     size="sm"
-                    variant={currentToolProps?.underline ? "default" : "outline"}
-                    onClick={() => updateProperty('text', 'underline', !currentToolProps?.underline)}
+                    variant={getPropertiesForTool('text').underline ? "default" : "outline"}
+                    onClick={() => updateProperty('text', 'underline', !getPropertiesForTool('text').underline)}
                   >
                     <u>U</u>
                   </Button>
@@ -336,7 +407,7 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
                 <div>
                   <Label className="text-xs">Etiqueta</Label>
                   <Input
-                    value={currentToolProps?.label || ''}
+                    value={getPropertiesForTool('checkbox').label}
                     onChange={(e) => updateProperty('checkbox', 'label', e.target.value)}
                     className="h-8"
                     placeholder="Etiqueta de la casilla"
@@ -350,7 +421,7 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
                 <div>
                   <Label className="text-xs">Etiqueta</Label>
                   <Input
-                    value={currentToolProps?.label || ''}
+                    value={getPropertiesForTool('select').label}
                     onChange={(e) => updateProperty('select', 'label', e.target.value)}
                     className="h-8"
                     placeholder="Etiqueta de la lista"
@@ -360,7 +431,7 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
                   <Label className="text-xs">Opciones (una por línea)</Label>
                   <textarea
                     className="w-full h-20 text-xs border rounded px-2 py-1"
-                    value={currentToolProps?.options?.join('\n') || ''}
+                    value={getPropertiesForTool('select').options.join('\n')}
                     onChange={(e) => updateProperty('select', 'options', e.target.value.split('\n').filter(o => o.trim()))}
                     placeholder="Opción 1&#10;Opción 2&#10;Opción 3"
                   />
