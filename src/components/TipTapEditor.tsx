@@ -1,3 +1,4 @@
+
 import React, { useCallback, useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -747,7 +748,7 @@ export const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>(({
                   editor={editor}
                   onImageClick={() => addImage()}
                   onSignatureClick={insertSignature}
-                  onQuestionClick={insertDynamicQuestion}
+                  onQuestionClick={() => insertDynamicQuestion('text', 'Nueva pregunta')}
                 />
                 
                 {/* Advanced Tools */}
