@@ -27,7 +27,7 @@ import {
   Trash2,
   Settings
 } from 'lucide-react';
-import { TipTapEditor, TipTapEditorAPI } from '@/components/TipTapEditor';
+import TipTapEditor, { TipTapEditorAPI } from '@/components/TipTapEditor';
 import { toast } from 'sonner';
 
 interface TemplateDesignerProps {
@@ -183,7 +183,7 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
         editorAPI.addImage();
         break;
       case 'number':
-        editorAPI.insertDynamicQuestion('number');
+        editorAPI.insertDynamicQuestion('number', properties.number.label);
         break;
       case 'select':
         editorAPI.insertDropdown(properties.select.options);
@@ -192,7 +192,7 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
         editorAPI.insertRadioButton(properties.radio.options);
         break;
       case 'phone':
-        editorAPI.insertDynamicQuestion('tel');
+        editorAPI.insertDynamicQuestion('tel', properties.phone.label);
         break;
     }
     

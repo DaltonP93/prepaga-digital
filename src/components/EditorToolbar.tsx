@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -31,7 +32,7 @@ import {
 } from '@/components/ui/tooltip';
 
 interface EditorToolbarProps {
-  editor: Editor;
+  editor: Editor | null;
   onImageClick: () => void;
   onSignatureClick: () => void;
   onQuestionClick?: () => void;
@@ -43,6 +44,10 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onSignatureClick,
   onQuestionClick,
 }) => {
+  if (!editor) {
+    return null;
+  }
+
   const ToolbarButton = ({ 
     onClick, 
     isActive = false, 
@@ -141,13 +146,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             <Italic className="w-4 h-4" />
           </ToolbarButton>
           <ToolbarButton
-            onClick={() => editor.chain().focus().toggleUnderline().run()}
-            isActive={editor.isActive('underline')}
-            tooltip="Subrayado (Ctrl+U)"
-          >
-            <UnderlineIcon className="w-4 h-4" />
-          </ToolbarButton>
-          <ToolbarButton
             onClick={() => editor.chain().focus().toggleStrike().run()}
             isActive={editor.isActive('strike')}
             tooltip="Tachado"
@@ -177,35 +175,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         </div>
 
         <Separator orientation="vertical" className="h-6 mx-1" />
-
-        {/* Alignment - Removed as extension needs proper setup */}
-        {/* 
-        <div className="flex gap-1">
-          <ToolbarButton
-            onClick={() => editor.chain().focus().setTextAlign('left').run()}
-            isActive={editor.isActive({ textAlign: 'left' })}
-            tooltip="Alinear izquierda"
-          >
-            <AlignLeft className="w-4 h-4" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().setTextAlign('center').run()}
-            isActive={editor.isActive({ textAlign: 'center' })}
-            tooltip="Centrar"
-          >
-            <AlignCenter className="w-4 h-4" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().setTextAlign('right').run()}
-            isActive={editor.isActive({ textAlign: 'right' })}
-            tooltip="Alinear derecha"
-          >
-            <AlignRight className="w-4 h-4" />
-          </ToolbarButton>
-        </div>
-
-        <Separator orientation="vertical" className="h-6 mx-1" />
-        */}
 
         {/* Special Elements */}
         <div className="flex gap-1">

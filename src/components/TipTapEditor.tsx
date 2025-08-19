@@ -29,7 +29,16 @@ import { useToast } from '@/hooks/use-toast';
 
 export interface TipTapEditorProps {
   initialContent?: string;
+  content?: string;
   onChange?: (html: string) => void;
+  onContentChange?: (html: string) => void;
+  dynamicFields?: any[];
+  onDynamicFieldsChange?: (fields: any[]) => void;
+  templateQuestions?: any[];
+  templateId?: string;
+  showToolbar?: boolean;
+  showSidebar?: boolean;
+  onReady?: (api: TipTapEditorAPI) => void;
 }
 
 export interface TipTapEditorAPI {
@@ -40,7 +49,8 @@ export interface TipTapEditorAPI {
   insertRadioButton: (options?: string[]) => void;
   insertQRCode: (text?: string) => void;
   insertBarcode: (text?: string) => void;
-  insertDynamicQuestion: (type?: string, label?: string) => void;
+  insertDynamicQuestion: (type: string, label: string) => void;
+  insertText: (text: string) => void;
   addImage: (url?: string) => void;
   getEditor: () => any;
   updateSelectedNodeAttrs: (attrs: any) => void;
@@ -54,9 +64,21 @@ const ResizableImage = (window as any).ResizableImage;
 const SignatureField = (window as any).SignatureField;
 
 const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref) => {
-  const { initialContent, onChange } = props;
+  const { 
+    initialContent, 
+    content,
+    onChange, 
+    onContentChange,
+    dynamicFields = [],
+    onDynamicFieldsChange,
+    templateQuestions = [],
+    templateId,
+    showToolbar = true,
+    showSidebar = true,
+    onReady
+  } = props;
+  
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showSidebar, setShowSidebar] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showImageManager, setShowImageManager] = useState(false);
   const [stickyToolbar, setStickyToolbar] = useState(false);
@@ -67,9 +89,9 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        history: true,
-        // Exclude the image extension
-        // image: false,
+        history: {
+          depth: 10,
+        },
       }),
       Placeholder.configure({
         placeholder: ({ node }: any) => {
@@ -117,9 +139,11 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
       ResizableImage,
       SignatureField
     ],
-    content: initialContent || '<p>Escribe algo...</p>',
+    content: content || initialContent || '<p>Escribe algo...</p>',
     onUpdate: ({ editor }) => {
-      onChange?.(editor.getHTML());
+      const html = editor.getHTML();
+      onChange?.(html);
+      onContentChange?.(html);
     },
   });
 
@@ -241,6 +265,11 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
     editor.chain().focus().insertContent(questionNode).run();
   }, [editor]);
 
+  const insertText = useCallback((text: string) => {
+    if (!editor) return;
+    editor.chain().focus().insertContent(text).run();
+  }, [editor]);
+
   const addImage = useCallback((url: string = '') => {
     if (!editor) return;
 
@@ -274,6 +303,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
     insertQRCode,
     insertBarcode,
     insertDynamicQuestion,
+    insertText,
     addImage,
     getEditor: () => editor,
     updateSelectedNodeAttrs,
@@ -289,6 +319,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
     insertQRCode,
     insertBarcode,
     insertDynamicQuestion,
+    insertText,
     addImage,
     updateSelectedNodeAttrs,
     setContent,
@@ -296,93 +327,120 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
     editor
   ]);
 
+  useEffect(() => {
+    if (editor && onReady) {
+      onReady({
+        insertSignature,
+        insertPlaceholder,
+        insertDropdown,
+        insertCheckbox,
+        insertRadioButton,
+        insertQRCode,
+        insertBarcode,
+        insertDynamicQuestion,
+        insertText,
+        addImage,
+        getEditor: () => editor,
+        updateSelectedNodeAttrs,
+        setContent,
+        getContent,
+        focus: () => editor?.commands.focus(),
+      });
+    }
+  }, [editor, onReady, insertSignature, insertPlaceholder, insertDropdown, insertCheckbox, insertRadioButton, insertQRCode, insertBarcode, insertDynamicQuestion, insertText, addImage, updateSelectedNodeAttrs, setContent, getContent]);
+
   return (
     <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-white' : 'grid grid-cols-1 lg:grid-cols-4'} gap-6`}>
       <div className={`${isFullscreen ? 'flex-1 flex flex-col' : 'lg:col-span-3'} space-y-4`}>
         <Card className="flex-1">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                Editor de Plantillas
-              </CardTitle>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="gap-1">
-                  <Activity className="w-3 h-3" />
-                  {editor?.isActive ? 'Activo' : 'Inactivo'}
-                </Badge>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsFullscreen(!isFullscreen)}
-                >
-                  {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-
-          <CardContent className="space-y-4">
-            <div className="border rounded-lg">
-              <div ref={toolbarRef} className={stickyToolbar ? 'sticky top-0 z-10 bg-white border-b' : ''}>
-                <EditorToolbar 
-                  editor={editor} 
-                  onAddImage={() => setShowImageManager(true)}
-                  onQuestionClick={() => insertDynamicQuestion('text', 'Nueva pregunta')}
-                />
-                
-                <div className="flex items-center gap-1 p-2 border-b bg-gray-50/50">
+          {showToolbar && (
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Editor de Plantillas
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="gap-1">
+                    <Activity className="w-3 h-3" />
+                    {editor?.isActive ? 'Activo' : 'Inactivo'}
+                  </Badge>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => insertDynamicQuestion('text', 'Pregunta de texto')}
-                    className="gap-2"
+                    onClick={() => setIsFullscreen(!isFullscreen)}
                   >
-                    <Type className="w-4 h-4" />
-                    Texto
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => insertDynamicQuestion('textarea', 'Pregunta de texto largo')}
-                    className="gap-2"
-                  >
-                    <AlignLeft className="w-4 h-4" />
-                    Área de texto
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => insertDynamicQuestion('select', 'Pregunta de selección')}
-                    className="gap-2"
-                  >
-                    <ChevronDown className="w-4 h-4" />
-                    Lista
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => insertDynamicQuestion('radio', 'Pregunta de opción múltiple')}
-                    className="gap-2"
-                  >
-                    <Circle className="w-4 h-4" />
-                    Radio
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => insertDynamicQuestion('checkbox', 'Pregunta de casillas')}
-                    className="gap-2"
-                  >
-                    <Square className="w-4 h-4" />
-                    Checkbox
+                    {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                   </Button>
                 </div>
               </div>
+            </CardHeader>
+          )}
+
+          <CardContent className="space-y-4">
+            <div className="border rounded-lg">
+              {showToolbar && (
+                <div ref={toolbarRef} className={stickyToolbar ? 'sticky top-0 z-10 bg-white border-b' : ''}>
+                  <EditorToolbar 
+                    editor={editor} 
+                    onImageClick={() => setShowImageManager(true)}
+                    onSignatureClick={() => insertSignature('normal')}
+                    onQuestionClick={() => insertDynamicQuestion('text', 'Nueva pregunta')}
+                  />
+                  
+                  <div className="flex items-center gap-1 p-2 border-b bg-gray-50/50">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => insertDynamicQuestion('text', 'Pregunta de texto')}
+                      className="gap-2"
+                    >
+                      <Type className="w-4 h-4" />
+                      Texto
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => insertDynamicQuestion('textarea', 'Pregunta de texto largo')}
+                      className="gap-2"
+                    >
+                      <AlignLeft className="w-4 h-4" />
+                      Área de texto
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => insertDynamicQuestion('select', 'Pregunta de selección')}
+                      className="gap-2"
+                    >
+                      <ChevronDown className="w-4 h-4" />
+                      Lista
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => insertDynamicQuestion('radio', 'Pregunta de opción múltiple')}
+                      className="gap-2"
+                    >
+                      <Circle className="w-4 h-4" />
+                      Radio
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => insertDynamicQuestion('checkbox', 'Pregunta de casillas')}
+                      className="gap-2"
+                    >
+                      <Square className="w-4 h-4" />
+                      Checkbox
+                    </Button>
+                  </div>
+                </div>
+              )}
               
               <div className="min-h-[400px] p-4">
                 <EditorContent 
@@ -394,40 +452,36 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex gap-6 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Type className="w-4 h-4" />
-                <span>{editor?.storage.characterCount?.characters() || 0} caracteres</span>
+        {showToolbar && (
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex gap-6 text-sm text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <Type className="w-4 h-4" />
+                  <span>{editor?.storage.characterCount?.characters() || 0} caracteres</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <FileText className="w-4 h-4" />
+                  <span>{editor?.storage.characterCount?.words() || 0} palabras</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Hash className="w-4 h-4" />
+                  <span>Línea {editor?.state.selection.$head.pos || 1}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1">
-                <FileText className="w-4 h-4" />
-                <span>{editor?.storage.characterCount?.words() || 0} palabras</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Hash className="w-4 h-4" />
-                <span>Línea {editor?.state.selection.$head.pos || 1}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {showSidebar && (
         <div className={`${isFullscreen ? 'w-80 border-l' : 'lg:col-span-1'} ${sidebarCollapsed ? 'w-12' : ''}`}>
           <div className="sticky top-4">
             <DraggablePlaceholdersSidebar 
-              onPlaceholderAdd={insertPlaceholder}
-              onSignatureAdd={insertSignature}
-              onDropdownAdd={insertDropdown}
-              onCheckboxAdd={insertCheckbox}
-              onRadioAdd={insertRadioButton}
-              onQRAdd={insertQRCode}
-              onBarcodeAdd={insertBarcode}
-              onQuestionAdd={() => insertDynamicQuestion('text', 'Nueva pregunta')}
-              collapsed={sidebarCollapsed}
-              onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+              onPlaceholderInsert={insertPlaceholder}
+              dynamicFields={dynamicFields}
+              templateQuestions={templateQuestions}
+              onQuestionInsert={(question) => insertDynamicQuestion(question.question_type, question.question_text)}
             />
           </div>
         </div>
@@ -456,4 +510,4 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
 
 TipTapEditor.displayName = 'TipTapEditor';
 
-export default TipTapEditor;
+export { TipTapEditor as default };
