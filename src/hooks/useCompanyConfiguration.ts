@@ -2,7 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useAuthContext } from '@/components/AuthProvider';
+import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 
 interface CompanyConfiguration {
   id: string;
@@ -22,7 +22,7 @@ interface CompanyConfiguration {
 
 export const useCompanyConfiguration = () => {
   const queryClient = useQueryClient();
-  const { profile } = useAuthContext();
+  const { profile } = useSimpleAuthContext();
 
   const { data: configuration, isLoading } = useQuery({
     queryKey: ['company-configuration', profile?.company_id],
