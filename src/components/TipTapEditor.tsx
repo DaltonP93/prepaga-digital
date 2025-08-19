@@ -420,7 +420,7 @@ export const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>(({
     }).run();
   }, [editor]);
 
-  const insertDynamicQuestion = useCallback(() => {
+  const insertDynamicQuestion = useCallback((type: string = 'text', label: string = 'Nueva pregunta') => {
     if (!editor) return;
     
     const questionId = `q_${Date.now()}`;
@@ -429,8 +429,8 @@ export const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>(({
       attrs: {
         question: {
           id: questionId,
-          type: 'text',
-          label: 'Nueva pregunta',
+          type,
+          label,
           required: false,
         },
       },
@@ -624,7 +624,7 @@ export const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>(({
       }).run();
     }, [editor]),
 
-    insertDynamicQuestion: useCallback((type: string = 'text') => {
+    insertDynamicQuestion: useCallback((type: string = 'text', label: string = 'Nueva pregunta') => {
       if (!editor) return;
       const questionId = `q_${Date.now()}`;
       editor.chain().focus().insertContent({
@@ -633,7 +633,7 @@ export const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>(({
           question: {
             id: questionId,
             type,
-            label: 'Nueva pregunta',
+            label,
             required: false,
           },
         },
