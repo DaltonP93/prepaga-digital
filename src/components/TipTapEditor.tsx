@@ -1,5 +1,4 @@
-
-import React, { useCallback, useState, useRef, useEffect } from 'react';
+import React, { useCallback, useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
@@ -51,6 +50,24 @@ import {
   QRCodeExtension, 
   BarcodeExtension 
 } from '@/components/editor/AdvancedExtensions';
+
+// API interface for external control
+export interface TipTapEditorAPI {
+  insertSignature: (size?: 'normal' | 'small') => void;
+  insertPlaceholder: (name: string) => void;
+  insertDropdown: (options?: string[]) => void;
+  insertCheckbox: (label?: string) => void;
+  insertRadioButton: (options?: string[]) => void;
+  insertQRCode: (text?: string) => void;
+  insertBarcode: (text?: string) => void;
+  insertDynamicQuestion: (type?: string) => void;
+  addImage: (url?: string) => void;
+  getEditor: () => any;
+  updateSelectedNodeAttrs: (attrs: any) => void;
+  insertText: (text: string) => void;
+  insertHeading: (level: number) => void;
+  focus: () => void;
+}
 
 // Custom extension for dynamic placeholders
 const DynamicPlaceholder = Node.create({
@@ -215,16 +232,22 @@ interface TipTapEditorProps {
   onDynamicFieldsChange: (fields: any[]) => void;
   templateQuestions?: any[];
   templateId?: string;
+  showToolbar?: boolean;
+  showSidebar?: boolean;
+  onReady?: (api: TipTapEditorAPI) => void;
 }
 
-export const TipTapEditor: React.FC<TipTapEditorProps> = ({
+export const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>(({
   content,
   onContentChange,
   dynamicFields,
   onDynamicFieldsChange,
   templateQuestions = [],
   templateId,
-}) => {
+  showToolbar = true,
+  showSidebar = true,
+  onReady,
+}, ref) => {
   const { placeholders } = useTemplatePlaceholders();
   const { versions, createVersion, isCreatingVersion } = useTemplateVersioning(templateId);
   const [showImageManager, setShowImageManager] = useState(false);
@@ -516,6 +539,147 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
     setIsFullscreen(!isFullscreen);
   }, [isFullscreen]);
 
+  const apiMethods: TipTapEditorAPI = {
+    insertSignature: useCallback((size: 'normal' | 'small' = 'normal') => {
+      if (!editor) return;
+      const width = size === 'small' ? 150 : 200;
+      const height = size === 'small' ? 60 : 80;
+      editor.chain().focus().insertContent({
+        type: 'signatureField',
+        attrs: { width, height },
+      }).run();
+    }, [editor]),
+
+    insertPlaceholder: useCallback((placeholderName: string) => {
+      if (!editor) return;
+      const placeholder = placeholders?.find(p => p.placeholder_name === placeholderName);
+      if (!placeholder) return;
+
+      editor.chain().focus().insertContent({
+        type: 'dynamicPlaceholder',
+        attrs: {
+          name: placeholderName,
+          label: placeholder.placeholder_label,
+        },
+      }).run();
+    }, [editor, placeholders]),
+
+    insertDropdown: useCallback((options: string[] = ['Opción 1', 'Opción 2', 'Opción 3']) => {
+      if (!editor) return;
+      editor.chain().focus().insertContent({
+        type: 'dropdown',
+        attrs: {
+          label: 'Seleccionar opción',
+          options,
+          required: false,
+          placeholder: 'Seleccione una opción...',
+        },
+      }).run();
+    }, [editor]),
+
+    insertCheckbox: useCallback((label: string = 'Opción de checkbox') => {
+      if (!editor) return;
+      editor.chain().focus().insertContent({
+        type: 'checkbox',
+        attrs: {
+          label,
+          checked: false,
+          required: false,
+        },
+      }).run();
+    }, [editor]),
+
+    insertRadioButton: useCallback((options: string[] = ['Opción 1', 'Opción 2', 'Opción 3']) => {
+      if (!editor) return;
+      editor.chain().focus().insertContent({
+        type: 'radioButton',
+        attrs: {
+          label: 'Pregunta de opción múltiple',
+          options,
+          required: false,
+          name: 'radio_' + Date.now(),
+        },
+      }).run();
+    }, [editor]),
+
+    insertQRCode: useCallback((text: string = 'https://example.com') => {
+      if (!editor) return;
+      editor.chain().focus().insertContent({
+        type: 'qrCode',
+        attrs: {
+          text,
+          size: 150,
+        },
+      }).run();
+    }, [editor]),
+
+    insertBarcode: useCallback((text: string = '123456789') => {
+      if (!editor) return;
+      editor.chain().focus().insertContent({
+        type: 'barcode',
+        attrs: {
+          text,
+          type: 'CODE128',
+        },
+      }).run();
+    }, [editor]),
+
+    insertDynamicQuestion: useCallback((type: string = 'text') => {
+      if (!editor) return;
+      const questionId = `q_${Date.now()}`;
+      editor.chain().focus().insertContent({
+        type: 'dynamicQuestion',
+        attrs: {
+          question: {
+            id: questionId,
+            type,
+            label: 'Nueva pregunta',
+            required: false,
+          },
+        },
+      }).run();
+    }, [editor]),
+
+    addImage: useCallback((url?: string) => {
+      if (!editor) return;
+      if (url) {
+        editor.chain().focus().setImage({ src: url }).run();
+      } else {
+        setShowImageManager(true);
+      }
+    }, [editor]),
+
+    getEditor: useCallback(() => editor, [editor]),
+
+    updateSelectedNodeAttrs: useCallback((attrs: any) => {
+      if (!editor) return;
+      editor.chain().focus().updateAttributes(attrs).run();
+    }, [editor]),
+
+    insertText: useCallback((text: string) => {
+      if (!editor) return;
+      editor.chain().focus().insertContent(`<p>${text}</p>`).run();
+    }, [editor]),
+
+    insertHeading: useCallback((level: number) => {
+      if (!editor) return;
+      editor.chain().focus().toggleHeading({ level: level as 1 | 2 | 3 | 4 | 5 | 6 }).run();
+    }, [editor]),
+
+    focus: useCallback(() => {
+      if (!editor) return;
+      editor.chain().focus().run();
+    }, [editor]),
+  };
+
+  useImperativeHandle(ref, () => apiMethods, [apiMethods]);
+  
+  useEffect(() => {
+    if (editor && onReady) {
+      onReady(apiMethods);
+    }
+  }, [editor, onReady, apiMethods]);
+
   if (!editor) {
     return null;
   }
@@ -572,68 +736,70 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
             </div>
           </CardHeader>
           <CardContent className="p-0 flex-1">
-            <div
-              ref={toolbarRef}
-              className={`transition-all duration-200 ${
-                stickyToolbar ? 'sticky top-0 z-10 bg-white shadow-md' : ''
-              }`}
-            >
-              <EditorToolbar
-                editor={editor}
-                onImageClick={() => addImage()}
-                onSignatureClick={insertSignature}
-                onQuestionClick={insertDynamicQuestion}
-              />
-              
-              {/* Advanced Tools */}
-              <div className="flex items-center gap-1 p-2 border-b bg-gray-50/50">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={insertDropdown}
-                  className="h-8 px-2 text-xs"
-                >
-                  <DropdownIcon className="h-4 w-4 mr-1" />
-                  Lista
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={insertCheckbox}
-                  className="h-8 px-2 text-xs"
-                >
-                  <CheckSquare className="h-4 w-4 mr-1" />
-                  Checkbox
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={insertRadioButton}
-                  className="h-8 px-2 text-xs"
-                >
-                  <RadioIcon className="h-4 w-4 mr-1" />
-                  Radio
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={insertQRCode}
-                  className="h-8 px-2 text-xs"
-                >
-                  <QrCode className="h-4 w-4 mr-1" />
-                  QR
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={insertBarcode}
-                  className="h-8 px-2 text-xs"
-                >
-                  <Barcode className="h-4 w-4 mr-1" />
-                  Código
-                </Button>
+            {showToolbar && (
+              <div
+                ref={toolbarRef}
+                className={`transition-all duration-200 ${
+                  stickyToolbar ? 'sticky top-0 z-10 bg-white shadow-md' : ''
+                }`}
+              >
+                <EditorToolbar
+                  editor={editor}
+                  onImageClick={() => addImage()}
+                  onSignatureClick={insertSignature}
+                  onQuestionClick={insertDynamicQuestion}
+                />
+                
+                {/* Advanced Tools */}
+                <div className="flex items-center gap-1 p-2 border-b bg-gray-50/50">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={insertDropdown}
+                    className="h-8 px-2 text-xs"
+                  >
+                    <DropdownIcon className="h-4 w-4 mr-1" />
+                    Lista
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={insertCheckbox}
+                    className="h-8 px-2 text-xs"
+                  >
+                    <CheckSquare className="h-4 w-4 mr-1" />
+                    Checkbox
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={insertRadioButton}
+                    className="h-8 px-2 text-xs"
+                  >
+                    <RadioIcon className="h-4 w-4 mr-1" />
+                    Radio
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={insertQRCode}
+                    className="h-8 px-2 text-xs"
+                  >
+                    <QrCode className="h-4 w-4 mr-1" />
+                    QR
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={insertBarcode}
+                    className="h-8 px-2 text-xs"
+                  >
+                    <Barcode className="h-4 w-4 mr-1" />
+                    Código
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
             
             <div className="min-h-[500px] relative border-t flex-1">
               <EditorContent editor={editor} className="h-full" />
@@ -662,28 +828,30 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       </div>
 
       {/* Panel Lateral */}
-      <div className={`${isFullscreen ? 'w-80 border-l' : 'lg:col-span-1'} ${sidebarCollapsed ? 'w-12' : ''}`}>
-        <div className="sticky top-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="w-full mb-2"
-          >
-            {sidebarCollapsed ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            {!sidebarCollapsed && 'Contraer Panel'}
-          </Button>
-          
-          {!sidebarCollapsed && (
-            <DraggablePlaceholdersSidebar
-              onPlaceholderInsert={insertPlaceholder}
-              dynamicFields={dynamicFields}
-              templateQuestions={templateQuestions}
-              onQuestionInsert={insertSingleQuestion}
-            />
-          )}
+      {showSidebar && (
+        <div className={`${isFullscreen ? 'w-80 border-l' : 'lg:col-span-1'} ${sidebarCollapsed ? 'w-12' : ''}`}>
+          <div className="sticky top-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="w-full mb-2"
+            >
+              {sidebarCollapsed ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              {!sidebarCollapsed && 'Contraer Panel'}
+            </Button>
+            
+            {!sidebarCollapsed && (
+              <DraggablePlaceholdersSidebar
+                onPlaceholderInsert={insertPlaceholder}
+                dynamicFields={dynamicFields}
+                templateQuestions={templateQuestions}
+                onQuestionInsert={insertSingleQuestion}
+              />
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Image Manager Modal */}
       {showImageManager && (
@@ -705,4 +873,6 @@ export const TipTapEditor: React.FC<TipTapEditorProps> = ({
       )}
     </div>
   );
-};
+});
+
+TipTapEditor.displayName = 'TipTapEditor';

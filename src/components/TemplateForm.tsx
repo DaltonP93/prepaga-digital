@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { TipTapEditor } from "@/components/TipTapEditor";
+import { TemplateDesigner } from "@/components/TemplateDesigner";
 import { QuestionBuilder } from "@/components/QuestionBuilder";
 import { DocumentPreview } from "@/components/DocumentPreview";
 import { QuestionCopyDialog } from "@/components/QuestionCopyDialog";
@@ -140,7 +140,7 @@ export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps
                 </TabsTrigger>
                 <TabsTrigger value="content" className="flex items-center gap-2">
                   <FileText className="h-4 w-4" />
-                  Contenido
+                  Diseñador
                 </TabsTrigger>
                 <TabsTrigger value="questions" className="flex items-center gap-2">
                   <HelpCircle className="h-4 w-4" />
@@ -208,17 +208,18 @@ export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps
               </TabsContent>
 
               <TabsContent value="content" className="space-y-4">
-                <Card>
+                <Card className="h-[600px]">
                   <CardHeader>
-                    <CardTitle>Editor de Contenido</CardTitle>
+                    <CardTitle>Diseñador de Template</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <TipTapEditor
+                  <CardContent className="p-0 h-full">
+                    <TemplateDesigner
                       content={watch("content")}
                       onContentChange={handleContentChange}
                       dynamicFields={dynamicFields}
                       onDynamicFieldsChange={handleDynamicFieldsChange}
                       templateQuestions={questions || []}
+                      templateId={template?.id}
                     />
                   </CardContent>
                 </Card>
