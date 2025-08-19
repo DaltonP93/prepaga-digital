@@ -1,4 +1,3 @@
-
 import React, { useCallback, useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -52,7 +51,6 @@ import {
   BarcodeExtension 
 } from '@/components/editor/AdvancedExtensions';
 
-// API interface for external control
 export interface TipTapEditorAPI {
   insertSignature: (size?: 'normal' | 'small') => void;
   insertPlaceholder: (name: string) => void;
@@ -61,7 +59,7 @@ export interface TipTapEditorAPI {
   insertRadioButton: (options?: string[]) => void;
   insertQRCode: (text?: string) => void;
   insertBarcode: (text?: string) => void;
-  insertDynamicQuestion: (type?: string) => void;
+  insertDynamicQuestion: (type?: string, label?: string) => void;
   addImage: (url?: string) => void;
   getEditor: () => any;
   updateSelectedNodeAttrs: (attrs: any) => void;
@@ -70,7 +68,6 @@ export interface TipTapEditorAPI {
   focus: () => void;
 }
 
-// Custom extension for dynamic placeholders
 const DynamicPlaceholder = Node.create({
   name: 'dynamicPlaceholder',
   group: 'inline',
@@ -108,7 +105,6 @@ const DynamicPlaceholder = Node.create({
   },
 });
 
-// Enhanced Image Extension with resize capabilities
 const ResizableImage = Image.extend({
   addAttributes() {
     return {
@@ -183,7 +179,6 @@ const ResizableImage = Image.extend({
   },
 });
 
-// Custom extension for signature field
 const SignatureField = Node.create({
   name: 'signatureField',
   group: 'block',
@@ -257,7 +252,6 @@ export const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>(({
   const [stickyToolbar, setStickyToolbar] = useState(false);
   const toolbarRef = useRef<HTMLDivElement>(null);
 
-  // Sticky toolbar effect
   useEffect(() => {
     const handleScroll = () => {
       if (toolbarRef.current) {
@@ -438,7 +432,6 @@ export const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>(({
     }).run();
   }, [editor]);
 
-  // Advanced insertion functions
   const insertDropdown = useCallback(() => {
     if (!editor) return;
     editor.chain().focus().insertContent({
@@ -687,7 +680,6 @@ export const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>(({
 
   return (
     <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-white' : 'grid grid-cols-1 lg:grid-cols-4'} gap-6`}>
-      {/* Editor Principal */}
       <div className={`${isFullscreen ? 'flex-1 flex flex-col' : 'lg:col-span-3'} space-y-4`}>
         <Card className="flex-1">
           <CardHeader className="pb-2">
@@ -751,7 +743,6 @@ export const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>(({
                   onQuestionClick={() => insertDynamicQuestion('text', 'Nueva pregunta')}
                 />
                 
-                {/* Advanced Tools */}
                 <div className="flex items-center gap-1 p-2 border-b bg-gray-50/50">
                   <Button
                     variant="outline"
@@ -812,7 +803,6 @@ export const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>(({
           </CardContent>
         </Card>
 
-        {/* Quick Stats */}
         <Card>
           <CardContent className="pt-4">
             <div className="flex gap-6 text-sm text-muted-foreground">
@@ -828,7 +818,6 @@ export const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>(({
         </Card>
       </div>
 
-      {/* Panel Lateral */}
       {showSidebar && (
         <div className={`${isFullscreen ? 'w-80 border-l' : 'lg:col-span-1'} ${sidebarCollapsed ? 'w-12' : ''}`}>
           <div className="sticky top-4">
@@ -854,7 +843,6 @@ export const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>(({
         </div>
       )}
 
-      {/* Image Manager Modal */}
       {showImageManager && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
