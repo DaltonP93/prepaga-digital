@@ -47,9 +47,9 @@ export const useOptimizedDashboard = () => {
 
       // Calcular métricas
       const totalSales = sales.length;
-      const totalRevenue = sales.reduce((sum, sale) => sum + (sale.total_amount || 0), 0);
-      const completedSales = sales.filter(sale => sale.status === 'completado').length;
-      const pendingSales = sales.filter(sale => sale.status === 'pendiente').length;
+      const totalRevenue = sales.reduce((sum: number, sale: any) => sum + (sale.total_amount || 0), 0);
+      const completedSales = sales.filter((sale: any) => sale.status === 'completado').length;
+      const pendingSales = sales.filter((sale: any) => sale.status === 'pendiente').length;
 
       // Calcular crecimiento (últimos 30 días vs anteriores 30 días)
       const thirtyDaysAgo = new Date();
@@ -58,11 +58,11 @@ export const useOptimizedDashboard = () => {
       const sixtyDaysAgo = new Date();
       sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
-      const recentSalesCount = sales.filter(sale => 
+      const recentSalesCount = sales.filter((sale: any) => 
         new Date(sale.created_at) >= thirtyDaysAgo
       ).length;
 
-      const previousSalesCount = sales.filter(sale => 
+      const previousSalesCount = sales.filter((sale: any) => 
         new Date(sale.created_at) >= sixtyDaysAgo && 
         new Date(sale.created_at) < thirtyDaysAgo
       ).length;
@@ -89,38 +89,36 @@ export const useOptimizedDashboard = () => {
 };
 
 // Hook para búsquedas optimizadas
-export const useOptimizedSearch = (searchTerm: string, table: string) => {
+export const useOptimizedSearch = (searchTerm: string, table: 'clients' | 'sales') => {
   return useQuery({
     queryKey: ['optimized-search', table, searchTerm],
     queryFn: async () => {
       if (!searchTerm || searchTerm.length < 2) return [];
 
-      let query = supabase.from(table);
+      if (table === 'clients') {
+        const { data, error } = await supabase
+          .from('clients')
+          .select('id, first_name, last_name, email, dni')
+          .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,dni.ilike.%${searchTerm}%`)
+          .limit(10);
 
-      // Búsquedas específicas por tabla con índices
-      switch (table) {
-        case 'clients':
-          query = query
-            .select('id, first_name, last_name, email, dni')
-            .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,dni.ilike.%${searchTerm}%`)
-            .limit(10);
-          break;
-        
-        case 'sales':
-          query = query
-            .select('id, contract_number, request_number, status, total_amount, created_at')
-            .or(`contract_number.ilike.%${searchTerm}%,request_number.ilike.%${searchTerm}%`)
-            .order('created_at', { ascending: false })
-            .limit(10);
-          break;
-
-        default:
-          return [];
+        if (error) throw error;
+        return data || [];
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data || [];
+      if (table === 'sales') {
+        const { data, error } = await supabase
+          .from('sales')
+          .select('id, contract_number, request_number, status, total_amount, created_at')
+          .or(`contract_number.ilike.%${searchTerm}%,request_number.ilike.%${searchTerm}%`)
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (error) throw error;
+        return data || [];
+      }
+
+      return [];
     },
     enabled: searchTerm.length >= 2,
     staleTime: 2 * 60 * 1000, // Cache por 2 minutos

@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SimpleAuthProvider } from "@/components/SimpleAuthProvider";
 import { CompanyBrandingProvider } from "@/components/CompanyBrandingProvider";
 import { SimpleProtectedRoute } from "@/components/SimpleProtectedRoute";
-import SimpleLoginForm from "@/components/SimpleLoginForm";
+import { SimpleLoginForm } from "@/components/SimpleLoginForm";
 import SimpleDashboard from "@/pages/SimpleDashboard";
 
 // Crear cliente de React Query con configuración optimizada
