@@ -1,4 +1,6 @@
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +15,25 @@ export const SimpleLoginForm = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const { signIn } = useSimpleAuthContext();
+  const { user, loading, signIn } = useSimpleAuthContext();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  console.log('🔑 SimpleLoginForm: Estado actual', { 
+    user: !!user, 
+    loading,
+    email: user?.email,
+    pathname: location.pathname
+  });
+
+  // Redirect user after successful login
+  useEffect(() => {
+    if (user && !loading) {
+      const from = location.state?.from?.pathname || '/dashboard';
+      console.log('✅ SimpleLoginForm: Usuario autenticado, navegando a:', from);
+      navigate(from, { replace: true });
+    }
+  }, [user, loading, navigate, location.state]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +60,35 @@ export const SimpleLoginForm = () => {
     }
   };
 
+  // Show loading during auth verification
+  if (loading) {
+    console.log('⏳ SimpleLoginForm: Verificando autenticación...');
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+          <p className="text-sm text-muted-foreground">
+            Verificando autenticación...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading during redirection if user is present
+  if (user) {
+    console.log('🔄 SimpleLoginForm: Usuario presente, redirigiendo...');
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+          <p className="text-sm text-muted-foreground">Redirigiendo...</p>
+        </div>
+      </div>
+    );
+  }
+
+  console.log('📋 SimpleLoginForm: Mostrando formulario de login');
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
       <Card className="w-full max-w-md backdrop-blur-sm bg-background/95 border-border/50 shadow-xl">
