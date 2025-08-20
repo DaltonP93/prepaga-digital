@@ -10,6 +10,24 @@ import { SimpleLoginForm } from "@/components/SimpleLoginForm";
 import MainLayout from "@/layouts/MainLayout";
 import Dashboard from "@/pages/Dashboard";
 import SimpleDashboard from "@/pages/SimpleDashboard";
+import Sales from "@/pages/Sales";
+import NewSale from "@/pages/NewSale";
+import SaleDetail from "@/pages/SaleDetail";
+import SaleEdit from "@/pages/SaleEdit";
+import Clients from "@/pages/Clients";
+import Plans from "@/pages/Plans";
+import Documents from "@/pages/Documents";
+import Templates from "@/pages/Templates";
+import TemplateDetail from "@/pages/TemplateDetail";
+import TemplateEdit from "@/pages/TemplateEdit";
+import SignatureWorkflow from "@/pages/SignatureWorkflow";
+import Analytics from "@/pages/Analytics";
+import Profile from "@/pages/Profile";
+import Users from "@/pages/Users";
+import Companies from "@/pages/Companies";
+import AuditDashboard from "@/pages/AuditDashboard";
+import Experience from "@/pages/Experience";
+import NotFound from "@/pages/NotFound";
 
 // Crear cliente de React Query con configuración optimizada
 const queryClient = new QueryClient({
@@ -42,7 +60,26 @@ const App = () => {
                 >
                   <Route path="dashboard" element={<Dashboard />} />
                   <Route path="simple-dashboard" element={<SimpleDashboard />} />
+                  <Route path="sales" element={<Sales />} />
+                  <Route path="sales/new" element={<NewSale />} />
+                  <Route path="sales/:id" element={<SaleDetail />} />
+                  <Route path="sales/:id/edit" element={<SaleEdit />} />
+                  <Route path="clients" element={<Clients />} />
+                  <Route path="plans" element={<Plans />} />
+                  <Route path="documents" element={<Documents />} />
+                  <Route path="templates" element={<Templates />} />
+                  <Route path="templates/:id" element={<TemplateDetail />} />
+                  <Route path="templates/:id/edit" element={<TemplateEdit />} />
+                  <Route path="signature-workflow" element={<SignatureWorkflow />} />
+                  <Route path="signature-workflow/:saleId" element={<SignatureWorkflow />} />
+                  <Route path="analytics" element={<Analytics />} />
+                  <Route path="profile" element={<Profile />} />
+                  <Route path="users" element={<Users />} />
+                  <Route path="companies" element={<Companies />} />
+                  <Route path="audit" element={<AuditDashboard />} />
+                  <Route path="experience" element={<Experience />} />
                   <Route path="" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="*" element={<NotFound />} />
                 </Route>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
