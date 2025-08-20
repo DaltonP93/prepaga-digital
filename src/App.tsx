@@ -7,6 +7,8 @@ import { SimpleAuthProvider } from "@/components/SimpleAuthProvider";
 import { CompanyBrandingProvider } from "@/components/CompanyBrandingProvider";
 import { SimpleProtectedRoute } from "@/components/SimpleProtectedRoute";
 import { SimpleLoginForm } from "@/components/SimpleLoginForm";
+import MainLayout from "@/layouts/MainLayout";
+import Dashboard from "@/pages/Dashboard";
 import SimpleDashboard from "@/pages/SimpleDashboard";
 
 // Crear cliente de React Query con configuración optimizada
@@ -31,13 +33,17 @@ const App = () => {
               <Routes>
                 <Route path="/login" element={<SimpleLoginForm />} />
                 <Route 
-                  path="/dashboard" 
+                  path="/*" 
                   element={
                     <SimpleProtectedRoute>
-                      <SimpleDashboard />
+                      <MainLayout />
                     </SimpleProtectedRoute>
                   } 
-                />
+                >
+                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="simple-dashboard" element={<SimpleDashboard />} />
+                  <Route path="" element={<Navigate to="/dashboard" replace />} />
+                </Route>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>

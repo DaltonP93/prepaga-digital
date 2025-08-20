@@ -40,7 +40,7 @@ export function AppSidebar() {
   const menuItems: MainNavItem[] = [
     {
       title: "Dashboard",
-      url: "/",
+      url: "/dashboard",
       icon: LayoutDashboard,
       visible: permissions.canViewDashboard,
     },
