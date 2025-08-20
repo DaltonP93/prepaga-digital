@@ -9,7 +9,6 @@ import { SimpleProtectedRoute } from "@/components/SimpleProtectedRoute";
 import { SimpleLoginForm } from "@/components/SimpleLoginForm";
 import MainLayout from "@/layouts/MainLayout";
 import Dashboard from "@/pages/Dashboard";
-import SimpleDashboard from "@/pages/SimpleDashboard";
 import Sales from "@/pages/Sales";
 import NewSale from "@/pages/NewSale";
 import SaleDetail from "@/pages/SaleDetail";
@@ -58,8 +57,8 @@ const App = () => {
                     </SimpleProtectedRoute>
                   } 
                 >
+                  <Route index element={<Navigate to="/dashboard" replace />} />
                   <Route path="dashboard" element={<Dashboard />} />
-                  <Route path="simple-dashboard" element={<SimpleDashboard />} />
                   <Route path="sales" element={<Sales />} />
                   <Route path="sales/new" element={<NewSale />} />
                   <Route path="sales/:id" element={<SaleDetail />} />
@@ -78,11 +77,9 @@ const App = () => {
                   <Route path="companies" element={<Companies />} />
                   <Route path="audit" element={<AuditDashboard />} />
                   <Route path="experience" element={<Experience />} />
-                  <Route path="" element={<Navigate to="/dashboard" replace />} />
                   <Route path="*" element={<NotFound />} />
                 </Route>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </BrowserRouter>
           </CompanyBrandingProvider>
