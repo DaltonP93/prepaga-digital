@@ -41,7 +41,7 @@ export const useTemplateQuestions = (templateId: string) => {
       question_type: string;
       is_required: boolean;
       order_index: number;
-      options?: { option_text: string; option_value: string }[];
+      is_active?: boolean;
     }) => {
       console.log('Creating question:', questionData);
       
@@ -53,29 +53,12 @@ export const useTemplateQuestions = (templateId: string) => {
           question_type: questionData.question_type,
           is_required: questionData.is_required,
           order_index: questionData.order_index,
-          is_active: true,
+          is_active: questionData.is_active ?? true,
         })
         .select()
         .single();
 
       if (questionError) throw questionError;
-
-      // Si tiene opciones, las insertamos
-      if (questionData.options && questionData.options.length > 0) {
-        const optionsData = questionData.options.map((option, index) => ({
-          question_id: question.id,
-          option_text: option.option_text,
-          option_value: option.option_value,
-          order_index: index,
-        }));
-
-        const { error: optionsError } = await supabase
-          .from('template_question_options')
-          .insert(optionsData);
-
-        if (optionsError) throw optionsError;
-      }
-
       return question;
     },
     onSuccess: () => {
@@ -151,6 +134,72 @@ export const useTemplateQuestions = (templateId: string) => {
     },
   });
 
+  const createOption = useMutation({
+    mutationFn: async (optionData: {
+      question_id: string;
+      option_text: string;
+      option_value: string;
+      order_index: number;
+    }) => {
+      const { data, error } = await supabase
+        .from('template_question_options')
+        .insert(optionData)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['template-questions', templateId] });
+      toast.success('Opción creada exitosamente');
+    },
+    onError: (error: any) => {
+      console.error('Error creating option:', error);
+      toast.error('Error al crear la opción');
+    },
+  });
+
+  const deleteOption = useMutation({
+    mutationFn: async (optionId: string) => {
+      const { error } = await supabase
+        .from('template_question_options')
+        .delete()
+        .eq('id', optionId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['template-questions', templateId] });
+      toast.success('Opción eliminada exitosamente');
+    },
+    onError: (error: any) => {
+      console.error('Error deleting option:', error);
+      toast.error('Error al eliminar la opción');
+    },
+  });
+
+  const reorderQuestions = useMutation({
+    mutationFn: async (questions: { id: string; order_index: number }[]) => {
+      const updates = questions.map(q => 
+        supabase
+          .from('template_questions')
+          .update({ order_index: q.order_index })
+          .eq('id', q.id)
+      );
+
+      await Promise.all(updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['template-questions', templateId] });
+      toast.success('Orden de preguntas actualizado');
+    },
+    onError: (error: any) => {
+      console.error('Error reordering questions:', error);
+      toast.error('Error al reordenar las preguntas');
+    },
+  });
+
   return {
     questions,
     isLoading,
@@ -158,5 +207,8 @@ export const useTemplateQuestions = (templateId: string) => {
     createQuestion,
     updateQuestion,
     deleteQuestion,
+    createOption,
+    deleteOption,
+    reorderQuestions,
   };
 };

@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -300,7 +301,7 @@ export const SignatureWorkflowManager = ({
                       <Checkbox 
                         id="whatsapp" 
                         checked={sendWhatsApp}
-                        onCheckedChange={setSendWhatsApp}
+                        onCheckedChange={(checked) => setSendWhatsApp(checked === true)}
                       />
                       <Label htmlFor="whatsapp" className="flex items-center gap-2">
                         <MessageCircle className="w-4 h-4 text-green-600" />
@@ -312,7 +313,7 @@ export const SignatureWorkflowManager = ({
                       <Checkbox 
                         id="sms" 
                         checked={sendSMS}
-                        onCheckedChange={setSendSMS}
+                        onCheckedChange={(checked) => setSendSMS(checked === true)}
                       />
                       <Label htmlFor="sms" className="flex items-center gap-2">
                         <Phone className="w-4 h-4 text-blue-600" />
@@ -324,7 +325,7 @@ export const SignatureWorkflowManager = ({
                       <Checkbox 
                         id="email" 
                         checked={sendEmail}
-                        onCheckedChange={setSendEmail}
+                        onCheckedChange={(checked) => setSendEmail(checked === true)}
                       />
                       <Label htmlFor="email" className="flex items-center gap-2">
                         <Mail className="w-4 h-4 text-red-600" />

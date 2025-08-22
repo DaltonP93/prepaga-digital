@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -89,12 +90,12 @@ export const QuestionBuilder = ({ templateId }: QuestionBuilderProps) => {
         order_index: questions.length,
       };
 
-      const createdQuestion = await createQuestion(questionData);
+      const createdQuestion = await createQuestion.mutateAsync(questionData);
 
       // Create options if it's a select type
       if ((data.question_type === "select_single" || data.question_type === "select_multiple") && newOptions.length > 0) {
         for (let i = 0; i < newOptions.length; i++) {
-          await createOption({
+          await createOption.mutateAsync({
             question_id: createdQuestion.id,
             option_text: newOptions[i].option_text,
             option_value: newOptions[i].option_value,
@@ -125,7 +126,7 @@ export const QuestionBuilder = ({ templateId }: QuestionBuilderProps) => {
 
   const handleDeleteQuestion = async (questionId: string) => {
     try {
-      await deleteQuestion(questionId);
+      await deleteQuestion.mutateAsync(questionId);
     } catch (error) {
       console.error("Error deleting question:", error);
     }
@@ -185,7 +186,7 @@ export const QuestionBuilder = ({ templateId }: QuestionBuilderProps) => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => deleteOption(option.id)}
+                      onClick={() => deleteOption.mutateAsync(option.id)}
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
