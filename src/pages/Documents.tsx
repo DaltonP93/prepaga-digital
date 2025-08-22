@@ -5,9 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDocuments } from "@/hooks/useDocuments";
 import { SearchAndFilters, FilterOptions } from "@/components/SearchAndFilters";
 import { DocumentPreview } from "@/components/DocumentPreview";
-import { Plus } from "lucide-react";
+import { DocuSealForm } from "@/components/DocuSealForm";
+import { Plus, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DocumentForm } from "@/components/DocumentForm";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Documents: React.FC = () => {
   const { toast } = useToast();
@@ -21,6 +23,7 @@ const Documents: React.FC = () => {
   });
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [activeTab, setActiveTab] = useState("documents");
 
   const { documents, isLoading, createDocument, updateDocument, deleteDocument } = useDocuments();
 
@@ -50,6 +53,14 @@ const Documents: React.FC = () => {
       description: "El documento se ha eliminado exitosamente.",
     });
     setSelectedDocument(null);
+  };
+
+  const handleDocuSealCompleted = (data: any) => {
+    toast({
+      title: "Documento completado",
+      description: "El documento de DocuSeal ha sido completado exitosamente.",
+    });
+    console.log("DocuSeal completion data:", data);
   };
 
   const filteredDocuments = documents?.filter((doc: any) => {
@@ -90,167 +101,202 @@ const Documents: React.FC = () => {
         </Button>
       </div>
 
-      {/* Search and Filters */}
-      <SearchAndFilters
-        filters={filters}
-        onFiltersChange={setFilters}
-        statusOptions={[
-          { value: "draft", label: "Borrador" },
-          { value: "published", label: "Publicado" },
-          { value: "archived", label: "Archivado" },
-        ]}
-        companyOptions={[
-          { value: "contract", label: "Contrato" },
-          { value: "policy", label: "Póliza" },
-          { value: "report", label: "Reporte" },
-        ]}
-        planOptions={[]}
-        showExport={true}
-        onExport={() => {
-          toast({
-            title: "Exportando",
-            description: "Preparando la exportación de documentos...",
-          });
-        }}
-      />
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList>
+          <TabsTrigger value="documents" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Documentos Internos
+          </TabsTrigger>
+          <TabsTrigger value="docuseal" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            DocuSeal
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Documents List */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Lista de Documentos ({filteredDocuments.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {filteredDocuments.length > 0 ? (
-              <div className="space-y-4">
-                {filteredDocuments.map((doc: any) => (
-                  <div
-                    key={doc.id}
-                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                      selectedDocument?.id === doc.id
-                        ? "border-primary bg-primary/5"
-                        : "hover:border-primary/50"
-                    }`}
-                    onClick={() => {
-                      setSelectedDocument(doc);
-                      setShowCreateForm(false);
-                    }}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-medium">{doc.name}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {doc.document_type}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(doc.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (confirm('¿Está seguro de que desea eliminar este documento?')) {
-                            deleteDocument(doc.id);
-                          }
+        <TabsContent value="documents" className="space-y-6">
+          {/* Search and Filters */}
+          <SearchAndFilters
+            filters={filters}
+            onFiltersChange={setFilters}
+            statusOptions={[
+              { value: "draft", label: "Borrador" },
+              { value: "published", label: "Publicado" },
+              { value: "archived", label: "Archivado" },
+            ]}
+            companyOptions={[
+              { value: "contract", label: "Contrato" },
+              { value: "policy", label: "Póliza" },
+              { value: "report", label: "Reporte" },
+            ]}
+            planOptions={[]}
+            showExport={true}
+            onExport={() => {
+              toast({
+                title: "Exportando",
+                description: "Preparando la exportación de documentos...",
+              });
+            }}
+          />
+
+          {/* Main Content */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Documents List */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Lista de Documentos ({filteredDocuments.length})</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {filteredDocuments.length > 0 ? (
+                  <div className="space-y-4">
+                    {filteredDocuments.map((doc: any) => (
+                      <div
+                        key={doc.id}
+                        className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                          selectedDocument?.id === doc.id
+                            ? "border-primary bg-primary/5"
+                            : "hover:border-primary/50"
+                        }`}
+                        onClick={() => {
+                          setSelectedDocument(doc);
+                          setShowCreateForm(false);
                         }}
                       >
-                        Eliminar
-                      </Button>
-                    </div>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-medium">{doc.name}</h3>
+                            <p className="text-sm text-muted-foreground">
+                              {doc.document_type}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(doc.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm('¿Está seguro de que desea eliminar este documento?')) {
+                                deleteDocument(doc.id);
+                              }
+                            }}
+                          >
+                            Eliminar
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-center py-8">
-                No hay documentos disponibles
+                ) : (
+                  <p className="text-muted-foreground text-center py-8">
+                    No hay documentos disponibles
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Document Preview/Create Form */}
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  {showCreateForm
+                    ? "Crear Nuevo Documento"
+                    : selectedDocument
+                    ? "Vista Previa del Documento"
+                    : "Selecciona un documento"}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {showCreateForm ? (
+                  <DocumentForm
+                    onSubmit={(documentData) => {
+                      createDocument(documentData);
+                      handleDocumentCreated(documentData);
+                    }}
+                    onCancel={() => setShowCreateForm(false)}
+                  />
+                ) : selectedDocument ? (
+                  <DocumentPreview
+                    content={selectedDocument.content || ""}
+                    dynamicFields={selectedDocument.dynamic_fields || []}
+                    templateType={selectedDocument.document_type || "document"}
+                    templateName={selectedDocument.name || "documento"}
+                  />
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>Selecciona un documento de la lista para ver la vista previa</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Statistics */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Total Documentos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{documents?.length || 0}</div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Borradores</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {documents?.filter((doc: any) => doc.status === "draft").length || 0}
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Publicados</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {documents?.filter((doc: any) => doc.status === "published").length || 0}
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Archivados</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {documents?.filter((doc: any) => doc.status === "archived").length || 0}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="docuseal" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>DocuSeal - Firma Digital</CardTitle>
+              <p className="text-muted-foreground">
+                Utiliza DocuSeal para firmar documentos digitalmente
               </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Document Preview/Create Form */}
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              {showCreateForm
-                ? "Crear Nuevo Documento"
-                : selectedDocument
-                ? "Vista Previa del Documento"
-                : "Selecciona un documento"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {showCreateForm ? (
-              <DocumentForm
-                onSubmit={(documentData) => {
-                  createDocument(documentData);
-                  handleDocumentCreated(documentData);
-                }}
-                onCancel={() => setShowCreateForm(false)}
+            </CardHeader>
+            <CardContent>
+              <DocuSealForm
+                src="https://docuseal.com/d/LEVGR9rhZYf86M"
+                email="dalton.perez+test@saa.com.py"
+                onCompleted={handleDocuSealCompleted}
+                className="w-full"
               />
-            ) : selectedDocument ? (
-              <DocumentPreview
-                content={selectedDocument.content || ""}
-                dynamicFields={selectedDocument.dynamic_fields || []}
-                templateType={selectedDocument.document_type || "document"}
-                templateName={selectedDocument.name || "documento"}
-              />
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <p>Selecciona un documento de la lista para ver la vista previa</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Documentos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{documents?.length || 0}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Borradores</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {documents?.filter((doc: any) => doc.status === "draft").length || 0}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Publicados</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {documents?.filter((doc: any) => doc.status === "published").length || 0}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Archivados</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {documents?.filter((doc: any) => doc.status === "archived").length || 0}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
