@@ -130,6 +130,8 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
 
   const onSubmit = async (data: SaleFormData) => {
     try {
+      console.log('Form data received:', data);
+      
       const saleData = {
         client_id: data.client_id,
         plan_id: data.plan_id,
@@ -150,24 +152,32 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
         contract_number: data.contract_number || null,
       };
 
+      console.log('Processed sale data:', saleData);
+
       if (isEditing && sale) {
-        console.log('Updating sale with data:', { id: sale.id, ...saleData });
-        await updateSale.mutateAsync({ id: sale.id, ...saleData });
-        toast.success('Venta actualizada exitosamente');
+        console.log('Updating sale with ID:', sale.id);
+        await updateSale.mutateAsync({ 
+          id: sale.id, 
+          ...saleData,
+          updated_at: new Date().toISOString()
+        });
+        console.log('Sale updated successfully');
       } else {
-        console.log('Creating new sale with data:', saleData);
+        console.log('Creating new sale');
         await createSale.mutateAsync({
           ...saleData,
           salesperson_id: profile?.id,
-          status: 'borrador',
+          status: 'borrador' as any,
+          sale_date: new Date().toISOString(),
+          created_at: new Date().toISOString()
         });
-        toast.success('Venta creada exitosamente');
+        console.log('Sale created successfully');
       }
       
       onOpenChange(false);
     } catch (error) {
       console.error("Error saving sale:", error);
-      toast.error('Error al guardar la venta');
+      // Don't show toast error here, let the mutation handle it
     }
   };
 

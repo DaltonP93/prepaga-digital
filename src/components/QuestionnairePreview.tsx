@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useTemplateQuestions } from "@/hooks/useTemplateQuestions";
 import { Tables } from "@/integrations/supabase/types";
+import { Loader2 } from "lucide-react";
 
 type TemplateQuestion = Tables<"template_questions"> & {
   template_question_options: Tables<"template_question_options">[];
@@ -17,10 +19,25 @@ interface QuestionnairePreviewProps {
 }
 
 export const QuestionnairePreview = ({ templateId }: QuestionnairePreviewProps) => {
-  const { questions, isLoading } = useTemplateQuestions(templateId);
+  const { questions, isLoading, error } = useTemplateQuestions(templateId);
 
   if (isLoading) {
-    return <div>Cargando vista previa...</div>;
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground">Cargando preguntas...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-8 text-red-600">
+        Error al cargar las preguntas: {error.message}
+      </div>
+    );
   }
 
   if (!questions || questions.length === 0) {

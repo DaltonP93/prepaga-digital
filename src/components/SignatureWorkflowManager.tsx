@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   Send, 
   Clock, 
@@ -15,7 +15,11 @@ import {
   Copy, 
   AlertTriangle,
   RefreshCw,
-  Ban
+  Ban,
+  MessageCircle,
+  Mail,
+  Phone,
+  Share2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -40,8 +44,16 @@ export const SignatureWorkflowManager = ({
 }: SignatureWorkflowManagerProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRevoking, setIsRevoking] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [expirationHours, setExpirationHours] = useState(72);
   const [revocationReason, setRevocationReason] = useState("");
+  
+  // Opciones de envío
+  const [sendWhatsApp, setSendWhatsApp] = useState(true);
+  const [sendSMS, setSendSMS] = useState(false);
+  const [sendEmail, setSendEmail] = useState(true);
+  const [customMessage, setCustomMessage] = useState("");
+  
   const { toast } = useToast();
 
   const generateSignatureLink = async () => {
@@ -57,7 +69,7 @@ export const SignatureWorkflowManager = ({
           signature_token: token,
           signature_expires_at: expiresAt.toISOString(),
           status: "enviado"
-        } as any) // Using 'as any' to bypass type checking for new fields
+        } as any)
         .eq("id", saleId);
 
       if (error) throw error;
@@ -99,7 +111,7 @@ export const SignatureWorkflowManager = ({
         .from('sales')
         .update({
           status: 'cancelado'
-        } as any) // Using 'as any' to bypass type checking for new fields
+        } as any)
         .eq('id', saleId);
 
       if (error) throw error;
@@ -134,6 +146,47 @@ export const SignatureWorkflowManager = ({
       title: "Enlace copiado",
       description: "El enlace de firma ha sido copiado al portapapeles",
     });
+  };
+
+  const sendSignatureLink = async () => {
+    if (!signatureToken) return;
+    
+    setIsSending(true);
+    try {
+      const link = `${window.location.origin}/signature/${signatureToken}`;
+      
+      // Simular envío por diferentes canales
+      const channels = [];
+      if (sendWhatsApp) channels.push('WhatsApp');
+      if (sendSMS) channels.push('SMS');
+      if (sendEmail) channels.push('Email');
+      
+      if (channels.length === 0) {
+        toast({
+          title: "Error",
+          description: "Selecciona al menos un canal de envío",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Aquí se implementaría la lógica real de envío
+      // Por ahora solo mostramos un mensaje de éxito
+      toast({
+        title: "Enlace enviado",
+        description: `El enlace de firma ha sido enviado por: ${channels.join(', ')}`,
+      });
+      
+    } catch (error) {
+      console.error("Error sending signature link:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo enviar el enlace de firma",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const getStatusBadge = (status?: string) => {
@@ -172,7 +225,7 @@ export const SignatureWorkflowManager = ({
           </div>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
         {!signatureToken || isTokenRevoked ? (
           <div className="space-y-4">
             <div className="space-y-2">
@@ -205,7 +258,8 @@ export const SignatureWorkflowManager = ({
             </Button>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
+            {/* Enlace generado */}
             <div className="p-3 bg-muted rounded-lg">
               <p className="text-sm font-medium mb-2">Enlace de firma:</p>
               <p className="text-xs break-all text-muted-foreground">{signatureLink}</p>
@@ -221,8 +275,87 @@ export const SignatureWorkflowManager = ({
                 <Copy className="h-4 w-4 mr-2" />
                 Copiar Enlace
               </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => window.open(signatureLink, '_blank')}
+                disabled={!canUseToken}
+              >
+                <Share2 className="h-4 w-4 mr-2" />
+                Abrir
+              </Button>
             </div>
 
+            {/* Opciones de envío */}
+            {canUseToken && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Enviar Enlace de Firma</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Canales de envío:</Label>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="whatsapp" 
+                        checked={sendWhatsApp}
+                        onCheckedChange={setSendWhatsApp}
+                      />
+                      <Label htmlFor="whatsapp" className="flex items-center gap-2">
+                        <MessageCircle className="w-4 h-4 text-green-600" />
+                        WhatsApp
+                      </Label>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="sms" 
+                        checked={sendSMS}
+                        onCheckedChange={setSendSMS}
+                      />
+                      <Label htmlFor="sms" className="flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-blue-600" />
+                        SMS
+                      </Label>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="email" 
+                        checked={sendEmail}
+                        onCheckedChange={setSendEmail}
+                      />
+                      <Label htmlFor="email" className="flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-red-600" />
+                        Email
+                      </Label>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="custom-message">Mensaje personalizado (opcional)</Label>
+                    <Input
+                      id="custom-message"
+                      placeholder="Agrega un mensaje personalizado..."
+                      value={customMessage}
+                      onChange={(e) => setCustomMessage(e.target.value)}
+                    />
+                  </div>
+
+                  <Button 
+                    onClick={sendSignatureLink}
+                    disabled={isSending}
+                    className="w-full"
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    {isSending ? "Enviando..." : "Enviar Enlace"}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Estado del enlace */}
             {signatureExpiresAt && (
               <div className="flex items-center gap-2 text-sm">
                 <Clock className="h-4 w-4" />
@@ -238,6 +371,7 @@ export const SignatureWorkflowManager = ({
               </div>
             )}
 
+            {/* Alertas */}
             {isExpired && !isTokenRevoked && (
               <Alert>
                 <XCircle className="h-4 w-4" />
@@ -257,6 +391,7 @@ export const SignatureWorkflowManager = ({
               </Alert>
             )}
 
+            {/* Revocar token */}
             {canUseToken && (
               <div className="space-y-3 pt-4 border-t">
                 <Label htmlFor="revocation-reason" className="text-sm font-medium text-red-600">

@@ -1,71 +1,108 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
-export const useTemplateQuestions = (templateId?: string) => {
-  const { toast } = useToast();
+export const useTemplateQuestions = (templateId: string) => {
   const queryClient = useQueryClient();
 
   const { data: questions, isLoading, error } = useQuery({
     queryKey: ['template-questions', templateId],
     queryFn: async () => {
       if (!templateId) return [];
-
-      console.log('Fetching questions for template:', templateId);
+      
+      console.log('Loading questions for template:', templateId);
       
       const { data, error } = await supabase
         .from('template_questions')
         .select(`
           *,
-          template_question_options(*)
+          template_question_options (*)
         `)
         .eq('template_id', templateId)
         .eq('is_active', true)
         .order('order_index', { ascending: true });
 
       if (error) {
-        console.error('Error fetching template questions:', error);
+        console.error('Error loading template questions:', error);
         throw error;
       }
 
-      console.log('Template questions fetched:', data?.length || 0);
+      console.log('Template questions loaded:', data);
       return data || [];
     },
     enabled: !!templateId,
-    retry: 2,
   });
 
   const createQuestion = useMutation({
-    mutationFn: async (questionData: any) => {
-      const { data, error } = await supabase
+    mutationFn: async (questionData: {
+      template_id: string;
+      question_text: string;
+      question_type: string;
+      is_required: boolean;
+      order_index: number;
+      options?: { option_text: string; option_value: string }[];
+    }) => {
+      console.log('Creating question:', questionData);
+      
+      const { data: question, error: questionError } = await supabase
         .from('template_questions')
-        .insert(questionData)
+        .insert({
+          template_id: questionData.template_id,
+          question_text: questionData.question_text,
+          question_type: questionData.question_type,
+          is_required: questionData.is_required,
+          order_index: questionData.order_index,
+          is_active: true,
+        })
         .select()
         .single();
 
-      if (error) throw error;
-      return data;
+      if (questionError) throw questionError;
+
+      // Si tiene opciones, las insertamos
+      if (questionData.options && questionData.options.length > 0) {
+        const optionsData = questionData.options.map((option, index) => ({
+          question_id: question.id,
+          option_text: option.option_text,
+          option_value: option.option_value,
+          order_index: index,
+        }));
+
+        const { error: optionsError } = await supabase
+          .from('template_question_options')
+          .insert(optionsData);
+
+        if (optionsError) throw optionsError;
+      }
+
+      return question;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['template-questions', templateId] });
-      toast({
-        title: 'Pregunta creada',
-        description: 'La pregunta se ha creado exitosamente.',
-      });
+      queryClient.invalidateQueries({ queryKey: ['templates'] });
+      toast.success('Pregunta creada exitosamente');
     },
     onError: (error: any) => {
       console.error('Error creating question:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudo crear la pregunta.',
-        variant: 'destructive',
-      });
+      toast.error('Error al crear la pregunta');
     },
   });
 
   const updateQuestion = useMutation({
-    mutationFn: async ({ id, ...updates }: any) => {
+    mutationFn: async ({
+      id,
+      updates,
+    }: {
+      id: string;
+      updates: Partial<{
+        question_text: string;
+        question_type: string;
+        is_required: boolean;
+        order_index: number;
+        is_active: boolean;
+      }>;
+    }) => {
       const { data, error } = await supabase
         .from('template_questions')
         .update(updates)
@@ -78,23 +115,24 @@ export const useTemplateQuestions = (templateId?: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['template-questions', templateId] });
-      toast({
-        title: 'Pregunta actualizada',
-        description: 'La pregunta se ha actualizado exitosamente.',
-      });
+      queryClient.invalidateQueries({ queryKey: ['templates'] });
+      toast.success('Pregunta actualizada exitosamente');
     },
     onError: (error: any) => {
       console.error('Error updating question:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudo actualizar la pregunta.',
-        variant: 'destructive',
-      });
+      toast.error('Error al actualizar la pregunta');
     },
   });
 
   const deleteQuestion = useMutation({
     mutationFn: async (questionId: string) => {
+      // Primero eliminamos las opciones
+      await supabase
+        .from('template_question_options')
+        .delete()
+        .eq('question_id', questionId);
+
+      // Luego eliminamos la pregunta
       const { error } = await supabase
         .from('template_questions')
         .delete()
@@ -104,105 +142,12 @@ export const useTemplateQuestions = (templateId?: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['template-questions', templateId] });
-      toast({
-        title: 'Pregunta eliminada',
-        description: 'La pregunta se ha eliminado exitosamente.',
-      });
+      queryClient.invalidateQueries({ queryKey: ['templates'] });
+      toast.success('Pregunta eliminada exitosamente');
     },
     onError: (error: any) => {
       console.error('Error deleting question:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudo eliminar la pregunta.',
-        variant: 'destructive',
-      });
-    },
-  });
-
-  const createOption = useMutation({
-    mutationFn: async (optionData: any) => {
-      const { data, error } = await supabase
-        .from('template_question_options')
-        .insert(optionData)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['template-questions', templateId] });
-      toast({
-        title: 'Opción creada',
-        description: 'La opción se ha creado exitosamente.',
-      });
-    },
-    onError: (error: any) => {
-      console.error('Error creating option:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudo crear la opción.',
-        variant: 'destructive',
-      });
-    },
-  });
-
-  const deleteOption = useMutation({
-    mutationFn: async (optionId: string) => {
-      const { error } = await supabase
-        .from('template_question_options')
-        .delete()
-        .eq('id', optionId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['template-questions', templateId] });
-      toast({
-        title: 'Opción eliminada',
-        description: 'La opción se ha eliminado exitosamente.',
-      });
-    },
-    onError: (error: any) => {
-      console.error('Error deleting option:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudo eliminar la opción.',
-        variant: 'destructive',
-      });
-    },
-  });
-
-  const reorderQuestions = useMutation({
-    mutationFn: async (reorderedQuestions: { id: string; order_index: number }[]) => {
-      const updates = reorderedQuestions.map(({ id, order_index }) =>
-        supabase
-          .from('template_questions')
-          .update({ order_index })
-          .eq('id', id)
-      );
-
-      const results = await Promise.all(updates);
-      const errors = results.filter(result => result.error);
-      
-      if (errors.length > 0) {
-        throw new Error('Error reordering questions');
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['template-questions', templateId] });
-      toast({
-        title: 'Orden actualizado',
-        description: 'El orden de las preguntas se ha actualizado.',
-      });
-    },
-    onError: (error: any) => {
-      console.error('Error reordering questions:', error);
-      toast({
-        title: 'Error',
-        description: 'No se pudo actualizar el orden.',
-        variant: 'destructive',
-      });
+      toast.error('Error al eliminar la pregunta');
     },
   });
 
@@ -210,14 +155,8 @@ export const useTemplateQuestions = (templateId?: string) => {
     questions,
     isLoading,
     error,
-    createQuestion: createQuestion.mutateAsync,
-    updateQuestion: updateQuestion.mutate,
-    deleteQuestion: deleteQuestion.mutate,
-    createOption: createOption.mutateAsync,
-    deleteOption: deleteOption.mutate,
-    reorderQuestions: reorderQuestions.mutate,
-    isCreating: createQuestion.isPending,
-    isUpdating: updateQuestion.isPending,
-    isDeleting: deleteQuestion.isPending,
+    createQuestion,
+    updateQuestion,
+    deleteQuestion,
   };
 };

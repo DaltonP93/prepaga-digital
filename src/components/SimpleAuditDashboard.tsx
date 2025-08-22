@@ -1,28 +1,30 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuditProcesses, useUpdateSaleStatus } from '@/hooks/useSimpleAuditProcess';
-import { CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, AlertCircle, Eye } from 'lucide-react';
+import { AuditSaleDetails } from '@/components/AuditSaleDetails';
 
 const SimpleAuditDashboard = () => {
   const { data: sales, isLoading } = useAuditProcesses();
   const updateSaleStatus = useUpdateSaleStatus();
+  const [selectedSale, setSelectedSale] = useState<any>(null);
 
-  const handleApprove = (saleId: string) => {
+  const handleApprove = (saleId: string, notes: string) => {
     updateSaleStatus.mutate({
       saleId,
       status: 'completado',
-      notes: 'Aprobado por auditor'
+      notes: notes || 'Aprobado por auditor'
     });
   };
 
-  const handleReject = (saleId: string) => {
+  const handleReject = (saleId: string, notes: string) => {
     updateSaleStatus.mutate({
       saleId,
       status: 'cancelado',
-      notes: 'Rechazado por auditor'
+      notes: notes || 'Rechazado por auditor'
     });
   };
 
@@ -48,6 +50,28 @@ const SimpleAuditDashboard = () => {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
           <p className="text-sm text-muted-foreground">Cargando procesos de auditoría...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (selectedSale) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Dashboard de Auditoría</h1>
+          <Button 
+            variant="outline" 
+            onClick={() => setSelectedSale(null)}
+          >
+            ← Volver al Dashboard
+          </Button>
+        </div>
+        <AuditSaleDetails
+          sale={selectedSale}
+          onApprove={handleApprove}
+          onReject={handleReject}
+          isUpdating={updateSaleStatus.isPending}
+        />
       </div>
     );
   }
@@ -118,8 +142,16 @@ const SimpleAuditDashboard = () => {
                   <Button
                     size="sm"
                     variant="outline"
+                    onClick={() => setSelectedSale(sale)}
+                  >
+                    <Eye className="w-4 h-4 mr-1" />
+                    Ver Detalles
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
                     className="text-green-600 border-green-600 hover:bg-green-50"
-                    onClick={() => handleApprove(sale.id)}
+                    onClick={() => handleApprove(sale.id, '')}
                     disabled={updateSaleStatus.isPending}
                   >
                     <CheckCircle className="w-4 h-4 mr-1" />
@@ -129,7 +161,7 @@ const SimpleAuditDashboard = () => {
                     size="sm"
                     variant="outline"
                     className="text-red-600 border-red-600 hover:bg-red-50"
-                    onClick={() => handleReject(sale.id)}
+                    onClick={() => handleReject(sale.id, '')}
                     disabled={updateSaleStatus.isPending}
                   >
                     <XCircle className="w-4 h-4 mr-1" />
