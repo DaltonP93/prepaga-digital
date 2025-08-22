@@ -99,6 +99,12 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
     console.log("DocuSeal completion data:", data);
   };
 
+  const handleVariableSelect = (variable: string) => {
+    const variablePlaceholder = `{{${variable}}}`;
+    const newContent = templateData.content + " " + variablePlaceholder;
+    handleContentChange(newContent);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -220,11 +226,7 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
 
           {/* Template Variables */}
           <TemplateVariables 
-            onVariableAdd={(variable) => {
-              // Handle variable addition to content
-              const variablePlaceholder = `{{${variable.name}}}`;
-              handleContentChange(templateData.content + " " + variablePlaceholder);
-            }}
+            onVariableSelect={handleVariableSelect}
           />
         </TabsContent>
 
