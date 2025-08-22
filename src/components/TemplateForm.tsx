@@ -214,6 +214,7 @@ export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps
                   </CardHeader>
                   <CardContent className="p-0 h-full">
                     <TemplateDesigner
+                      template={template}
                       content={watch("content")}
                       onContentChange={handleContentChange}
                       dynamicFields={dynamicFields}

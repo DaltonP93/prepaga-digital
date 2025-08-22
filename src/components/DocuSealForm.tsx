@@ -1,6 +1,19 @@
 
 import React, { useEffect, useRef } from 'react';
 
+// Declarar el elemento personalizado para TypeScript
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      'docuseal-form': {
+        id?: string;
+        'data-src'?: string;
+        'data-email'?: string;
+      };
+    }
+  }
+}
+
 interface DocuSealFormProps {
   src: string;
   email: string;

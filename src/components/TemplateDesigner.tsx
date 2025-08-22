@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DocuSealForm } from "@/components/DocuSealForm";
-import { TipTapEditor } from "@/components/TipTapEditor";
+import TipTapEditor from "@/components/TipTapEditor";
 import { TemplateVariables } from "@/components/TemplateVariables";
 import { DraggablePlaceholdersSidebar } from "@/components/DraggablePlaceholdersSidebar";
 import { Save, Eye, FileText, PenTool } from "lucide-react";
@@ -15,12 +15,24 @@ import { useToast } from "@/hooks/use-toast";
 
 interface TemplateDesignerProps {
   template?: any;
+  content?: string;
+  onContentChange?: (content: string) => void;
+  dynamicFields?: any[];
+  onDynamicFieldsChange?: (fields: any[]) => void;
+  templateQuestions?: any[];
+  templateId?: string;
   onSave?: (templateData: any) => void;
   onCancel?: () => void;
 }
 
 export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
   template,
+  content = "",
+  onContentChange,
+  dynamicFields = [],
+  onDynamicFieldsChange,
+  templateQuestions = [],
+  templateId,
   onSave,
   onCancel,
 }) => {
@@ -28,11 +40,17 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
   const [templateData, setTemplateData] = useState({
     name: template?.name || "",
     description: template?.description || "",
-    content: template?.content || "",
+    content: content || template?.content || "",
     template_type: template?.template_type || "document",
     is_active: template?.is_active !== false,
   });
   const [activeTab, setActiveTab] = useState("editor");
+
+  useEffect(() => {
+    if (content !== templateData.content) {
+      setTemplateData(prev => ({ ...prev, content }));
+    }
+  }, [content]);
 
   const handleSave = () => {
     if (!templateData.name.trim()) {
@@ -54,8 +72,23 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
     });
   };
 
-  const handleContentChange = (content: string) => {
-    setTemplateData(prev => ({ ...prev, content }));
+  const handleContentChange = (newContent: string) => {
+    setTemplateData(prev => ({ ...prev, content: newContent }));
+    if (onContentChange) {
+      onContentChange(newContent);
+    }
+  };
+
+  const handlePlaceholderInsert = (placeholderName: string) => {
+    const placeholder = `{{${placeholderName}}}`;
+    const newContent = templateData.content + " " + placeholder;
+    handleContentChange(newContent);
+  };
+
+  const handleQuestionInsert = (question: any) => {
+    const questionPlaceholder = `{{question_${question.id}}}`;
+    const newContent = templateData.content + " " + questionPlaceholder;
+    handleContentChange(newContent);
   };
 
   const handleDocuSealCompleted = (data: any) => {
@@ -157,7 +190,12 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Sidebar with placeholders */}
             <div className="lg:col-span-1">
-              <DraggablePlaceholdersSidebar />
+              <DraggablePlaceholdersSidebar 
+                onPlaceholderInsert={handlePlaceholderInsert}
+                dynamicFields={dynamicFields}
+                templateQuestions={templateQuestions}
+                onQuestionInsert={handleQuestionInsert}
+              />
             </div>
 
             {/* Main editor */}
@@ -170,7 +208,10 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
                   <TipTapEditor
                     content={templateData.content}
                     onChange={handleContentChange}
-                    placeholder="Escribe el contenido de tu template aquí..."
+                    dynamicFields={dynamicFields}
+                    onDynamicFieldsChange={onDynamicFieldsChange}
+                    templateQuestions={templateQuestions}
+                    templateId={templateId}
                   />
                 </CardContent>
               </Card>
@@ -179,14 +220,10 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
 
           {/* Template Variables */}
           <TemplateVariables 
-            templateId={template?.id}
             onVariableAdd={(variable) => {
               // Handle variable addition to content
               const variablePlaceholder = `{{${variable.name}}}`;
-              setTemplateData(prev => ({
-                ...prev,
-                content: prev.content + " " + variablePlaceholder
-              }));
+              handleContentChange(templateData.content + " " + variablePlaceholder);
             }}
           />
         </TabsContent>
