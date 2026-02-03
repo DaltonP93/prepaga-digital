@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +11,7 @@ import { TemplateVariables } from "@/components/TemplateVariables";
 import { DraggablePlaceholdersSidebar } from "@/components/DraggablePlaceholdersSidebar";
 import { Save, Eye, FileText, PenTool } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import DOMPurify from 'dompurify';
 
 interface TemplateDesignerProps {
   template?: any;
@@ -255,9 +255,10 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
               <CardTitle>Vista Previa del Template</CardTitle>
             </CardHeader>
             <CardContent>
+              {/* SECURITY: Content is sanitized with DOMPurify to prevent XSS attacks */}
               <div 
                 className="prose max-w-none p-6 border rounded-lg bg-white"
-                dangerouslySetInnerHTML={{ __html: templateData.content }}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(templateData.content) }}
               />
             </CardContent>
           </Card>

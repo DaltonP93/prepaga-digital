@@ -73,18 +73,20 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
 
       if (uploadError) throw uploadError;
 
-      // Obtener URL pública
-      const { data: { publicUrl } } = supabase.storage
+      // SECURITY: Use signed URLs instead of public URLs for private buckets
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
         .from('documents')
-        .getPublicUrl(filePath);
+        .createSignedUrl(filePath, 86400); // 24 hour expiry
 
-      // Insertar registro en base de datos
+      if (signedUrlError) throw signedUrlError;
+
+      // Insertar registro en base de datos - store the path for regenerating signed URLs later
       const { data, error } = await supabase
         .from('sale_documents')
         .insert({
           sale_id: saleId,
           file_name: metadata.file_name || file.name,
-          file_url: publicUrl,
+          file_url: filePath, // Store path, not full URL
           file_size: file.size,
           file_type: file.type,
           uploaded_by: user.id,
@@ -157,13 +159,37 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const handleDownload = (doc: SaleDocument) => {
+  const handleDownload = async (doc: SaleDocument) => {
+    // SECURITY: Generate signed URL for download
+    const { data: signedUrlData, error } = await supabase.storage
+      .from('documents')
+      .createSignedUrl(doc.file_url, 300); // 5 min expiry for downloads
+
+    if (error || !signedUrlData) {
+      toast.error('Error al generar enlace de descarga');
+      return;
+    }
+
     const link = window.document.createElement('a');
-    link.href = doc.file_url;
+    link.href = signedUrlData.signedUrl;
     link.download = doc.file_name;
     window.document.body.appendChild(link);
     link.click();
     window.document.body.removeChild(link);
+  };
+
+  const handleView = async (doc: SaleDocument) => {
+    // SECURITY: Generate signed URL for viewing
+    const { data: signedUrlData, error } = await supabase.storage
+      .from('documents')
+      .createSignedUrl(doc.file_url, 3600); // 1 hour expiry for viewing
+
+    if (error || !signedUrlData) {
+      toast.error('Error al generar enlace de visualización');
+      return;
+    }
+
+    window.open(signedUrlData.signedUrl, '_blank');
   };
 
   return (
@@ -267,7 +293,7 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => window.open(doc.file_url, '_blank')}
+                            onClick={() => handleView(doc)}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>

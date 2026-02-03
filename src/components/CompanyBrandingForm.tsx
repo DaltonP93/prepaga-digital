@@ -59,11 +59,15 @@ export function CompanyBrandingForm() {
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
+      // SECURITY: Use signed URLs instead of public URLs for private buckets
+      // For branding assets that need to be displayed, we create longer-lived signed URLs
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
         .from('documents')
-        .getPublicUrl(filePath);
+        .createSignedUrl(filePath, 604800); // 1 week expiry for branding assets
 
-      setValue(type === 'logo' ? 'logoUrl' : 'favicon', publicUrl);
+      if (signedUrlError) throw signedUrlError;
+
+      setValue(type === 'logo' ? 'logoUrl' : 'favicon', signedUrlData.signedUrl);
       toast.success(`${type === 'logo' ? 'Logo' : 'Favicon'} subido correctamente`);
     } catch (error: any) {
       toast.error(`Error al subir ${type}: ` + error.message);

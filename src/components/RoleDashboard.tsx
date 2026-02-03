@@ -20,6 +20,14 @@ export function RoleDashboard() {
 
   if (!profile) return null;
 
+  /**
+   * SECURITY NOTE: These client-side role checks are for UX purposes ONLY.
+   * They control what UI elements are displayed but do NOT provide security.
+   * All actual data access is protected by Row Level Security (RLS) policies
+   * in the database which enforce permissions server-side.
+   * 
+   * Never rely on these client-side checks for security - RLS is the enforcement layer.
+   */
   const userRole = profile.role || 'vendedor';
   const isVendedor = userRole === 'vendedor';
   const isGestorOrAdmin = ['gestor', 'admin', 'super_admin'].includes(userRole);

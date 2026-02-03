@@ -62,13 +62,20 @@ export const useFileUpload = () => {
 
       setUploadState(prev => ({ ...prev, progress: 100 }));
 
-      const { data: urlData } = supabase.storage
+      // SECURITY: Use signed URLs instead of public URLs for private buckets
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
         .from(bucket)
-        .getPublicUrl(data.path);
+        .createSignedUrl(data.path, 3600); // 1 hour expiry
+
+      if (signedUrlError) {
+        console.warn('Could not create signed URL, falling back to path:', signedUrlError);
+        setUploadState({ progress: 100, isUploading: false, error: null });
+        return data.path; // Return path for later signed URL generation
+      }
 
       setUploadState({ progress: 100, isUploading: false, error: null });
 
-      return urlData.publicUrl;
+      return signedUrlData.signedUrl;
     } catch (error: any) {
       setUploadState({ progress: 0, isUploading: false, error: error.message });
       toast.error(error.message || 'Error al subir el archivo');
