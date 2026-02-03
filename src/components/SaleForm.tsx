@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -6,12 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { X, Plus } from "lucide-react";
+import { X } from "lucide-react";
 import { useClients } from "@/hooks/useClients";
 import { usePlans } from "@/hooks/usePlans";
 import { useTemplates } from "@/hooks/useTemplates";
@@ -19,7 +18,6 @@ import { useCreateSale, useUpdateSale } from "@/hooks/useSales";
 import { useCompanies } from "@/hooks/useCompanies";
 import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 import { Database } from "@/integrations/supabase/types";
-import { toast } from "sonner";
 
 type Sale = Database['public']['Tables']['sales']['Row'];
 
@@ -36,17 +34,6 @@ interface SaleFormData {
   template_ids: string[];
   total_amount: number;
   notes?: string;
-  workplace?: string;
-  profession?: string;
-  work_phone?: string;
-  work_address?: string;
-  signature_modality?: string;
-  maternity_bonus?: boolean;
-  immediate_validity?: boolean;
-  leads_id?: string;
-  pediatrician?: string;
-  birth_place?: string;
-  contract_number?: string;
 }
 
 export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
@@ -79,17 +66,6 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
           template_ids: sale.template_id ? [sale.template_id] : [],
           total_amount: Number(sale.total_amount) || 0,
           notes: sale.notes || "",
-          workplace: sale.workplace || "",
-          profession: sale.profession || "",
-          work_phone: sale.work_phone || "",
-          work_address: sale.work_address || "",
-          signature_modality: sale.signature_modality || "",
-          maternity_bonus: sale.maternity_bonus || false,
-          immediate_validity: sale.immediate_validity || false,
-          leads_id: sale.leads_id || "",
-          pediatrician: sale.pediatrician || "",
-          birth_place: sale.birth_place || "",
-          contract_number: sale.contract_number || "",
         };
         
         reset(formData);
@@ -103,17 +79,6 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
           template_ids: [],
           total_amount: 0,
           notes: "",
-          workplace: "",
-          profession: "",
-          work_phone: "",
-          work_address: "",
-          signature_modality: "",
-          maternity_bonus: false,
-          immediate_validity: false,
-          leads_id: "",
-          pediatrician: "",
-          birth_place: "",
-          contract_number: "",
         };
         
         reset(formData);
@@ -139,17 +104,6 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
         total_amount: Number(data.total_amount),
         template_id: selectedTemplates.length > 0 ? selectedTemplates[0] : null,
         notes: data.notes || null,
-        workplace: data.workplace || null,
-        profession: data.profession || null,
-        work_phone: data.work_phone || null,
-        work_address: data.work_address || null,
-        signature_modality: data.signature_modality || null,
-        maternity_bonus: data.maternity_bonus || false,
-        immediate_validity: data.immediate_validity || false,
-        leads_id: data.leads_id || null,
-        pediatrician: data.pediatrician || null,
-        birth_place: data.birth_place || null,
-        contract_number: data.contract_number || null,
       };
 
       console.log('Processed sale data:', saleData);
@@ -168,7 +122,6 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
           ...saleData,
           salesperson_id: profile?.id,
           status: 'borrador' as any,
-          sale_date: new Date().toISOString(),
           created_at: new Date().toISOString()
         });
         console.log('Sale created successfully');
@@ -177,7 +130,6 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
       onOpenChange(false);
     } catch (error) {
       console.error("Error saving sale:", error);
-      // Don't show toast error here, let the mutation handle it
     }
   };
 
@@ -214,11 +166,9 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Tabs defaultValue="basic" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="basic">Básico</TabsTrigger>
               <TabsTrigger value="templates">Templates</TabsTrigger>
-              <TabsTrigger value="work">Laboral</TabsTrigger>
-              <TabsTrigger value="contract">Contractual</TabsTrigger>
             </TabsList>
             
             <TabsContent value="basic" className="space-y-4">
@@ -331,7 +281,7 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
                           .filter(template => !selectedTemplates.includes(template.id))
                           .map((template) => (
                             <SelectItem key={template.id} value={template.id}>
-                              {template.name} ({template.question_count || 0} preguntas)
+                              {template.name}
                             </SelectItem>
                           ))}
                       </SelectContent>
@@ -349,9 +299,6 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
                               <div className="flex items-center gap-2">
                                 <Badge variant="outline">#{index + 1}</Badge>
                                 <span className="font-medium">{template?.name}</span>
-                                <Badge variant="secondary">
-                                  {template?.question_count || 0} preguntas
-                                </Badge>
                               </div>
                               <Button
                                 type="button"
@@ -370,117 +317,7 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
                 </CardContent>
               </Card>
             </TabsContent>
-            
-            <TabsContent value="work" className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="workplace">Lugar de Trabajo</Label>
-                <Input
-                  id="workplace"
-                  {...register("workplace")}
-                  placeholder="Empresa o lugar donde trabaja"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="profession">Profesión</Label>
-                <Input
-                  id="profession"
-                  {...register("profession")}
-                  placeholder="Profesión u ocupación"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="work_phone">Teléfono Laboral</Label>
-                <Input
-                  id="work_phone"
-                  {...register("work_phone")}
-                  placeholder="Teléfono del trabajo"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="work_address">Dirección Laboral</Label>
-                <Textarea
-                  id="work_address"
-                  {...register("work_address")}
-                  placeholder="Dirección completa del lugar de trabajo"
-                />
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="contract" className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="contract_number">Número de Contrato</Label>
-                <Input
-                  id="contract_number"
-                  {...register("contract_number")}
-                  placeholder="Número de contrato asignado"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Modalidad de Firma</Label>
-                <Select value={watch("signature_modality") || ""} onValueChange={(value) => setValue("signature_modality", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar modalidad" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="digital">Digital</SelectItem>
-                    <SelectItem value="presencial">Presencial</SelectItem>
-                    <SelectItem value="hibrida">Híbrida</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="maternity_bonus"
-                  checked={watch("maternity_bonus")}
-                  onCheckedChange={(checked) => setValue("maternity_bonus", checked as boolean)}
-                />
-                <Label htmlFor="maternity_bonus">Prima de Maternidad</Label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="immediate_validity"
-                  checked={watch("immediate_validity")}
-                  onCheckedChange={(checked) => setValue("immediate_validity", checked as boolean)}
-                />
-                <Label htmlFor="immediate_validity">Vigencia Inmediata</Label>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="leads_id">ID Leads (CRM)</Label>
-                <Input
-                  id="leads_id"
-                  {...register("leads_id")}
-                  placeholder="ID del lead en el sistema CRM"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="pediatrician">Pediatra (Para menores)</Label>
-                <Input
-                  id="pediatrician"
-                  {...register("pediatrician")}
-                  placeholder="Nombre del pediatra asignado"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="birth_place">Lugar de Nacimiento</Label>
-                <Input
-                  id="birth_place"
-                  {...register("birth_place")}
-                  placeholder="Ciudad y país de nacimiento"
-                />
-              </div>
-            </TabsContent>
           </Tabs>
-
-          <Separator />
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -490,7 +327,7 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
               type="submit" 
               disabled={createSale.isPending || updateSale.isPending}
             >
-              {(createSale.isPending || updateSale.isPending) ? "Guardando..." : "Guardar"}
+              {createSale.isPending || updateSale.isPending ? 'Guardando...' : (isEditing ? 'Actualizar' : 'Crear')} Venta
             </Button>
           </DialogFooter>
         </form>

@@ -3,10 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-export const useTemplateQuestions = (templateId: string) => {
+export const useTemplateQuestions = (templateId?: string) => {
   const queryClient = useQueryClient();
 
-  const { data: questions, isLoading, error } = useQuery({
+  const { data: questions = [], isLoading, error } = useQuery({
     queryKey: ['template-questions', templateId],
     queryFn: async () => {
       if (!templateId) return [];
@@ -20,8 +20,7 @@ export const useTemplateQuestions = (templateId: string) => {
           template_question_options (*)
         `)
         .eq('template_id', templateId)
-        .eq('is_active', true)
-        .order('order_index', { ascending: true });
+        .order('sort_order', { ascending: true });
 
       if (error) {
         console.error('Error loading template questions:', error);
@@ -40,8 +39,7 @@ export const useTemplateQuestions = (templateId: string) => {
       question_text: string;
       question_type: string;
       is_required: boolean;
-      order_index: number;
-      is_active?: boolean;
+      sort_order?: number;
     }) => {
       console.log('Creating question:', questionData);
       
@@ -52,8 +50,7 @@ export const useTemplateQuestions = (templateId: string) => {
           question_text: questionData.question_text,
           question_type: questionData.question_type,
           is_required: questionData.is_required,
-          order_index: questionData.order_index,
-          is_active: questionData.is_active ?? true,
+          sort_order: questionData.sort_order ?? 0,
         })
         .select()
         .single();
@@ -82,8 +79,7 @@ export const useTemplateQuestions = (templateId: string) => {
         question_text: string;
         question_type: string;
         is_required: boolean;
-        order_index: number;
-        is_active: boolean;
+        sort_order: number;
       }>;
     }) => {
       const { data, error } = await supabase
@@ -109,13 +105,11 @@ export const useTemplateQuestions = (templateId: string) => {
 
   const deleteQuestion = useMutation({
     mutationFn: async (questionId: string) => {
-      // Primero eliminamos las opciones
       await supabase
         .from('template_question_options')
         .delete()
         .eq('question_id', questionId);
 
-      // Luego eliminamos la pregunta
       const { error } = await supabase
         .from('template_questions')
         .delete()
@@ -139,11 +133,16 @@ export const useTemplateQuestions = (templateId: string) => {
       question_id: string;
       option_text: string;
       option_value: string;
-      order_index: number;
+      sort_order?: number;
     }) => {
       const { data, error } = await supabase
         .from('template_question_options')
-        .insert(optionData)
+        .insert({
+          question_id: optionData.question_id,
+          option_text: optionData.option_text,
+          option_value: optionData.option_value,
+          sort_order: optionData.sort_order ?? 0,
+        })
         .select()
         .single();
 
@@ -180,11 +179,11 @@ export const useTemplateQuestions = (templateId: string) => {
   });
 
   const reorderQuestions = useMutation({
-    mutationFn: async (questions: { id: string; order_index: number }[]) => {
-      const updates = questions.map(q => 
+    mutationFn: async (questionsToReorder: { id: string; sort_order: number }[]) => {
+      const updates = questionsToReorder.map(q => 
         supabase
           .from('template_questions')
-          .update({ order_index: q.order_index })
+          .update({ sort_order: q.sort_order })
           .eq('id', q.id)
       );
 

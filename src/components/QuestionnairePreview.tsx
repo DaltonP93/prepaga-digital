@@ -66,11 +66,6 @@ export const QuestionnairePreview = ({ templateId }: QuestionnairePreviewProps) 
                   Obligatoria
                 </Badge>
               )}
-              {!question.is_active && (
-                <Badge variant="secondary" className="text-xs">
-                  Inactiva
-                </Badge>
-              )}
             </div>
           </div>
         </CardHeader>
@@ -108,7 +103,7 @@ export const QuestionnairePreview = ({ templateId }: QuestionnairePreviewProps) 
             <RadioGroup disabled>
               {question.template_question_options?.map((option) => (
                 <div key={option.id} className="flex items-center space-x-2">
-                  <RadioGroupItem value={option.option_value} id={option.id} />
+                  <RadioGroupItem value={option.option_value || ''} id={option.id} />
                   <Label htmlFor={option.id}>{option.option_text}</Label>
                 </div>
               ))}
@@ -144,8 +139,7 @@ export const QuestionnairePreview = ({ templateId }: QuestionnairePreviewProps) 
       <div className="text-center pt-4 border-t">
         <p className="text-sm text-muted-foreground">
           Total de preguntas: {questions.length} | 
-          Obligatorias: {questions.filter(q => q.is_required).length} | 
-          Activas: {questions.filter(q => q.is_active).length}
+          Obligatorias: {questions.filter(q => q.is_required).length}
         </p>
       </div>
     </div>

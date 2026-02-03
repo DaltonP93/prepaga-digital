@@ -2,16 +2,13 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { 
   Upload, 
   ImageIcon, 
-  Trash2, 
   Copy, 
-  Eye,
-  Download
+  Eye
 } from 'lucide-react';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { supabase } from '@/integrations/supabase/client';
@@ -25,11 +22,10 @@ interface ImageManagerProps {
 interface UploadedImage {
   id: string;
   file_name: string;
-  file_path: string;
-  file_size: number;
-  mime_type: string;
-  created_at: string;
-  url: string;
+  file_url: string;
+  file_size: number | null;
+  file_type: string | null;
+  created_at: string | null;
 }
 
 export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => {
@@ -45,9 +41,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
       
       const { data, error } = await supabase
         .from('file_uploads')
-        .select('*')
-        .eq('bucket_name', 'documents')
-        .like('mime_type', 'image%')
+        .select('id, file_name, file_url, file_size, file_type, created_at')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -57,20 +51,13 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
 
       console.log('✅ Images fetched from database:', data?.length || 0, 'items');
 
-      // Get public URLs for images
-      const imagesWithUrls: UploadedImage[] = data?.map(img => {
-        const { data: urlData } = supabase.storage
-          .from('documents')
-          .getPublicUrl(img.file_path);
-        
-        return {
-          ...img,
-          url: urlData.publicUrl
-        };
-      }) || [];
+      // Filter to only image files
+      const imageFiles = (data || []).filter(img => 
+        img.file_type?.startsWith('image/') || 
+        img.file_name?.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)
+      );
 
-      console.log('✅ Images with URLs:', imagesWithUrls.length);
-      return imagesWithUrls;
+      return imageFiles as UploadedImage[];
     }
   });
 
@@ -131,8 +118,8 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
     toast.success('URL copiada al portapapeles');
   };
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
+  const formatFileSize = (bytes: number | null) => {
+    if (!bytes || bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -207,17 +194,17 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
               {images.map((image) => (
                 <div key={image.id} className="relative group border rounded-lg p-2">
                   <img
-                    src={image.url}
+                    src={image.file_url}
                     alt={image.file_name}
                     className="w-full h-20 object-cover rounded cursor-pointer"
-                    onClick={() => onImageSelect(image.url)}
+                    onClick={() => onImageSelect(image.file_url)}
                   />
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-1">
                     <Button
                       size="sm"
                       variant="secondary"
                       className="h-6 w-6 p-0"
-                      onClick={() => onImageSelect(image.url)}
+                      onClick={() => onImageSelect(image.file_url)}
                     >
                       <Eye className="w-3 h-3" />
                     </Button>
@@ -225,7 +212,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
                       size="sm"
                       variant="secondary"
                       className="h-6 w-6 p-0"
-                      onClick={() => copyToClipboard(image.url)}
+                      onClick={() => copyToClipboard(image.file_url)}
                     >
                       <Copy className="w-3 h-3" />
                     </Button>

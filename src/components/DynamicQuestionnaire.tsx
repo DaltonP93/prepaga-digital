@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,8 +21,7 @@ type TemplateQuestion = Tables<"template_questions"> & {
 
 interface DynamicQuestionnaireProps {
   templateId: string;
-  clientId: string;
-  saleId?: string;
+  saleId: string;
   signatureToken?: string;
   onComplete?: (responses: Record<string, any>) => void;
   readOnly?: boolean;
@@ -29,7 +29,6 @@ interface DynamicQuestionnaireProps {
 
 export const DynamicQuestionnaire = ({ 
   templateId, 
-  clientId, 
   saleId, 
   signatureToken,
   onComplete, 
@@ -47,14 +46,14 @@ export const DynamicQuestionnaire = ({
   // Load existing responses if any
   useEffect(() => {
     const loadExistingResponses = async () => {
-      if (!clientId || !templateId) return;
+      if (!saleId || !templateId) return;
 
       try {
         const { data, error } = await supabase
           .from("template_responses")
           .select("question_id, response_value")
           .eq("template_id", templateId)
-          .eq("client_id", clientId);
+          .eq("sale_id", saleId);
 
         if (error) throw error;
 
@@ -71,7 +70,7 @@ export const DynamicQuestionnaire = ({
     };
 
     loadExistingResponses();
-  }, [clientId, templateId, form]);
+  }, [saleId, templateId, form]);
 
   const handleResponseChange = (questionId: string, value: any) => {
     const newResponses = { ...responses, [questionId]: value };
@@ -98,7 +97,6 @@ export const DynamicQuestionnaire = ({
       const responseData = Object.entries(responses).map(([questionId, value]) => ({
         template_id: templateId,
         question_id: questionId,
-        client_id: clientId,
         sale_id: saleId,
         response_value: typeof value === "object" ? JSON.stringify(value) : String(value),
       }));
@@ -108,7 +106,7 @@ export const DynamicQuestionnaire = ({
         .from("template_responses")
         .delete()
         .eq("template_id", templateId)
-        .eq("client_id", clientId);
+        .eq("sale_id", saleId);
 
       // Insert new responses
       const { error } = await supabase
@@ -199,7 +197,7 @@ export const DynamicQuestionnaire = ({
             >
               {question.template_question_options?.map((option) => (
                 <div key={option.id} className="flex items-center space-x-2">
-                  <RadioGroupItem value={option.option_value} id={option.id} />
+                  <RadioGroupItem value={option.option_value || ''} id={option.id} />
                   <Label htmlFor={option.id}>{option.option_text}</Label>
                 </div>
               ))}
@@ -208,25 +206,30 @@ export const DynamicQuestionnaire = ({
 
           {question.question_type === "select_multiple" && (
             <div className="space-y-2">
-              {question.template_question_options?.map((option) => (
-                <div key={option.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={option.id}
-                    checked={Array.isArray(currentValue) ? currentValue.includes(option.option_value) : false}
-                    onCheckedChange={(checked) => {
-                      let newValue = Array.isArray(currentValue) ? [...currentValue] : [];
-                      if (checked) {
-                        newValue.push(option.option_value);
-                      } else {
-                        newValue = newValue.filter(v => v !== option.option_value);
-                      }
-                      handleResponseChange(question.id, newValue);
-                    }}
-                    disabled={readOnly}
-                  />
-                  <Label htmlFor={option.id}>{option.option_text}</Label>
-                </div>
-              ))}
+              {question.template_question_options?.map((option) => {
+                const selectedValues = Array.isArray(currentValue) ? currentValue : [];
+                const isChecked = selectedValues.includes(option.option_value);
+                
+                return (
+                  <div key={option.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={option.id}
+                      checked={isChecked}
+                      disabled={readOnly}
+                      onCheckedChange={(checked) => {
+                        let newValues = [...selectedValues];
+                        if (checked) {
+                          newValues.push(option.option_value);
+                        } else {
+                          newValues = newValues.filter(v => v !== option.option_value);
+                        }
+                        handleResponseChange(question.id, newValues);
+                      }}
+                    />
+                    <Label htmlFor={option.id}>{option.option_text}</Label>
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -235,46 +238,38 @@ export const DynamicQuestionnaire = ({
   };
 
   if (isLoading) {
-    return <div>Cargando cuestionario...</div>;
+    return (
+      <div className="flex items-center justify-center py-8">
+        <p className="text-muted-foreground">Cargando cuestionario...</p>
+      </div>
+    );
   }
 
   if (!questions || questions.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
-        No hay preguntas disponibles para este template.
+        No hay preguntas configuradas para este cuestionario.
       </div>
     );
   }
 
-  const activeQuestions = questions;
-
   return (
-    <div className="space-y-4">
-      <div className="text-center mb-6">
-        <h3 className="text-lg font-semibold">Cuestionario</h3>
-        <p className="text-sm text-muted-foreground">
-          Por favor complete todas las preguntas marcadas como obligatorias
-        </p>
+    <Form {...form}>
+      <div className="space-y-4">
+        {questions.map((question, index) => renderQuestion(question, index))}
+        
+        {!readOnly && (
+          <div className="flex justify-end pt-4">
+            <Button 
+              onClick={handleSubmit} 
+              disabled={isSubmitting}
+              size="lg"
+            >
+              {isSubmitting ? "Guardando..." : "Completar Cuestionario"}
+            </Button>
+          </div>
+        )}
       </div>
-
-      {activeQuestions.map((question, index) => renderQuestion(question, index))}
-
-      {!readOnly && (
-        <div className="flex justify-center pt-6 border-t">
-          <Button 
-            onClick={handleSubmit} 
-            disabled={isSubmitting}
-            size="lg"
-          >
-            {isSubmitting ? "Guardando..." : "Completar Cuestionario"}
-          </Button>
-        </div>
-      )}
-
-      <div className="text-center pt-4 text-sm text-muted-foreground">
-        Total de preguntas: {activeQuestions.length} | 
-        Completadas: {Object.keys(responses).filter(key => responses[key] && responses[key] !== "").length}
-      </div>
-    </div>
+    </Form>
   );
 };

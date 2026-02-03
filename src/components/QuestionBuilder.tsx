@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,7 +18,6 @@ const questionSchema = z.object({
   question_text: z.string().min(1, "El texto de la pregunta es obligatorio"),
   question_type: z.enum(["yes_no", "text", "number", "select_single", "select_multiple"]),
   is_required: z.boolean().default(true),
-  is_active: z.boolean().default(true),
 });
 
 const optionSchema = z.object({
@@ -67,7 +65,6 @@ export const QuestionBuilder = ({ templateId }: QuestionBuilderProps) => {
       question_text: "",
       question_type: "yes_no",
       is_required: true,
-      is_active: true,
     },
   });
 
@@ -86,8 +83,7 @@ export const QuestionBuilder = ({ templateId }: QuestionBuilderProps) => {
         question_text: data.question_text,
         question_type: data.question_type,
         is_required: data.is_required,
-        is_active: data.is_active,
-        order_index: questions.length,
+        sort_order: questions.length,
       };
 
       const createdQuestion = await createQuestion.mutateAsync(questionData);
@@ -99,7 +95,7 @@ export const QuestionBuilder = ({ templateId }: QuestionBuilderProps) => {
             question_id: createdQuestion.id,
             option_text: newOptions[i].option_text,
             option_value: newOptions[i].option_value,
-            order_index: i,
+            sort_order: i,
           });
         }
       }
@@ -132,8 +128,8 @@ export const QuestionBuilder = ({ templateId }: QuestionBuilderProps) => {
     }
   };
 
-  const getQuestionTypeLabel = (type: string) => {
-    return questionTypes.find(qt => qt.value === type)?.label || type;
+  const getQuestionTypeLabel = (type: string | null) => {
+    return questionTypes.find(qt => qt.value === type)?.label || type || 'Desconocido';
   };
 
   if (isLoading) {
@@ -155,9 +151,6 @@ export const QuestionBuilder = ({ templateId }: QuestionBuilderProps) => {
                 <Badge variant="outline">{getQuestionTypeLabel(question.question_type)}</Badge>
                 <Badge variant={question.is_required ? "default" : "secondary"}>
                   {question.is_required ? "Obligatoria" : "Opcional"}
-                </Badge>
-                <Badge variant={question.is_active ? "default" : "secondary"}>
-                  {question.is_active ? "Activa" : "Inactiva"}
                 </Badge>
                 <Button
                   variant="ghost"
@@ -253,19 +246,6 @@ export const QuestionBuilder = ({ templateId }: QuestionBuilderProps) => {
                     render={({ field }) => (
                       <FormItem className="flex flex-row items-center justify-between space-y-0">
                         <FormLabel>Obligatoria</FormLabel>
-                        <FormControl>
-                          <Switch checked={field.value} onCheckedChange={field.onChange} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="is_active"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between space-y-0">
-                        <FormLabel>Activa</FormLabel>
                         <FormControl>
                           <Switch checked={field.value} onCheckedChange={field.onChange} />
                         </FormControl>

@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,17 +7,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import { 
-  Download, Calendar as CalendarIcon, FileText, 
-  BarChart3, PieChart, TrendingUp, Filter,
-  Clock, Mail, RefreshCw
+  Download, FileText, 
+  BarChart3, 
+  Clock
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -97,20 +96,19 @@ const useReportsData = () => {
       const { data: companies } = await supabase
         .from('companies')
         .select('id, name')
-        .eq('active', true);
+        .eq('is_active', true);
 
       // Obtener planes para filtros
       const { data: plans } = await supabase
         .from('plans')
         .select('id, name')
-        .eq('active', true);
+        .eq('is_active', true);
 
       // Obtener vendedores para filtros
       const { data: salespeople } = await supabase
         .from('profiles')
         .select('id, first_name, last_name')
-        .eq('role', 'vendedor')
-        .eq('active', true);
+        .eq('is_active', true);
 
       return {
         companies: companies || [],
@@ -136,7 +134,6 @@ const ReportsManager = () => {
   });
 
   const { data: reportsData, isLoading } = useReportsData();
-  const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const generateReportMutation = useMutation({
@@ -169,8 +166,7 @@ const ReportsManager = () => {
       *,
       clients(first_name, last_name, email, phone),
       plans(name, price),
-      companies(name),
-      salesperson:salesperson_id(first_name, last_name)
+      companies(name)
     `);
 
     // Aplicar filtros
@@ -181,7 +177,7 @@ const ReportsManager = () => {
       query = query.lte('created_at', config.filters.dateTo.toISOString());
     }
     if (config.filters.status?.length) {
-      query = query.in('status', config.filters.status as any);
+      query = query.in('status', config.filters.status);
     }
 
     const { data, error } = await query;
@@ -241,9 +237,6 @@ const ReportsManager = () => {
           case 'company_name':
             value = row.companies?.name || '';
             break;
-          case 'salesperson':
-            value = `${row.salesperson?.first_name || ''} ${row.salesperson?.last_name || ''}`.trim();
-            break;
           default:
             value = row[field] || '';
         }
@@ -297,9 +290,6 @@ const ReportsManager = () => {
                         break;
                       case 'company_name':
                         value = row.companies?.name || '';
-                        break;
-                      case 'salesperson':
-                        value = `${row.salesperson?.first_name || ''} ${row.salesperson?.last_name || ''}`.trim();
                         break;
                       default:
                         value = row[field] || '';
@@ -487,10 +477,10 @@ const ReportsManager = () => {
                     onValueChange={(value) => setCustomReport({...customReport, schedule: value === 'none' ? null : value as any})}
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Sin programación" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Sin programar</SelectItem>
+                      <SelectItem value="none">Sin programación</SelectItem>
                       <SelectItem value="daily">Diario</SelectItem>
                       <SelectItem value="weekly">Semanal</SelectItem>
                       <SelectItem value="monthly">Mensual</SelectItem>
@@ -499,108 +489,12 @@ const ReportsManager = () => {
                 </div>
               </div>
 
-              {/* Filtros de fecha */}
-              <div className="space-y-2">
-                <Label>Rango de Fechas</Label>
-                <div className="flex gap-2">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="flex-1">
-                        <CalendarIcon className="h-4 w-4 mr-2" />
-                        {customReport.filters.dateFrom ? 
-                          format(customReport.filters.dateFrom, 'dd/MM/yyyy', { locale: es }) : 
-                          'Fecha desde'
-                        }
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={customReport.filters.dateFrom}
-                        onSelect={(date) => setCustomReport({
-                          ...customReport, 
-                          filters: {...customReport.filters, dateFrom: date}
-                        })}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="flex-1">
-                        <CalendarIcon className="h-4 w-4 mr-2" />
-                        {customReport.filters.dateTo ? 
-                          format(customReport.filters.dateTo, 'dd/MM/yyyy', { locale: es }) : 
-                          'Fecha hasta'
-                        }
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={customReport.filters.dateTo}
-                        onSelect={(date) => setCustomReport({
-                          ...customReport, 
-                          filters: {...customReport.filters, dateTo: date}
-                        })}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-
-              {/* Campos a incluir */}
-              <div className="space-y-2">
-                <Label>Campos a Incluir</Label>
-                <div className="grid gap-2 md:grid-cols-3">
-                  {[
-                    { id: 'client_name', label: 'Nombre del Cliente' },
-                    { id: 'plan_name', label: 'Plan' },
-                    { id: 'total_amount', label: 'Monto Total' },
-                    { id: 'status', label: 'Estado' },
-                    { id: 'created_at', label: 'Fecha de Creación' },
-                    { id: 'salesperson', label: 'Vendedor' },
-                    { id: 'company_name', label: 'Empresa' },
-                    { id: 'notes', label: 'Notas' },
-                  ].map((field) => (
-                    <div key={field.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={field.id}
-                        checked={customReport.fields.includes(field.id)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setCustomReport({
-                              ...customReport,
-                              fields: [...customReport.fields, field.id]
-                            });
-                          } else {
-                            setCustomReport({
-                              ...customReport,
-                              fields: customReport.fields.filter(f => f !== field.id)
-                            });
-                          }
-                        }}
-                      />
-                      <label htmlFor={field.id} className="text-sm">
-                        {field.label}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex gap-2">
+              <div className="flex justify-end">
                 <Button 
                   onClick={() => generateReportMutation.mutate(customReport)}
-                  disabled={!customReport.name || !customReport.fields.length || generateReportMutation.isPending}
+                  disabled={!customReport.name || generateReportMutation.isPending}
                 >
-                  <Download className="h-4 w-4 mr-2" />
                   {generateReportMutation.isPending ? 'Generando...' : 'Generar Reporte'}
-                </Button>
-                <Button variant="outline">
-                  Guardar Configuración
                 </Button>
               </div>
             </CardContent>
@@ -612,41 +506,12 @@ const ReportsManager = () => {
             <CardHeader>
               <CardTitle>Reportes Programados</CardTitle>
               <CardDescription>
-                Gestione los reportes que se generan automáticamente
+                Reportes configurados para generarse automáticamente
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {predefinedReports.filter(r => r.schedule).map((report, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <h4 className="font-medium">{report.name}</h4>
-                      <p className="text-sm text-muted-foreground">{report.description}</p>
-                      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {report.schedule}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <FileText className="h-3 w-3" />
-                          {report.format.toUpperCase()}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Mail className="h-3 w-3" />
-                          Envío automático
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={report.isActive ? 'default' : 'secondary'}>
-                        {report.isActive ? 'Activo' : 'Inactivo'}
-                      </Badge>
-                      <Button variant="outline" size="sm">
-                        <RefreshCw className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+              <div className="text-center py-8 text-muted-foreground">
+                No hay reportes programados configurados
               </div>
             </CardContent>
           </Card>
