@@ -198,13 +198,12 @@ export const useTemplate = (templateId?: string) => {
             question_text,
             question_type,
             is_required,
-            order_index,
-            conditional_logic,
+            sort_order,
             template_question_options(
               id,
               option_text,
               option_value,
-              order_index
+              sort_order
             )
           )
         `)

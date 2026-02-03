@@ -1,40 +1,9 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
 
 type SaleStatus = Database['public']['Enums']['sale_status'];
-
-interface AuditProcess {
-  id: string;
-  sale_id: string;
-  auditor_id: string;
-  status: string;
-  notes?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface ProcessTrace {
-  id: string;
-  sale_id: string;
-  action: string;
-  performed_by?: string;
-  client_action: boolean;
-  details?: any;
-  created_at: string;
-}
-
-interface InformationRequest {
-  id: string;
-  audit_process_id: string;
-  requested_by: string;
-  description: string;
-  status: string;
-  created_at: string;
-  completed_at?: string;
-}
 
 export const useAuditProcesses = () => {
   return useQuery({
@@ -47,10 +16,8 @@ export const useAuditProcesses = () => {
           sales:sale_id(
             *,
             clients:client_id(first_name, last_name, email),
-            plans:plan_id(name, price),
-            salesperson:salesperson_id(first_name, last_name, email)
-          ),
-          auditor:auditor_id(first_name, last_name, email)
+            plans:plan_id(name, price)
+          )
         `)
         .order('created_at', { ascending: false });
 
@@ -78,7 +45,7 @@ export const useCreateAuditProcess = () => {
 
       if (error) throw error;
 
-      // Update sale status to en_auditoria instead of enviado
+      // Update sale status to en_auditoria
       await supabase
         .from('sales')
         .update({ status: 'en_auditoria' as SaleStatus })
@@ -90,8 +57,7 @@ export const useCreateAuditProcess = () => {
         .insert({
           sale_id: saleId,
           action: 'audit_started',
-          performed_by: auditorId,
-          client_action: false,
+          user_id: auditorId,
           details: { audit_process_id: data.id }
         });
 
@@ -113,12 +79,21 @@ export const useUpdateAuditProcess = () => {
 
   return useMutation({
     mutationFn: async ({ processId, status, notes }: { processId: string; status: string; notes?: string }) => {
+      // First get the audit process to find sale_id
+      const { data: auditProcess, error: fetchError } = await supabase
+        .from('audit_processes')
+        .select('sale_id')
+        .eq('id', processId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
       const { data, error } = await supabase
         .from('audit_processes')
         .update({ 
           status,
           notes: notes || '',
-          updated_at: new Date().toISOString()
+          completed_at: status === 'approved' || status === 'rejected' ? new Date().toISOString() : null
         })
         .eq('id', processId)
         .select()
@@ -126,8 +101,7 @@ export const useUpdateAuditProcess = () => {
 
       if (error) throw error;
 
-      // Get the sale_id to update sale status
-      const auditProcess = data as AuditProcess;
+      // Update sale status based on audit result
       let saleStatus: SaleStatus = 'enviado';
       
       if (status === 'approved') {
@@ -147,8 +121,6 @@ export const useUpdateAuditProcess = () => {
         .insert({
           sale_id: auditProcess.sale_id,
           action: `audit_${status}`,
-          performed_by: null, // Will be set by auth context
-          client_action: false,
           details: { notes }
         });
 

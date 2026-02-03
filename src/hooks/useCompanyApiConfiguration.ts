@@ -1,31 +1,10 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuthContext } from '@/components/AuthProvider';
+import { Database } from '@/integrations/supabase/types';
 
-interface CompanyApiConfiguration {
-  // WhatsApp Configuration
-  whatsapp_api_enabled: boolean;
-  whatsapp_api_token: string;
-  whatsapp_phone_number: string;
-  
-  // SMS Configuration
-  sms_api_enabled: boolean;
-  sms_api_provider: 'twilio' | 'nexmo' | 'messagebird';
-  sms_api_key: string;
-  sms_api_secret: string;
-  
-  // Email Configuration
-  email_api_enabled: boolean;
-  email_api_provider: 'resend' | 'sendgrid' | 'mailgun';
-  email_api_key: string;
-  email_from_address: string;
-  
-  // General Settings
-  tracking_enabled: boolean;
-  notifications_enabled: boolean;
-}
+type CompanySettingsRow = Database['public']['Tables']['company_settings']['Row'];
 
 export const useCompanyApiConfiguration = () => {
   const queryClient = useQueryClient();
@@ -40,7 +19,7 @@ export const useCompanyApiConfiguration = () => {
 
       const { data, error } = await supabase
         .from('company_settings')
-        .select('settings')
+        .select('*')
         .eq('company_id', profile.company_id)
         .single();
 
@@ -49,24 +28,27 @@ export const useCompanyApiConfiguration = () => {
         return getDefaultConfiguration();
       }
 
-      if (!data?.settings) {
+      if (!data) {
         return getDefaultConfiguration();
       }
 
-      const defaultConfig = getDefaultConfiguration();
-      // Ensure we only spread if settings is a valid object
-      const settings = data.settings && typeof data.settings === 'object' ? data.settings : {};
-      
       return {
-        ...defaultConfig,
-        ...settings
-      } as CompanyApiConfiguration;
+        whatsapp_api_enabled: !!data.whatsapp_api_key,
+        whatsapp_api_token: data.whatsapp_api_key || '',
+        whatsapp_phone_number: data.whatsapp_phone_id || '',
+        sms_api_enabled: !!data.sms_api_key,
+        sms_api_key: data.sms_api_key || '',
+        email_api_enabled: !!data.email_api_key,
+        email_api_key: data.email_api_key || '',
+        email_from_address: data.email_from_address || '',
+        email_from_name: data.email_from_name || '',
+      };
     },
     enabled: !!profile?.company_id,
   });
 
   const updateConfiguration = useMutation({
-    mutationFn: async (updates: Partial<CompanyApiConfiguration>) => {
+    mutationFn: async (updates: Partial<CompanySettingsRow>) => {
       if (!profile?.company_id) {
         throw new Error('No company ID available');
       }
@@ -75,7 +57,8 @@ export const useCompanyApiConfiguration = () => {
         .from('company_settings')
         .upsert({
           company_id: profile.company_id,
-          settings: updates
+          ...updates,
+          updated_at: new Date().toISOString(),
         })
         .select()
         .single();
@@ -101,18 +84,14 @@ export const useCompanyApiConfiguration = () => {
   };
 };
 
-const getDefaultConfiguration = (): CompanyApiConfiguration => ({
+const getDefaultConfiguration = () => ({
   whatsapp_api_enabled: false,
   whatsapp_api_token: '',
   whatsapp_phone_number: '',
   sms_api_enabled: false,
-  sms_api_provider: 'twilio',
   sms_api_key: '',
-  sms_api_secret: '',
   email_api_enabled: false,
-  email_api_provider: 'resend',
   email_api_key: '',
   email_from_address: '',
-  tracking_enabled: false,
-  notifications_enabled: false,
+  email_from_name: '',
 });

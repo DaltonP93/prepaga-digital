@@ -14,8 +14,7 @@ export const useAuditProcesses = () => {
         .select(`
           *,
           clients:client_id(first_name, last_name, email),
-          plans:plan_id(name, price),
-          salesperson:salesperson_id(first_name, last_name, email)
+          plans:plan_id(name, price)
         `)
         .in('status', ['borrador', 'enviado'])
         .order('created_at', { ascending: false });

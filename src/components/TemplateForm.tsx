@@ -18,6 +18,7 @@ import { FileText, Settings, Eye, HelpCircle, Copy } from "lucide-react";
 import { useCreateTemplate, useUpdateTemplate } from "@/hooks/useTemplates";
 import { useTemplateQuestions } from "@/hooks/useTemplateQuestions";
 import { Database } from "@/integrations/supabase/types";
+import { supabase } from "@/integrations/supabase/client";
 
 type Template = Database['public']['Tables']['templates']['Row'];
 
@@ -62,13 +63,9 @@ export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps
       setValue("name", template.name || "");
       setValue("description", template.description || "");
       setValue("content", typeof template.content === 'string' ? template.content : (template.content ? JSON.stringify(template.content) : ""));
-      setValue("active", template.active ?? true);
-      setValue("is_global", template.is_global ?? false);
-      
-      // Load dynamic fields if they exist
-      if (template.dynamic_fields && Array.isArray(template.dynamic_fields)) {
-        setDynamicFields(template.dynamic_fields);
-      }
+      setValue("active", template.is_active ?? true);
+      setValue("is_global", false); // is_global doesn't exist in DB, default to false
+      setDynamicFields([]);
     } else if (!template) {
       reset({
         name: "",
@@ -84,9 +81,20 @@ export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps
 
   const onSubmit = async (data: TemplateFormData) => {
     try {
+      // Get current user's company_id
+      const { data: userData } = await supabase.auth.getUser();
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('id', userData.user?.id || '')
+        .single();
+
       const templateData = {
-        ...data,
-        dynamic_fields: dynamicFields,
+        name: data.name,
+        description: data.description,
+        content: data.content,
+        is_active: data.active,
+        company_id: profile?.company_id || '',
       };
 
       if (isEditing && template) {

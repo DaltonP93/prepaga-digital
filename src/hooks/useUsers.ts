@@ -111,7 +111,7 @@ export const useDeleteUser = () => {
       // First deactivate the profile
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ active: false })
+        .update({ is_active: false })
         .eq('id', userId);
 
       if (profileError) throw profileError;
