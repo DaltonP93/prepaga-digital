@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -12,9 +11,8 @@ import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 interface CurrencyFormData {
   currency_code: string;
   currency_symbol: string;
-  currency_position: 'before' | 'after';
   decimal_places: number;
-  thousands_separator: string;
+  thousand_separator: string;
   decimal_separator: string;
 }
 
@@ -36,9 +34,8 @@ export const CurrencyConfigurationPanel = () => {
     defaultValues: {
       currency_code: 'GS',
       currency_symbol: 'Gs.',
-      currency_position: 'before',
       decimal_places: 0,
-      thousands_separator: '.',
+      thousand_separator: '.',
       decimal_separator: ',',
     }
   });
@@ -47,9 +44,8 @@ export const CurrencyConfigurationPanel = () => {
     if (settings) {
       setValue('currency_code', settings.currency_code);
       setValue('currency_symbol', settings.currency_symbol);
-      setValue('currency_position', settings.currency_position);
       setValue('decimal_places', settings.decimal_places);
-      setValue('thousands_separator', settings.thousands_separator);
+      setValue('thousand_separator', settings.thousand_separator);
       setValue('decimal_separator', settings.decimal_separator);
     }
   }, [settings, setValue]);
@@ -69,11 +65,11 @@ export const CurrencyConfigurationPanel = () => {
       // Set default formatting based on currency
       if (currency.code === 'GS') {
         setValue('decimal_places', 0);
-        setValue('thousands_separator', '.');
+        setValue('thousand_separator', '.');
         setValue('decimal_separator', ',');
       } else {
         setValue('decimal_places', 2);
-        setValue('thousands_separator', ',');
+        setValue('thousand_separator', ',');
         setValue('decimal_separator', '.');
       }
     }
@@ -139,22 +135,6 @@ export const CurrencyConfigurationPanel = () => {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="currency_position">Posición del símbolo</Label>
-          <Select
-            value={watchedValues.currency_position}
-            onValueChange={(value: 'before' | 'after') => setValue('currency_position', value)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="before">Antes del monto</SelectItem>
-              <SelectItem value="after">Después del monto</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
           <Label htmlFor="decimal_places">Decimales</Label>
           <Select
             value={watchedValues.decimal_places.toString()}
@@ -171,10 +151,10 @@ export const CurrencyConfigurationPanel = () => {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="thousands_separator">Separador de miles</Label>
+          <Label htmlFor="thousand_separator">Separador de miles</Label>
           <Select
-            value={watchedValues.thousands_separator}
-            onValueChange={(value) => setValue('thousands_separator', value)}
+            value={watchedValues.thousand_separator}
+            onValueChange={(value) => setValue('thousand_separator', value)}
           >
             <SelectTrigger>
               <SelectValue />

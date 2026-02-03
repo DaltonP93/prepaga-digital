@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { Settings, Eye, EyeOff, Grid, BarChart3, Users, Bell, Zap, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useDashboardWidgets } from '@/hooks/useDashboardWidgets';
@@ -24,9 +23,13 @@ const DashboardCustomizer = () => {
     widgets,
     isLoading,
     toggleWidgetVisibility,
-    updateWidgetSize,
+    updateWidgetConfig,
     isUpdating
   } = useDashboardWidgets();
+
+  const getWidgetSize = (config: any): string => {
+    return config?.size || 'medium';
+  };
 
   const getSizeColor = (size: string) => {
     switch (size) {
@@ -44,6 +47,10 @@ const DashboardCustomizer = () => {
       case 'large': return 'Grande';
       default: return size;
     }
+  };
+
+  const handleSizeChange = (widgetId: string, currentConfig: any, newSize: string) => {
+    updateWidgetConfig(widgetId, { ...currentConfig, size: newSize });
   };
 
   if (isLoading) {
@@ -77,10 +84,11 @@ const DashboardCustomizer = () => {
               {widgets.map((widget) => {
                 const widgetInfo = WIDGET_TYPES[widget.widget_type as keyof typeof WIDGET_TYPES];
                 const Icon = widgetInfo?.icon || Grid;
+                const currentSize = getWidgetSize(widget.config);
                 
                 return (
                   <Card key={widget.id} className={`transition-opacity ${
-                    !widget.visible ? 'opacity-50' : ''
+                    !widget.is_visible ? 'opacity-50' : ''
                   }`}>
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between gap-4">
@@ -94,8 +102,8 @@ const DashboardCustomizer = () => {
                               {widgetInfo?.description || 'Widget personalizado'}
                             </p>
                             <div className="flex items-center gap-2 mt-2">
-                              <Badge variant="outline" className={getSizeColor(widget.size)}>
-                                {getSizeLabel(widget.size)}
+                              <Badge variant="outline" className={getSizeColor(currentSize)}>
+                                {getSizeLabel(currentSize)}
                               </Badge>
                               <Badge variant="outline">
                                 Posición {widget.position + 1}
@@ -110,8 +118,8 @@ const DashboardCustomizer = () => {
                               Tamaño:
                             </Label>
                             <Select
-                              value={widget.size}
-                              onValueChange={(size) => updateWidgetSize(widget.id, size as any)}
+                              value={currentSize}
+                              onValueChange={(size) => handleSizeChange(widget.id, widget.config, size)}
                               disabled={isUpdating}
                             >
                               <SelectTrigger className="w-28">
@@ -129,10 +137,10 @@ const DashboardCustomizer = () => {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => toggleWidgetVisibility(widget.id, !widget.visible)}
+                              onClick={() => toggleWidgetVisibility(widget.id, !widget.is_visible)}
                               disabled={isUpdating}
                             >
-                              {widget.visible ? (
+                              {widget.is_visible ? (
                                 <Eye className="h-4 w-4" />
                               ) : (
                                 <EyeOff className="h-4 w-4" />

@@ -40,9 +40,10 @@ const DashboardWidgets = () => {
     );
   }
 
-  const visibleWidgets = widgets.filter(widget => widget.visible);
+  const visibleWidgets = widgets.filter(widget => widget.is_visible);
 
-  const getWidgetClassName = (size: string) => {
+  const getWidgetClassName = (config: any) => {
+    const size = config?.size || 'medium';
     switch (size) {
       case 'small':
         return 'col-span-1 lg:col-span-1';
@@ -62,7 +63,7 @@ const DashboardWidgets = () => {
         
         if (!WidgetComponent) {
           return (
-            <Card key={widget.id} className={getWidgetClassName(widget.size)}>
+            <Card key={widget.id} className={getWidgetClassName(widget.config)}>
               <CardContent className="p-6">
                 <div className="text-center text-muted-foreground">
                   <p>Widget desconocido: {widget.widget_type}</p>
@@ -73,7 +74,7 @@ const DashboardWidgets = () => {
         }
 
         return (
-          <div key={widget.id} className={getWidgetClassName(widget.size)}>
+          <div key={widget.id} className={getWidgetClassName(widget.config)}>
             <WidgetComponent />
           </div>
         );

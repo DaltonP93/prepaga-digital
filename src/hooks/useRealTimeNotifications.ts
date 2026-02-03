@@ -192,10 +192,7 @@ export const useRealTimeNotifications = () => {
     try {
       const { error } = await supabase
         .from('notifications')
-        .update({ 
-          read: true, 
-          updated_at: new Date().toISOString() 
-        })
+        .update({ is_read: true })
         .eq('id', notificationId);
 
       if (error) throw error;

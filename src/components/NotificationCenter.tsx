@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Bell, Check, CheckCheck, X, Settings } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -22,8 +21,6 @@ const NotificationCenter = () => {
     isLoading,
     markAsRead,
     markAllAsRead,
-    isMarkingAsRead,
-    isMarkingAllAsRead
   } = useNotifications();
 
   const { isConnected } = useRealTimeNotifications();
@@ -122,7 +119,6 @@ const NotificationCenter = () => {
                     variant="ghost"
                     size="sm"
                     onClick={() => markAllAsRead()}
-                    disabled={isMarkingAllAsRead}
                     className="text-xs"
                   >
                     <CheckCheck className="h-4 w-4 mr-1" />
@@ -166,7 +162,7 @@ const NotificationCenter = () => {
                     <div
                       key={notification.id}
                       className={`p-4 hover:bg-muted/50 transition-colors relative ${
-                        !notification.read ? 'bg-muted/30' : ''
+                        !notification.is_read ? 'bg-muted/30' : ''
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -176,7 +172,7 @@ const NotificationCenter = () => {
                           }`}>
                             {getNotificationIcon(notification.type)}
                           </div>
-                          {!notification.read && getPriorityBadge(notification.type) && (
+                          {!notification.is_read && getPriorityBadge(notification.type) && (
                             <div className="absolute -top-1 -right-1">
                               {getPriorityBadge(notification.type)}
                             </div>
@@ -187,7 +183,7 @@ const NotificationCenter = () => {
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1">
                               <h4 className={`font-medium text-sm ${
-                                !notification.read ? 'text-foreground' : 'text-muted-foreground'
+                                !notification.is_read ? 'text-foreground' : 'text-muted-foreground'
                               }`}>
                                 {notification.title}
                               </h4>
@@ -202,12 +198,11 @@ const NotificationCenter = () => {
                               </p>
                             </div>
                             
-                            {!notification.read && (
+                            {!notification.is_read && (
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => markAsRead(notification.id)}
-                                disabled={isMarkingAsRead}
                                 className="h-6 w-6 flex-shrink-0"
                               >
                                 <Check className="h-3 w-3" />
@@ -215,13 +210,13 @@ const NotificationCenter = () => {
                             )}
                           </div>
                           
-                          {notification.action_url && (
+                          {notification.link && (
                             <Button
                               variant="link"
                               size="sm"
                               className="h-auto p-0 text-xs mt-2"
                               onClick={() => {
-                                window.location.href = notification.action_url!;
+                                window.location.href = notification.link!;
                                 markAsRead(notification.id);
                                 setIsOpen(false);
                               }}

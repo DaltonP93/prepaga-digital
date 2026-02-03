@@ -38,7 +38,7 @@ export const useSignatureByToken = (token: string) => {
       }
       
       console.log('Signature data fetched successfully:', sale);
-      return sale as Sale;
+      return sale as any;
     },
     enabled: !!token,
     retry: 2,

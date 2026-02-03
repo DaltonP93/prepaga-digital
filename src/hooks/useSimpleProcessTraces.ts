@@ -38,7 +38,7 @@ export const useCreateTrace = () => {
         .insert({
           sale_id: saleId,
           user_id: user.user.id,
-          note: `${action}: ${JSON.stringify(details)}`
+          note_text: `${action}: ${JSON.stringify(details)}`
         });
 
       if (error) throw error;

@@ -13,7 +13,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useCommunications } from "@/hooks/useCommunications";
 import { useClients } from "@/hooks/useClients";
 import { useAuth } from "@/hooks/useAuth";
-import { Mail, MessageSquare, Send, Plus, Eye, BarChart3 } from "lucide-react";
+import { Mail, MessageSquare, Send, Plus, Eye } from "lucide-react";
 import { format } from "date-fns";
 
 export const CommunicationManager = () => {
@@ -39,7 +39,6 @@ export const CommunicationManager = () => {
   const [emailForm, setEmailForm] = useState({
     name: "",
     subject: "",
-    content: "",
     template_id: "",
   });
 
@@ -51,8 +50,7 @@ export const CommunicationManager = () => {
   const [templateForm, setTemplateForm] = useState({
     name: "",
     subject: "",
-    content: "",
-    variables: {},
+    body: "",
   });
 
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
@@ -64,17 +62,16 @@ export const CommunicationManager = () => {
       await createEmailCampaign.mutateAsync({
         name: emailForm.name,
         subject: emailForm.subject,
-        content: emailForm.content,
-        template_id: emailForm.template_id || undefined,
+        template_id: emailForm.template_id || null,
         company_id: user?.user_metadata?.company_id || "",
-        created_by: user?.id,
         status: "draft",
-        total_recipients: 0,
         sent_count: 0,
-        open_count: 0,
-        click_count: 0,
+        opened_count: 0,
+        clicked_count: 0,
+        scheduled_at: null,
+        sent_at: null,
       });
-      setEmailForm({ name: "", subject: "", content: "", template_id: "" });
+      setEmailForm({ name: "", subject: "", template_id: "" });
       setIsEmailDialogOpen(false);
     } catch (error) {
       console.error("Error creating email campaign:", error);
@@ -104,8 +101,8 @@ export const CommunicationManager = () => {
       await sendEmailCampaign.mutateAsync({
         campaignId,
         recipients,
-        subject: campaign.subject,
-        content: campaign.content,
+        subject: campaign.subject || "",
+        content: "",
         companyId: user?.user_metadata?.company_id || "",
       });
     } catch (error) {
@@ -119,11 +116,10 @@ export const CommunicationManager = () => {
         name: smsForm.name,
         message: smsForm.message,
         company_id: user?.user_metadata?.company_id || "",
-        created_by: user?.id,
         status: "draft",
-        total_recipients: 0,
         sent_count: 0,
-        delivered_count: 0,
+        scheduled_at: null,
+        sent_at: null,
       });
       setSmsForm({ name: "", message: "" });
       setIsSmsDialogOpen(false);
@@ -179,13 +175,11 @@ export const CommunicationManager = () => {
       await createEmailTemplate.mutateAsync({
         name: templateForm.name,
         subject: templateForm.subject,
-        content: templateForm.content,
-        variables: templateForm.variables,
+        body: templateForm.body,
         company_id: user?.user_metadata?.company_id || "",
-        created_by: user?.id,
-        is_global: false,
+        is_active: true,
       });
-      setTemplateForm({ name: "", subject: "", content: "", variables: {} });
+      setTemplateForm({ name: "", subject: "", body: "" });
       setIsTemplateDialogOpen(false);
     } catch (error) {
       console.error("Error creating template:", error);
@@ -269,19 +263,6 @@ export const CommunicationManager = () => {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-                <div>
-                  <Label htmlFor="email-content">Contenido</Label>
-                  <Textarea
-                    id="email-content"
-                    value={emailForm.content}
-                    onChange={(e) => setEmailForm({ ...emailForm, content: e.target.value })}
-                    placeholder="Hola {{nombre}}, te tenemos una oferta especial..."
-                    rows={6}
-                  />
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Usa &#123;&#123;nombre&#125;&#125; para personalizar con el nombre del cliente
-                  </p>
                 </div>
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" onClick={() => setIsEmailDialogOpen(false)}>
@@ -373,11 +354,11 @@ export const CommunicationManager = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="template-content">Contenido</Label>
+                  <Label htmlFor="template-body">Contenido</Label>
                   <Textarea
-                    id="template-content"
-                    value={templateForm.content}
-                    onChange={(e) => setTemplateForm({ ...templateForm, content: e.target.value })}
+                    id="template-body"
+                    value={templateForm.body}
+                    onChange={(e) => setTemplateForm({ ...templateForm, body: e.target.value })}
                     placeholder="Hola {{nombre}}, bienvenido a..."
                     rows={6}
                   />
@@ -428,7 +409,7 @@ export const CommunicationManager = () => {
                       <TableCell className="font-medium">{campaign.name}</TableCell>
                       <TableCell>{campaign.subject}</TableCell>
                       <TableCell>{getStatusBadge(campaign.status)}</TableCell>
-                      <TableCell>{campaign.sent_count}/{campaign.total_recipients}</TableCell>
+                      <TableCell>{campaign.sent_count}</TableCell>
                       <TableCell>
                         {campaign.sent_at 
                           ? format(new Date(campaign.sent_at), 'dd/MM/yyyy HH:mm')
@@ -485,7 +466,7 @@ export const CommunicationManager = () => {
                       <TableCell className="font-medium">{campaign.name}</TableCell>
                       <TableCell className="max-w-xs truncate">{campaign.message}</TableCell>
                       <TableCell>{getStatusBadge(campaign.status)}</TableCell>
-                      <TableCell>{campaign.sent_count}/{campaign.total_recipients}</TableCell>
+                      <TableCell>{campaign.sent_count}</TableCell>
                       <TableCell>
                         {campaign.sent_at 
                           ? format(new Date(campaign.sent_at), 'dd/MM/yyyy HH:mm')
@@ -530,7 +511,7 @@ export const CommunicationManager = () => {
                   <TableRow>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Asunto</TableHead>
-                    <TableHead>Global</TableHead>
+                    <TableHead>Activo</TableHead>
                     <TableHead>Fecha</TableHead>
                     <TableHead>Acciones</TableHead>
                   </TableRow>
@@ -541,10 +522,10 @@ export const CommunicationManager = () => {
                       <TableCell className="font-medium">{template.name}</TableCell>
                       <TableCell>{template.subject}</TableCell>
                       <TableCell>
-                        {template.is_global ? (
-                          <Badge variant="secondary">Global</Badge>
+                        {template.is_active ? (
+                          <Badge variant="secondary">Activo</Badge>
                         ) : (
-                          <Badge variant="outline">Empresa</Badge>
+                          <Badge variant="outline">Inactivo</Badge>
                         )}
                       </TableCell>
                       <TableCell>
@@ -574,8 +555,7 @@ export const CommunicationManager = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Destinatario</TableHead>
+                    <TableHead>Canal</TableHead>
                     <TableHead>Asunto/Mensaje</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead>Fecha</TableHead>
@@ -586,16 +566,13 @@ export const CommunicationManager = () => {
                     <TableRow key={log.id}>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {log.type === 'email' ? (
+                          {log.channel === 'email' ? (
                             <Mail className="w-4 h-4" />
                           ) : (
                             <MessageSquare className="w-4 h-4" />
                           )}
-                          {log.type.toUpperCase()}
+                          {log.channel.toUpperCase()}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        {log.recipient_email || log.recipient_phone}
                       </TableCell>
                       <TableCell className="max-w-xs truncate">
                         {log.subject || log.content}

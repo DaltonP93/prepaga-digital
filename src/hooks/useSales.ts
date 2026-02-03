@@ -56,14 +56,17 @@ export const useSales = () => {
           *,
           clients:client_id(first_name, last_name, email, phone, dni),
           plans:plan_id(name, price, description, coverage_details),
-          salesperson:salesperson_id(first_name, last_name, email),
+          profiles:salesperson_id(first_name, last_name, email),
           companies:company_id(name),
           templates:template_id(name, description)
         `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as ExtendedSale[];
+      return (data || []).map(sale => ({
+        ...sale,
+        salesperson: sale.profiles
+      })) as unknown as ExtendedSale[];
     },
   });
 };
@@ -259,7 +262,7 @@ export const useGenerateSignatureLink = () => {
 
       if (saleError) throw saleError;
 
-      const saleWithTokenInfo = sale as ExtendedSale;
+      const saleWithTokenInfo = { ...sale, salesperson: sale.profiles } as unknown as ExtendedSale;
 
       // If there's a template but no responses, require questionnaire completion
       if (sale.template_id && (!sale.template_responses || sale.template_responses.length === 0)) {
@@ -299,7 +302,7 @@ export const useGenerateSignatureLink = () => {
           .single();
 
         if (error) throw error;
-        updatedSale = newSale as ExtendedSale;
+        updatedSale = { ...newSale, salesperson: newSale?.profiles } as unknown as ExtendedSale;
       }
       
       const signatureUrl = `${window.location.origin}/signature/${token}`;

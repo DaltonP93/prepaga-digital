@@ -306,46 +306,16 @@ export const AdminConfigPanel: React.FC = () => {
               </div>
 
               {apiFormData.sms_api_enabled && (
-                <>
-                  <div>
-                    <Label htmlFor="sms_provider">Proveedor de SMS</Label>
-                    <Select
-                      value={apiFormData.sms_api_provider}
-                      onValueChange={(value) => handleApiInputChange('sms_api_provider', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="twilio">Twilio</SelectItem>
-                        <SelectItem value="nexmo">Nexmo/Vonage</SelectItem>
-                        <SelectItem value="messagebird">MessageBird</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="sms_key">API Key</Label>
-                      <Input
-                        id="sms_key"
-                        type="password"
-                        value={apiFormData.sms_api_key}
-                        onChange={(e) => handleApiInputChange('sms_api_key', e.target.value)}
-                        placeholder="Tu API Key"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="sms_secret">API Secret</Label>
-                      <Input
-                        id="sms_secret"
-                        type="password"
-                        value={apiFormData.sms_api_secret}
-                        onChange={(e) => handleApiInputChange('sms_api_secret', e.target.value)}
-                        placeholder="Tu API Secret"
-                      />
-                    </div>
-                  </div>
-                </>
+                <div>
+                  <Label htmlFor="sms_key">API Key</Label>
+                  <Input
+                    id="sms_key"
+                    type="password"
+                    value={apiFormData.sms_api_key}
+                    onChange={(e) => handleApiInputChange('sms_api_key', e.target.value)}
+                    placeholder="Tu API Key"
+                  />
+                </div>
               )}
             </CardContent>
           </Card>
@@ -371,22 +341,6 @@ export const AdminConfigPanel: React.FC = () => {
 
               {apiFormData.email_api_enabled && (
                 <>
-                  <div>
-                    <Label htmlFor="email_provider">Proveedor de Email</Label>
-                    <Select
-                      value={apiFormData.email_api_provider}
-                      onValueChange={(value) => handleApiInputChange('email_api_provider', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="resend">Resend</SelectItem>
-                        <SelectItem value="sendgrid">SendGrid</SelectItem>
-                        <SelectItem value="mailgun">Mailgun</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="email_key">API Key</Label>
