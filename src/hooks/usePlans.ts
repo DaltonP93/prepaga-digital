@@ -25,7 +25,7 @@ export const usePlans = () => {
           *,
           companies:company_id(id, name)
         `)
-        .eq('active', true)
+        .eq('is_active', true)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -97,7 +97,7 @@ export const useDeletePlan = () => {
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('plans')
-        .update({ active: false })
+        .update({ is_active: false })
         .eq('id', id);
 
       if (error) throw error;

@@ -92,12 +92,12 @@ const NotificationsWidget = () => {
                 <div 
                   key={notification.id} 
                   className={`flex items-start gap-3 p-2 rounded-lg transition-colors ${
-                    !notification.read ? 'bg-muted/50' : 'hover:bg-muted/30'
+                    !notification.is_read ? 'bg-muted/50' : 'hover:bg-muted/30'
                   }`}
                 >
                   <Icon className={`h-4 w-4 mt-0.5 ${getNotificationColor(notification.type)}`} />
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium ${!notification.read ? 'text-foreground' : 'text-muted-foreground'}`}>
+                    <p className={`text-sm font-medium ${!notification.is_read ? 'text-foreground' : 'text-muted-foreground'}`}>
                       {notification.title}
                     </p>
                     <p className="text-xs text-muted-foreground truncate">
@@ -110,7 +110,7 @@ const NotificationsWidget = () => {
                           locale: es
                         })}
                       </p>
-                      {!notification.read && (
+                      {!notification.is_read && (
                         <Button
                           size="sm"
                           variant="ghost"
