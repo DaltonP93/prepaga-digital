@@ -6,10 +6,16 @@ import { useDocuments } from "@/hooks/useDocuments";
 import { SearchAndFilters, FilterOptions } from "@/components/SearchAndFilters";
 import { DocumentPreview } from "@/components/DocumentPreview";
 import { DocuSealForm } from "@/components/DocuSealForm";
-import { Plus, FileText } from "lucide-react";
+import { Plus, FileText, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { DocumentForm } from "@/components/DocumentForm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useSales } from "@/hooks/useSales";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Documents: React.FC = () => {
   const { toast } = useToast();
@@ -25,34 +31,55 @@ const Documents: React.FC = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [activeTab, setActiveTab] = useState("documents");
 
-  const { documents, isLoading, createDocument, updateDocument, deleteDocument } = useDocuments();
+  // Form state for new document
+  const [docName, setDocName] = useState("");
+  const [docType, setDocType] = useState("contract");
+  const [docContent, setDocContent] = useState("");
+  const [docSaleId, setDocSaleId] = useState("");
+
+  const { documents, isLoading, createDocument, deleteDocument } = useDocuments();
+  const { data: sales } = useSales();
 
   const handleCreateDocument = () => {
     setShowCreateForm(true);
     setSelectedDocument(null);
+    // Reset form
+    setDocName("");
+    setDocType("contract");
+    setDocContent("");
+    setDocSaleId("");
   };
 
-  const handleDocumentCreated = (document: any) => {
-    toast({
-      title: "Documento creado",
-      description: "El documento se ha creado exitosamente.",
+  const handleSubmitDocument = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!docName.trim()) {
+      toast({
+        title: "Error",
+        description: "El nombre del documento es requerido",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!docSaleId) {
+      toast({
+        title: "Error",
+        description: "Debes seleccionar una venta asociada",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createDocument({
+      name: docName,
+      document_type: docType,
+      content: docContent,
+      sale_id: docSaleId,
+      status: 'pendiente' as const,
     });
+
     setShowCreateForm(false);
-  };
-
-  const handleDocumentUpdated = (document: any) => {
-    toast({
-      title: "Documento actualizado",
-      description: "El documento se ha actualizado exitosamente.",
-    });
-  };
-
-  const handleDocumentDeleted = () => {
-    toast({
-      title: "Documento eliminado",
-      description: "El documento se ha eliminado exitosamente.",
-    });
-    setSelectedDocument(null);
   };
 
   const handleDocuSealCompleted = (data: any) => {
@@ -200,23 +227,13 @@ const Documents: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle>
-                  {showCreateForm
-                    ? "Crear Nuevo Documento"
-                    : selectedDocument
+                  {selectedDocument
                     ? "Vista Previa del Documento"
                     : "Selecciona un documento"}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {showCreateForm ? (
-                  <DocumentForm
-                    onSubmit={(documentData) => {
-                      createDocument(documentData);
-                      handleDocumentCreated(documentData);
-                    }}
-                    onCancel={() => setShowCreateForm(false)}
-                  />
-                ) : selectedDocument ? (
+                {selectedDocument ? (
                   <DocumentPreview
                     content={selectedDocument.content || ""}
                     dynamicFields={selectedDocument.dynamic_fields || []}
@@ -231,6 +248,88 @@ const Documents: React.FC = () => {
               </CardContent>
             </Card>
           </div>
+
+          {/* Create Document Dialog */}
+          <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Crear Nuevo Documento</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmitDocument} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="docName">Nombre del Documento *</Label>
+                  <Input
+                    id="docName"
+                    value={docName}
+                    onChange={(e) => setDocName(e.target.value)}
+                    placeholder="Ingrese el nombre del documento"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="docSaleId">Venta Asociada *</Label>
+                  {sales && sales.length > 0 ? (
+                    <Select value={docSaleId} onValueChange={setDocSaleId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona una venta" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sales.map((sale) => (
+                          <SelectItem key={sale.id} value={sale.id}>
+                            CON-{sale.id.slice(-4)} - {sale.clients?.first_name} {sale.clients?.last_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        No hay ventas disponibles. Primero debes crear una venta.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="docType">Tipo de Documento</Label>
+                  <Select value={docType} onValueChange={setDocType}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona el tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="contract">Contrato</SelectItem>
+                      <SelectItem value="policy">Póliza</SelectItem>
+                      <SelectItem value="declaration">Declaración</SelectItem>
+                      <SelectItem value="report">Reporte</SelectItem>
+                      <SelectItem value="certificate">Certificado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="docContent">Contenido</Label>
+                  <Textarea
+                    id="docContent"
+                    value={docContent}
+                    onChange={(e) => setDocContent(e.target.value)}
+                    placeholder="Ingrese el contenido del documento"
+                    rows={6}
+                  />
+                </div>
+
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setShowCreateForm(false)}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={!docSaleId}>
+                    Crear Documento
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
 
           {/* Statistics */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
