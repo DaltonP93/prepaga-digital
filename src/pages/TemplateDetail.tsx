@@ -81,8 +81,8 @@ export default function TemplateDetail() {
               </CardHeader>
               <CardContent>
                 <div className="prose max-w-none">
-                  {template.static_content ? (
-                    <div dangerouslySetInnerHTML={{ __html: template.static_content }} />
+                  {template.content ? (
+                    <div dangerouslySetInnerHTML={{ __html: typeof template.content === 'string' ? template.content : JSON.stringify(template.content) }} />
                   ) : (
                     <p className="text-muted-foreground">No hay contenido disponible</p>
                   )}
@@ -101,22 +101,10 @@ export default function TemplateDetail() {
                   <span className="text-muted-foreground">Versión:</span>
                   <Badge variant="outline">v{template.version}</Badge>
                 </div>
-                {template.template_type && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Tipo:</span>
-                    <Badge variant="secondary">{template.template_type}</Badge>
-                  </div>
-                )}
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Estado:</span>
-                  <Badge variant={template.active ? "default" : "secondary"}>
-                    {template.active ? "Activo" : "Inactivo"}
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Global:</span>
-                  <Badge variant={template.is_global ? "default" : "outline"}>
-                    {template.is_global ? "Sí" : "No"}
+                  <Badge variant={template.is_active ? "default" : "secondary"}>
+                    {template.is_active ? "Activo" : "Inactivo"}
                   </Badge>
                 </div>
                 {template.created_at && (

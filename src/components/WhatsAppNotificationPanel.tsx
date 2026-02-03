@@ -1,15 +1,36 @@
-
-import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { useSendWhatsAppNotification, useWhatsAppNotifications } from '@/hooks/useWhatsAppNotifications';
-import { MessageSquare, Send, Clock, CheckCircle, XCircle, Eye } from 'lucide-react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import React, { useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import {
+  useSendWhatsAppNotification,
+  useWhatsAppNotifications,
+} from "@/hooks/useWhatsAppNotifications";
+import { MessageSquare, Send, Clock, CheckCircle, XCircle, Eye } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 
 interface WhatsAppNotificationPanelProps {
   saleId: string;
@@ -17,10 +38,17 @@ interface WhatsAppNotificationPanelProps {
   clientName?: string;
 }
 
-const WhatsAppNotificationPanel = ({ saleId, clientPhone = '', clientName = '' }: WhatsAppNotificationPanelProps) => {
+const WhatsAppNotificationPanel = ({
+  saleId,
+  clientPhone = "",
+  clientName = "",
+}: WhatsAppNotificationPanelProps) => {
   const [phone, setPhone] = useState(clientPhone);
-  const [message, setMessage] = useState('');
-  const [notificationType, setNotificationType] = useState<'signature' | 'questionnaire' | 'general'>('signature');
+  const [message, setMessage] = useState("");
+  const [notificationType, setNotificationType] = useState<
+    "signature" | "questionnaire" | "general"
+  >("signature");
+  const { profile } = useSimpleAuthContext();
 
   const sendNotification = useSendWhatsAppNotification();
   const { data: notifications, isLoading } = useWhatsAppNotifications(saleId);
@@ -28,41 +56,54 @@ const WhatsAppNotificationPanel = ({ saleId, clientPhone = '', clientName = '' }
   const predefinedMessages = {
     signature: `Hola ${clientName}, tu contrato está listo para firma. Haz clic en el enlace para completar el proceso: `,
     questionnaire: `Hola ${clientName}, necesitamos que completes un breve cuestionario antes de proceder. Accede aquí: `,
-    general: `Hola ${clientName}, tienes una actualización importante sobre tu proceso. Revisa aquí: `
+    general: `Hola ${clientName}, tienes una actualización importante sobre tu proceso. Revisa aquí: `,
   };
 
   const handleSendNotification = () => {
-    if (!phone || !message) return;
+    if (!phone || !message || !profile?.company_id) return;
 
     sendNotification.mutate({
       saleId,
       recipientPhone: phone,
       messageContent: message,
-      notificationType
+      companyId: profile.company_id,
+      notificationType,
     });
 
-    setMessage('');
+    setMessage("");
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'pending': return <Clock className="h-4 w-4" />;
-      case 'sent': return <Send className="h-4 w-4" />;
-      case 'delivered': return <CheckCircle className="h-4 w-4" />;
-      case 'read': return <Eye className="h-4 w-4" />;
-      case 'failed': return <XCircle className="h-4 w-4" />;
-      default: return <Clock className="h-4 w-4" />;
+      case "pending":
+        return <Clock className="h-4 w-4" />;
+      case "sent":
+        return <Send className="h-4 w-4" />;
+      case "delivered":
+        return <CheckCircle className="h-4 w-4" />;
+      case "read":
+        return <Eye className="h-4 w-4" />;
+      case "failed":
+        return <XCircle className="h-4 w-4" />;
+      default:
+        return <Clock className="h-4 w-4" />;
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'secondary';
-      case 'sent': return 'outline';
-      case 'delivered': return 'default';
-      case 'read': return 'default';
-      case 'failed': return 'destructive';
-      default: return 'secondary';
+      case "pending":
+        return "secondary";
+      case "sent":
+        return "outline";
+      case "delivered":
+        return "default";
+      case "read":
+        return "default";
+      case "failed":
+        return "destructive";
+      default:
+        return "secondary";
     }
   };
 
@@ -93,7 +134,10 @@ const WhatsAppNotificationPanel = ({ saleId, clientPhone = '', clientName = '' }
             </div>
             <div className="space-y-2">
               <Label htmlFor="type">Tipo de Notificación</Label>
-              <Select value={notificationType} onValueChange={(value: any) => setNotificationType(value)}>
+              <Select
+                value={notificationType}
+                onValueChange={(value: any) => setNotificationType(value)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -160,7 +204,10 @@ const WhatsAppNotificationPanel = ({ saleId, clientPhone = '', clientName = '' }
           ) : notifications && notifications.length > 0 ? (
             <div className="space-y-3">
               {notifications.map((notification) => (
-                <div key={notification.id} className="flex items-start space-x-3 p-3 border rounded">
+                <div
+                  key={notification.id}
+                  className="flex items-start space-x-3 p-3 border rounded"
+                >
                   <div className="flex-1">
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center gap-2">
@@ -170,28 +217,25 @@ const WhatsAppNotificationPanel = ({ saleId, clientPhone = '', clientName = '' }
                         </Badge>
                       </div>
                       <span className="text-xs text-muted-foreground">
-                        {new Date(notification.sent_at).toLocaleString()}
+                        {notification.sent_at
+                          ? new Date(notification.sent_at).toLocaleString()
+                          : "Pendiente"}
                       </span>
                     </div>
-                    
-                    <p className="text-sm font-medium">Para: {notification.recipient_phone}</p>
+
+                    <p className="text-sm font-medium">
+                      Para: {notification.phone_number}
+                    </p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {notification.message_content.substring(0, 100)}
-                      {notification.message_content.length > 100 ? '...' : ''}
+                      {notification.message.substring(0, 100)}
+                      {notification.message.length > 100 ? "..." : ""}
                     </p>
 
-                    <div className="flex gap-2 mt-2">
-                      {notification.opened_at && (
-                        <span className="text-xs text-green-600">
-                          Abierto: {new Date(notification.opened_at).toLocaleString()}
-                        </span>
-                      )}
-                      {notification.signed_at && (
-                        <span className="text-xs text-blue-600">
-                          Firmado: {new Date(notification.signed_at).toLocaleString()}
-                        </span>
-                      )}
-                    </div>
+                    {notification.error_message && (
+                      <p className="text-sm text-destructive mt-2">
+                        Error: {notification.error_message}
+                      </p>
+                    )}
 
                     <Dialog>
                       <DialogTrigger asChild>
@@ -205,25 +249,17 @@ const WhatsAppNotificationPanel = ({ saleId, clientPhone = '', clientName = '' }
                         </DialogHeader>
                         <div className="space-y-4">
                           <div>
-                            <p className="text-sm font-medium">URL de seguimiento:</p>
-                            <code className="text-xs bg-muted p-2 rounded block">
-                              {notification.notification_url}
-                            </code>
-                          </div>
-                          <div>
                             <p className="text-sm font-medium">Mensaje completo:</p>
                             <p className="text-sm bg-muted p-2 rounded">
-                              {notification.message_content}
+                              {notification.message}
                             </p>
                           </div>
-                          {notification.api_response && (
-                            <div>
-                              <p className="text-sm font-medium">Respuesta de la API:</p>
-                              <pre className="text-xs bg-muted p-2 rounded overflow-auto">
-                                {JSON.stringify(notification.api_response, null, 2)}
-                              </pre>
-                            </div>
-                          )}
+                          <div>
+                            <p className="text-sm font-medium">Estado:</p>
+                            <Badge variant={getStatusColor(notification.status) as any}>
+                              {notification.status}
+                            </Badge>
+                          </div>
                         </div>
                       </DialogContent>
                     </Dialog>
@@ -232,7 +268,9 @@ const WhatsAppNotificationPanel = ({ saleId, clientPhone = '', clientName = '' }
               ))}
             </div>
           ) : (
-            <p className="text-muted-foreground">No se han enviado notificaciones para esta venta.</p>
+            <p className="text-muted-foreground">
+              No se han enviado notificaciones para esta venta.
+            </p>
           )}
         </CardContent>
       </Card>

@@ -119,7 +119,7 @@ const SignatureWorkflow = () => {
                 <CardContent>
                   <div className="flex justify-between items-center">
                     <div className="text-sm text-muted-foreground">
-                      Solicitud: {sale.request_number} • Contrato: {sale.contract_number}
+                      ID: {sale.id.substring(0, 8)}...
                     </div>
                     <Button onClick={() => navigate(`/signature-workflow/${sale.id}`)}>
                       <Send className="w-4 h-4 mr-2" />

@@ -53,8 +53,8 @@ const Templates = () => {
   const filteredTemplates = templates.filter(template => {
     const matchesSearch = template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          template.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = typeFilter === "all" || template.template_type === typeFilter;
-    return matchesSearch && matchesType;
+    // Filter by type is disabled since template_type doesn't exist in schema
+    return matchesSearch;
   });
 
   const canDeleteTemplate = (template: Template) => {
@@ -233,16 +233,10 @@ const Templates = () => {
                     <span className="text-muted-foreground">Versión:</span>
                     <Badge variant="outline">v{template.version}</Badge>
                   </div>
-                  {template.template_type && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Tipo:</span>
-                      <Badge variant="secondary">{template.template_type}</Badge>
-                    </div>
-                  )}
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Estado:</span>
-                    <Badge variant={template.active ? "default" : "secondary"}>
-                      {template.active ? "Activo" : "Inactivo"}
+                    <Badge variant={template.is_active ? "default" : "secondary"}>
+                      {template.is_active ? "Activo" : "Inactivo"}
                     </Badge>
                   </div>
                   {template.created_at && (

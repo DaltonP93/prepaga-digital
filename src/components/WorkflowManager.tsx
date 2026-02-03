@@ -2,37 +2,14 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import {
   GitBranch,
-  MessageCircle,
   Clock,
-  User,
-  CheckCircle,
-  AlertCircle,
-  Archive,
-  Eye,
   Edit,
-  Send,
-  ArrowRight,
-  History,
+  Eye,
+  CheckCircle,
+  Archive,
 } from "lucide-react";
 import { useTemplateWorkflow } from "@/hooks/useTemplateWorkflow";
 import { formatDistanceToNow } from "date-fns";
@@ -76,59 +53,30 @@ const WORKFLOW_STATES = {
   },
 } as const;
 
-const WORKFLOW_TRANSITIONS = {
-  draft: ["in_review"],
-  in_review: ["draft", "approved"],
-  approved: ["published", "draft"],
-  published: ["archived"],
-  archived: ["draft"],
-} as const;
+export const WorkflowManager = ({
+  templateId,
+  onStateChange,
+}: WorkflowManagerProps) => {
+  const { workflowStates, currentState, isLoadingStates, trackEvent } =
+    useTemplateWorkflow(templateId);
 
-export const WorkflowManager = ({ templateId, onStateChange }: WorkflowManagerProps) => {
-  const {
-    workflowStates,
-    currentState,
-    updateState,
-    isUpdatingState,
-    trackEvent,
-  } = useTemplateWorkflow(templateId);
+  // Use state_name from the database schema
+  const currentStateKey =
+    (currentState?.state_name as keyof typeof WORKFLOW_STATES) || "draft";
+  const currentStateConfig = WORKFLOW_STATES[currentStateKey] || WORKFLOW_STATES.draft;
 
-  const [selectedNewState, setSelectedNewState] = useState<string>("");
-  const [transitionNotes, setTransitionNotes] = useState("");
-  const [showTransitionDialog, setShowTransitionDialog] = useState(false);
-
-  const currentStateKey = currentState?.state || "draft";
-  const currentStateConfig = WORKFLOW_STATES[currentStateKey];
-  const availableTransitions = WORKFLOW_TRANSITIONS[currentStateKey] || [];
-
-  const handleStateTransition = () => {
-    if (!selectedNewState) return;
-
-    updateState(
-      {
-        templateId,
-        newState: selectedNewState as any,
-        notes: transitionNotes,
-      },
-      {
-        onSuccess: () => {
-          setShowTransitionDialog(false);
-          setSelectedNewState("");
-          setTransitionNotes("");
-          onStateChange?.(selectedNewState);
-          trackEvent({
-            templateId,
-            eventType: "edit",
-            metadata: { action: "state_change", from: currentStateKey, to: selectedNewState },
-          });
-        },
-      }
+  if (isLoadingStates) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="animate-pulse space-y-3">
+            <div className="h-4 bg-muted rounded w-1/4"></div>
+            <div className="h-8 bg-muted rounded w-1/2"></div>
+          </div>
+        </CardContent>
+      </Card>
     );
-  };
-
-  const getInitials = (firstName?: string, lastName?: string) => {
-    return `${firstName?.charAt(0) || ""}${lastName?.charAt(0) || ""}`.toUpperCase();
-  };
+  }
 
   return (
     <div className="space-y-4">
@@ -140,16 +88,6 @@ export const WorkflowManager = ({ templateId, onStateChange }: WorkflowManagerPr
               <GitBranch className="h-5 w-5" />
               Estado del Workflow
             </CardTitle>
-            {availableTransitions.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowTransitionDialog(true)}
-              >
-                <ArrowRight className="h-4 w-4 mr-2" />
-                Cambiar Estado
-              </Button>
-            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -164,10 +102,8 @@ export const WorkflowManager = ({ templateId, onStateChange }: WorkflowManagerPr
               </p>
               {currentState && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Actualizado {formatDistanceToNow(new Date(currentState.changed_at), {
-                    addSuffix: true,
-                    locale: es,
-                  })}
+                  Orden: {currentState.state_order}
+                  {currentState.is_final && " (Estado final)"}
                 </p>
               )}
             </div>
@@ -175,27 +111,33 @@ export const WorkflowManager = ({ templateId, onStateChange }: WorkflowManagerPr
         </CardContent>
       </Card>
 
-      {/* Workflow History */}
-      {workflowStates && workflowStates.length > 1 && (
+      {/* Workflow States */}
+      {workflowStates && workflowStates.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <History className="h-5 w-5" />
-              Historial de Estados
+            <CardTitle className="text-base flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Estados del Workflow
             </CardTitle>
           </CardHeader>
           <CardContent>
             <ScrollArea className="max-h-48">
               <div className="space-y-3">
                 {workflowStates.map((state, index) => {
-                  const stateConfig = WORKFLOW_STATES[state.state];
-                  const isLatest = index === 0;
-                  
+                  const stateKey =
+                    (state.state_name as keyof typeof WORKFLOW_STATES) ||
+                    "draft";
+                  const stateConfig =
+                    WORKFLOW_STATES[stateKey] || WORKFLOW_STATES.draft;
+                  const isLatest = index === workflowStates.length - 1;
+
                   return (
                     <div key={state.id} className="flex items-start gap-3">
-                      <div className={`p-2 rounded-lg ${stateConfig.color} ${
-                        isLatest ? "ring-2 ring-primary ring-offset-2" : ""
-                      }`}>
+                      <div
+                        className={`p-2 rounded-lg ${stateConfig.color} ${
+                          isLatest ? "ring-2 ring-primary ring-offset-2" : ""
+                        }`}
+                      >
                         <stateConfig.icon className="h-4 w-4" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -206,28 +148,19 @@ export const WorkflowManager = ({ templateId, onStateChange }: WorkflowManagerPr
                               Actual
                             </Badge>
                           )}
+                          {state.is_final && (
+                            <Badge variant="outline" className="text-xs">
+                              Final
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Clock className="h-3 w-3" />
-                          {formatDistanceToNow(new Date(state.changed_at), {
+                          {formatDistanceToNow(new Date(state.created_at), {
                             addSuffix: true,
                             locale: es,
                           })}
-                          {state.changed_by_profile && (
-                            <>
-                              <span>•</span>
-                              <div className="flex items-center gap-1">
-                                <User className="h-3 w-3" />
-                                {state.changed_by_profile.first_name} {state.changed_by_profile.last_name}
-                              </div>
-                            </>
-                          )}
                         </div>
-                        {state.notes && (
-                          <p className="text-sm text-muted-foreground mt-1 bg-muted p-2 rounded">
-                            {state.notes}
-                          </p>
-                        )}
                       </div>
                     </div>
                   );
@@ -238,81 +171,18 @@ export const WorkflowManager = ({ templateId, onStateChange }: WorkflowManagerPr
         </Card>
       )}
 
-      {/* State Transition Dialog */}
-      <Dialog open={showTransitionDialog} onOpenChange={setShowTransitionDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Cambiar Estado del Template</DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Estado actual</label>
-              <div className="flex items-center gap-2 mt-1">
-                <div className={`p-2 rounded ${currentStateConfig.color}`}>
-                  <currentStateConfig.icon className="h-4 w-4" />
-                </div>
-                <span>{currentStateConfig.label}</span>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium">Nuevo estado</label>
-              <Select value={selectedNewState} onValueChange={setSelectedNewState}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Selecciona el nuevo estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableTransitions.map((stateKey) => {
-                    const config = WORKFLOW_STATES[stateKey];
-                    return (
-                      <SelectItem key={stateKey} value={stateKey}>
-                        <div className="flex items-center gap-2">
-                          <config.icon className="h-4 w-4" />
-                          {config.label}
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium">Notas (opcional)</label>
-              <Textarea
-                value={transitionNotes}
-                onChange={(e) => setTransitionNotes(e.target.value)}
-                placeholder="Explica el motivo del cambio de estado..."
-                className="mt-1"
-                rows={3}
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-4">
-            <Button
-              variant="outline"
-              onClick={() => setShowTransitionDialog(false)}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleStateTransition}
-              disabled={!selectedNewState || isUpdatingState}
-            >
-              {isUpdatingState ? (
-                "Actualizando..."
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  Cambiar Estado
-                </>
-              )}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Empty State */}
+      {(!workflowStates || workflowStates.length === 0) && (
+        <Card>
+          <CardContent className="text-center py-8">
+            <GitBranch className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">Sin estados de workflow</h3>
+            <p className="text-muted-foreground">
+              Los estados de workflow se configuran para este template
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

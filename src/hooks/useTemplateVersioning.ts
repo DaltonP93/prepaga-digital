@@ -1,24 +1,18 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { Database } from '@/integrations/supabase/types';
-import { useToast } from '@/hooks/use-toast';
-
-type Template = Database['public']['Tables']['templates']['Row'];
-type TemplateInsert = Database['public']['Tables']['templates']['Insert'];
+// Types matching the actual database schema for templates table
+// (no static_content, dynamic_fields, or parent_template_id columns)
 
 interface TemplateVersion {
   id: string;
   version: number;
   name: string;
-  description?: string;
-  content: any;
-  static_content?: string;
-  dynamic_fields?: any[];
+  description?: string | null;
+  content: string | null;
   created_at: string;
-  created_by?: string;
-  parent_template_id?: string;
+  created_by?: string | null;
   is_current: boolean;
 }
 
@@ -26,100 +20,97 @@ export const useTemplateVersioning = (templateId?: string) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Obtener versiones de un template
+  // Get versions from template_versions table
   const { data: versions, isLoading: versionsLoading } = useQuery({
-    queryKey: ['template-versions', templateId],
+    queryKey: ["template-versions", templateId],
     queryFn: async () => {
       if (!templateId) return [];
-      
+
       const { data, error } = await supabase
-        .from('templates')
-        .select('*')
-        .or(`id.eq.${templateId},parent_template_id.eq.${templateId}`)
-        .order('version', { ascending: false });
+        .from("template_versions")
+        .select("*")
+        .eq("template_id", templateId)
+        .order("version_number", { ascending: false });
 
       if (error) throw error;
-      
-      return data.map(template => ({
-        id: template.id,
-        version: template.version || 1,
-        name: template.name,
-        description: template.description,
-        content: template.content,
-        static_content: template.static_content,
-        dynamic_fields: template.dynamic_fields,
-        created_at: template.created_at!,
-        created_by: template.created_by,
-        parent_template_id: template.parent_template_id,
-        is_current: template.id === templateId,
+
+      return data.map((v) => ({
+        id: v.id,
+        version: v.version_number,
+        name: `Versión ${v.version_number}`,
+        description: null,
+        content: v.content,
+        created_at: v.created_at!,
+        created_by: v.created_by,
+        is_current: false, // Would need to check against current template
       })) as TemplateVersion[];
     },
     enabled: !!templateId,
   });
 
-  // Crear nueva versión
+  // Create new version
   const createVersionMutation = useMutation({
-    mutationFn: async ({ 
-      templateId, 
-      updates, 
-      versionNotes 
-    }: { 
-      templateId: string; 
-      updates: Partial<TemplateInsert>; 
-      versionNotes?: string; 
+    mutationFn: async ({
+      templateId,
+      updates,
+    }: {
+      templateId: string;
+      updates: { content?: string; description?: string };
+      versionNotes?: string;
     }) => {
-      console.log('Creating new version for template:', templateId);
-      
-      // Obtener la versión actual
+      console.log("Creating new version for template:", templateId);
+
+      // Get the current template
       const { data: currentTemplate, error: fetchError } = await supabase
-        .from('templates')
-        .select('*')
-        .eq('id', templateId)
+        .from("templates")
+        .select("*")
+        .eq("id", templateId)
         .single();
 
       if (fetchError) throw fetchError;
 
       const nextVersion = (currentTemplate.version || 1) + 1;
-      
-      // Crear nueva versión
-      const { data: newVersion, error: createError } = await supabase
-        .from('templates')
+
+      // Get current user
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      // Save current state as a version
+      const { error: versionError } = await supabase
+        .from("template_versions")
         .insert({
-          ...updates,
-          name: currentTemplate.name,
-          company_id: currentTemplate.company_id,
-          parent_template_id: currentTemplate.parent_template_id || templateId,
-          version: nextVersion,
-          created_by: currentTemplate.created_by,
-        })
-        .select()
-        .single();
+          template_id: templateId,
+          version_number: currentTemplate.version || 1,
+          content: currentTemplate.content,
+          created_by: user?.id,
+        });
 
-      if (createError) throw createError;
+      if (versionError) throw versionError;
 
-      // Actualizar template actual con la nueva versión
+      // Update template with new content and version
       const { error: updateError } = await supabase
-        .from('templates')
+        .from("templates")
         .update({
           ...updates,
           version: nextVersion,
         })
-        .eq('id', templateId);
+        .eq("id", templateId);
 
       if (updateError) throw updateError;
 
-      return newVersion;
+      return { version: nextVersion };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['template-versions'] });
-      queryClient.invalidateQueries({ queryKey: ['templates'] });
+      queryClient.invalidateQueries({ queryKey: ["template-versions"] });
+      queryClient.invalidateQueries({ queryKey: ["templates"] });
       toast({
         title: "Nueva versión creada",
         description: "Se ha creado una nueva versión del template exitosamente.",
       });
     },
     onError: (error: any) => {
-      console.error('Error creating version:', error);
+      console.error("Error creating version:", error);
       toast({
         title: "Error",
         description: error.message || "No se pudo crear la nueva versión.",
@@ -128,57 +119,60 @@ export const useTemplateVersioning = (templateId?: string) => {
     },
   });
 
-  // Restaurar versión anterior
+  // Restore previous version
   const restoreVersionMutation = useMutation({
-    mutationFn: async ({ templateId, versionId }: { templateId: string; versionId: string }) => {
-      console.log('Restoring version:', versionId, 'for template:', templateId);
-      
-      // Obtener la versión a restaurar
+    mutationFn: async ({
+      templateId,
+      versionId,
+    }: {
+      templateId: string;
+      versionId: string;
+    }) => {
+      console.log("Restoring version:", versionId, "for template:", templateId);
+
+      // Get the version to restore
       const { data: versionToRestore, error: fetchError } = await supabase
-        .from('templates')
-        .select('*')
-        .eq('id', versionId)
+        .from("template_versions")
+        .select("*")
+        .eq("id", versionId)
         .single();
 
       if (fetchError) throw fetchError;
 
-      // Obtener versión actual para el siguiente número
+      // Get current template version
       const { data: currentTemplate, error: currentError } = await supabase
-        .from('templates')
-        .select('version')
-        .eq('id', templateId)
+        .from("templates")
+        .select("version")
+        .eq("id", templateId)
         .single();
 
       if (currentError) throw currentError;
 
       const nextVersion = (currentTemplate.version || 1) + 1;
 
-      // Actualizar template actual con datos de la versión anterior
+      // Update template with version content
       const { error: updateError } = await supabase
-        .from('templates')
+        .from("templates")
         .update({
           content: versionToRestore.content,
-          static_content: versionToRestore.static_content,
-          dynamic_fields: versionToRestore.dynamic_fields,
-          description: versionToRestore.description,
           version: nextVersion,
         })
-        .eq('id', templateId);
+        .eq("id", templateId);
 
       if (updateError) throw updateError;
 
       return versionToRestore;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['template-versions'] });
-      queryClient.invalidateQueries({ queryKey: ['templates'] });
+      queryClient.invalidateQueries({ queryKey: ["template-versions"] });
+      queryClient.invalidateQueries({ queryKey: ["templates"] });
       toast({
         title: "Versión restaurada",
         description: "Se ha restaurado la versión seleccionada exitosamente.",
       });
     },
     onError: (error: any) => {
-      console.error('Error restoring version:', error);
+      console.error("Error restoring version:", error);
       toast({
         title: "Error",
         description: error.message || "No se pudo restaurar la versión.",
@@ -187,27 +181,27 @@ export const useTemplateVersioning = (templateId?: string) => {
     },
   });
 
-  // Eliminar versión
+  // Delete version
   const deleteVersionMutation = useMutation({
     mutationFn: async (versionId: string) => {
-      console.log('Deleting version:', versionId);
-      
+      console.log("Deleting version:", versionId);
+
       const { error } = await supabase
-        .from('templates')
+        .from("template_versions")
         .delete()
-        .eq('id', versionId);
+        .eq("id", versionId);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['template-versions'] });
+      queryClient.invalidateQueries({ queryKey: ["template-versions"] });
       toast({
         title: "Versión eliminada",
         description: "La versión ha sido eliminada exitosamente.",
       });
     },
     onError: (error: any) => {
-      console.error('Error deleting version:', error);
+      console.error("Error deleting version:", error);
       toast({
         title: "Error",
         description: error.message || "No se pudo eliminar la versión.",
