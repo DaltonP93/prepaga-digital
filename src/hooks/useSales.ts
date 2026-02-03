@@ -50,22 +50,42 @@ export const useSales = () => {
   return useQuery({
     queryKey: ['sales'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First, get sales with basic relations
+      const { data: salesData, error: salesError } = await supabase
         .from('sales')
         .select(`
           *,
           clients:client_id(first_name, last_name, email, phone, dni),
           plans:plan_id(name, price, description, coverage_details),
-          profiles:salesperson_id(first_name, last_name, email),
           companies:company_id(name),
           templates:template_id(name, description)
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return (data || []).map(sale => ({
+      if (salesError) throw salesError;
+
+      // Get unique salesperson IDs
+      const salespersonIds = [...new Set(salesData?.map(s => s.salesperson_id).filter(Boolean))];
+      
+      // Fetch salesperson profiles separately if there are any
+      let profilesMap: Record<string, any> = {};
+      if (salespersonIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email')
+          .in('id', salespersonIds);
+        
+        profilesMap = (profiles || []).reduce((acc, p) => {
+          acc[p.id] = p;
+          return acc;
+        }, {} as Record<string, any>);
+      }
+
+      // Merge salesperson data into sales
+      return (salesData || []).map(sale => ({
         ...sale,
-        salesperson: sale.profiles
+        salesperson: sale.salesperson_id ? profilesMap[sale.salesperson_id] : null,
+        profiles: sale.salesperson_id ? profilesMap[sale.salesperson_id] : null
       })) as unknown as ExtendedSale[];
     },
   });
@@ -253,7 +273,6 @@ export const useGenerateSignatureLink = () => {
           *,
           clients:client_id(first_name, last_name, email, phone),
           plans:plan_id(name, price),
-          profiles:salesperson_id(first_name, last_name, email),
           templates:template_id(name),
           template_responses(id)
         `)
@@ -262,7 +281,18 @@ export const useGenerateSignatureLink = () => {
 
       if (saleError) throw saleError;
 
-      const saleWithTokenInfo = { ...sale, salesperson: sale.profiles } as unknown as ExtendedSale;
+      // Fetch salesperson profile separately
+      let salesperson = null;
+      if (sale.salesperson_id) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('first_name, last_name, email')
+          .eq('id', sale.salesperson_id)
+          .single();
+        salesperson = profile;
+      }
+
+      const saleWithTokenInfo = { ...sale, salesperson, profiles: salesperson } as unknown as ExtendedSale;
 
       // If there's a template but no responses, require questionnaire completion
       if (sale.template_id && (!sale.template_responses || sale.template_responses.length === 0)) {
@@ -296,13 +326,12 @@ export const useGenerateSignatureLink = () => {
           .select(`
             *,
             clients:client_id(first_name, last_name, email, phone),
-            plans:plan_id(name, price),
-            profiles:salesperson_id(first_name, last_name, email)
+            plans:plan_id(name, price)
           `)
           .single();
 
         if (error) throw error;
-        updatedSale = { ...newSale, salesperson: newSale?.profiles } as unknown as ExtendedSale;
+        updatedSale = { ...newSale, salesperson, profiles: salesperson } as unknown as ExtendedSale;
       }
       
       const signatureUrl = `${window.location.origin}/signature/${token}`;
