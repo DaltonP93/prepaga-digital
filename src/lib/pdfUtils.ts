@@ -196,7 +196,7 @@ export const generateSimplePDF = async (data: PDFData): Promise<Uint8Array> => {
 };
 
 export const createPDFBlob = (pdfBytes: Uint8Array): Blob => {
-  return new Blob([pdfBytes], { type: 'application/pdf' });
+  return new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
 };
 
 export const generatePDFUrl = (pdfBytes: Uint8Array): string => {
