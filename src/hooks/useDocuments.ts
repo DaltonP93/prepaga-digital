@@ -21,9 +21,7 @@ export const useDocuments = () => {
         .from("documents")
         .select(`
           *,
-          sales:sale_id(id, status, contract_number),
-          plans:plan_id(name),
-          templates:template_id(name)
+          sales:sale_id(id, status)
         `)
         .order("created_at", { ascending: false });
 
