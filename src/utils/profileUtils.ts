@@ -6,7 +6,6 @@ type Profile = Tables<"profiles">;
 
 export interface ProfileBackupData {
   email: string;
-  role: string;
   company_id: string | null;
   first_name: string;
   last_name: string;
@@ -20,8 +19,7 @@ export class ProfileBackupManager {
   static backupProfile(profile: Profile): void {
     try {
       const backup: ProfileBackupData = {
-        email: profile.email,
-        role: profile.role,
+        email: profile.email || '',
         company_id: profile.company_id,
         first_name: profile.first_name || '',
         last_name: profile.last_name || '',
@@ -80,9 +78,8 @@ export class ProfileBackupManager {
           email: backup.email,
           first_name: backup.first_name,
           last_name: backup.last_name,
-          role: backup.role as any,
           company_id: backup.company_id,
-          active: true,
+          is_active: true,
           updated_at: new Date().toISOString()
         })
         .select()
@@ -108,18 +105,14 @@ export const validateProfileIntegrity = (profile: Profile): boolean => {
   // Check required fields
   const hasRequiredFields = !!(
     profile.id &&
-    profile.email &&
-    profile.role
+    profile.email
   );
 
   // Check if profile is active
-  const isActive = profile.active !== false;
+  const isActive = profile.is_active !== false;
 
   // Check if data looks reasonable
-  const hasReasonableData = (
-    profile.email.includes('@') &&
-    profile.role.length > 0
-  );
+  const hasReasonableData = profile.email ? profile.email.includes('@') : false;
 
   return hasRequiredFields && isActive && hasReasonableData;
 };

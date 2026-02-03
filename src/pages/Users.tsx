@@ -46,7 +46,7 @@ const Users = () => {
   const handleToggleUserStatus = async (user: Profile) => {
     await updateUser.mutateAsync({
       id: user.id,
-      active: !user.active,
+      is_active: !user.is_active,
     });
   };
 
@@ -111,16 +111,16 @@ const Users = () => {
                     </TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>
-                      <Badge variant={getRoleBadgeVariant(user.role)}>
-                        {getRoleLabel(user.role)}
+                      <Badge variant="outline">
+                        Vendedor
                       </Badge>
                     </TableCell>
                     <TableCell>
                       {user.companies?.name || 'Sin empresa'}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={user.active ? 'default' : 'secondary'}>
-                        {user.active ? 'Activo' : 'Inactivo'}
+                      <Badge variant={user.is_active ? 'default' : 'secondary'}>
+                        {user.is_active ? 'Activo' : 'Inactivo'}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -133,11 +133,11 @@ const Users = () => {
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
-                          variant={user.active ? "destructive" : "default"}
+                          variant={user.is_active ? "destructive" : "default"}
                           size="sm"
                           onClick={() => handleToggleUserStatus(user)}
                         >
-                          {user.active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                          {user.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
                         </Button>
                       </div>
                     </TableCell>
