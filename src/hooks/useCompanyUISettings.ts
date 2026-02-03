@@ -1,24 +1,10 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuthContext } from '@/components/AuthProvider';
+import { Database } from '@/integrations/supabase/types';
 
-interface CompanyUISettings {
-  id: string;
-  company_id: string;
-  dark_mode: boolean;
-  shadows: boolean;
-  font_family: string;
-  border_radius: string;
-  primary_color: string;
-  secondary_color: string;
-  accent_color: string;
-  favicon: string;
-  custom_css: string;
-  created_at: string;
-  updated_at: string;
-}
+type CompanyUISettingsRow = Database['public']['Tables']['company_ui_settings']['Row'];
 
 export const useCompanyUISettings = () => {
   const queryClient = useQueryClient();
@@ -42,13 +28,13 @@ export const useCompanyUISettings = () => {
         return null;
       }
 
-      return data as CompanyUISettings | null;
+      return data;
     },
     enabled: !!profile?.company_id,
   });
 
   const updateSettings = useMutation({
-    mutationFn: async (updates: Partial<CompanyUISettings>) => {
+    mutationFn: async (updates: Partial<CompanyUISettingsRow>) => {
       if (!profile?.company_id) {
         throw new Error('No company ID available');
       }
@@ -57,7 +43,8 @@ export const useCompanyUISettings = () => {
         .from('company_ui_settings')
         .upsert({
           company_id: profile.company_id,
-          ...updates
+          ...updates,
+          updated_at: new Date().toISOString(),
         })
         .select()
         .single();

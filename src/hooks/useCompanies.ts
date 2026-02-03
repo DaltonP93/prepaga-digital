@@ -79,7 +79,7 @@ export const useDeleteCompany = () => {
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('companies')
-        .update({ active: false })
+        .update({ is_active: false })
         .eq('id', id);
 
       if (error) throw error;

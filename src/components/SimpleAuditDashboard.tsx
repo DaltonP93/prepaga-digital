@@ -133,9 +133,6 @@ const SimpleAuditDashboard = () => {
                   <div className="text-sm text-muted-foreground">
                     Plan: {sale.plans?.name} - ${sale.plans?.price}
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    Vendedor: {sale.salesperson?.first_name} {sale.salesperson?.last_name}
-                  </div>
                 </div>
                 
                 <div className="flex gap-2">

@@ -39,15 +39,15 @@ export const useDashboardStats = () => {
         const totalRevenue = salesData?.reduce((sum, sale) => sum + (sale.total_amount || 0), 0) || 0;
         const completedSales = salesData?.filter(sale => sale.status === 'completado').length || 0;
 
-        // Get signatures data for documents metrics
-        const { data: signaturesData, error: signaturesError } = await supabase
+        // Get signatures count (signatures table doesn't have status column)
+        const { count: signaturesCount, error: signaturesError } = await supabase
           .from('signatures')
-          .select('status');
+          .select('*', { count: 'exact', head: true });
 
         if (signaturesError) throw signaturesError;
 
-        const signedDocuments = signaturesData?.filter(sig => sig.status === 'firmado').length || 0;
-        const pendingSignatures = signaturesData?.filter(sig => sig.status === 'pendiente').length || 0;
+        const signedDocuments = signaturesCount || 0;
+        const pendingSignatures = 0; // No status field in signatures table
 
         // Get recent sales with relationships - Fixed to include companies
         const { data: recentSales, error: recentSalesError } = await supabase

@@ -1,40 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { Database } from '@/integrations/supabase/types';
 
-interface AuditLogEntry {
-  id: string;
-  table_name: string;
-  action: string;
-  record_id?: string;
-  old_values?: any;
-  new_values?: any;
-  user_id?: string;
-  ip_address?: string;
-  user_agent?: string;
-  session_id?: string;
-  request_path?: string;
-  request_method?: string;
-  created_at: string;
-  profiles?: {
-    first_name: string;
-    last_name: string;
-    email: string;
-  };
-}
-
-interface CreateAuditLogParams {
-  table_name: string;
-  action: string;
-  record_id?: string;
-  old_values?: any;
-  new_values?: any;
-  ip_address?: string;
-  user_agent?: string;
-  session_id?: string;
-  request_path?: string;
-  request_method?: string;
-}
+type AuditLogRow = Database['public']['Tables']['audit_logs']['Row'];
+type AuthAttemptRow = Database['public']['Tables']['auth_attempts']['Row'];
 
 export const useAuditLogs = () => {
   return useQuery({
@@ -42,19 +11,12 @@ export const useAuditLogs = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('audit_logs')
-        .select(`
-          *,
-          profiles (
-            first_name,
-            last_name,
-            email
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(100);
 
       if (error) throw error;
-      return data as AuditLogEntry[];
+      return data || [];
     },
   });
 };
@@ -63,19 +25,38 @@ export const useCreateAuditLog = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: CreateAuditLogParams) => {
-      const { data, error } = await supabase.rpc('log_audit', {
-        p_table_name: params.table_name,
-        p_action: params.action,
-        p_record_id: params.record_id,
-        p_old_values: params.old_values,
-        p_new_values: params.new_values,
-        p_ip_address: params.ip_address,
-        p_user_agent: params.user_agent || navigator.userAgent,
-        p_session_id: params.session_id,
-        p_request_path: params.request_path || window.location.pathname,
-        p_request_method: params.request_method,
-      });
+    mutationFn: async (params: {
+      entity_type: string;
+      action: string;
+      entity_id?: string;
+      old_values?: any;
+      new_values?: any;
+      ip_address?: string;
+      user_agent?: string;
+    }) => {
+      // Get current user
+      const { data: userData } = await supabase.auth.getUser();
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('id', userData.user?.id || '')
+        .single();
+
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .insert({
+          entity_type: params.entity_type,
+          action: params.action,
+          entity_id: params.entity_id,
+          old_values: params.old_values,
+          new_values: params.new_values,
+          ip_address: params.ip_address,
+          user_agent: params.user_agent || navigator.userAgent,
+          user_id: userData.user?.id,
+          company_id: profile?.company_id,
+        })
+        .select()
+        .single();
 
       if (error) throw error;
       return data;
@@ -96,11 +77,11 @@ export const useAuthAttempts = () => {
       const { data, error } = await supabase
         .from('auth_attempts')
         .select('*')
-        .order('attempted_at', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(50);
 
       if (error) throw error;
-      return data;
+      return data || [];
     },
   });
 };
@@ -124,7 +105,6 @@ export const useLogAuthAttempt = () => {
           email,
           success,
           failure_reason,
-          ip_address: undefined, // Se puede obtener del servidor
           user_agent: navigator.userAgent,
         });
 

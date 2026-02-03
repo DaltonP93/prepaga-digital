@@ -1,21 +1,10 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
+import { Database } from '@/integrations/supabase/types';
 
-interface CurrencySettings {
-  id: string;
-  company_id: string;
-  currency_code: string;
-  currency_symbol: string;
-  currency_position: 'before' | 'after';
-  decimal_places: number;
-  thousands_separator: string;
-  decimal_separator: string;
-  created_at: string;
-  updated_at: string;
-}
+type CurrencySettingsRow = Database['public']['Tables']['company_currency_settings']['Row'];
 
 export const useCurrencySettings = () => {
   const queryClient = useQueryClient();
@@ -39,13 +28,13 @@ export const useCurrencySettings = () => {
         return null;
       }
 
-      return data as CurrencySettings | null;
+      return data;
     },
     enabled: !!profile?.company_id,
   });
 
   const updateSettings = useMutation({
-    mutationFn: async (updates: Partial<CurrencySettings>) => {
+    mutationFn: async (updates: Partial<CurrencySettingsRow>) => {
       if (!profile?.company_id) {
         throw new Error('No company ID available');
       }
@@ -54,7 +43,7 @@ export const useCurrencySettings = () => {
         .from('company_currency_settings')
         .upsert({
           company_id: profile.company_id,
-          ...updates
+          ...updates,
         })
         .select()
         .single();
@@ -82,23 +71,21 @@ export const useCurrencySettings = () => {
       return `Gs. ${formattedAmount}`;
     }
 
-    const { currency_symbol, currency_position, decimal_places, thousands_separator, decimal_separator } = settings;
+    const { currency_symbol, decimal_places, thousand_separator, decimal_separator } = settings;
     
     // Format the number with the specified decimal places
-    const formattedNumber = amount.toFixed(decimal_places);
+    const formattedNumber = amount.toFixed(decimal_places || 0);
     const [integerPart, decimalPart] = formattedNumber.split('.');
     
     // Add thousands separator
-    const integerWithSeparators = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, thousands_separator);
+    const integerWithSeparators = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, thousand_separator || '.');
     
     // Combine integer and decimal parts
-    const finalNumber = decimal_places > 0 && decimalPart 
-      ? `${integerWithSeparators}${decimal_separator}${decimalPart}`
+    const finalNumber = (decimal_places || 0) > 0 && decimalPart 
+      ? `${integerWithSeparators}${decimal_separator || ','}${decimalPart}`
       : integerWithSeparators;
     
-    return currency_position === 'before' 
-      ? `${currency_symbol} ${finalNumber}`
-      : `${finalNumber} ${currency_symbol}`;
+    return `${currency_symbol || '$'} ${finalNumber}`;
   };
 
   return {

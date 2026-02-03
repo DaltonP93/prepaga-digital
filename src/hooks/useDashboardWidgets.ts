@@ -1,28 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Database } from '@/integrations/supabase/types';
 
-interface DashboardWidget {
-  id: string;
-  user_id: string;
-  widget_type: string;
-  position: number;
-  size: 'small' | 'medium' | 'large';
-  visible: boolean;
-  settings: any;
-  created_at: string;
-  updated_at: string;
-}
+type DashboardWidgetRow = Database['public']['Tables']['dashboard_widgets']['Row'];
+type DashboardWidgetInsert = Database['public']['Tables']['dashboard_widgets']['Insert'];
 
-const DEFAULT_WIDGETS: Omit<DashboardWidget, 'id' | 'user_id' | 'created_at' | 'updated_at'>[] = [
-  { widget_type: 'sales_overview', position: 0, size: 'large', visible: true, settings: {} },
-  { widget_type: 'recent_clients', position: 1, size: 'medium', visible: true, settings: {} },
-  { widget_type: 'notifications', position: 2, size: 'medium', visible: true, settings: {} },
-  { widget_type: 'quick_actions', position: 3, size: 'small', visible: true, settings: {} },
-  { widget_type: 'sales_by_user', position: 4, size: 'large', visible: true, settings: {} },
-  { widget_type: 'conversion_metrics', position: 5, size: 'medium', visible: true, settings: {} },
-  { widget_type: 'analytics_chart', position: 6, size: 'large', visible: false, settings: {} },
-  { widget_type: 'pending_documents', position: 7, size: 'medium', visible: false, settings: {} }
+const DEFAULT_WIDGETS: Omit<DashboardWidgetInsert, 'user_id'>[] = [
+  { widget_type: 'sales_overview', position: 0, is_visible: true, config: {} },
+  { widget_type: 'recent_clients', position: 1, is_visible: true, config: {} },
+  { widget_type: 'notifications', position: 2, is_visible: true, config: {} },
+  { widget_type: 'quick_actions', position: 3, is_visible: true, config: {} },
+  { widget_type: 'sales_by_user', position: 4, is_visible: true, config: {} },
+  { widget_type: 'conversion_metrics', position: 5, is_visible: true, config: {} },
+  { widget_type: 'analytics_chart', position: 6, is_visible: false, config: {} },
+  { widget_type: 'pending_documents', position: 7, is_visible: false, config: {} }
 ];
 
 export const useDashboardWidgets = () => {
@@ -59,15 +51,15 @@ export const useDashboardWidgets = () => {
           .select();
 
         if (createError) throw createError;
-        return createdWidgets as DashboardWidget[];
+        return createdWidgets || [];
       }
 
-      return data as DashboardWidget[];
+      return data || [];
     }
   });
 
   const updateWidgetMutation = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<DashboardWidget> }) => {
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<DashboardWidgetRow> }) => {
       const { error } = await supabase
         .from('dashboard_widgets')
         .update({ ...updates, updated_at: new Date().toISOString() })
@@ -107,16 +99,12 @@ export const useDashboardWidgets = () => {
     }
   });
 
-  const toggleWidgetVisibility = (id: string, visible: boolean) => {
-    updateWidgetMutation.mutate({ id, updates: { visible } });
+  const toggleWidgetVisibility = (id: string, is_visible: boolean) => {
+    updateWidgetMutation.mutate({ id, updates: { is_visible } });
   };
 
-  const updateWidgetSize = (id: string, size: 'small' | 'medium' | 'large') => {
-    updateWidgetMutation.mutate({ id, updates: { size } });
-  };
-
-  const updateWidgetSettings = (id: string, settings: any) => {
-    updateWidgetMutation.mutate({ id, updates: { settings } });
+  const updateWidgetConfig = (id: string, config: any) => {
+    updateWidgetMutation.mutate({ id, updates: { config } });
   };
 
   const reorderWidgets = (reorderedWidgets: { id: string; position: number }[]) => {
@@ -128,8 +116,7 @@ export const useDashboardWidgets = () => {
     isLoading,
     error,
     toggleWidgetVisibility,
-    updateWidgetSize,
-    updateWidgetSettings,
+    updateWidgetConfig,
     reorderWidgets,
     isUpdating: updateWidgetMutation.isPending || reorderWidgetsMutation.isPending
   };

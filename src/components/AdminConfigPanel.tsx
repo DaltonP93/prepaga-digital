@@ -29,15 +29,11 @@ export const AdminConfigPanel: React.FC = () => {
     whatsapp_api_token: apiConfig?.whatsapp_api_token || '',
     whatsapp_phone_number: apiConfig?.whatsapp_phone_number || '',
     sms_api_enabled: apiConfig?.sms_api_enabled || false,
-    sms_api_provider: apiConfig?.sms_api_provider || 'twilio',
     sms_api_key: apiConfig?.sms_api_key || '',
-    sms_api_secret: apiConfig?.sms_api_secret || '',
     email_api_enabled: apiConfig?.email_api_enabled || false,
-    email_api_provider: apiConfig?.email_api_provider || 'resend',
     email_api_key: apiConfig?.email_api_key || '',
     email_from_address: apiConfig?.email_from_address || '',
-    tracking_enabled: apiConfig?.tracking_enabled || false,
-    notifications_enabled: apiConfig?.notifications_enabled || false,
+    email_from_name: apiConfig?.email_from_name || '',
   });
 
   React.useEffect(() => {
@@ -60,15 +56,11 @@ export const AdminConfigPanel: React.FC = () => {
         whatsapp_api_token: apiConfig.whatsapp_api_token || '',
         whatsapp_phone_number: apiConfig.whatsapp_phone_number || '',
         sms_api_enabled: apiConfig.sms_api_enabled || false,
-        sms_api_provider: apiConfig.sms_api_provider || 'twilio',
         sms_api_key: apiConfig.sms_api_key || '',
-        sms_api_secret: apiConfig.sms_api_secret || '',
         email_api_enabled: apiConfig.email_api_enabled || false,
-        email_api_provider: apiConfig.email_api_provider || 'resend',
         email_api_key: apiConfig.email_api_key || '',
         email_from_address: apiConfig.email_from_address || '',
-        tracking_enabled: apiConfig.tracking_enabled || false,
-        notifications_enabled: apiConfig.notifications_enabled || false,
+        email_from_name: apiConfig.email_from_name || '',
       });
     }
   }, [apiConfig]);

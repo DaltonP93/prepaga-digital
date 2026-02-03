@@ -44,7 +44,7 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
       first_name: user?.first_name || "",
       last_name: user?.last_name || "",
       phone: user?.phone || "",
-      role: user?.role || 'vendedor',
+      role: 'vendedor',
       company_id: user?.company_id || "",
     }
   });
@@ -56,7 +56,7 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
         first_name: user.first_name || "",
         last_name: user.last_name || "",
         phone: user.phone || "",
-        role: user.role || 'vendedor',
+        role: 'vendedor', // Role is in user_roles table, not profiles
         company_id: user.company_id || "",
       });
     }

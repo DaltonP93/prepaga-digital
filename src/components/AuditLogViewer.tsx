@@ -73,27 +73,21 @@ export const AuditLogViewer = () => {
                             <Badge className={getActionColor(log.action)}>
                               {log.action.toUpperCase()}
                             </Badge>
-                            <span className="font-medium">{log.table_name}</span>
+                            <span className="font-medium">{log.entity_type || 'N/A'}</span>
                             <span className="text-sm text-muted-foreground">
-                              {format(new Date(log.created_at), 'dd/MM/yyyy HH:mm:ss', { locale: es })}
+                              {log.created_at ? format(new Date(log.created_at), 'dd/MM/yyyy HH:mm:ss', { locale: es }) : 'N/A'}
                             </span>
                           </div>
                           
-                          {log.profiles && (
+                          {log.user_id && (
                             <div className="text-sm text-muted-foreground">
-                              Usuario: {log.profiles.first_name} {log.profiles.last_name} ({log.profiles.email})
+                              Usuario ID: {log.user_id}
                             </div>
                           )}
                           
                           {log.ip_address && (
                             <div className="text-sm text-muted-foreground">
                               IP: {log.ip_address}
-                            </div>
-                          )}
-                          
-                          {log.request_path && (
-                            <div className="text-sm text-muted-foreground">
-                              Ruta: {log.request_method} {log.request_path}
                             </div>
                           )}
                           
@@ -106,7 +100,7 @@ export const AuditLogViewer = () => {
                                 {log.old_values && (
                                   <div>
                                     <strong>Valores anteriores:</strong>
-                                    <pre className="bg-gray-50 p-2 rounded text-xs overflow-auto">
+                                    <pre className="bg-muted p-2 rounded text-xs overflow-auto">
                                       {formatJsonValue(log.old_values)}
                                     </pre>
                                   </div>
@@ -114,7 +108,7 @@ export const AuditLogViewer = () => {
                                 {log.new_values && (
                                   <div>
                                     <strong>Valores nuevos:</strong>
-                                    <pre className="bg-gray-50 p-2 rounded text-xs overflow-auto">
+                                    <pre className="bg-muted p-2 rounded text-xs overflow-auto">
                                       {formatJsonValue(log.new_values)}
                                     </pre>
                                   </div>
@@ -157,7 +151,7 @@ export const AuditLogViewer = () => {
                             </Badge>
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            {format(new Date(attempt.attempted_at), 'dd/MM/yyyy HH:mm:ss', { locale: es })}
+                            {attempt.created_at ? format(new Date(attempt.created_at), 'dd/MM/yyyy HH:mm:ss', { locale: es }) : 'N/A'}
                           </div>
                           {attempt.failure_reason && (
                             <div className="text-sm text-red-600">

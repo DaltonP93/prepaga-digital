@@ -1,9 +1,6 @@
-
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { usePDFGeneration } from '@/hooks/usePDFGeneration';
 
 interface CombinedRequestData {
   personal: {
@@ -21,30 +18,46 @@ interface CombinedRequestData {
 export const useCombinedRequest = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
-  const { generatePDF } = usePDFGeneration();
 
   const processCombinedRequest = async (data: CombinedRequestData) => {
     setIsProcessing(true);
     
     try {
-      // 1. Crear cliente
+      // Get current user's company_id
+      const { data: userData } = await supabase.auth.getUser();
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('id', userData.user?.id || '')
+        .single();
+
+      const companyId = profile?.company_id;
+      if (!companyId) {
+        throw new Error('No company ID found for user');
+      }
+
+      // 1. Crear cliente with company_id
       const { data: client, error: clientError } = await supabase
         .from('clients')
-        .insert(data.personal)
+        .insert({
+          ...data.personal,
+          company_id: companyId,
+        })
         .select()
         .single();
 
       if (clientError) throw clientError;
 
-      // 2. Crear venta - using correct property names from sales table schema
+      // 2. Crear venta with company_id
       const { data: sale, error: saleError } = await supabase
         .from('sales')
         .insert({
           client_id: client.id,
           plan_id: data.plan_id,
-          status: 'borrador', // Using the correct default status from schema
+          company_id: companyId,
+          status: 'borrador',
           signature_token: generateSignatureToken(),
-          signature_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // Convert to string
+          signature_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         })
         .select()
         .single();
@@ -56,7 +69,6 @@ export const useCombinedRequest = () => {
         const responses = Object.entries(data.health).map(([question_id, response_value]) => ({
           template_id: 'default-health-template',
           question_id,
-          client_id: client.id,
           sale_id: sale.id,
           response_value,
         }));
@@ -75,7 +87,6 @@ export const useCombinedRequest = () => {
           .insert({
             sale_id: sale.id,
             signature_data: data.signature,
-            status: 'firmado',
           });
 
         if (signatureError) throw signatureError;
@@ -111,4 +122,3 @@ export const useCombinedRequest = () => {
     isProcessing,
   };
 };
-

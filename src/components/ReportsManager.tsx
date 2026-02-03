@@ -177,7 +177,7 @@ const ReportsManager = () => {
       query = query.lte('created_at', config.filters.dateTo.toISOString());
     }
     if (config.filters.status?.length) {
-      query = query.in('status', config.filters.status);
+      query = query.in('status', config.filters.status as ('borrador' | 'cancelado' | 'completado' | 'en_auditoria' | 'enviado' | 'firmado' | 'pendiente')[]);
     }
 
     const { data, error } = await query;
