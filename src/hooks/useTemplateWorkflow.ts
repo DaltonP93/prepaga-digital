@@ -1,53 +1,33 @@
-import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient, useQuery, useMutation } from "@tanstack/react-query";
 
+// Types matching the actual database schema
+
 export interface TemplateWorkflowState {
   id: string;
   template_id: string;
-  state: "draft" | "in_review" | "approved" | "published" | "archived";
-  changed_by: string | null;
-  changed_at: string;
-  notes: string | null;
-  metadata: Record<string, any>;
+  state_name: string;
+  state_order: number;
+  is_final: boolean;
   created_at: string;
 }
 
 export interface TemplateComment {
   id: string;
   template_id: string;
-  user_id: string;
-  parent_comment_id: string | null;
-  content: string;
-  resolved: boolean;
-  resolved_by: string | null;
-  resolved_at: string | null;
+  user_id: string | null;
+  comment_text: string;
   created_at: string;
-  updated_at: string;
-  user?: {
-    first_name: string;
-    last_name: string;
-    avatar_url: string | null;
-  };
-  replies?: TemplateComment[];
 }
 
 export interface TemplateVersion {
   id: string;
   template_id: string;
   version_number: number;
-  content: Record<string, any>;
-  static_content: string | null;
-  dynamic_fields: any[];
-  created_by: string;
+  content: string | null;
+  created_by: string | null;
   created_at: string;
-  change_notes: string | null;
-  is_major_version: boolean;
-  user?: {
-    first_name: string;
-    last_name: string;
-  };
 }
 
 export const useTemplateWorkflow = (templateId?: string) => {
@@ -63,88 +43,49 @@ export const useTemplateWorkflow = (templateId?: string) => {
     queryKey: ["template-workflow-states", templateId],
     queryFn: async () => {
       if (!templateId) return [];
-      
+
       const { data, error } = await supabase
         .from("template_workflow_states")
-        .select(`
-          *,
-          changed_by_profile:profiles(first_name, last_name, avatar_url)
-        `)
+        .select("*")
         .eq("template_id", templateId)
-        .order("created_at", { ascending: false });
+        .order("state_order", { ascending: true });
 
       if (error) throw error;
-      return data as (TemplateWorkflowState & {
-        changed_by_profile?: {
-          first_name: string;
-          last_name: string;
-          avatar_url: string | null;
-        };
-      })[];
+      return data as TemplateWorkflowState[];
     },
     enabled: !!templateId,
   });
 
-  // Get current state
-  const currentState = workflowStates?.[0];
+  // Get current state (last one by order)
+  const currentState = workflowStates?.[workflowStates.length - 1];
 
-  // Update workflow state
-  const updateStateMutation = useMutation({
-    mutationFn: async ({
-      templateId,
-      newState,
-      notes,
-    }: {
-      templateId: string;
-      newState: TemplateWorkflowState["state"];
-      notes?: string;
-    }) => {
-      const { data, error } = await supabase.rpc(
-        "update_template_workflow_state",
-        {
-          p_template_id: templateId,
-          p_new_state: newState,
-          p_notes: notes,
-        }
-      );
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["template-workflow-states"] });
-      toast({
-        title: "Estado actualizado",
-        description: "El estado del template ha sido actualizado exitosamente",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error al actualizar estado",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Track analytics
+  // Track analytics (views, etc.)
   const trackEventMutation = useMutation({
     mutationFn: async ({
       templateId,
-      eventType,
-      metadata,
     }: {
       templateId: string;
-      eventType: "view" | "edit" | "pdf_generated" | "shared" | "duplicated";
+      eventType?: string;
       metadata?: Record<string, any>;
     }) => {
-      const { error } = await supabase.from("template_analytics").insert({
-        template_id: templateId,
-        event_type: eventType,
-        metadata: metadata || {},
-      });
+      // Update views_count in template_analytics
+      const { data: existing } = await supabase
+        .from("template_analytics")
+        .select("id, views_count")
+        .eq("template_id", templateId)
+        .single();
 
-      if (error) throw error;
+      if (existing) {
+        const { error } = await supabase
+          .from("template_analytics")
+          .update({
+            views_count: (existing.views_count || 0) + 1,
+            last_used_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+
+        if (error) throw error;
+      }
     },
   });
 
@@ -153,8 +94,6 @@ export const useTemplateWorkflow = (templateId?: string) => {
     currentState,
     isLoadingStates,
     statesError,
-    updateState: updateStateMutation.mutate,
-    isUpdatingState: updateStateMutation.isPending,
     trackEvent: trackEventMutation.mutate,
   };
 };
@@ -175,43 +114,12 @@ export const useTemplateComments = (templateId?: string) => {
 
       const { data, error } = await supabase
         .from("template_comments")
-        .select(`
-          *,
-          user:profiles(first_name, last_name, avatar_url),
-          resolved_by_profile:profiles!template_comments_resolved_by_fkey(first_name, last_name)
-        `)
+        .select("*")
         .eq("template_id", templateId)
         .order("created_at", { ascending: true });
 
       if (error) throw error;
-
-      // Organize comments into threads
-      const commentsMap = new Map();
-      const rootComments: TemplateComment[] = [];
-
-      data.forEach((comment: any) => {
-        const formattedComment = {
-          ...comment,
-          replies: [],
-        };
-        commentsMap.set(comment.id, formattedComment);
-
-        if (!comment.parent_comment_id) {
-          rootComments.push(formattedComment);
-        }
-      });
-
-      // Add replies to their parent comments
-      data.forEach((comment: any) => {
-        if (comment.parent_comment_id) {
-          const parent = commentsMap.get(comment.parent_comment_id);
-          if (parent) {
-            parent.replies.push(commentsMap.get(comment.id));
-          }
-        }
-      });
-
-      return rootComments;
+      return data as TemplateComment[];
     },
     enabled: !!templateId,
   });
@@ -221,13 +129,14 @@ export const useTemplateComments = (templateId?: string) => {
     mutationFn: async ({
       templateId,
       content,
-      parentCommentId,
     }: {
       templateId: string;
       content: string;
       parentCommentId?: string;
     }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
 
       const { data, error } = await supabase
@@ -235,8 +144,7 @@ export const useTemplateComments = (templateId?: string) => {
         .insert({
           template_id: templateId,
           user_id: user.id,
-          content,
-          parent_comment_id: parentCommentId,
+          comment_text: content,
         })
         .select()
         .single();
@@ -260,46 +168,12 @@ export const useTemplateComments = (templateId?: string) => {
     },
   });
 
-  // Resolve comment
-  const resolveCommentMutation = useMutation({
-    mutationFn: async ({ commentId }: { commentId: string }) => {
-      const { data, error } = await supabase
-        .from("template_comments")
-        .update({
-          resolved: true,
-          resolved_at: new Date().toISOString(),
-        })
-        .eq("id", commentId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["template-comments"] });
-      toast({
-        title: "Comentario resuelto",
-        description: "El comentario ha sido marcado como resuelto",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error al resolver comentario",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
   return {
     comments,
     isLoadingComments,
     commentsError,
     addComment: addCommentMutation.mutate,
     isAddingComment: addCommentMutation.isPending,
-    resolveComment: resolveCommentMutation.mutate,
-    isResolvingComment: resolveCommentMutation.isPending,
   };
 };
 
@@ -319,34 +193,29 @@ export const useTemplateVersions = (templateId?: string) => {
 
       const { data, error } = await supabase
         .from("template_versions")
-        .select(`
-          *,
-          user:profiles(first_name, last_name)
-        `)
+        .select("*")
         .eq("template_id", templateId)
         .order("version_number", { ascending: false });
 
       if (error) throw error;
-      return data as (TemplateVersion & {
-        user?: { first_name: string; last_name: string };
-      })[];
+      return data as TemplateVersion[];
     },
     enabled: !!templateId,
   });
 
-  // Create major version
-  const createMajorVersionMutation = useMutation({
+  // Create new version
+  const createVersionMutation = useMutation({
     mutationFn: async ({
       templateId,
       changeNotes,
     }: {
       templateId: string;
-      changeNotes: string;
+      changeNotes?: string;
     }) => {
       // Get current template data
       const { data: template, error: templateError } = await supabase
         .from("templates")
-        .select("content, static_content, dynamic_fields")
+        .select("content")
         .eq("id", templateId)
         .single();
 
@@ -363,7 +232,9 @@ export const useTemplateVersions = (templateId?: string) => {
 
       const nextVersion = (lastVersion?.version_number || 0) + 1;
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
 
       const { data, error } = await supabase
@@ -372,11 +243,7 @@ export const useTemplateVersions = (templateId?: string) => {
           template_id: templateId,
           version_number: nextVersion,
           content: template.content,
-          static_content: template.static_content,
-          dynamic_fields: template.dynamic_fields,
           created_by: user.id,
-          change_notes: changeNotes,
-          is_major_version: true,
         })
         .select()
         .single();
@@ -387,8 +254,8 @@ export const useTemplateVersions = (templateId?: string) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["template-versions"] });
       toast({
-        title: "Versión major creada",
-        description: "Se ha creado una nueva versión major del template",
+        title: "Versión creada",
+        description: "Se ha creado una nueva versión del template",
       });
     },
     onError: (error: any) => {
@@ -417,8 +284,6 @@ export const useTemplateVersions = (templateId?: string) => {
         .from("templates")
         .update({
           content: version.content,
-          static_content: version.static_content,
-          dynamic_fields: version.dynamic_fields,
         })
         .eq("id", version.template_id)
         .select()
@@ -448,8 +313,8 @@ export const useTemplateVersions = (templateId?: string) => {
     versions,
     isLoadingVersions,
     versionsError,
-    createMajorVersion: createMajorVersionMutation.mutate,
-    isCreatingVersion: createMajorVersionMutation.isPending,
+    createVersion: createVersionMutation.mutate,
+    isCreatingVersion: createVersionMutation.isPending,
     revertToVersion: revertToVersionMutation.mutate,
     isReverting: revertToVersionMutation.isPending,
   };

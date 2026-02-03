@@ -30,27 +30,30 @@ export const useSignatureFlow = () => {
       setCurrentStep(2); // Obteniendo respuestas del cuestionario
 
       // 2. Obtener respuestas del cuestionario si existe template
-      let questionnaireResponses = {};
+      let questionnaireResponses: Record<string, any> = {};
       if (saleData.template_id) {
         const { data: responses, error: responsesError } = await supabase
           .from('template_responses')
           .select(`
             question_id,
             response_value,
-            template_questions!inner(question_text, question_type)
+            template_questions(question_text, question_type)
           `)
           .eq('template_id', saleData.template_id)
-          .eq('client_id', saleData.client_id);
+          .eq('sale_id', saleData.id);
 
         if (!responsesError && responses) {
-          questionnaireResponses = responses.reduce((acc, response) => {
-            acc[response.question_id] = {
-              question: response.template_questions.question_text,
-              answer: response.response_value,
-              question_type: response.template_questions.question_type
-            };
+          questionnaireResponses = responses.reduce((acc: Record<string, any>, response: any) => {
+            const question = response.template_questions;
+            if (question) {
+              acc[response.question_id] = {
+                question: question.question_text,
+                answer: response.response_value,
+                question_type: question.question_type
+              };
+            }
             return acc;
-          }, {} as Record<string, any>);
+          }, {});
         }
       }
 

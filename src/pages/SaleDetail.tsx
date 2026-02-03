@@ -28,7 +28,7 @@ export default function SaleDetail() {
         <div>
           <h1 className="text-3xl font-bold">Detalle de Venta</h1>
           <p className="text-muted-foreground">
-            Información completa de la venta #{sale.contract_number || id?.slice(0, 8)}
+            Información completa de la venta #{id?.slice(0, 8)}
           </p>
         </div>
       </div>

@@ -94,8 +94,8 @@ const QuestionnaireView = () => {
                   <p className="text-muted-foreground mt-1">{template.description}</p>
                 )}
               </div>
-              <Badge variant={template.is_global ? "default" : "secondary"}>
-                {template.is_global ? "Global" : "Empresa"}
+              <Badge variant="secondary">
+                Template
               </Badge>
             </div>
           </CardHeader>
@@ -124,11 +124,9 @@ const QuestionnaireView = () => {
         {/* Questionnaire */}
         <DynamicQuestionnaire
           templateId={saleData.template_id}
-          clientId={saleData.clients.id}
           saleId={saleData.id}
           signatureToken={token}
           onComplete={() => {
-            // This will be called if no signatureToken is provided
             console.log("Cuestionario completado");
           }}
         />

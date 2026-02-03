@@ -1,8 +1,7 @@
-
-import { useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuthContext } from '@/components/AuthProvider';
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuthContext } from "@/components/AuthProvider";
 
 export const useTestData = () => {
   const [isCreating, setIsCreating] = useState(false);
@@ -13,7 +12,8 @@ export const useTestData = () => {
     if (!profile?.company_id) {
       toast({
         title: "Error",
-        description: "No se puede crear datos de prueba sin una empresa asociada.",
+        description:
+          "No se puede crear datos de prueba sin una empresa asociada.",
         variant: "destructive",
       });
       return;
@@ -21,112 +21,123 @@ export const useTestData = () => {
 
     setIsCreating(true);
     try {
-      // 1. Crear clientes de prueba
+      // 1. Create test clients (with required company_id)
       const clientsData = [
         {
-          first_name: 'María',
-          last_name: 'García',
-          email: 'maria.garcia@email.com',
-          phone: '+34 123 456 789',
-          dni: '12345678A',
-          address: 'Calle Mayor 123, Madrid'
+          first_name: "María",
+          last_name: "García",
+          email: "maria.garcia@email.com",
+          phone: "+34 123 456 789",
+          dni: "12345678A",
+          address: "Calle Mayor 123, Madrid",
+          company_id: profile.company_id,
         },
         {
-          first_name: 'Juan',
-          last_name: 'Rodríguez',
-          email: 'juan.rodriguez@email.com',
-          phone: '+34 987 654 321',
-          dni: '87654321B',
-          address: 'Avenida España 456, Barcelona'
+          first_name: "Juan",
+          last_name: "Rodríguez",
+          email: "juan.rodriguez@email.com",
+          phone: "+34 987 654 321",
+          dni: "87654321B",
+          address: "Avenida España 456, Barcelona",
+          company_id: profile.company_id,
         },
         {
-          first_name: 'Ana',
-          last_name: 'López',
-          email: 'ana.lopez@email.com',
-          phone: '+34 555 666 777',
-          dni: '11223344C',
-          address: 'Plaza Central 789, Valencia'
-        }
+          first_name: "Ana",
+          last_name: "López",
+          email: "ana.lopez@email.com",
+          phone: "+34 555 666 777",
+          dni: "11223344C",
+          address: "Plaza Central 789, Valencia",
+          company_id: profile.company_id,
+        },
       ];
 
       const { data: clients, error: clientsError } = await supabase
-        .from('clients')
+        .from("clients")
         .insert(clientsData)
         .select();
 
       if (clientsError) throw clientsError;
 
-      // 2. Crear planes de prueba
+      // 2. Create test plans (matching actual schema)
       const plansData = [
         {
-          name: 'Plan Básico',
-          description: 'Cobertura básica para necesidades estándar',
+          name: "Plan Básico",
+          description: "Cobertura básica para necesidades estándar",
           price: 99.99,
-          coverage_details: 'Cobertura básica incluye: consultas médicas, urgencias 24h, medicamentos básicos',
+          coverage_details: {
+            items: [
+              "Consultas médicas",
+              "Urgencias 24h",
+              "Medicamentos básicos",
+            ],
+          },
           company_id: profile.company_id,
-          created_by: profile.id
         },
         {
-          name: 'Plan Premium',
-          description: 'Cobertura completa con servicios adicionales',
+          name: "Plan Premium",
+          description: "Cobertura completa con servicios adicionales",
           price: 199.99,
-          coverage_details: 'Cobertura premium incluye: todo lo del plan básico + especialistas, cirugías, hospitalización',
+          coverage_details: {
+            items: [
+              "Todo del plan básico",
+              "Especialistas",
+              "Cirugías",
+              "Hospitalización",
+            ],
+          },
           company_id: profile.company_id,
-          created_by: profile.id
         },
         {
-          name: 'Plan Familiar',
-          description: 'Cobertura familiar para hasta 4 miembros',
+          name: "Plan Familiar",
+          description: "Cobertura familiar para hasta 4 miembros",
           price: 299.99,
-          coverage_details: 'Cobertura familiar incluye: todo lo del plan premium para toda la familia',
+          coverage_details: {
+            items: ["Todo del plan premium", "Cobertura familiar completa"],
+          },
           company_id: profile.company_id,
-          created_by: profile.id
-        }
+        },
       ];
 
       const { data: plans, error: plansError } = await supabase
-        .from('plans')
+        .from("plans")
         .insert(plansData)
         .select();
 
       if (plansError) throw plansError;
 
-      // 3. Crear templates de documentos de prueba
+      // 3. Create test templates (matching actual schema)
       const templatesData = [
         {
-          name: 'Contrato Estándar',
-          description: 'Template de contrato estándar para todos los planes',
-          content: {
-            title: 'CONTRATO DE SERVICIOS DE SALUD',
+          name: "Contrato Estándar",
+          description: "Template de contrato estándar para todos los planes",
+          content: JSON.stringify({
+            title: "CONTRATO DE SERVICIOS DE SALUD",
             sections: [
               {
-                title: 'DATOS DEL CONTRATANTE',
-                content: 'Nombre: {{cliente.nombre}} {{cliente.apellido}}\nDNI: {{cliente.dni}}\nEmail: {{cliente.email}}\nTeléfono: {{cliente.telefono}}'
+                title: "DATOS DEL CONTRATANTE",
+                content:
+                  "Nombre: {{cliente.nombre}} {{cliente.apellido}}\nDNI: {{cliente.dni}}",
               },
               {
-                title: 'PLAN CONTRATADO',
-                content: 'Plan: {{plan.nombre}}\nPrecio: {{precio_formateado}}\nDescripción: {{plan.descripcion}}'
+                title: "PLAN CONTRATADO",
+                content: "Plan: {{plan.nombre}}\nPrecio: {{precio_formateado}}",
               },
-              {
-                title: 'TÉRMINOS Y CONDICIONES',
-                content: 'Este contrato entra en vigor a partir de {{fecha.actual}} y tiene validez por un período de 12 meses. El cliente se compromete al pago mensual de {{precio_formateado}}.'
-              }
-            ]
-          },
-          is_global: false,
+            ],
+          }),
           company_id: profile.company_id,
-          created_by: profile.id
-        }
+          created_by: profile.id,
+        },
       ];
 
       const { data: templates, error: templatesError } = await supabase
-        .from('templates')
+        .from("templates")
         .insert(templatesData)
         .select();
 
       if (templatesError) throw templatesError;
 
-      // 4. Crear ventas de prueba en diferentes estados
+      // 4. Create test sales (matching actual schema - no sale_date field)
       const salesData = [
         {
           client_id: clients[0].id,
@@ -134,9 +145,8 @@ export const useTestData = () => {
           company_id: profile.company_id,
           salesperson_id: profile.id,
           total_amount: plans[0].price,
-          status: 'borrador' as const,
-          notes: 'Cliente interesado en el plan básico',
-          sale_date: new Date().toISOString()
+          status: "borrador" as const,
+          notes: "Cliente interesado en el plan básico",
         },
         {
           client_id: clients[1].id,
@@ -144,75 +154,36 @@ export const useTestData = () => {
           company_id: profile.company_id,
           salesperson_id: profile.id,
           total_amount: plans[1].price,
-          status: 'enviado' as const,
-          notes: 'Enviado para firma el día de hoy',
-          sale_date: new Date().toISOString()
-        }
+          status: "enviado" as const,
+          notes: "Enviado para firma el día de hoy",
+        },
       ];
 
       const { data: sales, error: salesError } = await supabase
-        .from('sales')
+        .from("sales")
         .insert(salesData)
         .select();
 
       if (salesError) throw salesError;
 
-      // 5. Crear documentos asociados a las ventas
+      // 5. Create documents (matching actual schema)
       const documentsData = [
         {
-          name: 'Contrato Plan Básico',
-          content: `
-            <h1>CONTRATO DE SERVICIOS DE SALUD</h1>
-            <h2>DATOS DEL CONTRATANTE</h2>
-            <p><strong>Nombre:</strong> ${clients[0].first_name} ${clients[0].last_name}</p>
-            <p><strong>DNI:</strong> ${clients[0].dni}</p>
-            <p><strong>Email:</strong> ${clients[0].email}</p>
-            <p><strong>Teléfono:</strong> ${clients[0].phone}</p>
-            
-            <h2>PLAN CONTRATADO</h2>
-            <p><strong>Plan:</strong> ${plans[0].name}</p>
-            <p><strong>Precio:</strong> €${plans[0].price}</p>
-            <p><strong>Descripción:</strong> ${plans[0].description}</p>
-            
-            <h2>TÉRMINOS Y CONDICIONES</h2>
-            <p>Este contrato entra en vigor a partir de la fecha de firma y tiene validez por un período de 12 meses.</p>
-            <p>El cliente se compromete al pago mensual de €${plans[0].price}.</p>
-          `,
+          name: "Contrato Plan Básico",
+          content: `<h1>CONTRATO DE SERVICIOS</h1><p>Cliente: ${clients[0].first_name} ${clients[0].last_name}</p>`,
           sale_id: sales[0].id,
-          template_id: templates[0].id,
-          plan_id: plans[0].id,
-          is_required: true,
-          order_index: 1
+          document_type: "contract",
         },
         {
-          name: 'Contrato Plan Premium',
-          content: `
-            <h1>CONTRATO DE SERVICIOS DE SALUD</h1>
-            <h2>DATOS DEL CONTRATANTE</h2>
-            <p><strong>Nombre:</strong> ${clients[1].first_name} ${clients[1].last_name}</p>
-            <p><strong>DNI:</strong> ${clients[1].dni}</p>
-            <p><strong>Email:</strong> ${clients[1].email}</p>
-            <p><strong>Teléfono:</strong> ${clients[1].phone}</p>
-            
-            <h2>PLAN CONTRATADO</h2>
-            <p><strong>Plan:</strong> ${plans[1].name}</p>
-            <p><strong>Precio:</strong> €${plans[1].price}</p>
-            <p><strong>Descripción:</strong> ${plans[1].description}</p>
-            
-            <h2>TÉRMINOS Y CONDICIONES</h2>
-            <p>Este contrato entra en vigor a partir de la fecha de firma y tiene validez por un período de 12 meses.</p>
-            <p>El cliente se compromete al pago mensual de €${plans[1].price}.</p>
-          `,
+          name: "Contrato Plan Premium",
+          content: `<h1>CONTRATO DE SERVICIOS</h1><p>Cliente: ${clients[1].first_name} ${clients[1].last_name}</p>`,
           sale_id: sales[1].id,
-          template_id: templates[0].id,
-          plan_id: plans[1].id,
-          is_required: true,
-          order_index: 1
-        }
+          document_type: "contract",
+        },
       ];
 
       const { error: documentsError } = await supabase
-        .from('documents')
+        .from("documents")
         .insert(documentsData);
 
       if (documentsError) throw documentsError;
@@ -224,7 +195,7 @@ export const useTestData = () => {
 
       return { success: true };
     } catch (error: any) {
-      console.error('Error creating test data:', error);
+      console.error("Error creating test data:", error);
       toast({
         title: "Error",
         description: error.message || "No se pudieron crear los datos de prueba.",

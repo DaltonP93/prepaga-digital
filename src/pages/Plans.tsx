@@ -133,16 +133,16 @@ const Plans = () => {
                 </div>
                 
                 <div className="flex flex-wrap gap-2">
-                  <Badge variant={plan.active ? 'default' : 'secondary'}>
-                    {plan.active ? 'Activo' : 'Inactivo'}
+                  <Badge variant={plan.is_active ? 'default' : 'secondary'}>
+                    {plan.is_active ? 'Activo' : 'Inactivo'}
                   </Badge>
                 </div>
 
-                {plan.coverage_details && (
+                {plan.coverage_details && typeof plan.coverage_details === 'object' && (
                   <div>
                     <h4 className="font-medium mb-2">Detalles de Cobertura:</h4>
                     <p className="text-sm text-muted-foreground">
-                      {plan.coverage_details}
+                      {JSON.stringify(plan.coverage_details)}
                     </p>
                   </div>
                 )}

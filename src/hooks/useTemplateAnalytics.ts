@@ -1,265 +1,179 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { subDays, format, startOfDay, endOfDay } from "date-fns";
+import { subDays, format } from "date-fns";
 
-export interface TemplateAnalytics {
+// This hook works with the actual template_analytics table schema:
+// id, template_id, views_count, completions_count, avg_completion_time, last_used_at, created_at, updated_at
+
+export interface TemplateAnalyticsData {
   id: string;
   template_id: string;
-  event_type: "view" | "edit" | "pdf_generated" | "shared" | "duplicated" | "template_updated";
-  user_id: string | null;
-  session_id: string | null;
-  metadata: Record<string, any>;
+  views_count: number;
+  completions_count: number;
+  avg_completion_time: number | null;
+  last_used_at: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 export interface AnalyticsMetrics {
   totalViews: number;
-  totalEdits: number;
-  totalPDFsGenerated: number;
-  totalShares: number;
-  totalDuplications: number;
-  dailyActivity: Array<{
-    date: string;
-    views: number;
-    edits: number;
-    pdf_generated: number;
-  }>;
-  topUsers: Array<{
-    user_id: string;
-    user_name: string;
-    event_count: number;
-  }>;
-  eventTrends: Array<{
-    event_type: string;
-    count: number;
-    percentage: number;
-  }>;
+  totalCompletions: number;
+  avgCompletionTime: number | null;
+  lastUsedAt: string | null;
 }
 
-// Function to track events
-export const trackEvent = async (
-  eventType: TemplateAnalytics["event_type"],
-  templateId: string,
-  metadata?: Record<string, any>
-) => {
-  try {
-    await supabase
-      .from("template_analytics")
-      .insert({
-        template_id: templateId,
-        event_type: eventType,
-        metadata: metadata || {},
-      });
-  } catch (error) {
-    console.error("Error tracking event:", error);
-  }
-};
+export const useTemplateAnalytics = (templateId?: string) => {
+  const queryClient = useQueryClient();
 
-export const useTemplateAnalytics = (templateId?: string, days = 30) => {
-  const fromDate = subDays(new Date(), days);
-  const toDate = new Date();
-
-  // Get analytics data
+  // Get analytics data for a specific template
   const {
     data: analytics,
     isLoading: isLoadingAnalytics,
     error: analyticsError,
   } = useQuery({
-    queryKey: ["template-analytics", templateId, days],
+    queryKey: ["template-analytics", templateId],
     queryFn: async () => {
-      if (!templateId) return [];
+      if (!templateId) return null;
 
       const { data, error } = await supabase
         .from("template_analytics")
-        .select(`
-          *,
-          user:profiles(first_name, last_name)
-        `)
+        .select("*")
         .eq("template_id", templateId)
-        .gte("created_at", fromDate.toISOString())
-        .lte("created_at", toDate.toISOString())
-        .order("created_at", { ascending: false });
+        .single();
 
-      if (error) throw error;
-      return data as (TemplateAnalytics & {
-        user?: { first_name: string; last_name: string };
-      })[];
+      if (error && error.code !== "PGRST116") throw error;
+      return data as TemplateAnalyticsData | null;
     },
     enabled: !!templateId,
   });
 
-  // Process metrics
-  const metrics: AnalyticsMetrics | null = analytics ? (() => {
-    const totalViews = analytics.filter(a => a.event_type === "view").length;
-    const totalEdits = analytics.filter(a => a.event_type === "edit").length;
-    const totalPDFsGenerated = analytics.filter(a => a.event_type === "pdf_generated").length;
-    const totalShares = analytics.filter(a => a.event_type === "shared").length;
-    const totalDuplications = analytics.filter(a => a.event_type === "duplicated").length;
+  // Increment view count
+  const trackViewMutation = useMutation({
+    mutationFn: async (templateId: string) => {
+      // Check if analytics record exists
+      const { data: existing } = await supabase
+        .from("template_analytics")
+        .select("id, views_count")
+        .eq("template_id", templateId)
+        .single();
 
-    // Daily activity
-    const dailyMap = new Map<string, { views: number; edits: number; pdf_generated: number }>();
-    
-    for (let i = 0; i < days; i++) {
-      const date = format(subDays(new Date(), i), "yyyy-MM-dd");
-      dailyMap.set(date, { views: 0, edits: 0, pdf_generated: 0 });
-    }
+      if (existing) {
+        // Update existing record
+        const { error } = await supabase
+          .from("template_analytics")
+          .update({
+            views_count: (existing.views_count || 0) + 1,
+            last_used_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
 
-    analytics.forEach(item => {
-      const date = format(new Date(item.created_at), "yyyy-MM-dd");
-      const dayData = dailyMap.get(date);
-      if (dayData) {
-        if (item.event_type === "view") dayData.views++;
-        else if (item.event_type === "edit") dayData.edits++;
-        else if (item.event_type === "pdf_generated") dayData.pdf_generated++;
+        if (error) throw error;
       }
-    });
+      // Note: If no record exists, we can't insert due to RLS restrictions
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["template-analytics"] });
+    },
+  });
 
-    const dailyActivity = Array.from(dailyMap.entries())
-      .map(([date, data]) => ({ date, ...data }))
-      .sort((a, b) => a.date.localeCompare(b.date));
+  // Track completion
+  const trackCompletionMutation = useMutation({
+    mutationFn: async ({
+      templateId,
+      completionTimeMs,
+    }: {
+      templateId: string;
+      completionTimeMs?: number;
+    }) => {
+      const { data: existing } = await supabase
+        .from("template_analytics")
+        .select("id, completions_count, avg_completion_time")
+        .eq("template_id", templateId)
+        .single();
 
-    // Top users
-    const userMap = new Map<string, { name: string; count: number }>();
-    analytics.forEach(item => {
-      if (item.user_id && item.user) {
-        const userId = item.user_id;
-        const userName = `${item.user.first_name} ${item.user.last_name}`;
-        const existing = userMap.get(userId);
-        if (existing) {
-          existing.count++;
-        } else {
-          userMap.set(userId, { name: userName, count: 1 });
+      if (existing) {
+        const newCount = (existing.completions_count || 0) + 1;
+        let newAvg = existing.avg_completion_time;
+
+        if (completionTimeMs) {
+          const oldAvg = existing.avg_completion_time || 0;
+          const oldCount = existing.completions_count || 0;
+          newAvg = Math.round((oldAvg * oldCount + completionTimeMs) / newCount);
         }
+
+        const { error } = await supabase
+          .from("template_analytics")
+          .update({
+            completions_count: newCount,
+            avg_completion_time: newAvg,
+            last_used_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+
+        if (error) throw error;
       }
-    });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["template-analytics"] });
+    },
+  });
 
-    const topUsers = Array.from(userMap.entries())
-      .map(([user_id, data]) => ({
-        user_id,
-        user_name: data.name,
-        event_count: data.count,
-      }))
-      .sort((a, b) => b.event_count - a.event_count)
-      .slice(0, 5);
-
-    // Event trends
-    const eventCounts = analytics.reduce((acc, item) => {
-      acc[item.event_type] = (acc[item.event_type] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    const totalEvents = analytics.length;
-    const eventTrends = Object.entries(eventCounts).map(([event_type, count]) => ({
-      event_type,
-      count,
-      percentage: totalEvents > 0 ? Math.round((count / totalEvents) * 100) : 0,
-    }));
-
-    return {
-      totalViews,
-      totalEdits,
-      totalPDFsGenerated,
-      totalShares,
-      totalDuplications,
-      dailyActivity,
-      topUsers,
-      eventTrends,
-    };
-  })() : null;
+  const metrics: AnalyticsMetrics | null = analytics
+    ? {
+        totalViews: analytics.views_count || 0,
+        totalCompletions: analytics.completions_count || 0,
+        avgCompletionTime: analytics.avg_completion_time,
+        lastUsedAt: analytics.last_used_at,
+      }
+    : null;
 
   return {
     analytics,
     metrics,
     isLoadingAnalytics,
     analyticsError,
-    trackEvent: (eventType: TemplateAnalytics["event_type"], metadata?: Record<string, any>) => {
-      if (templateId) {
-        return trackEvent(eventType, templateId, metadata);
-      }
-    },
+    trackView: (templateId: string) => trackViewMutation.mutate(templateId),
+    trackCompletion: trackCompletionMutation.mutate,
   };
 };
 
-export const useCompanyAnalytics = (days = 30) => {
-  const fromDate = subDays(new Date(), days);
-  const toDate = new Date();
-
-  // Get company-wide analytics
+export const useCompanyAnalytics = () => {
+  // Get all template analytics for the company
   const {
     data: companyAnalytics,
     isLoading: isLoadingCompanyAnalytics,
     error: companyAnalyticsError,
   } = useQuery({
-    queryKey: ["company-analytics", days],
+    queryKey: ["company-analytics"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("template_analytics")
         .select(`
           *,
-          template:templates(name, template_type),
-          user:profiles(first_name, last_name)
+          templates(id, name, description)
         `)
-        .gte("created_at", fromDate.toISOString())
-        .lte("created_at", toDate.toISOString())
-        .order("created_at", { ascending: false });
+        .order("views_count", { ascending: false });
 
       if (error) throw error;
       return data;
     },
   });
 
-  // Get template usage stats
-  const {
-    data: templateStats,
-    isLoading: isLoadingTemplateStats,
-  } = useQuery({
-    queryKey: ["template-stats", days],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("template_analytics")
-        .select(`
-          template_id,
-          event_type,
-          template:templates(name, template_type)
-        `)
-        .gte("created_at", fromDate.toISOString())
-        .lte("created_at", toDate.toISOString());
-
-      if (error) throw error;
-
-      // Group by template
-      const templateMap = new Map();
-      data.forEach(item => {
-        const templateId = item.template_id;
-        if (!templateMap.has(templateId)) {
-          templateMap.set(templateId, {
-            template_id: templateId,
-            template_name: item.template?.name || "Unknown",
-            template_type: item.template?.template_type || "unknown",
-            views: 0,
-            edits: 0,
-            pdf_generated: 0,
-            total_events: 0,
-          });
-        }
-        
-        const stats = templateMap.get(templateId);
-        stats.total_events++;
-        if (item.event_type === "view") stats.views++;
-        else if (item.event_type === "edit") stats.edits++;
-        else if (item.event_type === "pdf_generated") stats.pdf_generated++;
-      });
-
-      return Array.from(templateMap.values())
-        .sort((a, b) => b.total_events - a.total_events);
-    },
-  });
+  // Calculate aggregated stats
+  const templateStats = companyAnalytics?.map((item) => ({
+    template_id: item.template_id,
+    template_name: (item.templates as any)?.name || "Unknown",
+    views: item.views_count || 0,
+    completions: item.completions_count || 0,
+    avg_completion_time: item.avg_completion_time,
+    last_used_at: item.last_used_at,
+  })) || [];
 
   return {
     companyAnalytics,
     templateStats,
     isLoadingCompanyAnalytics,
-    isLoadingTemplateStats,
     companyAnalyticsError,
   };
 };

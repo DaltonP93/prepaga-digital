@@ -9,9 +9,9 @@ type TemplateResponseInsert = TablesInsert<"template_responses">;
 export const useTemplateResponses = (templateId?: string, clientId?: string, saleId?: string) => {
   const queryClient = useQueryClient();
 
-  // Fetch responses for a specific template and client
+  // Fetch responses for a specific template and sale
   const { data: responses, isLoading } = useQuery({
-    queryKey: ["template-responses", templateId, clientId, saleId],
+    queryKey: ["template-responses", templateId, saleId],
     queryFn: async () => {
       if (!templateId) return [];
       
@@ -19,14 +19,9 @@ export const useTemplateResponses = (templateId?: string, clientId?: string, sal
         .from("template_responses")
         .select(`
           *,
-          template_questions!inner(question_text, question_type),
-          clients(first_name, last_name)
+          template_questions(question_text, question_type)
         `)
         .eq("template_id", templateId);
-
-      if (clientId) {
-        query = query.eq("client_id", clientId);
-      }
 
       if (saleId) {
         query = query.eq("sale_id", saleId);
@@ -35,7 +30,7 @@ export const useTemplateResponses = (templateId?: string, clientId?: string, sal
       const { data, error } = await query.order("created_at", { ascending: true });
 
       if (error) throw error;
-      return data;
+      return data as any[];
     },
     enabled: !!templateId,
   });
@@ -78,14 +73,14 @@ export const useTemplateResponses = (templateId?: string, clientId?: string, sal
   // Create/update responses mutation
   const saveResponsesMutation = useMutation({
     mutationFn: async (responsesData: TemplateResponseInsert[]) => {
-      // First, delete existing responses for this client and template
+      // First, delete existing responses for this sale and template
       if (responsesData.length > 0) {
         const firstResponse = responsesData[0];
         await supabase
           .from("template_responses")
           .delete()
           .eq("template_id", firstResponse.template_id)
-          .eq("client_id", firstResponse.client_id);
+          .eq("sale_id", firstResponse.sale_id);
       }
 
       // Then insert new responses
@@ -109,12 +104,12 @@ export const useTemplateResponses = (templateId?: string, clientId?: string, sal
 
   // Delete responses mutation
   const deleteResponsesMutation = useMutation({
-    mutationFn: async ({ templateId, clientId }: { templateId: string; clientId: string }) => {
+    mutationFn: async ({ templateId, saleId }: { templateId: string; saleId: string }) => {
       const { error } = await supabase
         .from("template_responses")
         .delete()
         .eq("template_id", templateId)
-        .eq("client_id", clientId);
+        .eq("sale_id", saleId);
 
       if (error) throw error;
     },

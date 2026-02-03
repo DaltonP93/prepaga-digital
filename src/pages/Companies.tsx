@@ -117,7 +117,7 @@ const Companies = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {companies?.filter(c => c.active).length || 0}
+                {companies?.filter(c => c.is_active).length || 0}
               </div>
               <p className="text-xs text-muted-foreground">Activas del total</p>
             </CardContent>
@@ -179,10 +179,10 @@ const Companies = () => {
                     <TableCell>{company.email || '-'}</TableCell>
                     <TableCell>
                       <Badge 
-                        variant={company.active ? "default" : "secondary"}
-                        className={company.active ? "bg-green-100 text-green-800" : ""}
+                        variant={company.is_active ? "default" : "secondary"}
+                        className={company.is_active ? "bg-green-100 text-green-800" : ""}
                       >
-                        {company.active ? "Activa" : "Inactiva"}
+                        {company.is_active ? "Activa" : "Inactiva"}
                       </Badge>
                     </TableCell>
                     <TableCell>
