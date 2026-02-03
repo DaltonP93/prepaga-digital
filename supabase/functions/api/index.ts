@@ -7,11 +7,30 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS"
 };
 
-// Helper function to validate API key
-const validateApiKey = async (apiKey: string) => {
-  // In production, store API keys in a secure table
-  const validApiKeys = ["api_key_123", "api_key_456"]; // Demo keys
-  return validApiKeys.includes(apiKey);
+/**
+ * Validate API key against database-stored keys
+ * SECURITY: API keys should be stored in a secure table with hashing
+ * This implementation validates against the company_settings table
+ */
+const validateApiKey = async (supabase: any, apiKey: string): Promise<{ valid: boolean; companyId?: string }> => {
+  if (!apiKey || apiKey.length < 32) {
+    return { valid: false };
+  }
+
+  // Check if API key exists in company settings
+  // In production, you should hash the API key and compare hashes
+  const { data, error } = await supabase
+    .from('company_settings')
+    .select('company_id, email_api_key')
+    .eq('email_api_key', apiKey)
+    .single();
+
+  if (error || !data) {
+    console.log('API key validation failed:', error?.message || 'Key not found');
+    return { valid: false };
+  }
+
+  return { valid: true, companyId: data.company_id };
 };
 
 serve(async (req) => {
@@ -20,34 +39,43 @@ serve(async (req) => {
   }
 
   try {
-    // Validate API Key
+    // Initialize Supabase client with service role for API key validation
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    // Validate API Key from header
     const apiKey = req.headers.get("x-api-key");
-    if (!apiKey || !(await validateApiKey(apiKey))) {
+    if (!apiKey) {
+      return new Response(JSON.stringify({ error: "API key required" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    const validation = await validateApiKey(supabase, apiKey);
+    if (!validation.valid) {
       return new Response(JSON.stringify({ error: "Invalid API key" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
+    const companyId = validation.companyId;
     const url = new URL(req.url);
     const path = url.pathname;
     const method = req.method;
 
-    // Initialize Supabase client
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
-    // Route handling
+    // Route handling - pass companyId for scoped access
     if (path.startsWith("/api/clients")) {
-      return handleClientsAPI(supabase, method, path, req);
+      return handleClientsAPI(supabase, method, path, req, companyId);
     } else if (path.startsWith("/api/sales")) {
-      return handleSalesAPI(supabase, method, path, req);
+      return handleSalesAPI(supabase, method, path, req, companyId);
     } else if (path.startsWith("/api/documents")) {
-      return handleDocumentsAPI(supabase, method, path, req);
+      return handleDocumentsAPI(supabase, method, path, req, companyId);
     } else if (path.startsWith("/api/analytics")) {
-      return handleAnalyticsAPI(supabase, method, path, req);
+      return handleAnalyticsAPI(supabase, method, path, req, companyId);
     } else {
       return new Response(JSON.stringify({ error: "Endpoint not found" }), {
         status: 404,
@@ -64,19 +92,20 @@ serve(async (req) => {
   }
 });
 
-// Clients API handlers
-async function handleClientsAPI(supabase: any, method: string, path: string, req: Request) {
+// Clients API handlers - scoped to company
+async function handleClientsAPI(supabase: any, method: string, path: string, req: Request, companyId?: string) {
   const pathParts = path.split("/");
   const clientId = pathParts[3];
 
   switch (method) {
     case "GET":
       if (clientId) {
-        // Get specific client
+        // Get specific client - scoped to company
         const { data, error } = await supabase
           .from("clients")
           .select("*")
           .eq("id", clientId)
+          .eq("company_id", companyId)
           .single();
         
         if (error) throw error;
@@ -84,10 +113,11 @@ async function handleClientsAPI(supabase: any, method: string, path: string, req
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
       } else {
-        // Get all clients
+        // Get all clients for company
         const { data, error } = await supabase
           .from("clients")
           .select("*")
+          .eq("company_id", companyId)
           .order("created_at", { ascending: false });
         
         if (error) throw error;
@@ -98,9 +128,10 @@ async function handleClientsAPI(supabase: any, method: string, path: string, req
 
     case "POST":
       const clientData = await req.json();
+      // Enforce company_id from API key
       const { data, error } = await supabase
         .from("clients")
-        .insert(clientData)
+        .insert({ ...clientData, company_id: companyId })
         .select()
         .single();
       
@@ -115,10 +146,12 @@ async function handleClientsAPI(supabase: any, method: string, path: string, req
         throw new Error("Client ID required for update");
       }
       const updateData = await req.json();
+      // Only allow update of clients in same company
       const { data: updatedData, error: updateError } = await supabase
         .from("clients")
         .update(updateData)
         .eq("id", clientId)
+        .eq("company_id", companyId)
         .select()
         .single();
       
@@ -131,10 +164,12 @@ async function handleClientsAPI(supabase: any, method: string, path: string, req
       if (!clientId) {
         throw new Error("Client ID required for delete");
       }
+      // Only allow delete of clients in same company
       const { error: deleteError } = await supabase
         .from("clients")
         .delete()
-        .eq("id", clientId);
+        .eq("id", clientId)
+        .eq("company_id", companyId);
       
       if (deleteError) throw deleteError;
       return new Response(JSON.stringify({ message: "Client deleted successfully" }), {
@@ -146,8 +181,8 @@ async function handleClientsAPI(supabase: any, method: string, path: string, req
   }
 }
 
-// Sales API handlers
-async function handleSalesAPI(supabase: any, method: string, path: string, req: Request) {
+// Sales API handlers - scoped to company
+async function handleSalesAPI(supabase: any, method: string, path: string, req: Request, companyId?: string) {
   const pathParts = path.split("/");
   const saleId = pathParts[3];
 
@@ -160,10 +195,10 @@ async function handleSalesAPI(supabase: any, method: string, path: string, req: 
             *,
             clients(*),
             plans(*),
-            companies(*),
-            profiles(*)
+            companies(*)
           `)
           .eq("id", saleId)
+          .eq("company_id", companyId)
           .single();
         
         if (error) throw error;
@@ -179,6 +214,7 @@ async function handleSalesAPI(supabase: any, method: string, path: string, req: 
             plans(*),
             companies(*)
           `)
+          .eq("company_id", companyId)
           .order("created_at", { ascending: false });
         
         if (error) throw error;
@@ -189,9 +225,10 @@ async function handleSalesAPI(supabase: any, method: string, path: string, req: 
 
     case "POST":
       const saleData = await req.json();
+      // Enforce company_id from API key
       const { data, error } = await supabase
         .from("sales")
-        .insert(saleData)
+        .insert({ ...saleData, company_id: companyId })
         .select()
         .single();
       
@@ -206,17 +243,26 @@ async function handleSalesAPI(supabase: any, method: string, path: string, req: 
   }
 }
 
-// Documents API handlers
-async function handleDocumentsAPI(supabase: any, method: string, path: string, req: Request) {
+// Documents API handlers - scoped to company via sales
+async function handleDocumentsAPI(supabase: any, method: string, path: string, req: Request, companyId?: string) {
   switch (method) {
     case "GET":
+      // Get documents for sales belonging to this company
+      const { data: sales } = await supabase
+        .from("sales")
+        .select("id")
+        .eq("company_id", companyId);
+      
+      const saleIds = sales?.map((s: any) => s.id) || [];
+      
       const { data, error } = await supabase
         .from("documents")
         .select("*")
+        .in("sale_id", saleIds)
         .order("created_at", { ascending: false });
       
       if (error) throw error;
-      return new Response(JSON.stringify({ documents: data, total: data.length }), {
+      return new Response(JSON.stringify({ documents: data, total: data?.length || 0 }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
 
@@ -225,32 +271,29 @@ async function handleDocumentsAPI(supabase: any, method: string, path: string, r
   }
 }
 
-// Analytics API handlers
-async function handleAnalyticsAPI(supabase: any, method: string, path: string, req: Request) {
+// Analytics API handlers - scoped to company
+async function handleAnalyticsAPI(supabase: any, method: string, path: string, req: Request, companyId?: string) {
   if (method !== "GET") {
     throw new Error("Only GET method allowed for analytics");
   }
 
-  // Get comprehensive analytics
+  // Get comprehensive analytics scoped to company
   const [
     { data: clients },
     { data: sales },
-    { data: documents },
-    { data: companies }
+    { data: documents }
   ] = await Promise.all([
-    supabase.from("clients").select("*"),
-    supabase.from("sales").select("*"),
-    supabase.from("documents").select("*"),
-    supabase.from("companies").select("*")
+    supabase.from("clients").select("*").eq("company_id", companyId),
+    supabase.from("sales").select("*").eq("company_id", companyId),
+    supabase.from("documents").select("*, sales!inner(company_id)").eq("sales.company_id", companyId)
   ]);
 
   const analytics = {
     totalClients: clients?.length || 0,
     totalSales: sales?.length || 0,
     totalDocuments: documents?.length || 0,
-    totalCompanies: companies?.length || 0,
-    totalRevenue: sales?.reduce((sum, sale) => sum + (sale.total_amount || 0), 0) || 0,
-    salesByStatus: sales?.reduce((acc, sale) => {
+    totalRevenue: sales?.reduce((sum: number, sale: any) => sum + (sale.total_amount || 0), 0) || 0,
+    salesByStatus: sales?.reduce((acc: any, sale: any) => {
       acc[sale.status] = (acc[sale.status] || 0) + 1;
       return acc;
     }, {}),

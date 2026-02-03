@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { PDFGeneratorControls } from '@/components/PDFGeneratorControls';
+import DOMPurify from 'dompurify';
 
 interface DocumentPreviewProps {
   content: string;
@@ -100,9 +101,10 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
         </CardHeader>
         <CardContent>
           <div className="bg-white border rounded-lg p-6 min-h-[400px] max-h-[600px] overflow-y-auto">
+            {/* SECURITY: Content is sanitized with DOMPurify to prevent XSS attacks */}
             <div 
               className="prose prose-sm max-w-none"
-              dangerouslySetInnerHTML={{ __html: previewContent }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewContent) }}
             />
           </div>
         </CardContent>

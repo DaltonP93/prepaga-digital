@@ -1,4 +1,3 @@
-
 import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { ArrowLeft, Loader2, Edit3 } from "lucide-react";
@@ -8,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { useTemplates } from "@/hooks/useTemplates";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import DOMPurify from 'dompurify';
 
 export default function TemplateDetail() {
   const { id } = useParams<{ id: string }>();
@@ -80,9 +80,10 @@ export default function TemplateDetail() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                {/* SECURITY: Content is sanitized with DOMPurify to prevent XSS attacks */}
                 <div className="prose max-w-none">
                   {template.content ? (
-                    <div dangerouslySetInnerHTML={{ __html: typeof template.content === 'string' ? template.content : JSON.stringify(template.content) }} />
+                    <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(typeof template.content === 'string' ? template.content : JSON.stringify(template.content)) }} />
                   ) : (
                     <p className="text-muted-foreground">No hay contenido disponible</p>
                   )}
