@@ -132,12 +132,7 @@ export const DocumentTrackingPanel: React.FC<DocumentTrackingPanelProps> = ({ sa
           <span>{new Date(sale.created_at || '').toLocaleDateString()}</span>
         </div>
         
-        {sale.sale_date && (
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Fecha de venta:</span>
-            <span>{new Date(sale.sale_date).toLocaleDateString()}</span>
-          </div>
-        )}
+        {/* Date info is shown via created_at */}
 
         {sale.signature_expires_at && (
           <div className="flex items-center justify-between text-sm">
@@ -171,19 +166,7 @@ export const DocumentTrackingPanel: React.FC<DocumentTrackingPanelProps> = ({ sa
           </div>
         )}
 
-        {sale.contract_number && (
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Número de contrato:</span>
-            <span className="font-mono text-xs">{sale.contract_number}</span>
-          </div>
-        )}
-
-        {sale.request_number && (
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Número de solicitud:</span>
-            <span className="font-mono text-xs">{sale.request_number}</span>
-          </div>
-        )}
+        {/* Contract and request numbers are part of sales metadata if needed */}
 
         {saleWithTokenInfo.token_revoked_at && (
           <div className="flex items-center justify-between text-sm">

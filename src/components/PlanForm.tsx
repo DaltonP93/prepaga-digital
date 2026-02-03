@@ -53,9 +53,9 @@ export function PlanForm({ open, onOpenChange, plan }: PlanFormProps) {
       setValue("name", plan.name || "");
       setValue("description", plan.description || "");
       setValue("price", Number(plan.price) || 0);
-      setValue("coverage_details", plan.coverage_details || "");
+      setValue("coverage_details", typeof plan.coverage_details === 'string' ? plan.coverage_details : JSON.stringify(plan.coverage_details || {}));
       setValue("company_id", plan.company_id || profile?.company_id || "");
-      setValue("active", plan.active ?? true);
+      setValue("active", plan.is_active ?? true);
     } else if (!plan && open) {
       // Reset for new plan
       reset({
@@ -74,12 +74,21 @@ export function PlanForm({ open, onOpenChange, plan }: PlanFormProps) {
       if (isEditing && plan) {
         await updatePlan.mutateAsync({
           id: plan.id,
-          ...data,
+          name: data.name,
+          description: data.description,
+          price: data.price,
+          coverage_details: data.coverage_details,
+          company_id: data.company_id,
+          is_active: data.active,
         });
       } else {
         await createPlan.mutateAsync({
-          ...data,
-          created_by: profile?.id,
+          name: data.name,
+          description: data.description,
+          price: data.price,
+          coverage_details: data.coverage_details,
+          company_id: data.company_id,
+          is_active: data.active,
         });
       }
       onOpenChange(false);

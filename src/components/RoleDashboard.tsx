@@ -1,5 +1,5 @@
 
-import { useAuthContext } from "@/components/AuthProvider";
+import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -11,7 +11,7 @@ import { usePlans } from "@/hooks/usePlans";
 import { useCompanies } from "@/hooks/useCompanies";
 
 export function RoleDashboard() {
-  const { profile } = useAuthContext();
+  const { profile } = useSimpleAuthContext();
   const { data: sales = [] } = useSales();
   const { data: clients = [] } = useClients();
   const { templates = [] } = useTemplates();
@@ -20,7 +20,7 @@ export function RoleDashboard() {
 
   if (!profile) return null;
 
-  const userRole = profile.role;
+  const userRole = profile.role || 'vendedor';
   const isVendedor = userRole === 'vendedor';
   const isGestorOrAdmin = ['gestor', 'admin', 'super_admin'].includes(userRole);
 
@@ -45,7 +45,7 @@ export function RoleDashboard() {
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
   const monthlySales = filteredSales.filter(sale => {
-    const saleDate = new Date(sale.sale_date || sale.created_at);
+    const saleDate = new Date(sale.created_at || new Date());
     return saleDate.getMonth() === currentMonth && saleDate.getFullYear() === currentYear;
   });
 

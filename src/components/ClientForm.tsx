@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useCreateClient, useUpdateClient } from "@/hooks/useClients";
+import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 import { Database } from "@/integrations/supabase/types";
 import { useEffect } from "react";
 
@@ -26,16 +26,19 @@ interface ClientFormData {
   dni?: string;
   birth_date?: string;
   address?: string;
-  neighborhood?: string;
-  marital_status?: string;
+  city?: string;
+  province?: string;
+  postal_code?: string;
+  notes?: string;
 }
 
 export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
+  const { profile } = useSimpleAuthContext();
   const createClient = useCreateClient();
   const updateClient = useUpdateClient();
   const isEditing = !!client;
 
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<ClientFormData>();
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<ClientFormData>();
 
   // Reset form when client data changes or dialog opens
   useEffect(() => {
@@ -50,8 +53,10 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
           dni: client.dni || "",
           birth_date: client.birth_date || "",
           address: client.address || "",
-          neighborhood: client.neighborhood || "",
-          marital_status: client.marital_status || "",
+          city: client.city || "",
+          province: client.province || "",
+          postal_code: client.postal_code || "",
+          notes: client.notes || "",
         });
       } else {
         // Creating mode - clear form
@@ -63,8 +68,10 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
           dni: "",
           birth_date: "",
           address: "",
-          neighborhood: "",
-          marital_status: "",
+          city: "",
+          province: "",
+          postal_code: "",
+          notes: "",
         });
       }
     }
@@ -72,22 +79,16 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
 
   const onSubmit = async (data: ClientFormData) => {
     try {
-      // Convert special values back to null
-      const maritalStatus = data.marital_status === "__none__" ? null : data.marital_status;
-      
-      const finalData = {
-        ...data,
-        marital_status: maritalStatus,
-        neighborhood: data.neighborhood || null,
-      };
-
       if (isEditing && client) {
         await updateClient.mutateAsync({
           id: client.id,
-          ...finalData,
+          ...data,
         });
       } else {
-        await createClient.mutateAsync(finalData);
+        await createClient.mutateAsync({
+          ...data,
+          company_id: profile?.company_id || '',
+        });
       }
       onOpenChange(false);
     } catch (error) {
@@ -113,7 +114,7 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
                 {...register("first_name", { required: "El nombre es requerido" })}
               />
               {errors.first_name && (
-                <span className="text-sm text-red-500">{errors.first_name.message}</span>
+                <span className="text-sm text-destructive">{errors.first_name.message}</span>
               )}
             </div>
 
@@ -124,7 +125,7 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
                 {...register("last_name", { required: "El apellido es requerido" })}
               />
               {errors.last_name && (
-                <span className="text-sm text-red-500">{errors.last_name.message}</span>
+                <span className="text-sm text-destructive">{errors.last_name.message}</span>
               )}
             </div>
           </div>
@@ -134,11 +135,8 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
             <Input
               id="email"
               type="email"
-              {...register("email", { required: "El email es requerido" })}
+              {...register("email")}
             />
-            {errors.email && (
-              <span className="text-sm text-red-500">{errors.email.message}</span>
-            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -170,32 +168,19 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="neighborhood">Barrio</Label>
+              <Label htmlFor="city">Ciudad</Label>
               <Input
-                id="neighborhood"
-                {...register("neighborhood")}
-                placeholder="Barrio o vecindario"
+                id="city"
+                {...register("city")}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="marital_status">Estado Civil</Label>
-              <Select 
-                value={watch("marital_status") || ""} 
-                onValueChange={(value) => setValue("marital_status", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar estado civil" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">No especificar</SelectItem>
-                  <SelectItem value="soltero">Soltero/a</SelectItem>
-                  <SelectItem value="casado">Casado/a</SelectItem>
-                  <SelectItem value="divorciado">Divorciado/a</SelectItem>
-                  <SelectItem value="viudo">Viudo/a</SelectItem>
-                  <SelectItem value="union_libre">Unión libre</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="province">Provincia</Label>
+              <Input
+                id="province"
+                {...register("province")}
+              />
             </div>
           </div>
 
@@ -204,7 +189,7 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
             <Textarea
               id="address"
               {...register("address")}
-              rows={3}
+              rows={2}
             />
           </div>
 

@@ -85,7 +85,7 @@ export const DynamicQuestionnaire = ({
     setIsSubmitting(true);
     try {
       // Validate required questions
-      const requiredQuestions = questions.filter(q => q.is_required && q.is_active);
+      const requiredQuestions = questions.filter(q => q.is_required);
       const missingResponses = requiredQuestions.filter(q => !responses[q.id] || responses[q.id] === "");
       
       if (missingResponses.length > 0) {
@@ -137,8 +137,6 @@ export const DynamicQuestionnaire = ({
     const questionNumber = index + 1;
     const currentValue = responses[question.id] || "";
 
-    if (!question.is_active && !readOnly) return null;
-
     return (
       <Card key={question.id} className="mb-4">
         <CardHeader className="pb-4">
@@ -150,11 +148,6 @@ export const DynamicQuestionnaire = ({
               {question.is_required && (
                 <Badge variant="destructive" className="text-xs">
                   Obligatoria
-                </Badge>
-              )}
-              {!question.is_active && (
-                <Badge variant="secondary" className="text-xs">
-                  Inactiva
                 </Badge>
               )}
             </div>
@@ -253,7 +246,7 @@ export const DynamicQuestionnaire = ({
     );
   }
 
-  const activeQuestions = questions.filter(q => q.is_active || readOnly);
+  const activeQuestions = questions;
 
   return (
     <div className="space-y-4">

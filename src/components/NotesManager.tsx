@@ -180,7 +180,7 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ saleId }) => {
                 <CardContent className="pt-4">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <p className="text-sm">{note.note}</p>
+                      <p className="text-sm">{note.note_text}</p>
                       <p className="text-xs text-muted-foreground mt-2">
                         {new Date(note.created_at).toLocaleString()}
                       </p>
