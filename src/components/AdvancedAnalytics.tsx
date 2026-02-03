@@ -89,8 +89,7 @@ const useAdvancedAnalytics = (period: string) => {
           *,
           clients(first_name, last_name),
           plans(name, price),
-          companies(name),
-          salesperson:salesperson_id(first_name, last_name)
+          companies(name)
         `)
         .gte('created_at', startDate.toISOString());
 
@@ -126,8 +125,8 @@ const useAdvancedAnalytics = (period: string) => {
       // Performance por usuario
       const userPerformance = salesData?.reduce((acc, sale) => {
         const userId = sale.salesperson_id;
-        if (userId && sale.salesperson) {
-          const userName = `${sale.salesperson.first_name} ${sale.salesperson.last_name}`;
+        if (userId) {
+          const userName = `Vendedor ${userId.slice(0, 8)}`;
           if (!acc[userId]) {
             acc[userId] = { name: userName, totalSales: 0, completedSales: 0 };
           }

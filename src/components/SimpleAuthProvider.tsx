@@ -1,14 +1,12 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
-import { Database } from '@/integrations/supabase/types';
 import { supabase } from '@/integrations/supabase/client';
-
-type Profile = Database['public']['Tables']['profiles']['Row'];
+import { ProfileWithRole } from '@/types/auth';
 
 interface SimpleAuthContextType {
   user: User | null;
-  profile: Profile | null;
+  profile: ProfileWithRole | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -18,7 +16,7 @@ const SimpleAuthContext = createContext<SimpleAuthContextType | undefined>(undef
 
 export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<ProfileWithRole | null>(null);
   const [loading, setLoading] = useState(true);
 
   console.log('🔐 SimpleAuthProvider: Estado actual', { 
@@ -59,17 +57,36 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       try {
         console.log('👤 SimpleAuthProvider: Obteniendo perfil para:', userId);
         
-        const { data, error } = await supabase
+        // Get profile
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', userId)
           .maybeSingle();
 
-        if (error) {
-          console.error('❌ SimpleAuthProvider: Error fetching profile:', error);
-        } else if (data && mounted) {
-          console.log('✅ SimpleAuthProvider: Perfil obtenido:', data);
-          setProfile(data);
+        if (profileError) {
+          console.error('❌ SimpleAuthProvider: Error fetching profile:', profileError);
+          return;
+        }
+
+        // Get role from user_roles table
+        const { data: roleData, error: roleError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (roleError) {
+          console.error('❌ SimpleAuthProvider: Error fetching role:', roleError);
+        }
+
+        if (profileData && mounted) {
+          const profileWithRole: ProfileWithRole = {
+            ...profileData,
+            role: roleData?.role || null
+          };
+          console.log('✅ SimpleAuthProvider: Perfil obtenido:', profileWithRole);
+          setProfile(profileWithRole);
         }
       } catch (error) {
         console.error('❌ SimpleAuthProvider: Error fetching profile:', error);

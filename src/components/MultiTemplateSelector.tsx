@@ -30,12 +30,17 @@ export const MultiTemplateSelector: React.FC<MultiTemplateSelectorProps> = ({
     queryFn: async () => {
       const { data, error } = await supabase
         .from('templates')
-        .select('id, name, description, template_type, active')
-        .eq('active', true)
+        .select('id, name, description, is_active')
+        .eq('is_active', true)
         .order('name', { ascending: true });
 
       if (error) throw error;
-      return data as Template[];
+      return (data || []).map(t => ({
+        id: t.id,
+        name: t.name,
+        description: t.description,
+        active: t.is_active ?? true
+      })) as Template[];
     },
   });
 

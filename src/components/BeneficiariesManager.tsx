@@ -260,9 +260,8 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
                 <TableHead>Nombre</TableHead>
                 <TableHead>DNI</TableHead>
                 <TableHead>Relación</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Teléfono</TableHead>
-                <TableHead>Monto</TableHead>
+                <TableHead>Fecha Nac.</TableHead>
+                <TableHead>Principal</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -273,12 +272,9 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
                     {beneficiary.first_name} {beneficiary.last_name}
                   </TableCell>
                   <TableCell>{beneficiary.dni || '-'}</TableCell>
-                  <TableCell>{beneficiary.relationship}</TableCell>
-                  <TableCell>{beneficiary.email || '-'}</TableCell>
-                  <TableCell>{beneficiary.phone || '-'}</TableCell>
-                  <TableCell>
-                    {beneficiary.amount ? `$${beneficiary.amount.toLocaleString()}` : '-'}
-                  </TableCell>
+                  <TableCell>{beneficiary.relationship || '-'}</TableCell>
+                  <TableCell>{beneficiary.birth_date || '-'}</TableCell>
+                  <TableCell>{beneficiary.is_primary ? 'Sí' : 'No'}</TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
                       <Button

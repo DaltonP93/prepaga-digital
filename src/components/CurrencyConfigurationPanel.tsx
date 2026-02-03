@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, DollarSign } from 'lucide-react';
 import { useCurrencySettings } from '@/hooks/useCurrencySettings';
-import { useAuthContext } from '@/components/AuthProvider';
+import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 
 interface CurrencyFormData {
   currency_code: string;
@@ -27,7 +27,7 @@ const currencies = [
 ];
 
 export const CurrencyConfigurationPanel = () => {
-  const { profile } = useAuthContext();
+  const { profile } = useSimpleAuthContext();
   const { settings, isLoading, updateSettings, isUpdating, formatCurrency } = useCurrencySettings();
   
   const canManage = ['admin', 'super_admin'].includes(profile?.role || '');
