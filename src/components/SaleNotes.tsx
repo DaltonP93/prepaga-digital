@@ -12,15 +12,11 @@ import { toast } from 'sonner';
 
 interface SaleNote {
   id: string;
-  note: string;
-  created_at: string;
-  updated_at: string;
-  user_id: string;
-  profiles?: {
-    first_name?: string;
-    last_name?: string;
-    avatar_url?: string;
-  };
+  note_text: string;
+  created_at: string | null;
+  user_id: string | null;
+  sale_id: string;
+  is_internal: boolean | null;
 }
 
 interface SaleNotesProps {
@@ -44,14 +40,7 @@ export const SaleNotes: React.FC<SaleNotesProps> = ({
     queryFn: async () => {
       const { data, error } = await supabase
         .from('sale_notes')
-        .select(`
-          *,
-          profiles (
-            first_name,
-            last_name,
-            avatar_url
-          )
-        `)
+        .select('*')
         .eq('sale_id', saleId)
         .order('created_at', { ascending: false });
 
@@ -62,7 +51,7 @@ export const SaleNotes: React.FC<SaleNotesProps> = ({
   });
 
   const addNote = useMutation({
-    mutationFn: async (note: string) => {
+    mutationFn: async (noteText: string) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
 
@@ -70,17 +59,11 @@ export const SaleNotes: React.FC<SaleNotesProps> = ({
         .from('sale_notes')
         .insert({
           sale_id: saleId,
-          note: note.trim(),
+          note_text: noteText.trim(),
           user_id: user.id,
+          is_internal: true,
         })
-        .select(`
-          *,
-          profiles (
-            first_name,
-            last_name,
-            avatar_url
-          )
-        `)
+        .select()
         .single();
 
       if (error) throw error;
@@ -124,19 +107,6 @@ export const SaleNotes: React.FC<SaleNotesProps> = ({
       return;
     }
     addNote.mutate(newNote);
-  };
-
-  const getUserName = (note: SaleNote) => {
-    if (note.profiles?.first_name || note.profiles?.last_name) {
-      return `${note.profiles.first_name || ''} ${note.profiles.last_name || ''}`.trim();
-    }
-    return 'Usuario';
-  };
-
-  const getUserInitials = (note: SaleNote) => {
-    const firstName = note.profiles?.first_name || '';
-    const lastName = note.profiles?.last_name || '';
-    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || 'U';
   };
 
   return (
@@ -208,16 +178,14 @@ export const SaleNotes: React.FC<SaleNotesProps> = ({
                   <CardContent className="p-4">
                     <div className="flex gap-3">
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src={note.profiles?.avatar_url} />
-                        <AvatarFallback>{getUserInitials(note)}</AvatarFallback>
+                        <AvatarFallback>U</AvatarFallback>
                       </Avatar>
                       
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">{getUserName(note)}</span>
                             <span className="text-xs text-muted-foreground">
-                              {new Date(note.created_at).toLocaleString()}
+                              {note.created_at ? new Date(note.created_at).toLocaleString() : 'Sin fecha'}
                             </span>
                           </div>
                           <Button
@@ -232,14 +200,8 @@ export const SaleNotes: React.FC<SaleNotesProps> = ({
                         </div>
                         
                         <p className="text-sm text-foreground whitespace-pre-wrap">
-                          {note.note}
+                          {note.note_text}
                         </p>
-                        
-                        {note.updated_at !== note.created_at && (
-                          <p className="text-xs text-muted-foreground">
-                            Editado: {new Date(note.updated_at).toLocaleString()}
-                          </p>
-                        )}
                       </div>
                     </div>
                   </CardContent>

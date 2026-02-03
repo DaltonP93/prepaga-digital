@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Trash2, Plus, Edit2 } from 'lucide-react';
@@ -19,8 +18,7 @@ interface RequirementsManagerProps {
 export const RequirementsManager: React.FC<RequirementsManagerProps> = ({ saleId }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingRequirement, setEditingRequirement] = useState<any>(null);
-  const [requirementName, setRequirementName] = useState('');
-  const [notes, setNotes] = useState('');
+  const [requirementText, setRequirementText] = useState('');
   const [isCompleted, setIsCompleted] = useState(false);
 
   const { toast } = useToast();
@@ -42,7 +40,7 @@ export const RequirementsManager: React.FC<RequirementsManagerProps> = ({ saleId
   });
 
   const createRequirement = useMutation({
-    mutationFn: async (requirement: any) => {
+    mutationFn: async (requirement: { sale_id: string; requirement_text: string; is_completed: boolean }) => {
       const { data, error } = await supabase
         .from('sale_requirements')
         .insert(requirement)
@@ -60,7 +58,7 @@ export const RequirementsManager: React.FC<RequirementsManagerProps> = ({ saleId
   });
 
   const updateRequirement = useMutation({
-    mutationFn: async ({ id, ...updates }: any) => {
+    mutationFn: async ({ id, ...updates }: { id: string; requirement_text?: string; is_completed?: boolean }) => {
       const { data, error } = await supabase
         .from('sale_requirements')
         .update(updates)
@@ -94,8 +92,7 @@ export const RequirementsManager: React.FC<RequirementsManagerProps> = ({ saleId
   });
 
   const resetForm = () => {
-    setRequirementName('');
-    setNotes('');
+    setRequirementText('');
     setIsCompleted(false);
     setShowForm(false);
     setEditingRequirement(null);
@@ -103,27 +100,27 @@ export const RequirementsManager: React.FC<RequirementsManagerProps> = ({ saleId
 
   const handleEdit = (requirement: any) => {
     setEditingRequirement(requirement);
-    setRequirementName(requirement.requirement_name);
-    setNotes(requirement.notes || '');
+    setRequirementText(requirement.requirement_text || '');
     setIsCompleted(requirement.is_completed || false);
     setShowForm(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!requirementName) return;
-
-    const requirementData = {
-      sale_id: saleId,
-      requirement_name: requirementName,
-      notes,
-      is_completed: isCompleted
-    };
+    if (!requirementText) return;
 
     if (editingRequirement) {
-      updateRequirement.mutate({ id: editingRequirement.id, ...requirementData });
+      updateRequirement.mutate({ 
+        id: editingRequirement.id, 
+        requirement_text: requirementText,
+        is_completed: isCompleted 
+      });
     } else {
-      createRequirement.mutate(requirementData);
+      createRequirement.mutate({
+        sale_id: saleId,
+        requirement_text: requirementText,
+        is_completed: isCompleted
+      });
     }
   };
 
@@ -161,22 +158,13 @@ export const RequirementsManager: React.FC<RequirementsManagerProps> = ({ saleId
             </h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="title">Nombre del Requisito</Label>
+                <Label htmlFor="title">Descripción del Requisito</Label>
                 <Input
                   id="title"
-                  value={requirementName}
-                  onChange={(e) => setRequirementName(e.target.value)}
-                  placeholder="Nombre del requisito"
+                  value={requirementText}
+                  onChange={(e) => setRequirementText(e.target.value)}
+                  placeholder="Descripción del requisito"
                   required
-                />
-              </div>
-              <div>
-                <Label htmlFor="description">Notas</Label>
-                <Textarea
-                  id="description"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Notas adicionales del requisito"
                 />
               </div>
               <div className="flex items-center space-x-2">
@@ -203,8 +191,7 @@ export const RequirementsManager: React.FC<RequirementsManagerProps> = ({ saleId
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Notas</TableHead>
+                <TableHead>Descripción</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Fecha</TableHead>
                 <TableHead>Acciones</TableHead>
@@ -213,8 +200,7 @@ export const RequirementsManager: React.FC<RequirementsManagerProps> = ({ saleId
             <TableBody>
               {requirements.map((requirement) => (
                 <TableRow key={requirement.id}>
-                  <TableCell>{requirement.requirement_name}</TableCell>
-                  <TableCell>{requirement.notes || '-'}</TableCell>
+                  <TableCell>{requirement.requirement_text}</TableCell>
                   <TableCell>
                     {requirement.is_completed ? (
                       <span className="text-green-600">Completado</span>

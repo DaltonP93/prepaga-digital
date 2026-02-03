@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { FileText, Upload, Download, Trash2, Eye } from 'lucide-react';
@@ -16,14 +15,13 @@ import { useDropzone } from 'react-dropzone';
 
 interface SaleDocument {
   id: string;
-  document_name: string;
-  document_type: string;
+  file_name: string;
+  file_type: string | null;
   file_url: string;
-  file_size?: number;
-  mime_type?: string;
-  observations?: string;
-  created_at: string;
-  uploaded_by: string;
+  file_size: number | null;
+  created_at: string | null;
+  uploaded_by: string | null;
+  sale_id: string;
 }
 
 interface SaleDocumentsProps {
@@ -38,8 +36,7 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
   onOpenChange,
 }) => {
   const [uploadForm, setUploadForm] = useState({
-    document_name: '',
-    document_type: '',
+    file_name: '',
     observations: '',
   });
 
@@ -86,12 +83,10 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
         .from('sale_documents')
         .insert({
           sale_id: saleId,
-          document_name: metadata.document_name || file.name,
-          document_type: metadata.document_type,
+          file_name: metadata.file_name || file.name,
           file_url: publicUrl,
           file_size: file.size,
-          mime_type: file.type,
-          observations: metadata.observations,
+          file_type: file.type,
           uploaded_by: user.id,
         })
         .select()
@@ -104,8 +99,7 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
       queryClient.invalidateQueries({ queryKey: ['sale-documents', saleId] });
       toast.success('Documento subido correctamente');
       setUploadForm({
-        document_name: '',
-        document_type: '',
+        file_name: '',
         observations: '',
       });
     },
@@ -137,8 +131,8 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
       const file = acceptedFiles[0];
-      if (!uploadForm.document_name) {
-        setUploadForm(prev => ({ ...prev, document_name: file.name }));
+      if (!uploadForm.file_name) {
+        setUploadForm(prev => ({ ...prev, file_name: file.name }));
       }
       uploadDocument.mutate({ file, metadata: uploadForm });
     }
@@ -155,18 +149,8 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
     maxSize: 10 * 1024 * 1024, // 10MB
   });
 
-  const documentTypes = [
-    { value: 'identificacion', label: 'Identificación' },
-    { value: 'comprobante_ingresos', label: 'Comprobante de Ingresos' },
-    { value: 'declaracion_jurada', label: 'Declaración Jurada' },
-    { value: 'constancia_trabajo', label: 'Constancia de Trabajo' },
-    { value: 'recibo_sueldo', label: 'Recibo de Sueldo' },
-    { value: 'certificado_medico', label: 'Certificado Médico' },
-    { value: 'otro', label: 'Otro' },
-  ];
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
+  const formatFileSize = (bytes: number | null) => {
+    if (!bytes || bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -176,7 +160,7 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
   const handleDownload = (doc: SaleDocument) => {
     const link = window.document.createElement('a');
     link.href = doc.file_url;
-    link.download = doc.document_name;
+    link.download = doc.file_name;
     window.document.body.appendChild(link);
     link.click();
     window.document.body.removeChild(link);
@@ -201,31 +185,13 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="document_name">Nombre del Documento</Label>
+                  <Label htmlFor="file_name">Nombre del Documento</Label>
                   <Input
-                    id="document_name"
-                    value={uploadForm.document_name}
-                    onChange={(e) => setUploadForm(prev => ({ ...prev, document_name: e.target.value }))}
+                    id="file_name"
+                    value={uploadForm.file_name}
+                    onChange={(e) => setUploadForm(prev => ({ ...prev, file_name: e.target.value }))}
                     placeholder="Nombre descriptivo del documento"
                   />
-                </div>
-                <div>
-                  <Label htmlFor="document_type">Tipo de Documento</Label>
-                  <Select
-                    value={uploadForm.document_type}
-                    onValueChange={(value) => setUploadForm(prev => ({ ...prev, document_type: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar tipo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {documentTypes.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
               </div>
 
@@ -279,19 +245,20 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
                         <div className="space-y-2 flex-1">
                           <div className="flex items-center gap-2">
                             <FileText className="h-4 w-4" />
-                            <h4 className="font-medium">{doc.document_name}</h4>
-                            <Badge variant="outline">
-                              {documentTypes.find(t => t.value === doc.document_type)?.label || doc.document_type}
-                            </Badge>
+                            <h4 className="font-medium">{doc.file_name}</h4>
+                            {doc.file_type && (
+                              <Badge variant="outline">
+                                {doc.file_type}
+                              </Badge>
+                            )}
                           </div>
                           
                           <div className="text-sm text-muted-foreground space-y-1">
                             {doc.file_size && (
                               <p>Tamaño: {formatFileSize(doc.file_size)}</p>
                             )}
-                            <p>Subido: {new Date(doc.created_at).toLocaleString()}</p>
-                            {doc.observations && (
-                              <p>Observaciones: {doc.observations}</p>
+                            {doc.created_at && (
+                              <p>Subido: {new Date(doc.created_at).toLocaleString()}</p>
                             )}
                           </div>
                         </div>

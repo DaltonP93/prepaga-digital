@@ -20,11 +20,12 @@ interface QuestionCopyDialogProps {
 interface TemplateQuestion {
   id: string;
   question_text: string;
-  question_type: string;
-  conditional_logic: any;
-  is_required: boolean;
-  order_index: number;
+  question_type: string | null;
+  is_required: boolean | null;
+  sort_order: number | null;
   template_id: string;
+  validation_rules: any;
+  placeholder_name: string | null;
 }
 
 export function QuestionCopyDialog({ open, onOpenChange, targetTemplateId }: QuestionCopyDialogProps) {
@@ -40,7 +41,7 @@ export function QuestionCopyDialog({ open, onOpenChange, targetTemplateId }: Que
         .from('templates')
         .select('id, name')
         .neq('id', targetTemplateId)
-        .eq('active', true)
+        .eq('is_active', true)
         .order('name');
 
       if (error) throw error;
@@ -59,7 +60,7 @@ export function QuestionCopyDialog({ open, onOpenChange, targetTemplateId }: Que
         .from('template_questions')
         .select('*')
         .eq('template_id', sourceTemplateId)
-        .order('order_index');
+        .order('sort_order');
 
       if (error) throw error;
       return data as TemplateQuestion[];
@@ -82,28 +83,29 @@ export function QuestionCopyDialog({ open, onOpenChange, targetTemplateId }: Que
 
       if (fetchError) throw fetchError;
 
-      // Obtener el siguiente order_index para el template destino
+      // Obtener el siguiente sort_order para el template destino
       const { data: maxOrder } = await supabase
         .from('template_questions')
-        .select('order_index')
+        .select('sort_order')
         .eq('template_id', targetTemplateId)
-        .order('order_index', { ascending: false })
+        .order('sort_order', { ascending: false })
         .limit(1);
 
-      let nextOrderIndex = 1;
-      if (maxOrder && maxOrder.length > 0) {
-        nextOrderIndex = maxOrder[0].order_index + 1;
+      let nextSortOrder = 1;
+      if (maxOrder && maxOrder.length > 0 && maxOrder[0].sort_order !== null) {
+        nextSortOrder = maxOrder[0].sort_order + 1;
       }
 
       // Preparar las preguntas para insertar
-      const questionsToInsert = questionsData.map((question, index) => ({
+      const questionsToInsert = questionsData?.map((question, index) => ({
         template_id: targetTemplateId,
         question_text: question.question_text,
         question_type: question.question_type,
-        conditional_logic: question.conditional_logic,
         is_required: question.is_required,
-        order_index: nextOrderIndex + index,
-      }));
+        sort_order: nextSortOrder + index,
+        validation_rules: question.validation_rules,
+        placeholder_name: question.placeholder_name,
+      })) || [];
 
       // Insertar las preguntas
       const { error: insertError } = await supabase
