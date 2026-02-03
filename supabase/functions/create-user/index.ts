@@ -43,7 +43,13 @@ serve(async (req) => {
       );
     }
 
-    const { email, password, firstName, lastName, role = 'vendedor', companyId } = requestBody;
+    // Support both camelCase and snake_case field names
+    const email = requestBody.email;
+    const password = requestBody.password;
+    const firstName = requestBody.firstName || requestBody.first_name;
+    const lastName = requestBody.lastName || requestBody.last_name;
+    const role = requestBody.role || 'vendedor';
+    const companyId = requestBody.companyId || requestBody.company_id;
 
     console.log('Creating user with data:', { email, firstName, lastName, role, companyId });
 
