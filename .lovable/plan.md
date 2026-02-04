@@ -1,56 +1,157 @@
 
-# Plan: Corrección de Templates, Mejora del Diseñador y Flujo de Ventas con Beneficiarios
+# Plan: Corrección del Estado de Carga de Autenticación
 
-## ✅ COMPLETADO
+## Problema Identificado
 
----
+El sistema se queda mostrando "Verificando autenticación..." cuando se navega entre páginas o se cargan templates. Esto ocurre por los siguientes conflictos:
 
-## Cambios Realizados
+### Causas Raíz
 
-### 1. ✅ Migración de Base de Datos - Tabla beneficiaries
-Se agregaron las columnas:
-- `amount` (decimal 12,2) - Monto de cobertura
-- `email` (varchar 255) - Email del beneficiario  
-- `phone` (varchar 50) - Teléfono del beneficiario
+1. **Doble verificación de `loading`**:
+   - `SimpleProtectedRoute` muestra spinner cuando `loading` es true
+   - `Layout` también muestra spinner cuando `loading` es true
+   - Esto crea una cascada de verificaciones que puede bloquear la UI
 
-### 2. ✅ Corrección del Hook useTemplates.ts
-- Implementado patrón de fetch manual para evitar error de FK con `created_by`
-- Ahora obtiene templates primero, luego consulta profiles por separado
-- Combina los datos en el cliente
+2. **Múltiples listeners de auth state**:
+   - `SimpleAuthProvider` tiene un listener de `onAuthStateChange`
+   - `useSessionManager` (usado en `ProtectedRoute`) tiene otro listener
+   - Esto puede causar estados inconsistentes
 
-### 3. ✅ Mejoras en BeneficiariesManager.tsx
-- Nueva columna "Monto" en la tabla con formato de moneda
-- Nuevas columnas "Email" y "Teléfono"
-- Indicador "Principal" junto al nombre
-- Suma total de montos al final de la tabla
-- Formato de moneda en pesos argentinos
-
-### 4. ✅ Mejoras en DraggablePlaceholdersSidebar.tsx
-Panel de variables de BD organizado por categorías:
-- 👤 Cliente (nombre, apellido, email, DNI, etc.)
-- 💳 Plan (nombre, precio, descripción, cobertura)
-- 🏢 Empresa (nombre, email, teléfono, dirección)
-- 🛒 Venta (fecha, total, vendedor, notas)
-- 📅 Fechas (actual, vencimiento)
-- 👥 Beneficiarios (lista, total montos)
+3. **`Layout` component bloquea innecesariamente**:
+   - El componente `Layout` verifica `loading` y muestra spinner
+   - Esto es redundante porque `SimpleProtectedRoute` ya verifica la autenticación
 
 ---
 
-## Archivos Modificados
+## Solución Propuesta
 
-| Archivo | Estado |
+### Cambio 1: Eliminar verificación de loading en Layout
+
+El `Layout` component no debe verificar el estado de loading porque:
+- Ya está dentro de una ruta protegida (`SimpleProtectedRoute`)
+- Si llegamos al `Layout`, ya pasamos la verificación de auth
+
+```text
+Archivo: src/components/Layout.tsx
+
+Antes:
+- Verifica loading del auth context
+- Muestra spinner si loading es true
+
+Después:
+- Renderiza directamente el contenido
+- No verifica loading (ya lo hace SimpleProtectedRoute)
+```
+
+### Cambio 2: Simplificar SimpleProtectedRoute
+
+Mejorar la lógica para evitar re-renders innecesarios:
+
+```text
+Archivo: src/components/SimpleProtectedRoute.tsx
+
+Mejoras:
+- Usar useMemo para evitar re-cálculos
+- Optimizar el timeout para casos edge
+- Mejor logging para debugging
+```
+
+### Cambio 3: Eliminar uso de useSessionManager en ProtectedRoute
+
+El `ProtectedRoute` usa `useSessionManager` que añade otro listener de auth. Dado que el proyecto usa `SimpleProtectedRoute`, el `ProtectedRoute` con `useSessionManager` no debería ser necesario.
+
+```text
+Archivo: src/components/ProtectedRoute.tsx
+
+Cambio:
+- Eliminar useSessionManager
+- Simplificar el componente para evitar conflictos
+```
+
+---
+
+## Archivos a Modificar
+
+| Archivo | Cambio |
 |---------|--------|
-| `src/hooks/useTemplates.ts` | ✅ Fetch manual de profiles |
-| `src/components/BeneficiariesManager.tsx` | ✅ UI mejorada con montos |
-| `src/components/DraggablePlaceholdersSidebar.tsx` | ✅ Variables de BD por categorías |
-| Base de datos `beneficiaries` | ✅ Migración ejecutada |
+| `src/components/Layout.tsx` | Eliminar verificación de loading |
+| `src/components/SimpleProtectedRoute.tsx` | Optimizar lógica de loading |
+| `src/components/ProtectedRoute.tsx` | Eliminar useSessionManager |
 
 ---
 
-## Flujo de Pruebas
+## Detalles Técnicos
 
-1. ✅ Lista de templates carga correctamente
-2. Crear un nuevo template y confirmar que se guarda
-3. Crear una venta y agregar beneficiarios con montos
-4. Verificar que los montos se guardan y cargan correctamente
-5. Probar el diseñador de templates insertando variables
+### Layout.tsx - Antes y Después
+
+```typescript
+// ANTES (problemático)
+export function Layout({ children, title, description }: LayoutProps) {
+  const { profile, loading } = useSimpleAuthContext();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+  // ...
+}
+
+// DESPUÉS (corregido)
+export function Layout({ children, title, description }: LayoutProps) {
+  // No verificar loading - SimpleProtectedRoute ya lo maneja
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">{title}</h1>
+        {description && (
+          <p className="text-muted-foreground">{description}</p>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+```
+
+### ProtectedRoute.tsx - Simplificación
+
+```typescript
+// Eliminar useSessionManager para evitar conflictos
+// El componente solo debe verificar auth y roles
+export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
+  const { user, profile, loading } = useSimpleAuthContext();
+  // No usar useSessionManager aquí
+  // ...
+};
+```
+
+---
+
+## Flujo Esperado Después de los Cambios
+
+```text
+Usuario navega a /templates
+       ↓
+SimpleProtectedRoute verifica auth (única vez)
+       ↓
+Si autenticado → renderiza MainLayout
+       ↓
+MainLayout renderiza Outlet (Templates)
+       ↓
+Templates usa Layout (sin verificar loading)
+       ↓
+Templates carga y muestra contenido
+```
+
+---
+
+## Pruebas Recomendadas
+
+1. Navegar a `/templates` y verificar que carga sin quedarse en "Verificando autenticación"
+2. Crear un nuevo template y verificar que el formulario funciona
+3. Editar un template existente
+4. Navegar entre diferentes páginas (Sales, Documents, etc.)
+5. Refrescar la página y verificar que se recupera la sesión correctamente
