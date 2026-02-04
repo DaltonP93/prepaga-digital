@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
-import { useSessionManager } from "@/hooks/useSessionManager";
 import { supabase } from "@/integrations/supabase/client";
 import { AppRole } from "@/types/auth";
 
@@ -11,9 +10,9 @@ interface ProtectedRouteProps {
   requiredRole?: AppRole[];
 }
 
+// ProtectedRoute simplificado - sin useSessionManager para evitar conflictos
 export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   const { user, profile, loading } = useSimpleAuthContext();
-  const { updateActivity } = useSessionManager(5, 30);
   const location = useLocation();
   const [userRole, setUserRole] = useState<AppRole | null>(null);
   const [loadingRole, setLoadingRole] = useState(true);
@@ -46,28 +45,13 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
     fetchRole();
   }, [user]);
 
-  // Update activity when user interacts with protected routes
-  useEffect(() => {
-    if (user) {
-      updateActivity();
-    }
-  }, [user, updateActivity, location.pathname]);
-
-  console.log('🛡️ ProtectedRoute: Estado actual -', { 
-    user: !!user, 
-    loading, 
-    hasProfile: !!profile,
-    userRole,
-    pathname: location.pathname
-  });
-
-  // Show loading during initial auth check
+  // Show loading during initial auth check only
   if (loading || loadingRole) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-          <p className="text-sm text-muted-foreground">Cargando aplicación...</p>
+          <p className="text-sm text-muted-foreground">Cargando...</p>
         </div>
       </div>
     );
@@ -75,14 +59,12 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
 
   // Redirect to login if not authenticated
   if (!user) {
-    console.log('🛡️ ProtectedRoute: No hay usuario, redirigiendo a login');
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   // Check role permissions if required
   if (requiredRole && requiredRole.length > 0 && userRole) {
     if (!requiredRole.includes(userRole)) {
-      console.log('🛡️ ProtectedRoute: Rol no autorizado');
       return (
         <div className="min-h-screen flex items-center justify-center bg-background">
           <div className="text-center">
@@ -94,7 +76,5 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
     }
   }
 
-  // Allow access - user is authenticated
-  console.log('✅ ProtectedRoute: Acceso permitido, renderizando children');
   return <>{children}</>;
 };

@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { Navigate, useLocation } from 'react-router-dom';
 
@@ -12,49 +12,57 @@ export const SimpleProtectedRoute: React.FC<SimpleProtectedRouteProps> = ({ chil
   const [hasTimedOut, setHasTimedOut] = useState(false);
   const location = useLocation();
 
-  // Set a timeout to prevent infinite loading
+  // Timeout solo para el loading inicial - 5 segundos es suficiente
   useEffect(() => {
+    if (!loading) {
+      setHasTimedOut(false);
+      return;
+    }
+    
     const timeout = setTimeout(() => {
       if (loading) {
-        console.log('⚠️ SimpleProtectedRoute: Loading timeout reached');
         setHasTimedOut(true);
       }
-    }, 10000); // 10 seconds timeout
+    }, 5000);
 
     return () => clearTimeout(timeout);
   }, [loading]);
 
-  console.log('🛡️ SimpleProtectedRoute: Estado actual', { 
-    user: !!user, 
-    loading,
-    hasTimedOut,
-    pathname: location.pathname,
-    email: user?.email 
-  });
+  // Memoizar la decisión de renderizado para evitar re-renders
+  const renderContent = useMemo(() => {
+    // Si tenemos usuario, mostrar contenido inmediatamente
+    if (user) {
+      return 'authenticated';
+    }
+    
+    // Si loading terminó y no hay usuario, redirigir
+    if (!loading && !user) {
+      return 'redirect';
+    }
+    
+    // Si timeout y no hay usuario, redirigir
+    if (hasTimedOut && !user) {
+      return 'redirect';
+    }
+    
+    // Mostrar loading solo durante la verificación inicial
+    return 'loading';
+  }, [user, loading, hasTimedOut]);
 
-  // If loading has timed out and we still don't have a user, redirect to login
-  if (hasTimedOut && !user) {
-    console.log('⏰ SimpleProtectedRoute: Timeout reached, redirecting to login');
+  if (renderContent === 'redirect') {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  if (loading && !hasTimedOut) {
-    console.log('⏳ SimpleProtectedRoute: Mostrando loading...');
+  if (renderContent === 'loading') {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary/20 to-secondary/20">
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-          <p className="text-sm text-muted-foreground">Verificando autenticación...</p>
+          <p className="text-sm text-muted-foreground">Cargando...</p>
         </div>
       </div>
     );
   }
 
-  if (!user) {
-    console.log('❌ SimpleProtectedRoute: Usuario no autenticado, redirigiendo a login');
-    return <Navigate to="/login" replace state={{ from: location }} />;
-  }
-
-  console.log('✅ SimpleProtectedRoute: Usuario autenticado, mostrando contenido protegido');
   return <>{children}</>;
 };
