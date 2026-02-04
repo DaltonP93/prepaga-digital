@@ -1,134 +1,124 @@
 
-# Plan: Restaurar Base de Datos Prepaga Digital
+# Plan: Corrección de Templates, Mejora del Diseñador y Flujo de Ventas con Beneficiarios
 
-## Resumen
-Crear todas las tablas, tipos y funciones del backup en la base de datos Supabase conectada. El codigo frontend ya esta preparado para este esquema.
+## Resumen del Problema
 
-## Esquema de Base de Datos
+Se identificaron los siguientes problemas:
 
-### ENUMs a Crear
-| ENUM | Valores |
-|------|---------|
-| user_role | super_admin, admin, gestor, vendedor |
-| sale_status | borrador, enviado, firmado, completado, cancelado, pendiente, en_auditoria |
-| document_status | pendiente, firmado, vencido |
+1. **Templates no cargan**: Error de relación entre `templates` y `created_by` (no existe FK en la BD)
+2. **Beneficiarios incompletos**: La tabla `beneficiaries` no tiene columnas para `amount`, `email`, `phone` que el componente intenta usar
+3. **Diseñador de templates básico**: Necesita mejoras para usar datos de la BD de forma más intuitiva
+4. **Flujo de ventas incompleto**: Falta integrar mejor la gestión de adherentes con montos editables
 
-### Tablas Principales (32 tablas)
+---
 
-**Gestion de Usuarios y Empresas:**
-- `companies` - Empresas del sistema con branding personalizado
-- `profiles` - Perfiles de usuarios vinculados a auth.users
-- `company_settings` - Configuracion API (WhatsApp, SMS, Email)
-- `company_currency_settings` - Configuracion de moneda
-- `company_ui_settings` - Personalizacion de UI
-- `countries` - Catalogo de paises
+## Cambios Propuestos
 
-**Gestion de Ventas:**
-- `clients` - Clientes con datos personales
-- `plans` - Planes de prepaga/seguros
-- `sales` - Ventas/contratos principales
-- `beneficiaries` - Beneficiarios de cada venta
-- `sale_templates` - Templates asignados a ventas
-- `sale_documents` - Documentos subidos a ventas
-- `sale_notes` - Notas internas de ventas
-- `sale_requirements` - Requisitos pendientes
+### 1. Corrección del Hook useTemplates.ts
 
-**Sistema de Templates y Firmas:**
-- `templates` - Templates de contratos/documentos
-- `template_placeholders` - Variables para templates
-- `template_questions` - Preguntas de cuestionarios
-- `template_question_options` - Opciones de respuesta
-- `template_responses` - Respuestas de clientes
-- `template_versions` - Historial de versiones
-- `template_workflow_states` - Estados de workflow
-- `template_analytics` - Metricas de uso
-- `template_comments` - Comentarios colaborativos
-- `documents` - Documentos generados
-- `signatures` - Firmas digitales
+**Problema**: La consulta usa `creator:created_by(first_name, last_name)` pero no existe FK.
 
-**Comunicaciones:**
-- `email_campaigns` - Campanas de email
-- `email_templates` - Templates de email
-- `sms_campaigns` - Campanas SMS
-- `whatsapp_notifications` - Notificaciones WhatsApp
-- `communication_logs` - Registro de comunicaciones
+**Solución**: Aplicar el patrón de fetch manual (como en useSales):
 
-**Sistema y Auditoria:**
-- `audit_logs` - Registro de cambios
-- `audit_processes` - Procesos de auditoria
-- `auth_attempts` - Intentos de login
-- `notifications` - Notificaciones in-app
-- `dashboard_widgets` - Configuracion de widgets
-- `file_uploads` - Archivos subidos
-- `password_reset_tokens` - Tokens de recuperacion
-- `process_traces` - Trazabilidad de procesos
-- `information_requests` - Solicitudes de informacion
-- `document_access_logs` - Acceso a documentos
-
-### Funciones SQL
-- `create_password_reset_token()` - Genera tokens de recuperacion
-- `create_template_version()` - Trigger para versionado automatico
-- `create_user_profile()` - Crea perfil al registrar usuario
-- `get_user_role()` - Obtiene rol del usuario (security definer)
-- `handle_profile_updated()` - Trigger para actualizar timestamp
-- `update_updated_at_column()` - Trigger generico para updated_at
-
-## Secuencia de Implementacion
-
-### Paso 1: Crear ENUMs y Extension
 ```text
-CREATE TYPE public.user_role AS ENUM (...)
-CREATE TYPE public.sale_status AS ENUM (...)
-CREATE TYPE public.document_status AS ENUM (...)
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp"
+Paso 1: Obtener templates sin la relación
+Paso 2: Extraer IDs únicos de created_by
+Paso 3: Consultar profiles por separado
+Paso 4: Combinar los datos
 ```
 
-### Paso 2: Crear Tablas Base (sin FK)
-Tablas independientes primero:
-- companies, countries, template_placeholders
+### 2. Migración de Base de Datos - Tabla beneficiaries
 
-### Paso 3: Crear Tablas con Dependencias
-En orden de dependencias:
-1. profiles (depende de companies)
-2. clients, plans, templates (dependen de companies)
-3. sales (depende de clients, plans, profiles)
-4. Resto de tablas...
+Agregar columnas faltantes:
 
-### Paso 4: Crear Funciones y Triggers
-- Funciones security definer para RLS
-- Triggers de actualizacion automatica
-- Trigger de versionado de templates
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `amount` | `decimal(12,2)` | Monto de cobertura del beneficiario |
+| `email` | `varchar(255)` | Email del beneficiario |
+| `phone` | `varchar(50)` | Teléfono del beneficiario |
 
-### Paso 5: Habilitar RLS y Crear Politicas
-Politicas basadas en:
-- company_id para aislamiento multi-tenant
-- user_id para datos personales
-- Rol para permisos administrativos
+### 3. Mejoras en el Componente BeneficiariesManager
 
-## Datos de Ejemplo
-El backup incluye datos de prueba:
-- 1 empresa de ejemplo
-- Usuarios de prueba
-- Clientes demo
-- Templates predefinidos
+- Mostrar columna de "Monto" en la tabla
+- Permitir edición inline del monto
+- Validación de datos antes de guardar
+- Formato de moneda para el monto
 
-## Compatibilidad con Codigo Existente
+### 4. Mejoras en el Template Designer
 
-El codigo frontend ya tiene:
-- Hooks para todas las entidades (useUsers, useSales, useClients, etc.)
-- Componentes de formularios y listas
-- Sistema de autenticacion con roles
-- Dashboard con widgets configurables
+Agregar panel de variables de base de datos organizado por categorías:
 
-**No se requieren cambios en el codigo** - esta disenado para este esquema.
+```text
+Categorías:
+├── Cliente (nombre, apellido, email, DNI, etc.)
+├── Plan (nombre, precio, descripción, cobertura)
+├── Empresa (nombre, email, teléfono, dirección)
+├── Venta (fecha, total, vendedor, notas)
+├── Beneficiarios (lista dinámica)
+└── Fechas (actual, vencimiento)
+```
 
-## Advertencia de Seguridad
+---
 
-El esquema almacena el rol en la tabla `profiles`. Segun las mejores practicas, deberiamos considerar mover los roles a una tabla separada `user_roles` para evitar ataques de escalacion de privilegios. Esto requeriria cambios menores en el codigo.
+## Archivos a Modificar
 
-## Proximos Pasos Despues de la Migracion
+| Archivo | Cambio |
+|---------|--------|
+| `src/hooks/useTemplates.ts` | Fetch manual de profiles para evitar error de FK |
+| `src/hooks/useBeneficiaries.ts` | Actualizar tipos para incluir nuevas columnas |
+| `src/components/BeneficiariesManager.tsx` | Mejorar UI con monto editable |
+| `src/integrations/supabase/types.ts` | Se actualizará automáticamente con la migración |
 
-1. Crear usuario inicial (super_admin)
-2. Crear empresa de prueba
-3. Configurar storage buckets para documentos
-4. Probar flujo completo de ventas y firmas
+---
+
+## Detalles Técnicos
+
+### Migración SQL
+
+```sql
+-- Agregar columnas a beneficiaries
+ALTER TABLE beneficiaries 
+ADD COLUMN IF NOT EXISTS amount decimal(12,2) DEFAULT 0,
+ADD COLUMN IF NOT EXISTS email varchar(255),
+ADD COLUMN IF NOT EXISTS phone varchar(50);
+```
+
+### Corrección useTemplates.ts
+
+```typescript
+// Cambio de query con join directo a fetch manual
+const { data: templatesData, error } = await supabase
+  .from('templates')
+  .select(`*, company:company_id(name), template_questions(id)`)
+  .order('created_at', { ascending: false });
+
+// Fetch de creators por separado
+const creatorIds = [...new Set(templatesData?.map(t => t.created_by).filter(Boolean))];
+const { data: creators } = await supabase
+  .from('profiles')
+  .select('id, first_name, last_name')
+  .in('id', creatorIds);
+
+// Combinar datos
+const templatesWithCreators = templatesData?.map(template => ({
+  ...template,
+  creator: creators?.find(c => c.id === template.created_by) || null
+}));
+```
+
+### Mejora BeneficiariesManager
+
+- Agregar columna "Monto" en la tabla
+- Input numérico con formato de moneda
+- Cálculo de suma total de montos de beneficiarios
+- Badge con estado "Principal" / "Secundario"
+
+---
+
+## Flujo de Pruebas Recomendado
+
+1. Verificar que la lista de templates carga correctamente
+2. Crear un nuevo template y confirmar que se guarda
+3. Crear una venta y agregar beneficiarios con montos
+4. Verificar que los montos se guardan y cargan correctamente
+5. Probar el diseñador de templates insertando variables
