@@ -19,12 +19,12 @@ export const useTemplates = () => {
     queryFn: async () => {
       console.log('🔍 Fetching templates...');
       
-      const { data, error } = await supabase
+      // Fetch templates without the creator relation (no FK exists)
+      const { data: templatesData, error } = await supabase
         .from('templates')
         .select(`
           *,
           company:company_id(name),
-          creator:created_by(first_name, last_name),
           template_questions(id)
         `)
         .order('created_at', { ascending: false });
@@ -34,15 +34,36 @@ export const useTemplates = () => {
         throw error;
       }
 
-      console.log('✅ Templates fetched:', data?.length || 0, 'items');
+      // Fetch creators separately using manual pattern
+      const creatorIds = [...new Set(templatesData?.map(t => t.created_by).filter(Boolean) || [])];
+      let creatorsMap: Record<string, { first_name: string; last_name: string }> = {};
       
-      // Add question count to each template
-      const templatesWithCount = data?.map(template => ({
+      if (creatorIds.length > 0) {
+        const { data: creators } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name')
+          .in('id', creatorIds);
+        
+        if (creators) {
+          creatorsMap = creators.reduce((acc, creator) => {
+            acc[creator.id] = { first_name: creator.first_name || '', last_name: creator.last_name || '' };
+            return acc;
+          }, {} as Record<string, { first_name: string; last_name: string }>);
+        }
+      }
+
+      console.log('✅ Templates fetched:', templatesData?.length || 0, 'items');
+      
+      // Combine data with creators and question count
+      const templatesWithCreators = templatesData?.map(template => ({
         ...template,
+        creator: template.created_by && creatorsMap[template.created_by] 
+          ? creatorsMap[template.created_by] 
+          : null,
         question_count: template.template_questions?.length || 0
       })) || [];
 
-      return templatesWithCount;
+      return templatesWithCreators;
     },
   });
 
