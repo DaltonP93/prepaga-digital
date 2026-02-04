@@ -4,22 +4,11 @@ import { Outlet } from 'react-router-dom';
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { Separator } from '@/components/ui/separator';
-import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
-import { Loader2 } from "lucide-react";
 import NotificationCenter from '@/components/NotificationCenter';
 import DashboardCustomizer from '@/components/DashboardCustomizer';
 
+// MainLayout no verifica loading - SimpleProtectedRoute ya lo hace
 export default function MainLayout() {
-  const { profile, loading } = useSimpleAuthContext();
-  
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
