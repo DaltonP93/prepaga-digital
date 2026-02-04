@@ -137,35 +137,44 @@ export type Database = {
       }
       beneficiaries: {
         Row: {
+          amount: number | null
           birth_date: string | null
           created_at: string | null
           dni: string | null
+          email: string | null
           first_name: string
           id: string
           is_primary: boolean | null
           last_name: string
+          phone: string | null
           relationship: string | null
           sale_id: string
         }
         Insert: {
+          amount?: number | null
           birth_date?: string | null
           created_at?: string | null
           dni?: string | null
+          email?: string | null
           first_name: string
           id?: string
           is_primary?: boolean | null
           last_name: string
+          phone?: string | null
           relationship?: string | null
           sale_id: string
         }
         Update: {
+          amount?: number | null
           birth_date?: string | null
           created_at?: string | null
           dni?: string | null
+          email?: string | null
           first_name?: string
           id?: string
           is_primary?: boolean | null
           last_name?: string
+          phone?: string | null
           relationship?: string | null
           sale_id?: string
         }

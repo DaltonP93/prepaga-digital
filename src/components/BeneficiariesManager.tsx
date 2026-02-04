@@ -254,49 +254,68 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
         )}
 
         {beneficiaries.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead>DNI</TableHead>
-                <TableHead>Relación</TableHead>
-                <TableHead>Fecha Nac.</TableHead>
-                <TableHead>Principal</TableHead>
-                <TableHead>Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {beneficiaries.map((beneficiary) => (
-                <TableRow key={beneficiary.id}>
-                  <TableCell>
-                    {beneficiary.first_name} {beneficiary.last_name}
-                  </TableCell>
-                  <TableCell>{beneficiary.dni || '-'}</TableCell>
-                  <TableCell>{beneficiary.relationship || '-'}</TableCell>
-                  <TableCell>{beneficiary.birth_date || '-'}</TableCell>
-                  <TableCell>{beneficiary.is_primary ? 'Sí' : 'No'}</TableCell>
-                  <TableCell>
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEdit(beneficiary)}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDelete(beneficiary.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>DNI</TableHead>
+                  <TableHead>Relación</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Teléfono</TableHead>
+                  <TableHead className="text-right">Monto</TableHead>
+                  <TableHead>Acciones</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {beneficiaries.map((beneficiary: any) => (
+                  <TableRow key={beneficiary.id}>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{beneficiary.first_name} {beneficiary.last_name}</span>
+                        {beneficiary.is_primary && (
+                          <span className="text-xs text-primary">Principal</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>{beneficiary.dni || '-'}</TableCell>
+                    <TableCell className="capitalize">{beneficiary.relationship || '-'}</TableCell>
+                    <TableCell className="text-sm">{beneficiary.email || '-'}</TableCell>
+                    <TableCell>{beneficiary.phone || '-'}</TableCell>
+                    <TableCell className="text-right font-medium">
+                      ${(beneficiary.amount || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(beneficiary)}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDelete(beneficiary.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <div className="flex justify-end pt-4 border-t">
+              <div className="text-right">
+                <span className="text-sm text-muted-foreground">Total cobertura:</span>
+                <span className="ml-2 text-lg font-bold">
+                  ${beneficiaries.reduce((sum: number, b: any) => sum + (b.amount || 0), 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+          </>
         ) : (
           <p className="text-muted-foreground text-center py-4">
             No hay beneficiarios agregados
