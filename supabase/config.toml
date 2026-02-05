@@ -1,1 +1,34 @@
 project_id = "ykducvvcjzdpoojxlsig"
+
+[functions.send-whatsapp]
+verify_jwt = false
+
+[functions.schedule-reminders]
+verify_jwt = false
+
+[functions.generate-pdf]
+verify_jwt = false
+
+[functions.create-payment]
+verify_jwt = false
+
+[functions.create-subscription]
+verify_jwt = false
+
+[functions.create-user]
+verify_jwt = false
+
+[functions.file-manager]
+verify_jwt = false
+
+[functions.send-email-campaign]
+verify_jwt = false
+
+[functions.send-notification]
+verify_jwt = false
+
+[functions.send-sms-campaign]
+verify_jwt = false
+
+[functions.api]
+verify_jwt = false
