@@ -137,46 +137,85 @@ export type Database = {
       }
       beneficiaries: {
         Row: {
+          address: string | null
           amount: number | null
           birth_date: string | null
+          city: string | null
           created_at: string | null
           dni: string | null
+          document_number: string | null
+          document_type: string | null
           email: string | null
           first_name: string
+          gender: string | null
+          has_preexisting_conditions: boolean | null
           id: string
           is_primary: boolean | null
           last_name: string
+          marital_status: string | null
+          occupation: string | null
           phone: string | null
+          postal_code: string | null
+          preexisting_conditions_detail: string | null
+          province: string | null
           relationship: string | null
           sale_id: string
+          signature_link_id: string | null
+          signature_required: boolean | null
         }
         Insert: {
+          address?: string | null
           amount?: number | null
           birth_date?: string | null
+          city?: string | null
           created_at?: string | null
           dni?: string | null
+          document_number?: string | null
+          document_type?: string | null
           email?: string | null
           first_name: string
+          gender?: string | null
+          has_preexisting_conditions?: boolean | null
           id?: string
           is_primary?: boolean | null
           last_name: string
+          marital_status?: string | null
+          occupation?: string | null
           phone?: string | null
+          postal_code?: string | null
+          preexisting_conditions_detail?: string | null
+          province?: string | null
           relationship?: string | null
           sale_id: string
+          signature_link_id?: string | null
+          signature_required?: boolean | null
         }
         Update: {
+          address?: string | null
           amount?: number | null
           birth_date?: string | null
+          city?: string | null
           created_at?: string | null
           dni?: string | null
+          document_number?: string | null
+          document_type?: string | null
           email?: string | null
           first_name?: string
+          gender?: string | null
+          has_preexisting_conditions?: boolean | null
           id?: string
           is_primary?: boolean | null
           last_name?: string
+          marital_status?: string | null
+          occupation?: string | null
           phone?: string | null
+          postal_code?: string | null
+          preexisting_conditions_detail?: string | null
+          province?: string | null
           relationship?: string | null
           sale_id?: string
+          signature_link_id?: string | null
+          signature_required?: boolean | null
         }
         Relationships: [
           {
@@ -184,6 +223,69 @@ export type Database = {
             columns: ["sale_id"]
             isOneToOne: false
             referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      beneficiary_documents: {
+        Row: {
+          beneficiary_id: string
+          created_at: string | null
+          document_type_id: string | null
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          is_verified: boolean | null
+          upload_source: string | null
+          uploaded_by: string | null
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          beneficiary_id: string
+          created_at?: string | null
+          document_type_id?: string | null
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          is_verified?: boolean | null
+          upload_source?: string | null
+          uploaded_by?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          beneficiary_id?: string
+          created_at?: string | null
+          document_type_id?: string | null
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          is_verified?: boolean | null
+          upload_source?: string | null
+          uploaded_by?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beneficiary_documents_beneficiary_id_fkey"
+            columns: ["beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiary_documents_document_type_id_fkey"
+            columns: ["document_type_id"]
+            isOneToOne: false
+            referencedRelation: "document_types"
             referencedColumns: ["id"]
           },
         ]
@@ -596,41 +698,218 @@ export type Database = {
           },
         ]
       }
-      documents: {
+      document_package_items: {
         Row: {
-          content: string | null
           created_at: string | null
-          document_type: string | null
-          file_url: string | null
+          document_id: string
+          id: string
+          is_required: boolean | null
+          package_id: string
+          sort_order: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          document_id: string
+          id?: string
+          is_required?: boolean | null
+          package_id: string
+          sort_order?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          document_id?: string
+          id?: string
+          is_required?: boolean | null
+          package_id?: string
+          sort_order?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_package_items_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_package_items_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "document_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_packages: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
           id: string
           name: string
+          package_type: string | null
           sale_id: string
-          status: Database["public"]["Enums"]["document_status"] | null
           updated_at: string | null
         }
         Insert: {
-          content?: string | null
           created_at?: string | null
-          document_type?: string | null
-          file_url?: string | null
+          created_by?: string | null
+          description?: string | null
           id?: string
           name: string
+          package_type?: string | null
           sale_id: string
-          status?: Database["public"]["Enums"]["document_status"] | null
           updated_at?: string | null
         }
         Update: {
-          content?: string | null
           created_at?: string | null
-          document_type?: string | null
-          file_url?: string | null
+          created_by?: string | null
+          description?: string | null
           id?: string
           name?: string
+          package_type?: string | null
           sale_id?: string
-          status?: Database["public"]["Enums"]["document_status"] | null
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "document_packages_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_types: {
+        Row: {
+          applies_to: string | null
+          code: string
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          is_required: boolean | null
+          name: string
+          requires_signature: boolean | null
+          sort_order: number | null
+          template_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          applies_to?: string | null
+          code: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_required?: boolean | null
+          name: string
+          requires_signature?: boolean | null
+          sort_order?: number | null
+          template_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          applies_to?: string | null
+          code?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_required?: boolean | null
+          name?: string
+          requires_signature?: boolean | null
+          sort_order?: number | null
+          template_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_types_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          beneficiary_id: string | null
+          content: string | null
+          created_at: string | null
+          document_type: string | null
+          document_type_id: string | null
+          file_url: string | null
+          generated_from_template: boolean | null
+          id: string
+          is_final: boolean | null
+          name: string
+          requires_signature: boolean | null
+          sale_id: string
+          signature_data: string | null
+          signed_at: string | null
+          signed_by: string | null
+          status: Database["public"]["Enums"]["document_status"] | null
+          updated_at: string | null
+          version: number | null
+        }
+        Insert: {
+          beneficiary_id?: string | null
+          content?: string | null
+          created_at?: string | null
+          document_type?: string | null
+          document_type_id?: string | null
+          file_url?: string | null
+          generated_from_template?: boolean | null
+          id?: string
+          is_final?: boolean | null
+          name: string
+          requires_signature?: boolean | null
+          sale_id: string
+          signature_data?: string | null
+          signed_at?: string | null
+          signed_by?: string | null
+          status?: Database["public"]["Enums"]["document_status"] | null
+          updated_at?: string | null
+          version?: number | null
+        }
+        Update: {
+          beneficiary_id?: string | null
+          content?: string | null
+          created_at?: string | null
+          document_type?: string | null
+          document_type_id?: string | null
+          file_url?: string | null
+          generated_from_template?: boolean | null
+          id?: string
+          is_final?: boolean | null
+          name?: string
+          requires_signature?: boolean | null
+          sale_id?: string
+          signature_data?: string | null
+          signed_at?: string | null
+          signed_by?: string | null
+          status?: Database["public"]["Enums"]["document_status"] | null
+          updated_at?: string | null
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_beneficiary_id_fkey"
+            columns: ["beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_document_type_id_fkey"
+            columns: ["document_type_id"]
+            isOneToOne: false
+            referencedRelation: "document_types"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "documents_sale_id_fkey"
             columns: ["sale_id"]
@@ -1171,16 +1450,68 @@ export type Database = {
           },
         ]
       }
+      sale_workflow_states: {
+        Row: {
+          change_reason: string | null
+          changed_by: string | null
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          new_status: string
+          previous_status: string | null
+          sale_id: string
+        }
+        Insert: {
+          change_reason?: string | null
+          changed_by?: string | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          new_status: string
+          previous_status?: string | null
+          sale_id: string
+        }
+        Update: {
+          change_reason?: string | null
+          changed_by?: string | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          new_status?: string
+          previous_status?: string | null
+          sale_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_workflow_states_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales: {
         Row: {
+          adherents_count: number | null
+          all_signatures_completed: boolean | null
+          audit_notes: string | null
+          audit_status: string | null
+          audited_at: string | null
+          auditor_id: string | null
           client_id: string | null
           company_id: string
+          contract_number: string | null
           contract_pdf_url: string | null
           created_at: string | null
           id: string
           notes: string | null
           plan_id: string | null
+          request_number: string | null
+          requires_adherents: boolean | null
+          sale_date: string | null
           salesperson_id: string | null
+          signature_completed_at: string | null
           signature_expires_at: string | null
           signature_token: string | null
           signed_at: string | null
@@ -1191,14 +1522,25 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          adherents_count?: number | null
+          all_signatures_completed?: boolean | null
+          audit_notes?: string | null
+          audit_status?: string | null
+          audited_at?: string | null
+          auditor_id?: string | null
           client_id?: string | null
           company_id: string
+          contract_number?: string | null
           contract_pdf_url?: string | null
           created_at?: string | null
           id?: string
           notes?: string | null
           plan_id?: string | null
+          request_number?: string | null
+          requires_adherents?: boolean | null
+          sale_date?: string | null
           salesperson_id?: string | null
+          signature_completed_at?: string | null
           signature_expires_at?: string | null
           signature_token?: string | null
           signed_at?: string | null
@@ -1209,14 +1551,25 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          adherents_count?: number | null
+          all_signatures_completed?: boolean | null
+          audit_notes?: string | null
+          audit_status?: string | null
+          audited_at?: string | null
+          auditor_id?: string | null
           client_id?: string | null
           company_id?: string
+          contract_number?: string | null
           contract_pdf_url?: string | null
           created_at?: string | null
           id?: string
           notes?: string | null
           plan_id?: string | null
+          request_number?: string | null
+          requires_adherents?: boolean | null
+          sale_date?: string | null
           salesperson_id?: string | null
+          signature_completed_at?: string | null
           signature_expires_at?: string | null
           signature_token?: string | null
           signed_at?: string | null
@@ -1253,6 +1606,135 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signature_links: {
+        Row: {
+          access_count: number | null
+          accessed_at: string | null
+          completed_at: string | null
+          created_at: string | null
+          created_by: string | null
+          expires_at: string
+          id: string
+          ip_addresses: Json | null
+          package_id: string | null
+          recipient_email: string
+          recipient_id: string | null
+          recipient_phone: string | null
+          recipient_type: string
+          sale_id: string
+          status: string | null
+          token: string
+          updated_at: string | null
+        }
+        Insert: {
+          access_count?: number | null
+          accessed_at?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          expires_at: string
+          id?: string
+          ip_addresses?: Json | null
+          package_id?: string | null
+          recipient_email: string
+          recipient_id?: string | null
+          recipient_phone?: string | null
+          recipient_type: string
+          sale_id: string
+          status?: string | null
+          token: string
+          updated_at?: string | null
+        }
+        Update: {
+          access_count?: number | null
+          accessed_at?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          ip_addresses?: Json | null
+          package_id?: string | null
+          recipient_email?: string
+          recipient_id?: string | null
+          recipient_phone?: string | null
+          recipient_type?: string
+          sale_id?: string
+          status?: string | null
+          token?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signature_links_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "document_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_links_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signature_workflow_steps: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          data: Json | null
+          document_id: string | null
+          id: string
+          signature_link_id: string
+          started_at: string | null
+          status: string | null
+          step_order: number
+          step_type: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          data?: Json | null
+          document_id?: string | null
+          id?: string
+          signature_link_id: string
+          started_at?: string | null
+          status?: string | null
+          step_order: number
+          step_type: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          data?: Json | null
+          document_id?: string | null
+          id?: string
+          signature_link_id?: string
+          started_at?: string | null
+          status?: string | null
+          step_order?: number
+          step_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signature_workflow_steps_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_workflow_steps_signature_link_id_fkey"
+            columns: ["signature_link_id"]
+            isOneToOne: false
+            referencedRelation: "signature_links"
             referencedColumns: ["id"]
           },
         ]
@@ -1669,7 +2151,11 @@ export type Database = {
           id: string
           is_active: boolean | null
           name: string
+          pdf_layout: Json | null
+          requires_signature: boolean | null
+          template_type: string | null
           updated_at: string | null
+          uses_dynamic_fields: boolean | null
           version: number | null
         }
         Insert: {
@@ -1681,7 +2167,11 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name: string
+          pdf_layout?: Json | null
+          requires_signature?: boolean | null
+          template_type?: string | null
           updated_at?: string | null
+          uses_dynamic_fields?: boolean | null
           version?: number | null
         }
         Update: {
@@ -1693,7 +2183,11 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name?: string
+          pdf_layout?: Json | null
+          requires_signature?: boolean | null
+          template_type?: string | null
           updated_at?: string | null
+          uses_dynamic_fields?: boolean | null
           version?: number | null
         }
         Relationships: [
@@ -1726,6 +2220,82 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      whatsapp_messages: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          delivered_at: string | null
+          error_message: string | null
+          id: string
+          message_body: string
+          message_type: string | null
+          phone_number: string
+          read_at: string | null
+          sale_id: string | null
+          sent_at: string | null
+          sent_by: string | null
+          signature_link_id: string | null
+          status: string | null
+          whatsapp_message_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          delivered_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_body: string
+          message_type?: string | null
+          phone_number: string
+          read_at?: string | null
+          sale_id?: string | null
+          sent_at?: string | null
+          sent_by?: string | null
+          signature_link_id?: string | null
+          status?: string | null
+          whatsapp_message_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          delivered_at?: string | null
+          error_message?: string | null
+          id?: string
+          message_body?: string
+          message_type?: string | null
+          phone_number?: string
+          read_at?: string | null
+          sale_id?: string | null
+          sent_at?: string | null
+          sent_by?: string | null
+          signature_link_id?: string | null
+          status?: string | null
+          whatsapp_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_messages_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_signature_link_id_fkey"
+            columns: ["signature_link_id"]
+            isOneToOne: false
+            referencedRelation: "signature_links"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whatsapp_notifications: {
         Row: {
@@ -1783,6 +2353,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_all_signatures_completed: {
+        Args: { p_sale_id: string }
+        Returns: boolean
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
