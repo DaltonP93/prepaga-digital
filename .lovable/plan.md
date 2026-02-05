@@ -125,7 +125,33 @@
 
 ---
 
-## Documentación de Referencia
+### ✅ Fase 6: Integraciones Finales (COMPLETADO)
+
+#### Storage
+- [x] Bucket `documents` privado con políticas RLS por company_id
+
+#### Página de Firma Pública
+- [x] `useSignatureLinkPublic.ts` - Hook para firma pública con signature_links
+- [x] `SignatureView.tsx` - Página mejorada con EnhancedSignatureCanvas
+
+#### SaleDetail Mejorado
+- [x] Tabs de Paquetes de Documentos
+- [x] Tab de Generación de Enlaces de Firma
+- [x] Tab de WhatsApp Notifications
+
+#### Editor de Templates Mejorado
+- [x] Integración de EnhancedPlaceholdersPanel
+- [x] LiveTemplatePreview con vista desktop/mobile/print
+- [x] Generación PDF desde vista previa
+
+---
+
+## 🔒 Configuración Pendiente (Usuario)
+
+1. **Leaked Password Protection**: Habilitar en Supabase Dashboard > Authentication > Settings
+2. **WhatsApp API**: Configurar `whatsapp_api_key` y `whatsapp_phone_id` en `company_settings`
+
+---
 
 Ver archivo completo: `.lovable/analisis_mejoras_sistema_firma_digital.md`
 
