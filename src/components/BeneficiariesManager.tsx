@@ -1,29 +1,15 @@
 
 import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Trash2, Plus, Edit2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Trash2, Plus, Edit2, ChevronDown, FileText, UserCheck, AlertCircle } from 'lucide-react';
 import { useBeneficiaries, useCreateBeneficiary, useUpdateBeneficiary, useDeleteBeneficiary } from '@/hooks/useBeneficiaries';
-
-const beneficiarySchema = z.object({
-  first_name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
-  last_name: z.string().min(2, 'El apellido debe tener al menos 2 caracteres'),
-  dni: z.string().optional(),
-  email: z.string().email('Email inválido').optional().or(z.literal('')),
-  phone: z.string().optional(),
-  relationship: z.string().min(1, 'La relación es requerida'),
-  birth_date: z.string().optional(),
-  amount: z.number().min(0, 'El monto debe ser mayor o igual a 0').optional(),
-});
-
-type BeneficiaryFormData = z.infer<typeof beneficiarySchema>;
+import { BeneficiaryForm, BeneficiaryFormData } from '@/components/beneficiaries/BeneficiaryForm';
+import { BeneficiaryDocuments } from '@/components/beneficiaries/BeneficiaryDocuments';
+import { useCurrencySettings } from '@/hooks/useCurrencySettings';
 
 interface BeneficiariesManagerProps {
   saleId: string;
@@ -32,41 +18,20 @@ interface BeneficiariesManagerProps {
 export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ saleId }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingBeneficiary, setEditingBeneficiary] = useState<any>(null);
+  const [expandedBeneficiary, setExpandedBeneficiary] = useState<string | null>(null);
 
   const { data: beneficiaries = [], isLoading } = useBeneficiaries(saleId);
   const createBeneficiary = useCreateBeneficiary();
   const updateBeneficiary = useUpdateBeneficiary();
   const deleteBeneficiary = useDeleteBeneficiary();
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    formState: { errors },
-  } = useForm<BeneficiaryFormData>({
-    resolver: zodResolver(beneficiarySchema),
-  });
+  const { formatCurrency } = useCurrencySettings();
 
   const handleEdit = (beneficiary: any) => {
     setEditingBeneficiary(beneficiary);
-    setValue('first_name', beneficiary.first_name);
-    setValue('last_name', beneficiary.last_name);
-    setValue('dni', beneficiary.dni || '');
-    setValue('email', beneficiary.email || '');
-    setValue('phone', beneficiary.phone || '');
-    setValue('relationship', beneficiary.relationship);
-    setValue('birth_date', beneficiary.birth_date || '');
-    setValue('amount', beneficiary.amount || 0);
     setShowForm(true);
   };
 
   const onSubmit = (data: BeneficiaryFormData) => {
-    // Ensure required fields are present
-    if (!data.first_name || !data.last_name || !data.relationship) {
-      return;
-    }
-
     const beneficiaryData = {
       sale_id: saleId,
       first_name: data.first_name,
@@ -76,7 +41,20 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
       amount: data.amount || 0,
       email: data.email || null,
       phone: data.phone || null,
-      dni: data.dni || null,
+      dni: data.dni || data.document_number || null,
+      document_type: data.document_type || null,
+      document_number: data.document_number || null,
+      gender: data.gender || null,
+      marital_status: data.marital_status || null,
+      occupation: data.occupation || null,
+      address: data.address || null,
+      city: data.city || null,
+      province: data.province || null,
+      postal_code: data.postal_code || null,
+      is_primary: data.is_primary || false,
+      signature_required: data.signature_required ?? true,
+      has_preexisting_conditions: data.has_preexisting_conditions || false,
+      preexisting_conditions_detail: data.preexisting_conditions_detail || null,
     };
 
     if (editingBeneficiary) {
@@ -84,7 +62,6 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
         { id: editingBeneficiary.id, ...beneficiaryData },
         {
           onSuccess: () => {
-            reset();
             setShowForm(false);
             setEditingBeneficiary(null);
           },
@@ -93,7 +70,6 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
     } else {
       createBeneficiary.mutate(beneficiaryData, {
         onSuccess: () => {
-          reset();
           setShowForm(false);
         },
       });
@@ -101,7 +77,6 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
   };
 
   const handleCancel = () => {
-    reset();
     setShowForm(false);
     setEditingBeneficiary(null);
   };
@@ -112,8 +87,20 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
     }
   };
 
+  const toggleExpand = (id: string) => {
+    setExpandedBeneficiary(expandedBeneficiary === id ? null : id);
+  };
+
   if (isLoading) {
-    return <div>Cargando beneficiarios...</div>;
+    return (
+      <Card>
+        <CardContent className="py-8">
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -121,9 +108,9 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
       <CardHeader>
         <div className="flex justify-between items-center">
           <div>
-            <CardTitle>Beneficiarios</CardTitle>
+            <CardTitle>Beneficiarios / Adherentes</CardTitle>
             <CardDescription>
-              Gestiona los beneficiarios de esta venta
+              Gestiona los beneficiarios de esta venta ({beneficiaries.length} registrados)
             </CardDescription>
           </div>
           <Button onClick={() => setShowForm(true)} disabled={showForm}>
@@ -138,187 +125,167 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
             <h3 className="font-semibold mb-4">
               {editingBeneficiary ? 'Editar' : 'Nuevo'} Beneficiario
             </h3>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="first_name">Nombre *</Label>
-                  <Input
-                    id="first_name"
-                    {...register('first_name')}
-                    placeholder="Nombre del beneficiario"
-                  />
-                  {errors.first_name && (
-                    <p className="text-red-500 text-sm">{errors.first_name.message}</p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="last_name">Apellido *</Label>
-                  <Input
-                    id="last_name"
-                    {...register('last_name')}
-                    placeholder="Apellido del beneficiario"
-                  />
-                  {errors.last_name && (
-                    <p className="text-red-500 text-sm">{errors.last_name.message}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="dni">DNI/CI</Label>
-                  <Input
-                    id="dni"
-                    {...register('dni')}
-                    placeholder="Documento de identidad"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="relationship">Relación *</Label>
-                  <Select onValueChange={(value) => setValue('relationship', value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar relación" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="conyuge">Cónyuge</SelectItem>
-                      <SelectItem value="hijo">Hijo/a</SelectItem>
-                      <SelectItem value="padre">Padre</SelectItem>
-                      <SelectItem value="madre">Madre</SelectItem>
-                      <SelectItem value="hermano">Hermano/a</SelectItem>
-                      <SelectItem value="otro">Otro</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {errors.relationship && (
-                    <p className="text-red-500 text-sm">{errors.relationship.message}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    {...register('email')}
-                    placeholder="Email del beneficiario"
-                  />
-                  {errors.email && (
-                    <p className="text-red-500 text-sm">{errors.email.message}</p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="phone">Teléfono</Label>
-                  <Input
-                    id="phone"
-                    {...register('phone')}
-                    placeholder="Teléfono del beneficiario"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="birth_date">Fecha de Nacimiento</Label>
-                  <Input
-                    id="birth_date"
-                    type="date"
-                    {...register('birth_date')}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="amount">Monto de Cobertura</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    step="0.01"
-                    {...register('amount', { valueAsNumber: true })}
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-2">
-                <Button type="button" variant="outline" onClick={handleCancel}>
-                  Cancelar
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={createBeneficiary.isPending || updateBeneficiary.isPending}
-                >
-                  {editingBeneficiary ? 'Actualizar' : 'Crear'} Beneficiario
-                </Button>
-              </div>
-            </form>
+            <BeneficiaryForm
+              defaultValues={editingBeneficiary || {}}
+              onSubmit={onSubmit}
+              onCancel={handleCancel}
+              isSubmitting={createBeneficiary.isPending || updateBeneficiary.isPending}
+              isEditing={!!editingBeneficiary}
+            />
           </div>
         )}
 
         {beneficiaries.length > 0 ? (
-          <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>DNI</TableHead>
-                  <TableHead>Relación</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Teléfono</TableHead>
-                  <TableHead className="text-right">Monto</TableHead>
-                  <TableHead>Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {beneficiaries.map((beneficiary: any) => (
-                  <TableRow key={beneficiary.id}>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{beneficiary.first_name} {beneficiary.last_name}</span>
-                        {beneficiary.is_primary && (
-                          <span className="text-xs text-primary">Principal</span>
-                        )}
+          <div className="space-y-3">
+            {beneficiaries.map((beneficiary: any) => (
+              <Collapsible
+                key={beneficiary.id}
+                open={expandedBeneficiary === beneficiary.id}
+                onOpenChange={() => toggleExpand(beneficiary.id)}
+              >
+                <div className="border rounded-lg">
+                  <CollapsibleTrigger asChild>
+                    <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50">
+                      <div className="flex items-center gap-4">
+                        <ChevronDown 
+                          className={`h-4 w-4 transition-transform ${
+                            expandedBeneficiary === beneficiary.id ? 'rotate-180' : ''
+                          }`} 
+                        />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">
+                              {beneficiary.first_name} {beneficiary.last_name}
+                            </span>
+                            {beneficiary.is_primary && (
+                              <Badge variant="default" className="text-xs">
+                                <UserCheck className="h-3 w-3 mr-1" />
+                                Titular
+                              </Badge>
+                            )}
+                            {beneficiary.has_preexisting_conditions && (
+                              <Badge variant="outline" className="text-xs text-orange-600">
+                                <AlertCircle className="h-3 w-3 mr-1" />
+                                Preexistencias
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {beneficiary.relationship && (
+                              <span className="capitalize">{beneficiary.relationship}</span>
+                            )}
+                            {beneficiary.dni && (
+                              <span> • DNI: {beneficiary.dni}</span>
+                            )}
+                            {beneficiary.email && (
+                              <span> • {beneficiary.email}</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </TableCell>
-                    <TableCell>{beneficiary.dni || '-'}</TableCell>
-                    <TableCell className="capitalize">{beneficiary.relationship || '-'}</TableCell>
-                    <TableCell className="text-sm">{beneficiary.email || '-'}</TableCell>
-                    <TableCell>{beneficiary.phone || '-'}</TableCell>
-                    <TableCell className="text-right font-medium">
-                      ${(beneficiary.amount || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(beneficiary)}
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDelete(beneficiary.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <div className="flex items-center gap-4">
+                        <span className="font-medium">
+                          {formatCurrency(beneficiary.amount || 0)}
+                        </span>
+                        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(beneficiary)}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(beneficiary.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </div>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="border-t p-4 space-y-4 bg-muted/20">
+                      {/* Additional Details */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Teléfono:</span>
+                          <p className="font-medium">{beneficiary.phone || '-'}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Fecha Nacimiento:</span>
+                          <p className="font-medium">
+                            {beneficiary.birth_date 
+                              ? new Date(beneficiary.birth_date).toLocaleDateString() 
+                              : '-'}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Género:</span>
+                          <p className="font-medium capitalize">{beneficiary.gender || '-'}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Estado Civil:</span>
+                          <p className="font-medium capitalize">{beneficiary.marital_status || '-'}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Ocupación:</span>
+                          <p className="font-medium">{beneficiary.occupation || '-'}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Dirección:</span>
+                          <p className="font-medium">{beneficiary.address || '-'}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Ciudad:</span>
+                          <p className="font-medium">
+                            {beneficiary.city}
+                            {beneficiary.province && `, ${beneficiary.province}`}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Requiere Firma:</span>
+                          <p className="font-medium">
+                            {beneficiary.signature_required ? 'Sí' : 'No'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {beneficiary.has_preexisting_conditions && beneficiary.preexisting_conditions_detail && (
+                        <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                          <p className="text-sm font-medium text-orange-800">Condiciones Preexistentes:</p>
+                          <p className="text-sm text-orange-700">{beneficiary.preexisting_conditions_detail}</p>
+                        </div>
+                      )}
+
+                      {/* Documents Section */}
+                      <BeneficiaryDocuments
+                        beneficiaryId={beneficiary.id}
+                        beneficiaryName={`${beneficiary.first_name} ${beneficiary.last_name}`}
+                      />
+                    </div>
+                  </CollapsibleContent>
+                </div>
+              </Collapsible>
+            ))}
+
+            {/* Total Summary */}
             <div className="flex justify-end pt-4 border-t">
               <div className="text-right">
                 <span className="text-sm text-muted-foreground">Total cobertura:</span>
                 <span className="ml-2 text-lg font-bold">
-                  ${beneficiaries.reduce((sum: number, b: any) => sum + (b.amount || 0), 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                  {formatCurrency(
+                    beneficiaries.reduce((sum: number, b: any) => sum + (b.amount || 0), 0)
+                  )}
                 </span>
               </div>
             </div>
-          </>
+          </div>
         ) : (
-          <p className="text-muted-foreground text-center py-4">
-            No hay beneficiarios agregados
+          <p className="text-muted-foreground text-center py-8">
+            No hay beneficiarios agregados. Haz clic en "Agregar Beneficiario" para comenzar.
           </p>
         )}
       </CardContent>
