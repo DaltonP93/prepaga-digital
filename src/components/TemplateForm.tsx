@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -12,11 +11,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { TemplateDesigner } from "@/components/TemplateDesigner";
 import { QuestionBuilder } from "@/components/QuestionBuilder";
-import { DocumentPreview } from "@/components/DocumentPreview";
 import { QuestionCopyDialog } from "@/components/QuestionCopyDialog";
-import { FileText, Settings, Eye, HelpCircle, Copy } from "lucide-react";
+import { EnhancedPlaceholdersPanel } from "@/components/templates/EnhancedPlaceholdersPanel";
+import { LiveTemplatePreview } from "@/components/templates/LiveTemplatePreview";
+import { FileText, Settings, Eye, HelpCircle, Copy, Code } from "lucide-react";
 import { useCreateTemplate, useUpdateTemplate } from "@/hooks/useTemplates";
 import { useTemplateQuestions } from "@/hooks/useTemplateQuestions";
+import { useEnhancedPDFGeneration } from "@/hooks/useEnhancedPDFGeneration";
 import { Database } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -45,6 +46,7 @@ export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps
   const [dynamicFields, setDynamicFields] = useState<any[]>([]);
 
   const { questions, isLoading: questionsLoading } = useTemplateQuestions(template?.id);
+  const { downloadDocument, isGenerating } = useEnhancedPDFGeneration();
 
   const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<TemplateFormData>({
     defaultValues: {
@@ -141,7 +143,7 @@ export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <Tabs defaultValue="basic" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="basic" className="flex items-center gap-2">
                   <Settings className="h-4 w-4" />
                   Configuración
@@ -149,6 +151,10 @@ export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps
                 <TabsTrigger value="content" className="flex items-center gap-2">
                   <FileText className="h-4 w-4" />
                   Diseñador
+                </TabsTrigger>
+                <TabsTrigger value="variables" className="flex items-center gap-2">
+                  <Code className="h-4 w-4" />
+                  Variables
                 </TabsTrigger>
                 <TabsTrigger value="questions" className="flex items-center gap-2">
                   <HelpCircle className="h-4 w-4" />
@@ -234,6 +240,15 @@ export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps
                 </Card>
               </TabsContent>
 
+              <TabsContent value="variables" className="space-y-4">
+                <EnhancedPlaceholdersPanel
+                  onPlaceholderInsert={(placeholder) => {
+                    const currentContent = watch("content");
+                    setValue("content", currentContent + " " + placeholder);
+                  }}
+                />
+              </TabsContent>
+
               <TabsContent value="questions" className="space-y-4">
                 <Card>
                   <CardHeader>
@@ -269,18 +284,17 @@ export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps
               </TabsContent>
 
               <TabsContent value="preview" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Vista Previa del Template</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <DocumentPreview
-                      content={watch("content")}
-                      dynamicFields={dynamicFields}
-                      templateType="contract"
-                    />
-                  </CardContent>
-                </Card>
+                <LiveTemplatePreview
+                  content={watch("content")}
+                  onDownloadPDF={() => {
+                    downloadDocument({
+                      htmlContent: watch("content"),
+                      filename: watch("name") || "template",
+                      documentType: "contract",
+                    });
+                  }}
+                  isGeneratingPDF={isGenerating}
+                />
               </TabsContent>
             </Tabs>
 
