@@ -6,11 +6,12 @@ import { Tables } from "@/integrations/supabase/types";
 
 type Profile = Tables<"profiles">;
 
-interface SimpleAuthContextType {
+export interface SimpleAuthContextType {
   user: User | null;
   profile: Profile | null;
   session: Session | null;
   loading: boolean;
+  userRole: string | null;
   signOut: () => Promise<void>;
 }
 
@@ -19,6 +20,28 @@ export const useSimpleAuth = (): SimpleAuthContextType => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  // Función para obtener el rol del usuario
+  const fetchUserRole = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('❌ SimpleAuth: Error obteniendo rol:', error);
+        return null;
+      }
+
+      return data?.role || 'vendedor';
+    } catch (error) {
+      console.error('❌ SimpleAuth: Error inesperado obteniendo rol:', error);
+      return null;
+    }
+  }, []);
 
   // Función optimizada para obtener perfil
   const fetchProfile = useCallback(async (userId: string) => {
@@ -52,6 +75,7 @@ export const useSimpleAuth = (): SimpleAuthContextType => {
       setUser(null);
       setProfile(null);
       setSession(null);
+      setUserRole(null);
       setLoading(false);
       
       // Limpiar storage
@@ -67,6 +91,7 @@ export const useSimpleAuth = (): SimpleAuthContextType => {
       setUser(null);
       setProfile(null);
       setSession(null);
+      setUserRole(null);
       setLoading(false);
     }
   }, []);
@@ -89,10 +114,15 @@ export const useSimpleAuth = (): SimpleAuthContextType => {
           setSession(currentSession);
           setUser(currentSession.user);
           
-          // Obtener perfil si hay usuario
-          const userProfile = await fetchProfile(currentSession.user.id);
+          // Obtener perfil y rol si hay usuario
+          const [userProfile, role] = await Promise.all([
+            fetchProfile(currentSession.user.id),
+            fetchUserRole(currentSession.user.id)
+          ]);
+          
           if (mounted) {
             setProfile(userProfile);
+            setUserRole(role);
           }
         } else {
           console.log('ℹ️ SimpleAuth: No hay sesión activa');
@@ -114,7 +144,7 @@ export const useSimpleAuth = (): SimpleAuthContextType => {
     return () => {
       mounted = false;
     };
-  }, [fetchProfile]);
+  }, [fetchProfile, fetchUserRole]);
 
   // Listener de cambios de autenticación optimizado
   useEffect(() => {
@@ -132,16 +162,25 @@ export const useSimpleAuth = (): SimpleAuthContextType => {
 
         if (event === 'SIGNED_OUT') {
           setProfile(null);
+          setUserRole(null);
           setLoading(false);
         } else if (event === 'SIGNED_IN' && newSession?.user) {
           setLoading(true);
-          const userProfile = await fetchProfile(newSession.user.id);
+          const [userProfile, role] = await Promise.all([
+            fetchProfile(newSession.user.id),
+            fetchUserRole(newSession.user.id)
+          ]);
           setProfile(userProfile);
+          setUserRole(role);
           setLoading(false);
         } else if (event === 'TOKEN_REFRESHED' && newSession?.user) {
           if (!profile) {
-            const userProfile = await fetchProfile(newSession.user.id);
+            const [userProfile, role] = await Promise.all([
+              fetchProfile(newSession.user.id),
+              fetchUserRole(newSession.user.id)
+            ]);
             setProfile(userProfile);
+            setUserRole(role);
           }
         }
       }
@@ -151,13 +190,14 @@ export const useSimpleAuth = (): SimpleAuthContextType => {
       console.log('🔇 SimpleAuth: Desconectando listener');
       subscription.unsubscribe();
     };
-  }, [fetchProfile, profile]);
+  }, [fetchProfile, fetchUserRole, profile]);
 
   return {
     user,
     profile,
     session,
     loading,
+    userRole,
     signOut,
   };
 };

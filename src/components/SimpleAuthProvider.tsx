@@ -4,10 +4,11 @@ import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { ProfileWithRole } from '@/types/auth';
 
-interface SimpleAuthContextType {
+export interface SimpleAuthContextType {
   user: User | null;
   profile: ProfileWithRole | null;
   loading: boolean;
+  userRole: string | null;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -18,6 +19,7 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<ProfileWithRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   console.log('🔐 SimpleAuthProvider: Estado actual', { 
     user: !!user, 
@@ -87,6 +89,7 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           };
           console.log('✅ SimpleAuthProvider: Perfil obtenido:', profileWithRole);
           setProfile(profileWithRole);
+          setUserRole(roleData?.role || 'vendedor');
         }
       } catch (error) {
         console.error('❌ SimpleAuthProvider: Error fetching profile:', error);
@@ -112,6 +115,7 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           console.log('👋 SimpleAuthProvider: Usuario deslogueado');
           setUser(null);
           setProfile(null);
+          setUserRole(null);
           // Limpiar storage
           localStorage.clear();
           sessionStorage.clear();
@@ -178,6 +182,7 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     user,
     profile,
     loading,
+    userRole,
     signIn,
     signOut,
   };
