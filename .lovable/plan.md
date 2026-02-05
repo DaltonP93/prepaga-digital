@@ -79,21 +79,49 @@
 
 ---
 
-### 🔲 Fase 4: Integración WhatsApp (PENDIENTE)
+### ✅ Fase 4: Integración WhatsApp (COMPLETADO)
 
-- [ ] Configurar API de WhatsApp Business
-- [ ] Crear edge function para envío de mensajes
-- [ ] Implementar WhatsAppService con templates
-- [ ] Sistema de recordatorios automáticos
+#### Edge Functions Creadas
+- [x] `send-whatsapp/index.ts` - Envío de mensajes vía WhatsApp Business API
+- [x] `schedule-reminders/index.ts` - Recordatorios automáticos de firmas pendientes
+
+#### Servicios y Hooks
+- [x] `WhatsAppService.ts` - Servicio completo con templates de mensajes
+- [x] `useWhatsAppService.ts` - Hook para envío de mensajes, recordatorios y notificaciones
+
+#### Templates de Mensajes
+- Enlace de Firma (`signature_link`)
+- Cuestionario (`questionnaire`)
+- Recordatorio (`reminder`)
+- Aprobación (`approval`)
+- Rechazo (`rejection`)
+- General (`general`)
 
 ---
 
-### 🔲 Fase 5: Templates Dinámicos (PENDIENTE)
+### ✅ Fase 5: Templates Dinámicos (COMPLETADO)
 
-- [ ] Editor de templates mejorado con placeholders
-- [ ] Sistema de variables dinámicas
-- [ ] Generación automática de PDFs
-- [ ] Vista previa de documentos
+#### Motor de Templates Mejorado
+- [x] `enhancedTemplateEngine.ts` - Motor con soporte para beneficiarios, loops y formateo
+
+#### Componentes Nuevos
+- [x] `EnhancedPlaceholdersPanel.tsx` - Panel de variables con búsqueda y categorías
+- [x] `LiveTemplatePreview.tsx` - Vista previa en vivo con datos de prueba
+
+#### Hooks de Generación PDF
+- [x] `useEnhancedPDFGeneration.ts` - Hook mejorado para generación de documentos
+
+#### Edge Function Actualizada
+- [x] `generate-pdf/index.ts` - Generación PDF con interpolación de variables y tabla de beneficiarios
+
+#### Variables Disponibles
+- Cliente: nombre, apellido, email, teléfono, DNI, dirección, edad
+- Plan: nombre, precio, descripción, cobertura
+- Empresa: nombre, email, teléfono, dirección
+- Venta: fecha, total, vendedor, contrato, estado
+- Firma: enlace, token, expiración
+- Fecha: actual, formateada, año, mes, día
+- Beneficiarios: loop con datos completos de cada adherente
 
 ---
 
