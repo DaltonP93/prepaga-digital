@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,15 +7,30 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Loader2, Shield, Key, Smartphone } from "lucide-react";
+import { Loader2, Shield, Key, Smartphone, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { usePasswordSecurity } from "@/hooks/usePasswordSecurity";
+import { PasswordStrengthIndicator } from "@/components/PasswordStrengthIndicator";
 
 export function SecuritySettings() {
   const [loading, setLoading] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  
+  const { checkPassword, isChecking, lastResult } = usePasswordSecurity();
+
+  // Verificar nueva contraseña con debounce
+  useEffect(() => {
+    if (newPassword.length >= 6) {
+      const timer = setTimeout(() => {
+        checkPassword(newPassword);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [newPassword, checkPassword]);
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,8 +40,16 @@ export function SecuritySettings() {
       return;
     }
 
-    if (newPassword.length < 6) {
-      toast.error('La contraseña debe tener al menos 6 caracteres');
+    // Verificar seguridad de la nueva contraseña
+    const securityResult = await checkPassword(newPassword);
+    
+    if (securityResult.isBreached) {
+      toast.error('Esta contraseña ha sido expuesta en filtraciones de datos. Elige otra.');
+      return;
+    }
+    
+    if (!securityResult.isStrong) {
+      toast.error(securityResult.errors[0] || 'La contraseña no cumple con los requisitos de seguridad.');
       return;
     }
 
@@ -97,14 +120,36 @@ export function SecuritySettings() {
             
             <div className="space-y-2">
               <Label htmlFor="new-password">Nueva Contraseña</Label>
-              <Input
-                id="new-password"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                required
-                minLength={6}
-              />
+              <div className="relative">
+                <Input
+                  id="new-password"
+                  type={showNewPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                >
+                  {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              
+              {/* Indicador de fortaleza */}
+              {newPassword.length > 0 && (
+                <PasswordStrengthIndicator
+                  strengthScore={lastResult?.strengthScore ?? 0}
+                  errors={lastResult?.errors ?? []}
+                  isBreached={lastResult?.isBreached ?? false}
+                  isChecking={isChecking}
+                />
+              )}
             </div>
             
             <div className="space-y-2">
@@ -119,9 +164,12 @@ export function SecuritySettings() {
               />
             </div>
 
-            <Button type="submit" disabled={loading}>
+            <Button 
+              type="submit" 
+              disabled={loading || isChecking || (lastResult && (!lastResult.isStrong || lastResult.isBreached))}
+            >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Actualizar Contraseña
+              {isChecking ? 'Verificando...' : 'Actualizar Contraseña'}
             </Button>
           </form>
         </CardContent>
