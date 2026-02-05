@@ -26,6 +26,7 @@ import Users from "@/pages/Users";
 import Companies from "@/pages/Companies";
 import AuditDashboard from "@/pages/AuditDashboard";
 import Experience from "@/pages/Experience";
+import SignatureView from "@/pages/SignatureView";
 import NotFound from "@/pages/NotFound";
 
 // Crear cliente de React Query con configuración optimizada
@@ -48,9 +49,12 @@ const App = () => {
             <Toaster />
             <BrowserRouter>
               <Routes>
+                {/* Public routes */}
                 <Route path="/login" element={<SimpleLoginForm />} />
-                <Route 
-                  path="/*" 
+                <Route path="/firmar/:token" element={<SignatureView />} />
+                
+                {/* Protected routes */}
+                <Route
                   element={
                     <SimpleProtectedRoute>
                       <MainLayout />
