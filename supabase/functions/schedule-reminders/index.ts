@@ -13,12 +13,38 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+
+    // Authenticate - this is typically called by a cron job or admin
+    const authHeader = req.headers.get('Authorization')
+    const isInternalCall = authHeader === `Bearer ${supabaseServiceKey}`
+
+    if (!isInternalCall) {
+      if (!authHeader?.startsWith('Bearer ')) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const anonClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } }
+      })
+      const token = authHeader.replace('Bearer ', '')
+      const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token)
+      if (claimsError || !claimsData?.claims?.sub) {
+        return new Response(JSON.stringify({ error: 'Invalid token' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     console.log('Checking for pending signature reminders...')
 
-    // Find signature links that are pending and need reminders
     const { data: pendingLinks, error: linksError } = await supabase
       .from('signature_links')
       .select(`
@@ -52,7 +78,6 @@ serve(async (req) => {
     const errors: string[] = []
 
     for (const link of pendingLinks || []) {
-      // Check if we've already sent a reminder in the last 24 hours
       const { data: recentReminders } = await supabase
         .from('whatsapp_messages')
         .select('id')
@@ -62,40 +87,28 @@ serve(async (req) => {
         .limit(1)
 
       if (recentReminders && recentReminders.length > 0) {
-        console.log(`Skipping reminder for sale ${link.sale_id} - already sent recently`)
         continue
       }
 
-      // Get client phone from the link or from the sale's client
       const clientPhone = link.recipient_phone || link.sales?.clients?.phone
       const clientName = link.recipient_name || 
         `${link.sales?.clients?.first_name || ''} ${link.sales?.clients?.last_name || ''}`.trim()
       const companyName = link.sales?.companies?.name || 'La empresa'
 
-      if (!clientPhone) {
-        console.log(`Skipping reminder for link ${link.id} - no phone number`)
-        continue
-      }
+      if (!clientPhone) continue
 
-      // Calculate days until expiration
       const expiresAt = new Date(link.expires_at)
       const daysUntilExpiration = Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
 
-      // Only send reminders if expires in 3 days or less
-      if (daysUntilExpiration > 3) {
-        console.log(`Skipping reminder for link ${link.id} - expires in ${daysUntilExpiration} days`)
-        continue
-      }
+      if (daysUntilExpiration > 3) continue
 
-      // Build signature URL
       const signatureUrl = `${supabaseUrl.replace('.supabase.co', '.lovable.app')}/firmar/${link.token}`
 
-      // Send reminder via edge function
       try {
         const response = await fetch(`${supabaseUrl}/functions/v1/send-whatsapp`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${supabaseKey}`,
+            'Authorization': `Bearer ${supabaseServiceKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -117,14 +130,11 @@ serve(async (req) => {
         
         if (result.success) {
           remindersSent.push(link.id)
-          console.log(`Reminder sent for link ${link.id}`)
         } else {
           errors.push(`Link ${link.id}: ${result.error}`)
-          console.error(`Failed to send reminder for link ${link.id}:`, result.error)
         }
       } catch (err) {
         errors.push(`Link ${link.id}: ${err.message}`)
-        console.error(`Error sending reminder for link ${link.id}:`, err)
       }
     }
 
@@ -141,7 +151,7 @@ serve(async (req) => {
     console.error('Error in schedule-reminders:', error)
     return new Response(JSON.stringify({
       success: false,
-      error: error.message
+      error: 'Internal server error'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

@@ -22,9 +22,34 @@ serve(async (req) => {
   }
 
   try {
+    // Authenticate the request
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+
+    // Verify the user's JWT
+    const anonClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    })
+    const token = authHeader.replace('Bearer ', '')
+    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token)
+    if (claimsError || !claimsData?.claims?.sub) {
+      return new Response(JSON.stringify({ error: 'Invalid token' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Use service role for data access
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     const { 
       templateId, 
@@ -39,7 +64,6 @@ serve(async (req) => {
     let processedContent = htmlContent || ''
     let templateData: any = null
 
-    // If templateId provided, fetch template
     if (templateId) {
       const { data: template, error: templateError } = await supabase
         .from('templates')
@@ -55,7 +79,6 @@ serve(async (req) => {
       processedContent = template.content || template.static_content || ''
     }
 
-    // If saleId provided, fetch sale data and interpolate
     if (saleId) {
       const { data: sale, error: saleError } = await supabase
         .from('sales')
@@ -72,7 +95,6 @@ serve(async (req) => {
       if (saleError) {
         console.error('Error fetching sale:', saleError)
       } else if (sale) {
-        // Replace template variables with sale data
         processedContent = interpolateTemplateVariables(processedContent, {
           cliente: {
             nombre: sale.clients?.first_name || '',
@@ -112,7 +134,6 @@ serve(async (req) => {
           },
         })
 
-        // Add beneficiaries table if requested
         if (includeBeneficiariesTable && sale.beneficiaries?.length > 0) {
           const beneficiariesTable = generateBeneficiariesTableHTML(sale.beneficiaries)
           processedContent = processedContent.replace(
@@ -123,14 +144,12 @@ serve(async (req) => {
       }
     }
 
-    // Generate full HTML document for PDF
     const fullHtmlDocument = generatePDFHtml(processedContent, {
       title: filename,
       documentType,
       includeSignatureFields,
     })
 
-    // Return HTML that can be converted to PDF on client side using html2pdf or similar
     return new Response(JSON.stringify({
       success: true,
       html: fullHtmlDocument,
@@ -150,7 +169,7 @@ serve(async (req) => {
     console.error('Error generating PDF:', error)
     return new Response(JSON.stringify({
       success: false,
-      error: error.message
+      error: 'Internal server error'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
@@ -183,7 +202,6 @@ function interpolateTemplateVariables(template: string, data: any): string {
   return result
 }
 
-// Generate beneficiaries table HTML
 function generateBeneficiariesTableHTML(beneficiaries: any[]): string {
   if (!beneficiaries || beneficiaries.length === 0) return ''
 
@@ -223,7 +241,6 @@ function generateBeneficiariesTableHTML(beneficiaries: any[]): string {
   `
 }
 
-// Generate full HTML document for PDF
 function generatePDFHtml(content: string, options: {
   title: string;
   documentType: string;
@@ -256,75 +273,21 @@ function generatePDFHtml(content: string, options: {
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>${options.title}</title>
       <style>
-        @page {
-          size: A4;
-          margin: 20mm;
-        }
-        
-        * {
-          box-sizing: border-box;
-        }
-        
-        body {
-          font-family: 'Helvetica Neue', Arial, sans-serif;
-          font-size: 12px;
-          line-height: 1.6;
-          color: #333;
-          margin: 0;
-          padding: 0;
-        }
-        
-        .document-container {
-          max-width: 210mm;
-          margin: 0 auto;
-          padding: 20px;
-        }
-        
+        @page { size: A4; margin: 20mm; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 12px; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+        .document-container { max-width: 210mm; margin: 0 auto; padding: 20px; }
         h1 { font-size: 24px; margin-bottom: 20px; color: #1a1a1a; }
         h2 { font-size: 18px; margin-top: 24px; margin-bottom: 12px; color: #333; }
         h3 { font-size: 14px; margin-top: 16px; margin-bottom: 8px; color: #444; }
-        
         p { margin-bottom: 12px; text-align: justify; }
-        
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          margin: 16px 0;
-        }
-        
-        th, td {
-          border: 1px solid #ddd;
-          padding: 10px;
-          text-align: left;
-        }
-        
-        th {
-          background-color: #f5f5f5;
-          font-weight: 600;
-        }
-        
-        .header {
-          border-bottom: 2px solid #333;
-          padding-bottom: 20px;
-          margin-bottom: 30px;
-        }
-        
-        .footer {
-          margin-top: 40px;
-          padding-top: 20px;
-          border-top: 1px solid #ddd;
-          font-size: 10px;
-          color: #666;
-          text-align: center;
-        }
-        
-        .page-break {
-          page-break-before: always;
-        }
-        
-        @media print {
-          body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-        }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f5f5f5; font-weight: 600; }
+        .header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
+        .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 10px; color: #666; text-align: center; }
+        .page-break { page-break-before: always; }
+        @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
       </style>
     </head>
     <body>

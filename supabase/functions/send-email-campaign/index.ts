@@ -15,16 +15,38 @@ serve(async (req) => {
   }
 
   try {
-    const { campaignId, recipients, subject, content, companyId } = await req.json();
+    // Authenticate the request
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    const anonClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims?.sub) {
+      return new Response(JSON.stringify({ error: "Invalid token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { campaignId, recipients, subject, content, companyId } = await req.json();
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const results = [];
     let sentCount = 0;
 
-    // Enviar emails a cada destinatario
     for (const recipient of recipients) {
       try {
         const emailResponse = await resend.emails.send({
@@ -34,7 +56,6 @@ serve(async (req) => {
           html: content.replace(/\{\{nombre\}\}/g, recipient.name || recipient.email),
         });
 
-        // Registrar en communication_logs
         await supabase
           .from('communication_logs')
           .insert({
@@ -54,7 +75,6 @@ serve(async (req) => {
       } catch (error) {
         console.error(`Error enviando email a ${recipient.email}:`, error);
         
-        // Registrar error en communication_logs
         await supabase
           .from('communication_logs')
           .insert({
@@ -73,7 +93,6 @@ serve(async (req) => {
       }
     }
 
-    // Actualizar estadísticas de la campaña
     await supabase
       .from('email_campaigns')
       .update({
@@ -90,15 +109,12 @@ serve(async (req) => {
       totalRecipients: recipients.length
     }), {
       status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        ...corsHeaders,
-      },
+      headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   } catch (error: any) {
     console.error("Error en send-email-campaign:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: "Internal server error" }),
       {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },

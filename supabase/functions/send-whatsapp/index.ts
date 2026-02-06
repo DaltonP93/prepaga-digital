@@ -22,12 +22,40 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+
+    // Authenticate the request
+    const authHeader = req.headers.get('Authorization')
+    
+    // Allow internal calls (from schedule-reminders) with service role key
+    const isInternalCall = authHeader === `Bearer ${supabaseServiceKey}`
+    
+    if (!isInternalCall) {
+      if (!authHeader?.startsWith('Bearer ')) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const anonClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } }
+      })
+      const token = authHeader.replace('Bearer ', '')
+      const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token)
+      if (claimsError || !claimsData?.claims?.sub) {
+        return new Response(JSON.stringify({ error: 'Invalid token' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     const { to, templateName, templateData, saleId, companyId, messageType = 'general' }: WhatsAppRequest = await req.json()
 
-    // Validate required fields
     if (!to || !companyId) {
       return new Response(JSON.stringify({
         success: false,
@@ -48,7 +76,6 @@ serve(async (req) => {
     if (settingsError || !companySettings?.whatsapp_api_key) {
       console.error('Company WhatsApp settings not found:', settingsError)
       
-      // Log the failed attempt
       await supabase.from('whatsapp_messages').insert({
         sale_id: saleId,
         phone_number: to,
@@ -68,10 +95,8 @@ serve(async (req) => {
       })
     }
 
-    // Build message from template
     const message = buildMessageFromTemplate(templateName, templateData)
 
-    // Send via WhatsApp Business API (Meta Graph API)
     const whatsappResponse = await sendWhatsAppMessage(
       companySettings.whatsapp_api_key,
       companySettings.whatsapp_phone_id,
@@ -79,7 +104,6 @@ serve(async (req) => {
       message
     )
 
-    // Log the message
     const { data: messageLog, error: logError } = await supabase
       .from('whatsapp_messages')
       .insert({
@@ -113,7 +137,7 @@ serve(async (req) => {
     console.error('Error sending WhatsApp message:', error)
     return new Response(JSON.stringify({
       success: false,
-      error: error.message
+      error: 'Internal server error'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
@@ -124,67 +148,17 @@ serve(async (req) => {
 // Build message from template
 function buildMessageFromTemplate(templateName: string, data: Record<string, string>): string {
   const templates: Record<string, string> = {
-    signature_link: `Hola {{clientName}}, tu contrato está listo para firma digital.
+    signature_link: `Hola {{clientName}}, tu contrato está listo para firma digital.\n\n📝 Por favor, accede al siguiente enlace para firmar tu documentación:\n{{signatureUrl}}\n\n⏰ Este enlace expira el {{expirationDate}}.\n\nSi tienes alguna pregunta, no dudes en contactarnos.\n\nSaludos,\n{{companyName}}`,
 
-📝 Por favor, accede al siguiente enlace para firmar tu documentación:
-{{signatureUrl}}
+    questionnaire: `Hola {{clientName}}, necesitamos que completes un breve cuestionario para continuar con tu proceso.\n\n📋 Accede aquí: {{questionnaireUrl}}\n\nEste paso es necesario para procesar tu solicitud.\n\nSaludos,\n{{companyName}}`,
 
-⏰ Este enlace expira el {{expirationDate}}.
+    reminder: `Hola {{clientName}}, te recordamos que tienes documentos pendientes de firma.\n\n📝 Enlace de firma: {{signatureUrl}}\n\n⚠️ Este enlace expira el {{expirationDate}}.\n\nNo pierdas tu lugar, firma ahora.\n\nSaludos,\n{{companyName}}`,
 
-Si tienes alguna pregunta, no dudes en contactarnos.
+    approval: `🎉 ¡Felicitaciones {{clientName}}!\n\nTu solicitud ha sido aprobada exitosamente.\n\n📄 Número de contrato: {{contractNumber}}\n💰 Plan: {{planName}}\n\nPronto recibirás más información sobre tu cobertura.\n\nGracias por confiar en nosotros.\n{{companyName}}`,
 
-Saludos,
-{{companyName}}`,
+    rejection: `Hola {{clientName}},\n\nLamentamos informarte que tu solicitud no pudo ser aprobada en esta ocasión.\n\n{{rejectionReason}}\n\nSi deseas más información, por favor contáctanos.\n\nSaludos,\n{{companyName}}`,
 
-    questionnaire: `Hola {{clientName}}, necesitamos que completes un breve cuestionario para continuar con tu proceso.
-
-📋 Accede aquí: {{questionnaireUrl}}
-
-Este paso es necesario para procesar tu solicitud.
-
-Saludos,
-{{companyName}}`,
-
-    reminder: `Hola {{clientName}}, te recordamos que tienes documentos pendientes de firma.
-
-📝 Enlace de firma: {{signatureUrl}}
-
-⚠️ Este enlace expira el {{expirationDate}}.
-
-No pierdas tu lugar, firma ahora.
-
-Saludos,
-{{companyName}}`,
-
-    approval: `🎉 ¡Felicitaciones {{clientName}}!
-
-Tu solicitud ha sido aprobada exitosamente.
-
-📄 Número de contrato: {{contractNumber}}
-💰 Plan: {{planName}}
-
-Pronto recibirás más información sobre tu cobertura.
-
-Gracias por confiar en nosotros.
-{{companyName}}`,
-
-    rejection: `Hola {{clientName}},
-
-Lamentamos informarte que tu solicitud no pudo ser aprobada en esta ocasión.
-
-{{rejectionReason}}
-
-Si deseas más información, por favor contáctanos.
-
-Saludos,
-{{companyName}}`,
-
-    general: `Hola {{clientName}},
-
-{{message}}
-
-Saludos,
-{{companyName}}`,
+    general: `Hola {{clientName}},\n\n{{message}}\n\nSaludos,\n{{companyName}}`,
   }
 
   let message = templates[templateName] || templates.general
@@ -220,9 +194,7 @@ async function sendWhatsAppMessage(
           messaging_product: 'whatsapp',
           to: formattedPhone,
           type: 'text',
-          text: {
-            body: message
-          }
+          text: { body: message }
         }),
       }
     )
