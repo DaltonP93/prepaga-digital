@@ -1,7 +1,22 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { createClient } from '@supabase/supabase-js';
 import { useToast } from '@/hooks/use-toast';
 
+const SUPABASE_URL = "https://ykducvvcjzdpoojxlsig.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrZHVjdnZjanpkcG9vanhsc2lnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwNzgwNzQsImV4cCI6MjA4NTY1NDA3NH0.SpX3e1GgENTB3kpQPPedPds0E13vxDeOmnmFYSJhfPM";
+
+/**
+ * Create a Supabase client with the signature token header for RLS policy validation
+ */
+const createSignatureClient = (token: string) => {
+  return createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    global: {
+      headers: {
+        'x-signature-token': token,
+      },
+    },
+  });
+};
 interface SignatureLinkData {
   id: string;
   sale_id: string;
@@ -60,10 +75,10 @@ export const useSignatureLinkByToken = (token: string) => {
     queryFn: async () => {
       if (!token) throw new Error('Token is required');
 
-      console.log('Fetching signature link for token:', token);
+      const signatureClient = createSignatureClient(token);
 
-      // First, get the signature link
-      const { data: linkData, error: linkError } = await supabase
+      // First, get the signature link - custom header validates against RLS policy
+      const { data: linkData, error: linkError } = await signatureClient
         .from('signature_links')
         .select('*')
         .eq('token', token)
@@ -76,7 +91,7 @@ export const useSignatureLinkByToken = (token: string) => {
       }
 
       // Increment access count
-      await supabase
+      await signatureClient
         .from('signature_links')
         .update({ 
           access_count: (linkData.access_count || 0) + 1,
@@ -84,8 +99,8 @@ export const useSignatureLinkByToken = (token: string) => {
         })
         .eq('id', linkData.id);
 
-      // Now get the sale data with proper relation names
-      const { data: saleData, error: saleError } = await supabase
+      // Now get the sale data - sales table has anon SELECT policy via signature_links
+      const { data: saleData, error: saleError } = await signatureClient
         .from('sales')
         .select(`
           id,
@@ -126,7 +141,7 @@ export const useSignatureLinkByToken = (token: string) => {
     },
     enabled: !!token,
     retry: 2,
-    staleTime: 1000 * 60, // 1 minute
+    staleTime: 1000 * 60,
   });
 };
 
@@ -147,9 +162,8 @@ export const useSubmitSignatureLink = () => {
       token: string;
       signatureData: string;
     }) => {
-      console.log('Submitting signature for link:', linkId);
+      const signatureClient = createSignatureClient(token);
 
-      // Get client IP (approximate - for logging purposes)
       let clientIp = 'unknown';
       try {
         const ipResponse = await fetch('https://api.ipify.org?format=json');
@@ -159,8 +173,7 @@ export const useSubmitSignatureLink = () => {
         console.log('Could not fetch client IP');
       }
 
-      // Update signature link with signature data
-      const { data, error } = await supabase
+      const { data, error } = await signatureClient
         .from('signature_links')
         .update({
           status: 'completado',
@@ -177,8 +190,7 @@ export const useSubmitSignatureLink = () => {
         throw error;
       }
 
-      // Log the workflow step
-      const { data: existingSteps } = await supabase
+      const { data: existingSteps } = await signatureClient
         .from('signature_workflow_steps')
         .select('step_order')
         .eq('signature_link_id', linkId)
@@ -187,7 +199,7 @@ export const useSubmitSignatureLink = () => {
 
       const nextStepOrder = (existingSteps?.[0]?.step_order || 0) + 1;
 
-      await supabase
+      await signatureClient
         .from('signature_workflow_steps')
         .insert({
           signature_link_id: linkId,
@@ -230,7 +242,11 @@ export const useSignatureLinkDocuments = (saleId: string | undefined) => {
     queryFn: async () => {
       if (!saleId) return [];
 
-      const { data, error } = await supabase
+      // Use default supabase client - documents are accessed via authenticated or public sale context
+      const { createClient } = await import('@supabase/supabase-js');
+      const client = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+      const { data, error } = await client
         .from('documents')
         .select('*')
         .eq('sale_id', saleId)
