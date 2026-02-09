@@ -27,7 +27,7 @@ interface UserFormData {
   first_name: string;
   last_name: string;
   phone?: string;
-  role: 'super_admin' | 'admin' | 'gestor' | 'vendedor';
+  role: 'super_admin' | 'admin' | 'supervisor' | 'auditor' | 'gestor' | 'vendedor';
   company_id: string;
 }
 
@@ -180,6 +180,8 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="vendedor">Vendedor</SelectItem>
+                    <SelectItem value="auditor">Auditor</SelectItem>
+                    <SelectItem value="supervisor">Supervisor</SelectItem>
                     <SelectItem value="gestor">Gestor</SelectItem>
                     <SelectItem value="admin">Administrador</SelectItem>
                     <SelectItem value="super_admin">Super Administrador</SelectItem>
