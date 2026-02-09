@@ -127,7 +127,9 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader>
         <div className="px-2 py-4">
-          <h2 className="text-lg font-semibold">Seguro Digital</h2>
+          <CardTitle className="text-2xl font-bold text-foreground">
+            {branding?.login_title || "SAMAP Digital"}
+          </CardTitle>
         </div>
       </SidebarHeader>
       <SidebarContent>

@@ -19,41 +19,41 @@ export const LoginForm = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  
+
   const { signIn } = useSimpleAuthContext();
-  const { 
-    loginAttempts, 
-    isBlocked, 
-    blockTimeLeft, 
-    recordFailedAttempt, 
-    resetAttempts 
+  const {
+    loginAttempts,
+    isBlocked,
+    blockTimeLeft,
+    recordFailedAttempt,
+    resetAttempts
   } = useLoginSecurity();
-  
+
   const { data: branding } = useCompanyBranding();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (isBlocked) {
       toast.error(`Cuenta bloqueada. Intente nuevamente en ${blockTimeLeft} minutos.`);
       return;
     }
-    
+
     setIsLoggingIn(true);
 
     try {
       console.log('🔑 LoginForm: Iniciando proceso de login...');
-      
+
       await signIn(email, password);
-      
+
       console.log('✅ LoginForm: Login exitoso');
       resetAttempts();
       toast.success('¡Bienvenido! Has iniciado sesión correctamente.');
-      
+
     } catch (error: any) {
       console.error('❌ LoginForm: Error en login:', error);
       const errorMessage = error?.message || '';
-      
+
       if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError') || errorMessage.includes('fetch')) {
         toast.error('Error de conexión. Verifica tu conexión a internet e intenta nuevamente.');
       } else {
@@ -75,15 +75,15 @@ export const LoginForm = () => {
         <CardHeader className="text-center space-y-4">
           {branding?.login_logo_url && (
             <div className="flex justify-center">
-              <img 
-                src={branding.login_logo_url} 
-                alt="Logo" 
+              <img
+                src={branding.login_logo_url}
+                alt="Logo"
                 className="h-16 w-auto object-contain"
               />
             </div>
           )}
           <CardTitle className="text-2xl font-bold text-foreground">
-            {branding?.login_title || "Seguro Digital"}
+            {branding?.login_title || "SAMAP Digital"}
           </CardTitle>
           <CardDescription className="text-muted-foreground">
             {branding?.login_subtitle || "Sistema de Firma Digital"}
@@ -96,7 +96,7 @@ export const LoginForm = () => {
               message={`Cuenta bloqueada por seguridad. Tiempo restante: ${blockTimeLeft} minutos.`}
             />
           )}
-          
+
           {loginAttempts > 0 && loginAttempts < 5 && (
             <SecurityAlert
               type="warning"
@@ -146,23 +146,23 @@ export const LoginForm = () => {
                 </Button>
               </div>
             </div>
-            
+
             <div className="flex items-center justify-between">
-              <Button 
-                type="button" 
-                variant="link" 
+              <Button
+                type="button"
+                variant="link"
                 className="p-0 h-auto text-sm"
                 onClick={() => setShowForgotPassword(true)}
                 disabled={isBlocked || isLoggingIn}
               >
                 ¿Olvidó su contraseña?
               </Button>
-              
+
               <Link to="/register" className="text-sm text-primary hover:underline">
                 Crear cuenta
               </Link>
             </div>
-            
+
             <Button type="submit" className="w-full" disabled={isLoggingIn || isBlocked}>
               {isLoggingIn ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </Button>

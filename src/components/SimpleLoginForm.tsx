@@ -19,8 +19,8 @@ export const SimpleLoginForm = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  console.log('🔑 SimpleLoginForm: Estado actual', { 
-    user: !!user, 
+  console.log('🔑 SimpleLoginForm: Estado actual', {
+    user: !!user,
     loading,
     email: user?.email,
     pathname: location.pathname
@@ -37,21 +37,21 @@ export const SimpleLoginForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email || !password) {
       toast.error('Por favor completa todos los campos');
       return;
     }
-    
+
     setIsLoggingIn(true);
 
     try {
       console.log('🔑 SimpleLoginForm: Iniciando proceso de login...');
       await signIn(email, password);
       console.log('✅ SimpleLoginForm: Login exitoso');
-      
+
       toast.success('¡Bienvenido! Has iniciado sesión correctamente.');
-      
+
     } catch (error: any) {
       console.error('❌ SimpleLoginForm: Error en login:', error);
       toast.error(error.message || 'Error al iniciar sesión');
@@ -99,7 +99,7 @@ export const SimpleLoginForm = () => {
             </div>
           </div>
           <CardTitle className="text-2xl font-bold text-foreground">
-            Seguro Digital
+            SAMAP Digital
           </CardTitle>
           <CardDescription className="text-muted-foreground">
             Sistema de Firma Digital - Inicia sesión en tu cuenta
@@ -121,7 +121,7 @@ export const SimpleLoginForm = () => {
                 className="w-full"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="password">Contraseña</Label>
               <div className="relative">
@@ -153,27 +153,27 @@ export const SimpleLoginForm = () => {
                 </Button>
               </div>
             </div>
-            
+
             <div className="flex items-center justify-between text-sm">
-              <Link 
-                to="/register" 
+              <Link
+                to="/register"
                 className="text-primary hover:underline"
                 tabIndex={isLoggingIn ? -1 : 0}
               >
                 ¿No tienes cuenta?
               </Link>
-              <Link 
-                to="/reset-password" 
+              <Link
+                to="/reset-password"
                 className="text-muted-foreground hover:text-foreground hover:underline"
                 tabIndex={isLoggingIn ? -1 : 0}
               >
                 ¿Olvidaste tu contraseña?
               </Link>
             </div>
-            
-            <Button 
-              type="submit" 
-              className="w-full" 
+
+            <Button
+              type="submit"
+              className="w-full"
               disabled={isLoggingIn}
               size="lg"
             >
