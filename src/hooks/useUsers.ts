@@ -115,14 +115,20 @@ export const useUpdateUser = () => {
 
       // Update role in user_roles table if provided
       if (role) {
-        const { error: roleError } = await supabase
+        // Delete all existing roles for this user first
+        const { error: deleteError } = await supabase
           .from('user_roles')
-          .upsert(
-            { user_id: id, role: role as any },
-            { onConflict: 'user_id' }
-          );
+          .delete()
+          .eq('user_id', id);
 
-        if (roleError) throw roleError;
+        if (deleteError) throw deleteError;
+
+        // Insert the new role
+        const { error: insertError } = await supabase
+          .from('user_roles')
+          .insert({ user_id: id, role: role as any });
+
+        if (insertError) throw insertError;
       }
 
       return { id };
@@ -157,6 +163,45 @@ export const useDeleteUser = () => {
     onError: (error: any) => {
       console.error('Error deactivating user:', error);
       toast.error(error.message || 'No se pudo desactivar el usuario');
+    },
+  });
+};
+
+export const useResetUserPassword = () => {
+  return useMutation({
+    mutationFn: async ({ userId, newPassword }: { userId: string; newPassword: string }) => {
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          action: 'reset_password',
+          user_id: userId,
+          new_password: newPassword,
+        },
+      });
+
+      if (error) {
+        const context = (error as any)?.context;
+        let errorMsg = 'Error al cambiar contraseña';
+        if (context?.body) {
+          try {
+            const body = typeof context.body === 'string' ? JSON.parse(context.body) : context.body;
+            errorMsg = body?.error || body?.details || errorMsg;
+          } catch {}
+        }
+        throw new Error(errorMsg);
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || 'Error al cambiar contraseña');
+      }
+
+      return data;
+    },
+    onSuccess: () => {
+      toast.success('Contraseña actualizada exitosamente');
+    },
+    onError: (error: any) => {
+      console.error('Error resetting password:', error);
+      toast.error(error.message || 'Error al cambiar contraseña');
     },
   });
 };

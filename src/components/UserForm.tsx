@@ -7,10 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useCreateUser, useUpdateUser, UserWithRole } from "@/hooks/useUsers";
+import { useCreateUser, useUpdateUser, useResetUserPassword, UserWithRole } from "@/hooks/useUsers";
 import { useCompanies } from "@/hooks/useCompanies";
 import { PermissionManager } from "./PermissionManager";
 import { toast } from "sonner";
+import { Key } from "lucide-react";
 
 interface UserFormProps {
   open: boolean;
@@ -39,8 +40,11 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
   const { data: companies = [] } = useCompanies();
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
+  const resetPassword = useResetUserPassword();
   const isEditing = !!user;
   const [activeTab, setActiveTab] = useState("basic");
+  const [newPassword, setNewPassword] = useState("");
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
 
   const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<UserFormData>({
     defaultValues: {
@@ -210,6 +214,47 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
                   </SelectContent>
                 </Select>
               </div>
+
+              {isEditing && user && (
+                <div className="space-y-2 border-t pt-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-2">
+                      <Key className="h-4 w-4" />
+                      Cambiar Contraseña
+                    </Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowPasswordReset(!showPasswordReset)}
+                    >
+                      {showPasswordReset ? "Cancelar" : "Cambiar"}
+                    </Button>
+                  </div>
+                  {showPasswordReset && (
+                    <div className="flex gap-2">
+                      <Input
+                        type="password"
+                        placeholder="Nueva contraseña (mín. 6 caracteres)"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        disabled={newPassword.length < 6 || resetPassword.isPending}
+                        onClick={async () => {
+                          await resetPassword.mutateAsync({ userId: user.id, newPassword });
+                          setNewPassword("");
+                          setShowPasswordReset(false);
+                        }}
+                      >
+                        {resetPassword.isPending ? "..." : "Aplicar"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="flex justify-end space-x-2 pt-4">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

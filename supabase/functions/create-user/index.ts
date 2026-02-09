@@ -65,6 +65,44 @@ serve(async (req) => {
       );
     }
 
+    // Handle password reset action
+    if (requestBody.action === 'reset_password') {
+      const targetUserId = requestBody.user_id;
+      const newPassword = requestBody.new_password;
+
+      if (!targetUserId || !newPassword) {
+        return new Response(
+          JSON.stringify({ error: 'Missing required fields: user_id, new_password' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (newPassword.length < 6) {
+        return new Response(
+          JSON.stringify({ error: 'La contraseña debe tener al menos 6 caracteres' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        targetUserId,
+        { password: newPassword }
+      );
+
+      if (updateError) {
+        return new Response(
+          JSON.stringify({ error: 'Failed to update password', details: updateError.message }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, message: 'Password updated successfully' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Original create user flow
     const email = requestBody.email;
     const password = requestBody.password;
     const firstName = requestBody.firstName || requestBody.first_name;
