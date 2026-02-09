@@ -13,6 +13,8 @@ const WIDGET_TYPES = {
   'recent_clients': { name: 'Clientes Recientes', icon: Users, description: 'Últimos clientes agregados' },
   'notifications': { name: 'Notificaciones', icon: Bell, description: 'Centro de notificaciones' },
   'quick_actions': { name: 'Acciones Rápidas', icon: Zap, description: 'Botones de acceso rápido' },
+  'sales_by_user': { name: 'Ventas por Usuario', icon: Users, description: 'Distribución de ventas por vendedor' },
+  'conversion_metrics': { name: 'Métricas de Conversión', icon: BarChart3, description: 'Tasas de conversión y rendimiento' },
   'analytics_chart': { name: 'Gráfico Analytics', icon: BarChart3, description: 'Análisis avanzado de datos' },
   'pending_documents': { name: 'Documentos Pendientes', icon: FileText, description: 'Documentos por firmar' }
 };
