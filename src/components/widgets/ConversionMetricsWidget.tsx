@@ -4,13 +4,11 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { TrendingUp, TrendingDown, Target, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { useSales } from '@/hooks/useSales';
-import { useTemplateResponses } from '@/hooks/useTemplateResponses';
 
 const ConversionMetricsWidget = () => {
   const { data: sales, isLoading: salesLoading } = useSales();
-  const { responses, isLoading: responsesLoading } = useTemplateResponses();
 
-  if (salesLoading || responsesLoading) {
+  if (salesLoading) {
     return (
       <Card>
         <CardHeader>
@@ -66,10 +64,8 @@ const ConversionMetricsWidget = () => {
     };
   });
 
-  // Métricas de cuestionarios/documentos
-  const totalResponses = responses.length || 0;
-  const completedForms = responses.filter(r => r.response_value).length || 0;
-  const formCompletionRate = totalResponses > 0 ? (completedForms / totalResponses) * 100 : 0;
+  // Métricas de formularios simplificadas
+  const formCompletionRate = totalSales > 0 ? (completedSales / totalSales) * 100 : 0;
 
   const metrics = [
     {
