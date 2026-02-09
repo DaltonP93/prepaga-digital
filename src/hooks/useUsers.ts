@@ -57,7 +57,16 @@ export const useCreateUser = () => {
 
       if (error) {
         console.error('Error from edge function:', error);
-        throw new Error(error.message || 'Error al crear usuario');
+        // Try to get the actual error body
+        const context = (error as any)?.context;
+        let errorMsg = 'Error al crear usuario';
+        if (context?.body) {
+          try {
+            const body = typeof context.body === 'string' ? JSON.parse(context.body) : context.body;
+            errorMsg = body?.error || body?.details || errorMsg;
+          } catch {}
+        }
+        throw new Error(errorMsg);
       }
 
       if (!data.success) {

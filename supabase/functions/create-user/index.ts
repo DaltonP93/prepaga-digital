@@ -13,7 +13,6 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
     // Authenticate the caller - must be admin
@@ -25,26 +24,23 @@ serve(async (req) => {
       )
     }
 
-    const anonClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } }
-    })
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Verify caller identity
     const token = authHeader.replace('Bearer ', '')
-    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token)
-    if (claimsError || !claimsData?.claims?.sub) {
+    const { data: { user: caller }, error: callerError } = await supabaseAdmin.auth.getUser(token)
+    if (callerError || !caller) {
       return new Response(
         JSON.stringify({ error: 'Invalid token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const callerUserId = claimsData.claims.sub
-
     // Verify the caller is an admin
-    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey)
-    const { data: roleData } = await supabaseClient
+    const { data: roleData } = await supabaseAdmin
       .from('user_roles')
       .select('role')
-      .eq('user_id', callerUserId)
+      .eq('user_id', caller.id)
       .in('role', ['admin', 'super_admin'])
       .limit(1)
 
@@ -73,8 +69,9 @@ serve(async (req) => {
     const password = requestBody.password;
     const firstName = requestBody.firstName || requestBody.first_name;
     const lastName = requestBody.lastName || requestBody.last_name;
+    const phone = requestBody.phone || null;
     const role = requestBody.role || 'vendedor';
-    const companyId = requestBody.companyId || requestBody.company_id;
+    const companyId = requestBody.companyId || requestBody.company_id || null;
 
     if (!email || !password || !firstName || !lastName) {
       return new Response(
@@ -91,7 +88,8 @@ serve(async (req) => {
       );
     }
 
-    const { data: authData, error: authError } = await supabaseClient.auth.admin.createUser({
+    // Create auth user
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
@@ -116,51 +114,63 @@ serve(async (req) => {
       );
     }
 
+    const userId = authData.user.id;
+
     try {
-      const { data: profileData, error: profileError } = await supabaseClient
-        .rpc('create_user_profile', {
-          user_id: authData.user.id,
-          user_email: email,
+      // Insert profile directly (service role bypasses RLS)
+      const { error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .upsert({
+          id: userId,
+          email: email,
           first_name: firstName,
           last_name: lastName,
-          user_role: role,
-          company_id: companyId || null
+          phone: phone,
+          company_id: companyId,
+          is_active: true,
         });
 
       if (profileError) {
-        try {
-          await supabaseClient.auth.admin.deleteUser(authData.user.id);
-        } catch (cleanupError) {
-          console.error('Failed to cleanup auth user:', cleanupError);
-        }
-        return new Response(
-          JSON.stringify({ error: 'Failed to create user profile' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        console.error('Profile insert error:', profileError);
+        throw profileError;
+      }
+
+      // Insert user role
+      const { error: roleError } = await supabaseAdmin
+        .from('user_roles')
+        .upsert({
+          user_id: userId,
+          role: role,
+        });
+
+      if (roleError) {
+        console.error('Role insert error:', roleError);
+        throw roleError;
       }
 
       return new Response(
         JSON.stringify({ 
           success: true,
-          user: { id: authData.user.id, email: authData.user.email, profile_id: profileData }
+          user: { id: userId, email: email }
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
 
     } catch (profileError) {
+      console.error('Profile/role creation failed:', profileError);
       try {
-        await supabaseClient.auth.admin.deleteUser(authData.user.id);
+        await supabaseAdmin.auth.admin.deleteUser(userId);
       } catch (cleanupError) {
         console.error('Failed to cleanup auth user:', cleanupError);
       }
       return new Response(
-        JSON.stringify({ error: 'Failed to create user profile' }),
+        JSON.stringify({ error: 'Failed to create user profile', details: String(profileError) }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
   } catch (error) {
-    console.error('Unexpected error in create-user function:', error);
+    console.error('Unexpected error:', error);
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
