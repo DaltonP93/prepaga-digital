@@ -41,7 +41,11 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         } else if (session?.user && mounted) {
           console.log('✅ SimpleAuthProvider: Sesión encontrada');
           setUser(session.user);
-          await fetchProfile(session.user.id);
+          try {
+            await fetchProfile(session.user.id);
+          } catch (profileError) {
+            console.warn('⚠️ SimpleAuthProvider: Error cargando perfil, continuando:', profileError);
+          }
         } else {
           console.log('ℹ️ SimpleAuthProvider: No hay sesión activa');
         }
@@ -110,7 +114,12 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (event === 'SIGNED_IN' && session?.user) {
           console.log('✅ SimpleAuthProvider: Usuario logueado');
           setUser(session.user);
-          await fetchProfile(session.user.id);
+          try {
+            await fetchProfile(session.user.id);
+          } catch (profileError) {
+            console.warn('⚠️ SimpleAuthProvider: Error cargando perfil post-login:', profileError);
+          }
+          setLoading(false);
         } else if (event === 'SIGNED_OUT') {
           console.log('👋 SimpleAuthProvider: Usuario deslogueado');
           setUser(null);
