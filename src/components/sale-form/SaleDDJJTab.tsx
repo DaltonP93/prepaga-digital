@@ -107,9 +107,9 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [initialized, setInitialized] = useState(false);
 
-  // Sort: titular (is_primary) first, then by created_at
+  // Sort: titular (is_primary) first, then by created_at ascending
   const sortedBeneficiaries = useMemo(() => {
-    if (!beneficiaries) return [];
+    if (!beneficiaries || beneficiaries.length === 0) return [];
     return [...beneficiaries].sort((a, b) => {
       if (a.is_primary && !b.is_primary) return -1;
       if (!a.is_primary && b.is_primary) return 1;
@@ -236,7 +236,7 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
     return (
       <div className="text-center py-8 text-muted-foreground">
         <Clock className="h-8 w-8 mx-auto mb-2" />
-        No hay adherentes registrados. Agregue adherentes en la pestaña correspondiente para completar las DDJJ de salud.
+        No hay titular ni adherentes registrados. Agregue al titular como beneficiario principal en la pestaña Adherentes para completar las DDJJ de salud.
       </div>
     );
   }

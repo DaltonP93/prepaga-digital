@@ -20,7 +20,7 @@ export const useRoutePermissions = () => {
     canViewPlans: true,
     canViewDocuments: true,
     canViewTemplates: true,
-    canViewAnalytics: isSuperAdmin || isAdmin || isSupervisor || isAuditor,
+    canViewAnalytics: isSuperAdmin || isAdmin || isSupervisor,
     canViewUsers: isSuperAdmin || isSupervisor,
     canViewCompanies: isSuperAdmin,
     canViewAudit: isSuperAdmin || isAdmin || isSupervisor || isAuditor,
