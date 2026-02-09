@@ -31,12 +31,19 @@ const Sales = () => {
     switch (status) {
       case 'firmado':
       case 'completado':
+      case 'aprobado_para_templates':
         return 'default';
       case 'enviado':
+      case 'en_revision':
+      case 'preparando_documentos':
+      case 'listo_para_enviar':
+      case 'firmado_parcial':
         return 'secondary';
       case 'borrador':
         return 'outline';
       case 'cancelado':
+      case 'rechazado':
+      case 'expirado':
         return 'destructive';
       default:
         return 'outline';
@@ -44,20 +51,21 @@ const Sales = () => {
   };
 
   const getStatusText = (status: string) => {
-    switch (status) {
-      case 'firmado':
-        return 'Firmado';
-      case 'completado':
-        return 'Completado';
-      case 'enviado':
-        return 'Enviado';
-      case 'borrador':
-        return 'Borrador';
-      case 'cancelado':
-        return 'Cancelado';
-      default:
-        return status;
-    }
+    const map: Record<string, string> = {
+      firmado: 'Firmado',
+      completado: 'Completado',
+      enviado: 'Enviado',
+      borrador: 'Borrador',
+      cancelado: 'Cancelado',
+      en_revision: 'En Revisión',
+      aprobado_para_templates: 'Aprobado',
+      rechazado: 'Rechazado',
+      firmado_parcial: 'Firmado Parcial',
+      expirado: 'Expirado',
+      preparando_documentos: 'Preparando Docs',
+      listo_para_enviar: 'Listo para Enviar',
+    };
+    return map[status] || status;
   };
 
   const formatDate = (dateString: string) => {
@@ -109,9 +117,16 @@ const Sales = () => {
                   <SelectItem value="todos">Todos los estados</SelectItem>
                   <SelectItem value="borrador">Borrador</SelectItem>
                   <SelectItem value="enviado">Enviado</SelectItem>
+                  <SelectItem value="en_revision">En Revisión</SelectItem>
+                  <SelectItem value="aprobado_para_templates">Aprobado</SelectItem>
+                  <SelectItem value="preparando_documentos">Preparando Docs</SelectItem>
+                  <SelectItem value="listo_para_enviar">Listo para Enviar</SelectItem>
                   <SelectItem value="firmado">Firmado</SelectItem>
+                  <SelectItem value="firmado_parcial">Firmado Parcial</SelectItem>
                   <SelectItem value="completado">Completado</SelectItem>
+                  <SelectItem value="rechazado">Rechazado</SelectItem>
                   <SelectItem value="cancelado">Cancelado</SelectItem>
+                  <SelectItem value="expirado">Expirado</SelectItem>
                 </SelectContent>
               </Select>
               
