@@ -12,7 +12,7 @@ import { AlertCircle, HeartPulse, CheckCircle, Clock, Save, ChevronLeft, Chevron
 import { useBeneficiaries } from '@/hooks/useBeneficiaries';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 interface SaleDDJJTabProps {
   saleId?: string;
@@ -50,7 +50,6 @@ const createEmptyData = (): BeneficiaryHealthData => ({
   saved: false,
 });
 
-/** Parse the stored preexisting_conditions_detail back into structured form data */
 const parseExistingData = (detail: string | null, hasPreexisting: boolean | null): BeneficiaryHealthData => {
   const data = createEmptyData();
   if (!detail && !hasPreexisting) return data;
@@ -58,7 +57,6 @@ const parseExistingData = (detail: string | null, hasPreexisting: boolean | null
   if (detail) {
     const parts = detail.split('; ');
     for (const part of parts) {
-      // Match health questions
       const qMatch = HEALTH_QUESTIONS.findIndex(q => part.startsWith(q));
       if (qMatch >= 0) {
         data.answers[qMatch] = 'si';
@@ -68,12 +66,9 @@ const parseExistingData = (detail: string | null, hasPreexisting: boolean | null
         }
         continue;
       }
-
       if (part.startsWith('Hábitos: ')) {
         const habitList = part.replace('Hábitos: ', '').split(', ');
-        HABITS.forEach((h, i) => {
-          if (habitList.includes(h)) data.habits[i] = true;
-        });
+        HABITS.forEach((h, i) => { if (habitList.includes(h)) data.habits[i] = true; });
         continue;
       }
       if (part.startsWith('Última menstruación/embarazo: ')) {
@@ -91,7 +86,6 @@ const parseExistingData = (detail: string | null, hasPreexisting: boolean | null
     }
   }
 
-  // Mark unanswered questions as 'no' if we have existing data
   if (hasPreexisting !== null) {
     data.answers = data.answers.map(a => a || 'no') as ('si' | 'no' | '')[];
     data.saved = true;
@@ -100,6 +94,20 @@ const parseExistingData = (detail: string | null, hasPreexisting: boolean | null
   return data;
 };
 
+// Virtual titular type for when no is_primary beneficiary exists
+interface VirtualTitular {
+  id: string; // will be 'virtual-titular'
+  first_name: string;
+  last_name: string;
+  dni: string | null;
+  is_primary: boolean;
+  relationship: string | null;
+  has_preexisting_conditions: boolean | null;
+  preexisting_conditions_detail: string | null;
+  created_at: string | null;
+  isVirtual: true;
+}
+
 const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
   const { data: beneficiaries, isLoading } = useBeneficiaries(saleId || '');
   const queryClient = useQueryClient();
@@ -107,26 +115,91 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [initialized, setInitialized] = useState(false);
 
-  // Sort: titular (is_primary) first, then by created_at ascending
+  // Fetch the sale's client data for virtual titular
+  const { data: saleClient } = useQuery({
+    queryKey: ['sale-client-for-ddjj', saleId],
+    queryFn: async () => {
+      const { data: sale } = await supabase
+        .from('sales')
+        .select('client_id')
+        .eq('id', saleId!)
+        .single();
+      if (!sale?.client_id) return null;
+      const { data: client } = await supabase
+        .from('clients')
+        .select('first_name, last_name, dni, birth_date, phone, email, address, city, province, postal_code')
+        .eq('id', sale.client_id)
+        .single();
+      return client ? { ...client, clientId: sale.client_id } : null;
+    },
+    enabled: !!saleId,
+  });
+
+  // Check if there's already a primary beneficiary
+  const hasPrimaryBeneficiary = useMemo(() => {
+    return beneficiaries?.some(b => b.is_primary) ?? false;
+  }, [beneficiaries]);
+
+  // Build the combined list: virtual titular (from client) if no is_primary exists, then adherents
   const sortedBeneficiaries = useMemo(() => {
-    if (!beneficiaries || beneficiaries.length === 0) return [];
-    return [...beneficiaries].sort((a, b) => {
+    if (!beneficiaries) return [];
+
+    const realBeneficiaries = [...beneficiaries].sort((a, b) => {
       if (a.is_primary && !b.is_primary) return -1;
       if (!a.is_primary && b.is_primary) return 1;
       return new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime();
     });
-  }, [beneficiaries]);
+
+    // If no primary beneficiary exists, prepend a virtual titular from the client
+    if (!hasPrimaryBeneficiary && saleClient) {
+      const virtualTitular: VirtualTitular = {
+        id: 'virtual-titular',
+        first_name: saleClient.first_name,
+        last_name: saleClient.last_name,
+        dni: saleClient.dni,
+        is_primary: true,
+        relationship: null,
+        has_preexisting_conditions: null,
+        preexisting_conditions_detail: null,
+        created_at: null,
+        isVirtual: true,
+      };
+      return [virtualTitular as any, ...realBeneficiaries];
+    }
+
+    return realBeneficiaries;
+  }, [beneficiaries, hasPrimaryBeneficiary, saleClient]);
 
   // Initialize health data from DB
   useEffect(() => {
-    if (!beneficiaries || beneficiaries.length === 0 || initialized) return;
+    if (!beneficiaries || beneficiaries.length === 0 || initialized) {
+      // Also init virtual titular if needed
+      if (!initialized && !hasPrimaryBeneficiary && saleClient && !healthData['virtual-titular']) {
+        setHealthData(prev => ({ ...prev, 'virtual-titular': createEmptyData() }));
+      }
+      if (beneficiaries && beneficiaries.length > 0 && !initialized) {
+        const initial: Record<string, BeneficiaryHealthData> = {};
+        for (const b of beneficiaries) {
+          initial[b.id] = parseExistingData(b.preexisting_conditions_detail, b.has_preexisting_conditions);
+        }
+        if (!hasPrimaryBeneficiary && saleClient) {
+          initial['virtual-titular'] = createEmptyData();
+        }
+        setHealthData(initial);
+        setInitialized(true);
+      }
+      return;
+    }
     const initial: Record<string, BeneficiaryHealthData> = {};
     for (const b of beneficiaries) {
       initial[b.id] = parseExistingData(b.preexisting_conditions_detail, b.has_preexisting_conditions);
     }
+    if (!hasPrimaryBeneficiary && saleClient) {
+      initial['virtual-titular'] = createEmptyData();
+    }
     setHealthData(initial);
     setInitialized(true);
-  }, [beneficiaries, initialized]);
+  }, [beneficiaries, initialized, hasPrimaryBeneficiary, saleClient]);
 
   // Reset initialized when saleId changes
   useEffect(() => {
@@ -147,7 +220,6 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
     const d = getData(id);
     const answers = [...d.answers];
     answers[idx] = val;
-    // Clear detail if changing to 'no'
     const details = [...d.details];
     if (val === 'no') details[idx] = '';
     update(id, { answers, details });
@@ -176,7 +248,6 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
     mutationFn: async (beneficiaryId: string) => {
       const d = getData(beneficiaryId);
 
-      // Validate all questions answered
       const unanswered = d.answers.filter(a => a === '').length;
       if (unanswered > 0) {
         throw new Error(`Debe responder todas las preguntas (${unanswered} sin responder)`);
@@ -196,6 +267,39 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
       if (d.peso) detailParts.push(`Peso: ${d.peso} kg`);
       if (d.altura) detailParts.push(`Estatura: ${d.altura} cm`);
 
+      // If this is a virtual titular, create the beneficiary first
+      if (beneficiaryId === 'virtual-titular') {
+        if (!saleClient || !saleId) throw new Error('No se encontró el cliente de la venta');
+
+        const { data: newBeneficiary, error: createError } = await supabase
+          .from('beneficiaries')
+          .insert({
+            sale_id: saleId,
+            first_name: saleClient.first_name,
+            last_name: saleClient.last_name,
+            dni: saleClient.dni,
+            birth_date: saleClient.birth_date,
+            phone: saleClient.phone,
+            email: saleClient.email,
+            address: saleClient.address,
+            city: saleClient.city,
+            province: saleClient.province,
+            postal_code: saleClient.postal_code,
+            is_primary: true,
+            relationship: 'Titular',
+            has_preexisting_conditions: hasPreexisting,
+            preexisting_conditions_detail: detailParts.length > 0 ? detailParts.join('; ') : null,
+          })
+          .select()
+          .single();
+
+        if (createError) throw createError;
+
+        // Move health data from virtual to real ID
+        return { realId: newBeneficiary.id, wasVirtual: true };
+      }
+
+      // Normal update for existing beneficiaries
       const { error } = await supabase
         .from('beneficiaries')
         .update({
@@ -204,15 +308,28 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
         })
         .eq('id', beneficiaryId);
       if (error) throw error;
-      return beneficiaryId;
+      return { realId: beneficiaryId, wasVirtual: false };
     },
-    onSuccess: (beneficiaryId) => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['beneficiaries'] });
-      // Mark as saved locally
-      setHealthData(prev => ({
-        ...prev,
-        [beneficiaryId]: { ...prev[beneficiaryId], saved: true },
-      }));
+
+      if (result.wasVirtual) {
+        // Transfer health data from virtual to the real beneficiary ID
+        setHealthData(prev => {
+          const virtualData = prev['virtual-titular'];
+          const next = { ...prev };
+          delete next['virtual-titular'];
+          if (virtualData) {
+            next[result.realId] = { ...virtualData, saved: true };
+          }
+          return next;
+        });
+      } else {
+        setHealthData(prev => ({
+          ...prev,
+          [result.realId]: { ...prev[result.realId], saved: true },
+        }));
+      }
       toast.success('DDJJ de Salud guardada correctamente');
     },
     onError: (e: any) => toast.error(e.message || 'Error al guardar'),
@@ -236,7 +353,7 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
     return (
       <div className="text-center py-8 text-muted-foreground">
         <Clock className="h-8 w-8 mx-auto mb-2" />
-        No hay titular ni adherentes registrados. Agregue al titular como beneficiario principal en la pestaña Adherentes para completar las DDJJ de salud.
+        No se encontró un cliente asociado a esta venta. Seleccione un cliente en la pestaña Básico.
       </div>
     );
   }
@@ -261,7 +378,7 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
 
       {/* Progress stepper */}
       <div className="flex items-center gap-2 flex-wrap">
-        {sortedBeneficiaries.map((b, idx) => {
+        {sortedBeneficiaries.map((b: any, idx: number) => {
           const completed = isComplete(b.id);
           const isCurrent = idx === currentStep;
           const isLocked = idx > 0 && !isComplete(sortedBeneficiaries[idx - 1].id);
