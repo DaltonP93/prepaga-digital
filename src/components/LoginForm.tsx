@@ -83,7 +83,7 @@ export const LoginForm = () => {
             </div>
           )}
           <CardTitle className="text-2xl font-bold text-foreground">
-            {branding?.login_title || "SAMAP  Digital"}
+            {branding?.login_title || "SAMAP Digital V1"}
           </CardTitle>
           <CardDescription className="text-muted-foreground">
             {branding?.login_subtitle || "Sistema de Firma Digital"}
