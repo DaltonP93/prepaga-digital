@@ -13,7 +13,7 @@ interface CreateUserParams {
   first_name: string;
   last_name: string;
   phone?: string;
-  role: 'super_admin' | 'admin' | 'gestor' | 'vendedor';
+  role: 'super_admin' | 'admin' | 'supervisor' | 'auditor' | 'gestor' | 'vendedor';
   company_id?: string;
 }
 

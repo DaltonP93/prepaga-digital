@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
-import { AlertCircle, HeartPulse, CheckCircle, Clock, Save } from 'lucide-react';
+import { AlertCircle, HeartPulse, CheckCircle, Clock, Save, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useBeneficiaries } from '@/hooks/useBeneficiaries';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -37,6 +37,7 @@ interface BeneficiaryHealthData {
   details: string[];
   habits: boolean[];
   lastMenstruation: string;
+  saved: boolean;
 }
 
 const createEmptyData = (): BeneficiaryHealthData => ({
@@ -46,12 +47,92 @@ const createEmptyData = (): BeneficiaryHealthData => ({
   details: new Array(HEALTH_QUESTIONS.length).fill(''),
   habits: new Array(HABITS.length).fill(false),
   lastMenstruation: '',
+  saved: false,
 });
+
+/** Parse the stored preexisting_conditions_detail back into structured form data */
+const parseExistingData = (detail: string | null, hasPreexisting: boolean | null): BeneficiaryHealthData => {
+  const data = createEmptyData();
+  if (!detail && !hasPreexisting) return data;
+
+  if (detail) {
+    const parts = detail.split('; ');
+    for (const part of parts) {
+      // Match health questions
+      const qMatch = HEALTH_QUESTIONS.findIndex(q => part.startsWith(q));
+      if (qMatch >= 0) {
+        data.answers[qMatch] = 'si';
+        const colonIdx = part.indexOf(': ', HEALTH_QUESTIONS[qMatch].length - 5);
+        if (colonIdx >= 0) {
+          data.details[qMatch] = part.substring(colonIdx + 2);
+        }
+        continue;
+      }
+
+      if (part.startsWith('Hábitos: ')) {
+        const habitList = part.replace('Hábitos: ', '').split(', ');
+        HABITS.forEach((h, i) => {
+          if (habitList.includes(h)) data.habits[i] = true;
+        });
+        continue;
+      }
+      if (part.startsWith('Última menstruación/embarazo: ')) {
+        data.lastMenstruation = part.replace('Última menstruación/embarazo: ', '');
+        continue;
+      }
+      if (part.startsWith('Peso: ')) {
+        data.peso = part.replace('Peso: ', '').replace(' kg', '');
+        continue;
+      }
+      if (part.startsWith('Estatura: ')) {
+        data.altura = part.replace('Estatura: ', '').replace(' cm', '');
+        continue;
+      }
+    }
+  }
+
+  // Mark unanswered questions as 'no' if we have existing data
+  if (hasPreexisting !== null) {
+    data.answers = data.answers.map(a => a || 'no') as ('si' | 'no' | '')[];
+    data.saved = true;
+  }
+
+  return data;
+};
 
 const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
   const { data: beneficiaries, isLoading } = useBeneficiaries(saleId || '');
   const queryClient = useQueryClient();
   const [healthData, setHealthData] = useState<Record<string, BeneficiaryHealthData>>({});
+  const [currentStep, setCurrentStep] = useState(0);
+  const [initialized, setInitialized] = useState(false);
+
+  // Sort: titular (is_primary) first, then by created_at
+  const sortedBeneficiaries = useMemo(() => {
+    if (!beneficiaries) return [];
+    return [...beneficiaries].sort((a, b) => {
+      if (a.is_primary && !b.is_primary) return -1;
+      if (!a.is_primary && b.is_primary) return 1;
+      return new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime();
+    });
+  }, [beneficiaries]);
+
+  // Initialize health data from DB
+  useEffect(() => {
+    if (!beneficiaries || beneficiaries.length === 0 || initialized) return;
+    const initial: Record<string, BeneficiaryHealthData> = {};
+    for (const b of beneficiaries) {
+      initial[b.id] = parseExistingData(b.preexisting_conditions_detail, b.has_preexisting_conditions);
+    }
+    setHealthData(initial);
+    setInitialized(true);
+  }, [beneficiaries, initialized]);
+
+  // Reset initialized when saleId changes
+  useEffect(() => {
+    setInitialized(false);
+    setCurrentStep(0);
+  }, [saleId]);
 
   const getData = (id: string) => healthData[id] || createEmptyData();
 
@@ -66,7 +147,10 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
     const d = getData(id);
     const answers = [...d.answers];
     answers[idx] = val;
-    update(id, { answers });
+    // Clear detail if changing to 'no'
+    const details = [...d.details];
+    if (val === 'no') details[idx] = '';
+    update(id, { answers, details });
   };
 
   const setDetail = (id: string, idx: number, val: string) => {
@@ -83,9 +167,21 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
     update(id, { habits });
   };
 
+  const isComplete = (id: string): boolean => {
+    const d = getData(id);
+    return d.answers.every(a => a !== '') && d.saved;
+  };
+
   const saveMutation = useMutation({
     mutationFn: async (beneficiaryId: string) => {
       const d = getData(beneficiaryId);
+
+      // Validate all questions answered
+      const unanswered = d.answers.filter(a => a === '').length;
+      if (unanswered > 0) {
+        throw new Error(`Debe responder todas las preguntas (${unanswered} sin responder)`);
+      }
+
       const hasPreexisting = d.answers.some(a => a === 'si') || d.habits.some(h => h);
 
       const detailParts: string[] = [];
@@ -104,13 +200,19 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
         .from('beneficiaries')
         .update({
           has_preexisting_conditions: hasPreexisting,
-          preexisting_conditions_detail: hasPreexisting ? detailParts.join('; ') : null,
+          preexisting_conditions_detail: detailParts.length > 0 ? detailParts.join('; ') : null,
         })
         .eq('id', beneficiaryId);
       if (error) throw error;
+      return beneficiaryId;
     },
-    onSuccess: () => {
+    onSuccess: (beneficiaryId) => {
       queryClient.invalidateQueries({ queryKey: ['beneficiaries'] });
+      // Mark as saved locally
+      setHealthData(prev => ({
+        ...prev,
+        [beneficiaryId]: { ...prev[beneficiaryId], saved: true },
+      }));
       toast.success('DDJJ de Salud guardada correctamente');
     },
     onError: (e: any) => toast.error(e.message || 'Error al guardar'),
@@ -130,9 +232,7 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
     return <div className="text-center py-8 text-muted-foreground">Cargando datos de salud...</div>;
   }
 
-  const allBeneficiaries = beneficiaries || [];
-
-  if (allBeneficiaries.length === 0) {
+  if (sortedBeneficiaries.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
         <Clock className="h-8 w-8 mx-auto mb-2" />
@@ -141,6 +241,14 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
     );
   }
 
+  const currentBeneficiary = sortedBeneficiaries[currentStep];
+  if (!currentBeneficiary) return null;
+
+  const d = getData(currentBeneficiary.id);
+  const hasAny = d.answers.some(a => a === 'si') || d.habits.some(h => h);
+  const canGoNext = currentStep < sortedBeneficiaries.length - 1 && isComplete(currentBeneficiary.id);
+  const canGoPrev = currentStep > 0;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2 mb-2">
@@ -148,134 +256,176 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
         <h3 className="text-lg font-semibold">Declaración Jurada de Salud - SAMAP</h3>
       </div>
       <p className="text-sm text-muted-foreground">
-        Complete la declaración jurada de salud para cada miembro del grupo familiar. Responda SÍ o NO y justifique cuando corresponda.
+        Complete la DDJJ de salud de forma secuencial. Primero el titular, luego cada adherente.
       </p>
 
-      {allBeneficiaries.map((b) => {
-        const d = healthData[b.id] || createEmptyData();
-        const hasAny = d.answers.some(a => a === 'si') || d.habits.some(h => h);
+      {/* Progress stepper */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {sortedBeneficiaries.map((b, idx) => {
+          const completed = isComplete(b.id);
+          const isCurrent = idx === currentStep;
+          const isLocked = idx > 0 && !isComplete(sortedBeneficiaries[idx - 1].id);
+          return (
+            <button
+              key={b.id}
+              onClick={() => !isLocked && setCurrentStep(idx)}
+              disabled={isLocked}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                isCurrent
+                  ? 'bg-primary text-primary-foreground'
+                  : completed
+                    ? 'bg-primary/20 text-primary cursor-pointer'
+                    : isLocked
+                      ? 'bg-muted text-muted-foreground cursor-not-allowed opacity-50'
+                      : 'bg-muted text-muted-foreground cursor-pointer'
+              }`}
+            >
+              {completed && <CheckCircle className="h-3 w-3" />}
+              {b.is_primary ? 'Titular' : b.relationship || `Adherente ${idx}`}: {b.first_name}
+            </button>
+          );
+        })}
+      </div>
 
-        return (
-          <Card key={b.id} className="border">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {b.has_preexisting_conditions ? (
-                    <AlertCircle className="h-5 w-5 text-destructive" />
-                  ) : (
-                    <CheckCircle className="h-5 w-5 text-primary" />
-                  )}
-                  <div>
-                    <CardTitle className="text-base">{b.first_name} {b.last_name}</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      {b.relationship || 'Titular'} {b.dni ? `• C.I.: ${b.dni}` : ''}
-                    </p>
-                  </div>
-                </div>
-                <Badge variant={hasAny || b.has_preexisting_conditions ? 'destructive' : 'default'}>
-                  {hasAny || b.has_preexisting_conditions ? 'Con preexistencias' : 'Sin preexistencias'}
-                </Badge>
+      {/* Current beneficiary form */}
+      <Card className="border">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {currentBeneficiary.has_preexisting_conditions || hasAny ? (
+                <AlertCircle className="h-5 w-5 text-destructive" />
+              ) : (
+                <CheckCircle className="h-5 w-5 text-primary" />
+              )}
+              <div>
+                <CardTitle className="text-base">
+                  {currentBeneficiary.first_name} {currentBeneficiary.last_name}
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  {currentBeneficiary.is_primary ? 'Titular' : currentBeneficiary.relationship || 'Adherente'}{' '}
+                  {currentBeneficiary.dni ? `• C.I.: ${currentBeneficiary.dni}` : ''}
+                  {' '}— Paso {currentStep + 1} de {sortedBeneficiaries.length}
+                </p>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              {/* Health Questions - Si/No */}
-              {HEALTH_QUESTIONS.map((question, idx) => (
-                <div key={idx} className="space-y-2 border-b pb-4 last:border-b-0">
-                  <Label className="text-sm font-medium leading-tight">{question}</Label>
-                  <RadioGroup
-                    value={d.answers[idx] || ''}
-                    onValueChange={(val) => setAnswer(b.id, idx, val as 'si' | 'no')}
-                    className="flex gap-6"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="si" id={`${b.id}-q${idx}-si`} />
-                      <Label htmlFor={`${b.id}-q${idx}-si`} className="cursor-pointer font-normal">SÍ</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="no" id={`${b.id}-q${idx}-no`} />
-                      <Label htmlFor={`${b.id}-q${idx}-no`} className="cursor-pointer font-normal">NO</Label>
-                    </div>
-                  </RadioGroup>
-                  {d.answers[idx] === 'si' && (
-                    <Textarea
-                      placeholder="Especificar..."
-                      value={d.details[idx] || ''}
-                      onChange={(e) => setDetail(b.id, idx, e.target.value)}
-                      className="text-sm"
-                      rows={2}
-                    />
-                  )}
+            </div>
+            <Badge variant={hasAny || currentBeneficiary.has_preexisting_conditions ? 'destructive' : 'default'}>
+              {hasAny || currentBeneficiary.has_preexisting_conditions ? 'Con preexistencias' : 'Sin preexistencias'}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {HEALTH_QUESTIONS.map((question, idx) => (
+            <div key={idx} className="space-y-2 border-b pb-4 last:border-b-0">
+              <Label className="text-sm font-medium leading-tight">{question}</Label>
+              <RadioGroup
+                value={d.answers[idx] || ''}
+                onValueChange={(val) => setAnswer(currentBeneficiary.id, idx, val as 'si' | 'no')}
+                className="flex gap-6"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="si" id={`${currentBeneficiary.id}-q${idx}-si`} />
+                  <Label htmlFor={`${currentBeneficiary.id}-q${idx}-si`} className="cursor-pointer font-normal">SÍ</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="no" id={`${currentBeneficiary.id}-q${idx}-no`} />
+                  <Label htmlFor={`${currentBeneficiary.id}-q${idx}-no`} className="cursor-pointer font-normal">NO</Label>
+                </div>
+              </RadioGroup>
+              {d.answers[idx] === 'si' && (
+                <Textarea
+                  placeholder="Especificar..."
+                  value={d.details[idx] || ''}
+                  onChange={(e) => setDetail(currentBeneficiary.id, idx, e.target.value)}
+                  className="text-sm"
+                  rows={2}
+                />
+              )}
+            </div>
+          ))}
+
+          <div className="space-y-2 border-b pb-4">
+            <Label className="text-sm font-medium">Hábitos:</Label>
+            <div className="flex flex-wrap gap-4">
+              {HABITS.map((habit, idx) => (
+                <div key={idx} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`${currentBeneficiary.id}-habit-${idx}`}
+                    checked={d.habits[idx] || false}
+                    onCheckedChange={() => toggleHabit(currentBeneficiary.id, idx)}
+                  />
+                  <label htmlFor={`${currentBeneficiary.id}-habit-${idx}`} className="text-sm cursor-pointer">
+                    {habit}
+                  </label>
                 </div>
               ))}
+            </div>
+          </div>
 
-              {/* Habits */}
-              <div className="space-y-2 border-b pb-4">
-                <Label className="text-sm font-medium">Hábitos:</Label>
-                <div className="flex flex-wrap gap-4">
-                  {HABITS.map((habit, idx) => (
-                    <div key={idx} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`${b.id}-habit-${idx}`}
-                        checked={d.habits[idx] || false}
-                        onCheckedChange={() => toggleHabit(b.id, idx)}
-                      />
-                      <label htmlFor={`${b.id}-habit-${idx}`} className="text-sm cursor-pointer">
-                        {habit}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
+          <div className="space-y-2 border-b pb-4">
+            <Label className="text-sm font-medium">Fecha de última menstruación o embarazo (si corresponde):</Label>
+            <Input
+              type="text"
+              placeholder="Ej: 15/01/2026 o N/A"
+              value={d.lastMenstruation}
+              onChange={(e) => update(currentBeneficiary.id, { lastMenstruation: e.target.value })}
+            />
+          </div>
 
-              {/* Last menstruation */}
-              <div className="space-y-2 border-b pb-4">
-                <Label className="text-sm font-medium">Fecha de última menstruación o embarazo (si corresponde):</Label>
-                <Input
-                  type="text"
-                  placeholder="Ej: 15/01/2026 o N/A"
-                  value={d.lastMenstruation}
-                  onChange={(e) => update(b.id, { lastMenstruation: e.target.value })}
-                />
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Peso (kg)</Label>
+              <Input
+                type="number"
+                placeholder="Ej: 70"
+                value={d.peso}
+                onChange={(e) => update(currentBeneficiary.id, { peso: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>Estatura (cm)</Label>
+              <Input
+                type="number"
+                placeholder="Ej: 170"
+                value={d.altura}
+                onChange={(e) => update(currentBeneficiary.id, { altura: e.target.value })}
+              />
+            </div>
+          </div>
 
-              {/* Physical metrics */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Peso (kg)</Label>
-                  <Input
-                    type="number"
-                    placeholder="Ej: 70"
-                    value={d.peso}
-                    onChange={(e) => update(b.id, { peso: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label>Estatura (cm)</Label>
-                  <Input
-                    type="number"
-                    placeholder="Ej: 170"
-                    value={d.altura}
-                    onChange={(e) => update(b.id, { altura: e.target.value })}
-                  />
-                </div>
-              </div>
+          <p className="text-xs text-muted-foreground italic">
+            Declaro que los datos precedentes son fieles a la verdad y me comprometo a informar cualquier modificación en mi estado de salud.
+          </p>
 
-              <p className="text-xs text-muted-foreground italic">
-                Declaro que los datos precedentes son fieles a la verdad y me comprometo a informar cualquier modificación en mi estado de salud.
-              </p>
+          <Button
+            onClick={() => saveMutation.mutate(currentBeneficiary.id)}
+            disabled={saveMutation.isPending}
+            className="w-full"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Guardar DDJJ de {currentBeneficiary.first_name}
+          </Button>
 
-              <Button
-                onClick={() => saveMutation.mutate(b.id)}
-                disabled={saveMutation.isPending}
-                className="w-full"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Guardar DDJJ de {b.first_name}
-              </Button>
-            </CardContent>
-          </Card>
-        );
-      })}
+          {/* Navigation */}
+          <div className="flex justify-between pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setCurrentStep(s => s - 1)}
+              disabled={!canGoPrev}
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Anterior
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setCurrentStep(s => s + 1)}
+              disabled={!canGoNext}
+            >
+              Siguiente
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

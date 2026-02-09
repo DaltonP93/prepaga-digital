@@ -301,9 +301,9 @@ export const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
       switch: false,
     },
     users: {
-      create: false,
+      create: true,
       read: true,
-      update: false,
+      update: true,
       delete: false,
       assignRoles: false,
       viewAll: true,
@@ -324,9 +324,9 @@ export const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
       publish: true,
     },
     clients: {
-      create: false,
+      create: true,
       read: true,
-      update: false,
+      update: true,
       delete: false,
       viewAll: true,
       export: true,
@@ -353,11 +353,11 @@ export const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
       sign: false,
     },
     audit: {
-      access: false,
+      access: true,
       approve: false,
       reject: false,
-      viewAll: false,
-      assignAuditor: false,
+      viewAll: true,
+      assignAuditor: true,
     },
     communications: {
       sendWhatsApp: false,

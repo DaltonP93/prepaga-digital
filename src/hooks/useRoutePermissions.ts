@@ -1,13 +1,13 @@
 
-import { useHasPermission } from './usePermissions';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 
 export const useRoutePermissions = () => {
-  const { profile } = useSimpleAuthContext();
+  const { userRole } = useSimpleAuthContext();
   
-  // For now, return basic permissions based on role
-  const isSuperAdmin = profile?.role === 'super_admin';
-  const isAdmin = profile?.role === 'admin';
+  const isSuperAdmin = userRole === 'super_admin';
+  const isAdmin = userRole === 'admin';
+  const isSupervisor = userRole === 'supervisor';
+  const isAuditor = userRole === 'auditor';
 
   return {
     canViewDashboard: true,
@@ -20,11 +20,11 @@ export const useRoutePermissions = () => {
     canViewPlans: true,
     canViewDocuments: true,
     canViewTemplates: true,
-    canViewAnalytics: true,
-    canViewUsers: isSuperAdmin,
+    canViewAnalytics: isSuperAdmin || isAdmin || isSupervisor || isAuditor,
+    canViewUsers: isSuperAdmin || isSupervisor,
     canViewCompanies: isSuperAdmin,
-    canViewAudit: isSuperAdmin,
+    canViewAudit: isSuperAdmin || isAdmin || isSupervisor || isAuditor,
     canViewExperience: isSuperAdmin,
-    isSuperAdmin
+    isSuperAdmin,
   };
 };
