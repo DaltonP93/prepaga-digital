@@ -18,6 +18,10 @@ interface SaleBasicTabProps {
     total_amount: number;
     notes: string;
     requires_adherents: boolean;
+    signer_type: string;
+    signer_name: string;
+    signer_dni: string;
+    signer_relationship: string;
   };
   onChange: (field: string, value: any) => void;
   companyId?: string;
@@ -126,14 +130,57 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
 
       {/* Total Amount */}
       <div className="space-y-2">
-        <Label>Monto Total *</Label>
+        <Label>Monto Total (Gs.) *</Label>
         <Input
           type="number"
-          step="0.01"
+          step="1"
           value={formData.total_amount}
           onChange={(e) => onChange('total_amount', parseFloat(e.target.value) || 0)}
-          placeholder="0.00"
+          placeholder="0"
         />
+      </div>
+
+      {/* Signer Selection */}
+      <div className="space-y-4 border rounded-lg p-4">
+        <Label className="text-base font-semibold">¿Quién firmará el contrato?</Label>
+        <Select value={formData.signer_type || 'titular'} onValueChange={(v) => onChange('signer_type', v)}>
+          <SelectTrigger>
+            <SelectValue placeholder="Seleccionar firmante" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="titular">Titular (cliente)</SelectItem>
+            <SelectItem value="responsable_pago">Responsable de Pago</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {formData.signer_type === 'responsable_pago' && (
+          <div className="space-y-3 pl-2 border-l-2 border-primary/30">
+            <div className="space-y-1">
+              <Label>Nombre completo del responsable de pago *</Label>
+              <Input
+                value={formData.signer_name || ''}
+                onChange={(e) => onChange('signer_name', e.target.value)}
+                placeholder="Nombre y Apellido"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>C.I. del responsable de pago *</Label>
+              <Input
+                value={formData.signer_dni || ''}
+                onChange={(e) => onChange('signer_dni', e.target.value)}
+                placeholder="Número de Cédula"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Relación con el titular</Label>
+              <Input
+                value={formData.signer_relationship || ''}
+                onChange={(e) => onChange('signer_relationship', e.target.value)}
+                placeholder="Ej: Padre, Madre, Tutor legal"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Notes */}
