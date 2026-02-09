@@ -1,12 +1,13 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
 import { AlertCircle, HeartPulse, CheckCircle, Clock, Save } from 'lucide-react';
 import { useBeneficiaries } from '@/hooks/useBeneficiaries';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,82 +18,93 @@ interface SaleDDJJTabProps {
   saleId?: string;
 }
 
-const HEALTH_CATEGORIES = [
-  'Sistema Respiratorio (asma, bronquitis, EPOC, tuberculosis)',
-  'Sistema Cardiovascular (hipertensión, arritmias, infarto, soplos)',
-  'Sistema Digestivo (úlceras, gastritis, hepatitis, colitis)',
-  'Sistema Urinario (cálculos renales, infecciones urinarias, insuficiencia renal)',
-  'Sistema Nervioso (epilepsia, migrañas, ACV, convulsiones)',
-  'Sistema Endocrino (diabetes, tiroides, obesidad)',
-  'Sistema Músculo-Esquelético (artritis, artrosis, hernias de disco, fracturas)',
-  'Enfermedades Oncológicas (tumores, cáncer, quimioterapia)',
-  'Enfermedades de la Sangre (anemia, leucemia, problemas de coagulación)',
-  'Enfermedades Dermatológicas (psoriasis, dermatitis, alergias cutáneas)',
-  'Enfermedades Oftalmológicas (glaucoma, cataratas, desprendimiento de retina)',
-  'Enfermedades ORL (sinusitis crónica, otitis, desviación de tabique)',
-  'Cirugías realizadas (cualquier intervención quirúrgica previa)',
-  'Internaciones previas (hospitalizaciones por cualquier causa)',
-  'Tratamiento psicológico/psiquiátrico (depresión, ansiedad, adicciones)',
-  'Enfermedades ginecológicas/urológicas (endometriosis, próstata, etc.)',
+const HEALTH_QUESTIONS = [
+  '1. ¿Padece alguna enfermedad crónica (diabetes, hipertensión, asma, EPOC, reumatológicas, tiroideas, insuficiencia renal u otras)?',
+  '2. ¿Padece o ha padecido alguna enfermedad o trastorno mental o neurológico (ansiedad, depresión, convulsiones u otros)?',
+  '3. ¿Padece o ha padecido enfermedad cardiovascular o coronaria, o se ha sometido a procedimientos (marcapasos, bypass, cateterismo, etc.)?',
+  '4. ¿Posee o ha poseído quistes, tumores o enfermedades oncológicas que hayan requerido cirugía, quimioterapia o radioterapia?',
+  '5. ¿Ha sido internado/a o sometido/a a alguna cirugía?',
+  '6. ¿Consume medicamentos, sustancias o se somete a tratamientos, de origen médico, natural o experimental?',
+  '7. Otras enfermedades o condiciones no mencionadas',
 ];
+
+const HABITS = ['Fuma', 'Vapea', 'Consume bebidas alcohólicas'];
 
 interface BeneficiaryHealthData {
   peso: string;
   altura: string;
-  conditions: boolean[];
+  answers: ('si' | 'no' | '')[];
   details: string[];
+  habits: boolean[];
+  lastMenstruation: string;
 }
+
+const createEmptyData = (): BeneficiaryHealthData => ({
+  peso: '',
+  altura: '',
+  answers: new Array(HEALTH_QUESTIONS.length).fill(''),
+  details: new Array(HEALTH_QUESTIONS.length).fill(''),
+  habits: new Array(HABITS.length).fill(false),
+  lastMenstruation: '',
+});
 
 const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
   const { data: beneficiaries, isLoading } = useBeneficiaries(saleId || '');
   const queryClient = useQueryClient();
   const [healthData, setHealthData] = useState<Record<string, BeneficiaryHealthData>>({});
 
-  const initBeneficiaryData = (beneficiaryId: string): BeneficiaryHealthData => {
-    if (healthData[beneficiaryId]) return healthData[beneficiaryId];
-    return {
-      peso: '',
-      altura: '',
-      conditions: new Array(HEALTH_CATEGORIES.length).fill(false),
-      details: new Array(HEALTH_CATEGORIES.length).fill(''),
-    };
-  };
+  const getData = (id: string) => healthData[id] || createEmptyData();
 
-  const updateHealthData = (beneficiaryId: string, data: Partial<BeneficiaryHealthData>) => {
+  const update = (id: string, patch: Partial<BeneficiaryHealthData>) => {
     setHealthData(prev => ({
       ...prev,
-      [beneficiaryId]: { ...initBeneficiaryData(beneficiaryId), ...prev[beneficiaryId], ...data },
+      [id]: { ...getData(id), ...prev[id], ...patch },
     }));
   };
 
-  const toggleCondition = (beneficiaryId: string, index: number) => {
-    const current = healthData[beneficiaryId] || initBeneficiaryData(beneficiaryId);
-    const newConditions = [...current.conditions];
-    newConditions[index] = !newConditions[index];
-    updateHealthData(beneficiaryId, { conditions: newConditions });
+  const setAnswer = (id: string, idx: number, val: 'si' | 'no') => {
+    const d = getData(id);
+    const answers = [...d.answers];
+    answers[idx] = val;
+    update(id, { answers });
   };
 
-  const updateDetail = (beneficiaryId: string, index: number, value: string) => {
-    const current = healthData[beneficiaryId] || initBeneficiaryData(beneficiaryId);
-    const newDetails = [...current.details];
-    newDetails[index] = value;
-    updateHealthData(beneficiaryId, { details: newDetails });
+  const setDetail = (id: string, idx: number, val: string) => {
+    const d = getData(id);
+    const details = [...d.details];
+    details[idx] = val;
+    update(id, { details });
+  };
+
+  const toggleHabit = (id: string, idx: number) => {
+    const d = getData(id);
+    const habits = [...d.habits];
+    habits[idx] = !habits[idx];
+    update(id, { habits });
   };
 
   const saveMutation = useMutation({
     mutationFn: async (beneficiaryId: string) => {
-      const data = healthData[beneficiaryId] || initBeneficiaryData(beneficiaryId);
-      const hasPreexisting = data.conditions.some(c => c);
-      const detailText = HEALTH_CATEGORIES
-        .map((cat, i) => data.conditions[i] ? `${cat}: ${data.details[i] || 'Sí'}` : null)
-        .filter(Boolean)
-        .join('; ');
+      const d = getData(beneficiaryId);
+      const hasPreexisting = d.answers.some(a => a === 'si') || d.habits.some(h => h);
+
+      const detailParts: string[] = [];
+      HEALTH_QUESTIONS.forEach((q, i) => {
+        if (d.answers[i] === 'si') {
+          detailParts.push(`${q}: ${d.details[i] || 'Sí'}`);
+        }
+      });
+      const activeHabits = HABITS.filter((_, i) => d.habits[i]);
+      if (activeHabits.length) detailParts.push(`Hábitos: ${activeHabits.join(', ')}`);
+      if (d.lastMenstruation) detailParts.push(`Última menstruación/embarazo: ${d.lastMenstruation}`);
+      if (d.peso) detailParts.push(`Peso: ${d.peso} kg`);
+      if (d.altura) detailParts.push(`Estatura: ${d.altura} cm`);
 
       const { error } = await supabase
         .from('beneficiaries')
         .update({
           has_preexisting_conditions: hasPreexisting,
-          preexisting_conditions_detail: hasPreexisting ? detailText : null,
+          preexisting_conditions_detail: hasPreexisting ? detailParts.join('; ') : null,
         })
         .eq('id', beneficiaryId);
       if (error) throw error;
@@ -133,16 +145,16 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
     <div className="space-y-6">
       <div className="flex items-center gap-2 mb-2">
         <HeartPulse className="h-5 w-5" />
-        <h3 className="text-lg font-semibold">Declaración Jurada de Salud</h3>
+        <h3 className="text-lg font-semibold">Declaración Jurada de Salud - SAMAP</h3>
       </div>
       <p className="text-sm text-muted-foreground">
-        Complete la declaración jurada de salud para cada miembro del grupo familiar. Marque las categorías que apliquen y agregue detalles.
+        Complete la declaración jurada de salud para cada miembro del grupo familiar. Responda SÍ o NO y justifique cuando corresponda.
       </p>
 
       {allBeneficiaries.map((b) => {
-        const bData = healthData[b.id] || initBeneficiaryData(b.id);
-        const hasAny = bData.conditions.some(c => c);
-        
+        const d = healthData[b.id] || createEmptyData();
+        const hasAny = d.answers.some(a => a === 'si') || d.habits.some(h => h);
+
         return (
           <Card key={b.id} className="border">
             <CardHeader className="pb-3">
@@ -156,16 +168,76 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
                   <div>
                     <CardTitle className="text-base">{b.first_name} {b.last_name}</CardTitle>
                     <p className="text-sm text-muted-foreground">
-                      {b.relationship || 'Titular'} {b.dni ? `• DNI: ${b.dni}` : ''}
+                      {b.relationship || 'Titular'} {b.dni ? `• C.I.: ${b.dni}` : ''}
                     </p>
                   </div>
                 </div>
-                <Badge variant={b.has_preexisting_conditions ? 'destructive' : 'default'}>
-                  {b.has_preexisting_conditions ? 'Con preexistencias' : 'Sin preexistencias'}
+                <Badge variant={hasAny || b.has_preexisting_conditions ? 'destructive' : 'default'}>
+                  {hasAny || b.has_preexisting_conditions ? 'Con preexistencias' : 'Sin preexistencias'}
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
+              {/* Health Questions - Si/No */}
+              {HEALTH_QUESTIONS.map((question, idx) => (
+                <div key={idx} className="space-y-2 border-b pb-4 last:border-b-0">
+                  <Label className="text-sm font-medium leading-tight">{question}</Label>
+                  <RadioGroup
+                    value={d.answers[idx] || ''}
+                    onValueChange={(val) => setAnswer(b.id, idx, val as 'si' | 'no')}
+                    className="flex gap-6"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="si" id={`${b.id}-q${idx}-si`} />
+                      <Label htmlFor={`${b.id}-q${idx}-si`} className="cursor-pointer font-normal">SÍ</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="no" id={`${b.id}-q${idx}-no`} />
+                      <Label htmlFor={`${b.id}-q${idx}-no`} className="cursor-pointer font-normal">NO</Label>
+                    </div>
+                  </RadioGroup>
+                  {d.answers[idx] === 'si' && (
+                    <Textarea
+                      placeholder="Especificar..."
+                      value={d.details[idx] || ''}
+                      onChange={(e) => setDetail(b.id, idx, e.target.value)}
+                      className="text-sm"
+                      rows={2}
+                    />
+                  )}
+                </div>
+              ))}
+
+              {/* Habits */}
+              <div className="space-y-2 border-b pb-4">
+                <Label className="text-sm font-medium">Hábitos:</Label>
+                <div className="flex flex-wrap gap-4">
+                  {HABITS.map((habit, idx) => (
+                    <div key={idx} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`${b.id}-habit-${idx}`}
+                        checked={d.habits[idx] || false}
+                        onCheckedChange={() => toggleHabit(b.id, idx)}
+                      />
+                      <label htmlFor={`${b.id}-habit-${idx}`} className="text-sm cursor-pointer">
+                        {habit}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Last menstruation */}
+              <div className="space-y-2 border-b pb-4">
+                <Label className="text-sm font-medium">Fecha de última menstruación o embarazo (si corresponde):</Label>
+                <Input
+                  type="text"
+                  placeholder="Ej: 15/01/2026 o N/A"
+                  value={d.lastMenstruation}
+                  onChange={(e) => update(b.id, { lastMenstruation: e.target.value })}
+                />
+              </div>
+
               {/* Physical metrics */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -173,53 +245,24 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
                   <Input
                     type="number"
                     placeholder="Ej: 70"
-                    value={bData.peso}
-                    onChange={(e) => updateHealthData(b.id, { peso: e.target.value })}
+                    value={d.peso}
+                    onChange={(e) => update(b.id, { peso: e.target.value })}
                   />
                 </div>
                 <div>
-                  <Label>Altura (cm)</Label>
+                  <Label>Estatura (cm)</Label>
                   <Input
                     type="number"
                     placeholder="Ej: 170"
-                    value={bData.altura}
-                    onChange={(e) => updateHealthData(b.id, { altura: e.target.value })}
+                    value={d.altura}
+                    onChange={(e) => update(b.id, { altura: e.target.value })}
                   />
                 </div>
               </div>
 
-              {/* Health categories */}
-              <div className="space-y-2">
-                <Label className="font-semibold">¿Padece o padeció alguna de las siguientes enfermedades?</Label>
-                <div className="grid gap-2">
-                  {HEALTH_CATEGORIES.map((cat, index) => (
-                    <div key={index} className="space-y-1">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`${b.id}-cat-${index}`}
-                          checked={bData.conditions[index] || false}
-                          onCheckedChange={() => toggleCondition(b.id, index)}
-                        />
-                        <label
-                          htmlFor={`${b.id}-cat-${index}`}
-                          className="text-sm cursor-pointer leading-tight"
-                        >
-                          {cat}
-                        </label>
-                      </div>
-                      {bData.conditions[index] && (
-                        <Textarea
-                          placeholder="Detalle la enfermedad, tratamiento, fecha, etc."
-                          value={bData.details[index] || ''}
-                          onChange={(e) => updateDetail(b.id, index, e.target.value)}
-                          className="ml-6 text-sm"
-                          rows={2}
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <p className="text-xs text-muted-foreground italic">
+                Declaro que los datos precedentes son fieles a la verdad y me comprometo a informar cualquier modificación en mi estado de salud.
+              </p>
 
               <Button
                 onClick={() => saveMutation.mutate(b.id)}
