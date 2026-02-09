@@ -7,43 +7,51 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { UserPlus, Pencil, UserCheck, UserX } from "lucide-react";
 import { UserForm } from "@/components/UserForm";
-import { useUsers, useUpdateUser } from "@/hooks/useUsers";
-import { Database } from "@/integrations/supabase/types";
+import { useUsers, useUpdateUser, UserWithRole } from "@/hooks/useUsers";
 
-type Profile = Database['public']['Tables']['profiles']['Row'];
+const getRoleBadgeVariant = (role: string) => {
+  switch (role) {
+    case 'super_admin': return 'destructive';
+    case 'admin': return 'default';
+    case 'supervisor': return 'secondary';
+    case 'auditor': return 'secondary';
+    case 'gestor': return 'secondary';
+    case 'vendedor': return 'outline';
+    default: return 'outline';
+  }
+};
+
+const getRoleLabel = (role: string) => {
+  switch (role) {
+    case 'super_admin': return 'Super Admin';
+    case 'admin': return 'Admin';
+    case 'supervisor': return 'Supervisor';
+    case 'auditor': return 'Auditor';
+    case 'gestor': return 'Gestor';
+    case 'vendedor': return 'Vendedor';
+    default: return role;
+  }
+};
+
+const getUserRole = (user: UserWithRole): string => {
+  if (user.user_roles && user.user_roles.length > 0) {
+    return user.user_roles[0].role;
+  }
+  return 'vendedor';
+};
 
 const Users = () => {
   const [showUserForm, setShowUserForm] = useState(false);
-  const [editingUser, setEditingUser] = useState<Profile | null>(null);
+  const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
   const { data: users = [], isLoading } = useUsers();
   const updateUser = useUpdateUser();
 
-  const getRoleBadgeVariant = (role: string) => {
-    switch (role) {
-      case 'super_admin': return 'destructive';
-      case 'admin': return 'default';
-      case 'gestor': return 'secondary';
-      case 'vendedor': return 'outline';
-      default: return 'outline';
-    }
-  };
-
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case 'super_admin': return 'Super Admin';
-      case 'admin': return 'Admin';
-      case 'gestor': return 'Gestor';
-      case 'vendedor': return 'Vendedor';
-      default: return role;
-    }
-  };
-
-  const handleEditUser = (user: Profile) => {
+  const handleEditUser = (user: UserWithRole) => {
     setEditingUser(user);
     setShowUserForm(true);
   };
 
-  const handleToggleUserStatus = async (user: Profile) => {
+  const handleToggleUserStatus = async (user: UserWithRole) => {
     await updateUser.mutateAsync({
       id: user.id,
       is_active: !user.is_active,
@@ -104,45 +112,48 @@ const Users = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">
-                      {user.first_name} {user.last_name}
-                    </TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        Vendedor
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {user.companies?.name || 'Sin empresa'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={user.is_active ? 'default' : 'secondary'}>
-                        {user.is_active ? 'Activo' : 'Inactivo'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditUser(user)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant={user.is_active ? "destructive" : "default"}
-                          size="sm"
-                          onClick={() => handleToggleUserStatus(user)}
-                        >
-                          {user.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {users.map((user) => {
+                  const role = getUserRole(user);
+                  return (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium">
+                        {user.first_name} {user.last_name}
+                      </TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>
+                        <Badge variant={getRoleBadgeVariant(role) as any}>
+                          {getRoleLabel(role)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {user.companies?.name || 'Sin empresa'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={user.is_active ? 'default' : 'secondary'}>
+                          {user.is_active ? 'Activo' : 'Inactivo'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditUser(user)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant={user.is_active ? "destructive" : "default"}
+                            size="sm"
+                            onClick={() => handleToggleUserStatus(user)}
+                          >
+                            {user.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
 

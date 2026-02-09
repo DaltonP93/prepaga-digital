@@ -7,18 +7,15 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useCreateUser, useUpdateUser } from "@/hooks/useUsers";
+import { useCreateUser, useUpdateUser, UserWithRole } from "@/hooks/useUsers";
 import { useCompanies } from "@/hooks/useCompanies";
 import { PermissionManager } from "./PermissionManager";
-import { Database } from "@/integrations/supabase/types";
 import { toast } from "sonner";
-
-type Profile = Database['public']['Tables']['profiles']['Row'];
 
 interface UserFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  user?: Profile | null;
+  user?: UserWithRole | null;
 }
 
 interface UserFormData {
@@ -30,6 +27,13 @@ interface UserFormData {
   role: 'super_admin' | 'admin' | 'supervisor' | 'auditor' | 'gestor' | 'vendedor';
   company_id: string;
 }
+
+const getUserRole = (user: UserWithRole | null | undefined): UserFormData['role'] => {
+  if (user?.user_roles && user.user_roles.length > 0) {
+    return user.user_roles[0].role as UserFormData['role'];
+  }
+  return 'vendedor';
+};
 
 export function UserForm({ open, onOpenChange, user }: UserFormProps) {
   const { data: companies = [] } = useCompanies();
@@ -44,7 +48,7 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
       first_name: user?.first_name || "",
       last_name: user?.last_name || "",
       phone: user?.phone || "",
-      role: 'vendedor',
+      role: getUserRole(user),
       company_id: user?.company_id || "",
     }
   });
@@ -56,7 +60,7 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
         first_name: user.first_name || "",
         last_name: user.last_name || "",
         phone: user.phone || "",
-        role: 'vendedor', // Role is in user_roles table, not profiles
+        role: getUserRole(user),
         company_id: user.company_id || "",
       });
     }
@@ -67,11 +71,14 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
       if (isEditing && user) {
         await updateUser.mutateAsync({
           id: user.id,
-          ...data
+          first_name: data.first_name,
+          last_name: data.last_name,
+          phone: data.phone,
+          company_id: data.company_id,
+          role: data.role,
         });
         toast.success('Usuario actualizado exitosamente');
       } else {
-        // For create user, password is required
         if (!data.password) {
           toast.error('La contraseña es requerida');
           return;
@@ -86,7 +93,6 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
       reset();
     } catch (error) {
       console.error("Error saving user:", error);
-      toast.error('Error al guardar el usuario');
     }
   };
 
@@ -187,9 +193,6 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
                     <SelectItem value="super_admin">Super Administrador</SelectItem>
                   </SelectContent>
                 </Select>
-                {errors.role && (
-                  <span className="text-sm text-red-500">El rol es requerido</span>
-                )}
               </div>
 
               <div className="space-y-2">
@@ -206,9 +209,6 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
                     ))}
                   </SelectContent>
                 </Select>
-                {errors.company_id && (
-                  <span className="text-sm text-red-500">La empresa es requerida</span>
-                )}
               </div>
 
               <div className="flex justify-end space-x-2 pt-4">

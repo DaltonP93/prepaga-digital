@@ -17,11 +17,16 @@ interface CreateUserParams {
   company_id?: string;
 }
 
+export interface UserWithRole extends Profile {
+  companies: { name: string } | null;
+  user_roles: { role: string }[] | null;
+}
+
 export const useUsers = () => {
   return useQuery({
     queryKey: ['users'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: profiles, error } = await supabase
         .from('profiles')
         .select(`
           *,
@@ -30,7 +35,21 @@ export const useUsers = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data;
+
+      // Fetch roles separately since there's no direct FK
+      const userIds = profiles.map(p => p.id);
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('user_id, role')
+        .in('user_id', userIds);
+
+      const roleMap = new Map<string, string>();
+      roles?.forEach(r => roleMap.set(r.user_id, r.role));
+
+      return profiles.map(p => ({
+        ...p,
+        user_roles: roleMap.has(p.id) ? [{ role: roleMap.get(p.id)! }] : null,
+      })) as UserWithRole[];
     },
   });
 };
@@ -40,9 +59,6 @@ export const useCreateUser = () => {
 
   return useMutation({
     mutationFn: async (userData: CreateUserParams) => {
-      console.log('Creating user with data:', userData);
-      
-      // Call the create-user edge function
       const { data, error } = await supabase.functions.invoke('create-user', {
         body: {
           email: userData.email,
@@ -56,8 +72,6 @@ export const useCreateUser = () => {
       });
 
       if (error) {
-        console.error('Error from edge function:', error);
-        // Try to get the actual error body
         const context = (error as any)?.context;
         let errorMsg = 'Error al crear usuario';
         if (context?.body) {
@@ -90,16 +104,28 @@ export const useUpdateUser = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, ...updates }: ProfileUpdate & { id: string }) => {
-      const { data, error } = await supabase
+    mutationFn: async ({ id, role, ...profileUpdates }: ProfileUpdate & { id: string; role?: string }) => {
+      // Update profile fields (exclude role)
+      const { error: profileError } = await supabase
         .from('profiles')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+        .update(profileUpdates)
+        .eq('id', id);
 
-      if (error) throw error;
-      return data;
+      if (profileError) throw profileError;
+
+      // Update role in user_roles table if provided
+      if (role) {
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .upsert(
+            { user_id: id, role: role as any },
+            { onConflict: 'user_id' }
+          );
+
+        if (roleError) throw roleError;
+      }
+
+      return { id };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -117,7 +143,6 @@ export const useDeleteUser = () => {
 
   return useMutation({
     mutationFn: async (userId: string) => {
-      // First deactivate the profile
       const { error: profileError } = await supabase
         .from('profiles')
         .update({ is_active: false })
@@ -136,7 +161,6 @@ export const useDeleteUser = () => {
   });
 };
 
-// Hook to get countries for dropdown
 export const useCountries = () => {
   return useQuery({
     queryKey: ['countries'],
@@ -149,6 +173,6 @@ export const useCountries = () => {
       if (error) throw error;
       return data;
     },
-    staleTime: 10 * 60 * 1000, // 10 minutes cache
+    staleTime: 10 * 60 * 1000,
   });
 };
