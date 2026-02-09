@@ -35,7 +35,7 @@ export const LoginForm = () => {
     e.preventDefault();
 
     if (isBlocked) {
-      toast.error(`Cuenta bloqueada. Intente nuevamente en ${blockTimeLeft} minutos.`);
+      toast.error(`Cuenta bloqueada. Intente nuevamente en  ${blockTimeLeft} minutos.`);
       return;
     }
 
