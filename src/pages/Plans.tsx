@@ -14,11 +14,11 @@ import { useCurrencySettings } from '@/hooks/useCurrencySettings';
 const Plans = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingPlan, setEditingPlan] = useState(null);
-  const { profile } = useSimpleAuthContext();
+  const { profile, userRole } = useSimpleAuthContext();
   const { formatCurrency } = useCurrencySettings();
   const queryClient = useQueryClient();
 
-  const { data: plans, isLoading } = useQuery({
+  const { data: plans, isLoading, error } = useQuery({
     queryKey: ['plans'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -26,7 +26,10 @@ const Plans = () => {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching plans:', error);
+        throw error;
+      }
       return data;
     }
   });
@@ -65,7 +68,7 @@ const Plans = () => {
     setEditingPlan(null);
   };
 
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
+  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
 
   if (isLoading) {
     return (
