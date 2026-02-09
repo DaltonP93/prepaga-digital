@@ -35,6 +35,10 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
     total_amount: sale?.total_amount || 0,
     notes: sale?.notes || '',
     requires_adherents: sale?.requires_adherents || false,
+    signer_type: (sale as any)?.signer_type || 'titular',
+    signer_name: (sale as any)?.signer_name || '',
+    signer_dni: (sale as any)?.signer_dni || '',
+    signer_relationship: (sale as any)?.signer_relationship || '',
   });
 
   const handleChange = (field: string, value: any) => {
@@ -58,7 +62,11 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           total_amount: formData.total_amount,
           notes: formData.notes,
           requires_adherents: formData.requires_adherents,
-        });
+          signer_type: formData.signer_type,
+          signer_name: formData.signer_type === 'responsable_pago' ? formData.signer_name : null,
+          signer_dni: formData.signer_type === 'responsable_pago' ? formData.signer_dni : null,
+          signer_relationship: formData.signer_type === 'responsable_pago' ? formData.signer_relationship : null,
+        } as any);
         toast.success('Venta actualizada');
       } else {
         const result = await createSale.mutateAsync({
@@ -70,7 +78,11 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           requires_adherents: formData.requires_adherents,
           salesperson_id: profile?.id,
           status: 'borrador',
-        });
+          signer_type: formData.signer_type,
+          signer_name: formData.signer_type === 'responsable_pago' ? formData.signer_name : null,
+          signer_dni: formData.signer_type === 'responsable_pago' ? formData.signer_dni : null,
+          signer_relationship: formData.signer_type === 'responsable_pago' ? formData.signer_relationship : null,
+        } as any);
         toast.success('Venta creada exitosamente');
         navigate(`/sales/${result.id}/edit`);
       }

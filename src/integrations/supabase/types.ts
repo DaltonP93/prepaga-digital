@@ -1516,6 +1516,10 @@ export type Database = {
           signature_token: string | null
           signed_at: string | null
           signed_ip: string | null
+          signer_dni: string | null
+          signer_name: string | null
+          signer_relationship: string | null
+          signer_type: string | null
           status: Database["public"]["Enums"]["sale_status"] | null
           template_id: string | null
           total_amount: number | null
@@ -1545,6 +1549,10 @@ export type Database = {
           signature_token?: string | null
           signed_at?: string | null
           signed_ip?: string | null
+          signer_dni?: string | null
+          signer_name?: string | null
+          signer_relationship?: string | null
+          signer_type?: string | null
           status?: Database["public"]["Enums"]["sale_status"] | null
           template_id?: string | null
           total_amount?: number | null
@@ -1574,6 +1582,10 @@ export type Database = {
           signature_token?: string | null
           signed_at?: string | null
           signed_ip?: string | null
+          signer_dni?: string | null
+          signer_name?: string | null
+          signer_relationship?: string | null
+          signer_type?: string | null
           status?: Database["public"]["Enums"]["sale_status"] | null
           template_id?: string | null
           total_amount?: number | null
