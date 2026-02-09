@@ -52,8 +52,14 @@ export const LoginForm = () => {
       
     } catch (error: any) {
       console.error('❌ LoginForm: Error en login:', error);
-      const result = recordFailedAttempt();
-      toast.error(result.message || error.message || 'Error al iniciar sesión');
+      const errorMessage = error?.message || '';
+      
+      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError') || errorMessage.includes('fetch')) {
+        toast.error('Error de conexión. Verifica tu conexión a internet e intenta nuevamente.');
+      } else {
+        const result = recordFailedAttempt();
+        toast.error(result.message || errorMessage || 'Error al iniciar sesión');
+      }
     } finally {
       setIsLoggingIn(false);
     }
