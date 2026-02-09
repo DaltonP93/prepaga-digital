@@ -105,7 +105,7 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
             </div>
             {filteredPlans.map((plan) => (
               <SelectItem key={plan.id} value={plan.id}>
-                {plan.name} - ${Number(plan.price)?.toLocaleString('es-PY')}
+                {plan.name} - Gs. {Number(plan.price)?.toLocaleString('es-PY')}
               </SelectItem>
             ))}
           </SelectContent>

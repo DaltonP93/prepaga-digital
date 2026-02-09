@@ -39,9 +39,19 @@ const SaleDocumentsTab: React.FC<SaleDocumentsTabProps> = ({ saleId }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
 
+      // Get user's company_id for storage path (RLS requires company_id as first folder)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .single();
+
+      const companyId = profile?.company_id;
+      if (!companyId) throw new Error('No se encontró la empresa del usuario');
+
       const fileExt = file.name.split('.').pop();
       const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `sale-documents/${saleId}/${uniqueName}`;
+      const filePath = `${companyId}/sale-documents/${saleId}/${uniqueName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('documents')
