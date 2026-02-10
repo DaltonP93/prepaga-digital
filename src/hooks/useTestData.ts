@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuthContext } from "@/components/AuthProvider";
+import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 
 export const useTestData = () => {
   const [isCreating, setIsCreating] = useState(false);
   const { toast } = useToast();
-  const { profile } = useAuthContext();
+  const { profile } = useSimpleAuthContext();
 
   const createTestData = async () => {
     if (!profile?.company_id) {

@@ -117,9 +117,9 @@ export function AppSidebar() {
     },
     {
       title: "Configuración",
-      url: "/experience",
+      url: "/settings",
       icon: Settings,
-      visible: permissions.canViewExperience,
+      visible: permissions.canViewSettings,
     }
   ].filter(item => item.visible);
 

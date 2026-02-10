@@ -26,6 +26,7 @@ import Users from "@/pages/Users";
 import Companies from "@/pages/Companies";
 import AuditDashboard from "@/pages/AuditDashboard";
 import Experience from "@/pages/Experience";
+import Settings from "@/pages/Settings";
 import SignatureView from "@/pages/SignatureView";
 import NotFound from "@/pages/NotFound";
 
@@ -80,6 +81,7 @@ const App = () => {
                   <Route path="users" element={<Users />} />
                   <Route path="companies" element={<Companies />} />
                   <Route path="audit" element={<AuditDashboard />} />
+                  <Route path="settings" element={<Settings />} />
                   <Route path="experience" element={<Experience />} />
                   <Route path="*" element={<NotFound />} />
                 </Route>
