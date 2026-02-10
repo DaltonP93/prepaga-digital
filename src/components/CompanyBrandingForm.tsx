@@ -205,7 +205,7 @@ export function CompanyBrandingForm() {
                     <Input
                       value={watch("primaryColor")}
                       onChange={(e) => setValue("primaryColor", e.target.value)}
-                      placeholder="#667eea"
+                      placeholder="#1e3a5f"
                     />
                   </div>
                 </div>
@@ -221,7 +221,7 @@ export function CompanyBrandingForm() {
                     <Input
                       value={watch("secondaryColor")}
                       onChange={(e) => setValue("secondaryColor", e.target.value)}
-                      placeholder="#764ba2"
+                      placeholder="#334155"
                     />
                   </div>
                 </div>
@@ -237,7 +237,7 @@ export function CompanyBrandingForm() {
                     <Input
                       value={watch("accentColor")}
                       onChange={(e) => setValue("accentColor", e.target.value)}
-                      placeholder="#4ade80"
+                      placeholder="#3b82f6"
                     />
                   </div>
                 </div>

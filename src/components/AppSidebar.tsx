@@ -32,10 +32,12 @@ import {
 import { MainNavItem } from "@/types";
 import { LogoutButton } from './LogoutButton';
 import { useRoutePermissions } from '@/hooks/useRoutePermissions';
+import { useBranding } from './CompanyBrandingProvider';
 
 export function AppSidebar() {
   const location = useLocation();
   const permissions = useRoutePermissions();
+  const { logoUrl, companyName } = useBranding();
 
   const menuItems: MainNavItem[] = [
     {
@@ -127,10 +129,24 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader>
         <div className="px-2 py-4">
-          <h2 className="text-lg font-semibold text-foreground tracking-tight">
-            SAMAP Digital
-          </h2>
-          <p className="text-xs text-muted-foreground mt-1">Gestión comercial médica</p>
+          {logoUrl ? (
+            <div className="flex items-center gap-2">
+              <img src={logoUrl} alt={companyName} className="h-8 max-w-[120px] object-contain" />
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-foreground tracking-tight truncate">
+                  {companyName || 'SAMAP Digital'}
+                </h2>
+                <p className="text-xs text-muted-foreground">Gestión comercial médica</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <h2 className="text-lg font-semibold text-foreground tracking-tight">
+                {companyName || 'SAMAP Digital'}
+              </h2>
+              <p className="text-xs text-muted-foreground mt-1">Gestión comercial médica</p>
+            </>
+          )}
         </div>
       </SidebarHeader>
       <SidebarContent>

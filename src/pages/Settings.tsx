@@ -2,12 +2,13 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Settings as SettingsIcon, User, Bell, Shield, Database, Clock, Trash2, Gauge, Palette } from 'lucide-react';
+import { Settings as SettingsIcon, User, Bell, Shield, Database, Clock, Trash2, Gauge, Palette, Building2 } from 'lucide-react';
 import { TestDataManager } from '@/components/TestDataManager';
 import { SessionConfigurationPanel } from '@/components/SessionConfigurationPanel';
 import { SystemOptimizationPanel } from '@/components/SystemOptimizationPanel';
 import { CacheMonitor } from '@/components/CacheMonitor';
 import { CurrencyConfigurationPanel } from '@/components/CurrencyConfigurationPanel';
+import { ProfileCompanyAssignmentPanel } from '@/components/ProfileCompanyAssignmentPanel';
 
 export default function Settings() {
   return (
@@ -124,6 +125,21 @@ export default function Settings() {
 
         {/* Tercera fila - Configuración de moneda */}
         <div className="grid gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Asignación de Empresa por Usuario
+              </CardTitle>
+              <CardDescription>
+                Define la empresa vinculada a cada perfil para cumplir con RLS
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ProfileCompanyAssignmentPanel />
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

@@ -10,14 +10,14 @@ interface CompanyConfiguration {
   email?: string;
   phone?: string;
   address?: string;
-  login_background_url?: string;
-  login_logo_url?: string;
+  login_background_url?: string | null;
+  login_logo_url?: string | null;
   login_title?: string;
   login_subtitle?: string;
-  primary_color?: string;
-  secondary_color?: string;
-  accent_color?: string;
-  logo_url?: string;
+  primary_color?: string | null;
+  secondary_color?: string | null;
+  accent_color?: string | null;
+  logo_url?: string | null;
 }
 
 export const useCompanyConfiguration = () => {

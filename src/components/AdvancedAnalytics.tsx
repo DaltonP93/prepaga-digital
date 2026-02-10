@@ -117,10 +117,10 @@ const useAdvancedAnalytics = (period: string) => {
       }, {} as Record<string, number>) || {};
 
       const conversionFunnel = [
-        { name: 'Borradores', value: statusCounts['borrador'] || 0, fill: '#8884d8' },
-        { name: 'Enviados', value: statusCounts['enviado'] || 0, fill: '#82ca9d' },
-        { name: 'Firmados', value: statusCounts['firmado'] || 0, fill: '#ffc658' },
-        { name: 'Completados', value: statusCounts['completado'] || 0, fill: '#ff7300' }
+        { name: 'Borradores', value: statusCounts['borrador'] || 0, fill: '#1e3a5f' },
+        { name: 'Enviados', value: statusCounts['enviado'] || 0, fill: '#475569' },
+        { name: 'Firmados', value: statusCounts['firmado'] || 0, fill: '#64748b' },
+        { name: 'Completados', value: statusCounts['completado'] || 0, fill: '#3b82f6' }
       ];
 
       // Performance por usuario
@@ -403,8 +403,8 @@ const AdvancedAnalytics = () => {
                       name === 'ventas' ? `${value} ventas` : formatCurrency(Number(value) || 0),
                       name === 'ventas' ? 'Ventas' : 'Ingresos'
                     ]} />
-                    <Area type="monotone" dataKey="ventas" stackId="1" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
-                    <Area type="monotone" dataKey="ingresos" stackId="2" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.6} />
+                    <Area type="monotone" dataKey="ventas" stackId="1" stroke="#1e3a5f" fill="#1e3a5f" fillOpacity={0.6} />
+                    <Area type="monotone" dataKey="ingresos" stackId="2" stroke="#475569" fill="#475569" fillOpacity={0.6} />
                   </AreaChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -422,7 +422,7 @@ const AdvancedAnalytics = () => {
                     <XAxis dataKey="period" />
                     <YAxis />
                     <Tooltip formatter={(value) => [`${value} días`, 'Tiempo promedio']} />
-                    <Line type="monotone" dataKey="avgDays" stroke="#ff7300" strokeWidth={2} />
+                    <Line type="monotone" dataKey="avgDays" stroke="#3b82f6" strokeWidth={2} />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -465,8 +465,8 @@ const AdvancedAnalytics = () => {
                     <XAxis dataKey="name" />
                     <YAxis />
                     <Tooltip />
-                    <Bar dataKey="ventas" fill="#8884d8" />
-                    <Bar dataKey="ingresos" fill="#82ca9d" />
+                    <Bar dataKey="ventas" fill="#1e3a5f" />
+                    <Bar dataKey="ingresos" fill="#475569" />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -487,8 +487,8 @@ const AdvancedAnalytics = () => {
                   <XAxis type="number" />
                   <YAxis dataKey="name" type="category" width={150} />
                   <Tooltip />
-                  <Bar dataKey="ventas" fill="#8884d8" />
-                  <Bar dataKey="conversion" fill="#82ca9d" />
+                  <Bar dataKey="ventas" fill="#1e3a5f" />
+                  <Bar dataKey="conversion" fill="#475569" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -512,7 +512,7 @@ const AdvancedAnalytics = () => {
                       name === 'count' ? `${value} ventas` : formatCurrency(Number(value) || 0),
                       name === 'count' ? 'Cantidad' : 'Ingresos'
                     ]} />
-                    <Bar dataKey="revenue" fill="#8884d8" />
+                    <Bar dataKey="revenue" fill="#1e3a5f" />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -533,7 +533,7 @@ const AdvancedAnalytics = () => {
                       labelLine={false}
                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                       outerRadius={80}
-                      fill="#8884d8"
+                      fill="#1e3a5f"
                       dataKey="count"
                     >
                       {analytics.topPlans.map((entry, index) => (

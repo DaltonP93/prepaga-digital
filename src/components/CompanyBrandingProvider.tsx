@@ -13,9 +13,9 @@ interface BrandingContextType {
 }
 
 const BrandingContext = createContext<BrandingContextType>({
-  primaryColor: '#667eea',
-  secondaryColor: '#764ba2',
-  accentColor: '#4ade80',
+  primaryColor: '#1e3a5f',
+  secondaryColor: '#334155',
+  accentColor: '#3b82f6',
   companyName: 'Sistema Digital',
   isLoading: true,
 });
@@ -28,9 +28,9 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
   const [appliedBranding, setAppliedBranding] = useState(false);
 
   const brandingData = {
-    primaryColor: configuration?.primary_color || '#667eea',
-    secondaryColor: configuration?.secondary_color || '#764ba2',
-    accentColor: configuration?.accent_color || '#4ade80',
+    primaryColor: configuration?.primary_color || '#1e3a5f',
+    secondaryColor: configuration?.secondary_color || '#334155',
+    accentColor: configuration?.accent_color || '#3b82f6',
     logoUrl: configuration?.logo_url,
     companyName: configuration?.name || 'Sistema Digital',
     isLoading,
@@ -81,6 +81,12 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
           favicon.href = configuration.login_logo_url;
         }
       }
+
+      // Persist branding to localStorage for login page (pre-auth)
+      try {
+        localStorage.setItem('samap_branding_logo', brandingData.logoUrl || '');
+        localStorage.setItem('samap_branding_name', brandingData.companyName || '');
+      } catch { /* ignore */ }
 
       setAppliedBranding(true);
     }

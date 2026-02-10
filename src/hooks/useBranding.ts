@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuthContext } from '@/components/AuthProvider';
+import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 
 interface BrandingConfig {
   primaryColor: string;
@@ -17,21 +17,21 @@ interface BrandingConfig {
 }
 
 const DEFAULT_BRANDING: BrandingConfig = {
-  primaryColor: '#667eea',
-  secondaryColor: '#764ba2',
-  accentColor: '#4ade80',
+  primaryColor: '#1e3a5f',
+  secondaryColor: '#334155',
+  accentColor: '#3b82f6',
   logoUrl: '/icons/icon-192x192.png',
-  companyName: 'Prepaga Digital',
+  companyName: 'SAMAP Digital',
   favicon: '/favicon.ico',
   customCSS: '',
   darkMode: false,
   fontFamily: 'Inter',
-  borderRadius: '0.5rem',
+  borderRadius: '0.75rem',
   shadows: true
 };
 
 export const useBranding = () => {
-  const { profile } = useAuthContext();
+  const { profile } = useSimpleAuthContext();
   const [branding, setBranding] = useState<BrandingConfig>(DEFAULT_BRANDING);
   const [loading, setLoading] = useState(true);
 
@@ -97,8 +97,14 @@ export const useBranding = () => {
 
       if (error) throw error;
 
+      const merged = { ...branding, ...updates };
       setBranding(prev => ({ ...prev, ...updates }));
-      applyBranding({ ...branding, ...updates });
+      applyBranding(merged);
+      // Persist logo/name to localStorage for login page (pre-auth)
+      try {
+        localStorage.setItem('samap_branding_logo', merged.logoUrl || '');
+        localStorage.setItem('samap_branding_name', merged.companyName || '');
+      } catch { /* ignore */ }
     } catch (error) {
       console.error('Error updating branding:', error);
       throw error;

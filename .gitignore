@@ -12,8 +12,17 @@ dist
 dist-ssr
 *.local
 
-# Editor directories and files
+
+
+# Carpetas de Agente de IA-Nico
+.agent/*
+.agents/*
+.claude/*
+.cursor/*
 .vscode/*
+.trae/*
+
+# Editor directories and files
 !.vscode/extensions.json
 .idea
 .DS_Store
@@ -23,3 +32,4 @@ dist-ssr
 *.sln
 *.sw?
 SKILL.md
+CLAUDE.md

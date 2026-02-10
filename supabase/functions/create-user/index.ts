@@ -14,6 +14,129 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
+
+    let requestBody;
+    try {
+      const text = await req.text();
+      if (!text || text.trim() === '') {
+        requestBody = {};
+      } else {
+        requestBody = JSON.parse(text);
+      }
+    } catch (parseError) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON in request body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const { count: superAdminCount, error: superAdminCountError } = await supabaseAdmin
+      .from('user_roles')
+      .select('id', { count: 'exact', head: true })
+      .eq('role', 'super_admin');
+
+    if (superAdminCountError) {
+      return new Response(
+        JSON.stringify({ error: 'No se pudo verificar el estado de super admin' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const canBootstrap = (superAdminCount ?? 0) === 0;
+
+    if (requestBody.action === 'can_bootstrap_super_admin') {
+      return new Response(
+        JSON.stringify({ success: true, canBootstrap }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (requestBody.action === 'bootstrap_super_admin') {
+      if (!canBootstrap) {
+        return new Response(
+          JSON.stringify({ error: 'El super admin inicial ya fue creado' }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const email = requestBody.email || 'admin@samap.local';
+      const password = requestBody.password || 'admin123';
+      const firstName = requestBody.firstName || requestBody.first_name || 'Super';
+      const lastName = requestBody.lastName || requestBody.last_name || 'Admin';
+      const phone = requestBody.phone || null;
+
+      if (!email || !firstName || !lastName) {
+        return new Response(
+          JSON.stringify({ error: 'Faltan campos obligatorios para bootstrap inicial' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          first_name: firstName,
+          last_name: lastName,
+          role: 'super_admin',
+        },
+      });
+
+      if (authError || !authData.user) {
+        return new Response(
+          JSON.stringify({ error: 'No se pudo crear el super admin inicial', details: authError?.message }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const userId = authData.user.id;
+
+      const { error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .upsert({
+          id: userId,
+          email,
+          first_name: firstName,
+          last_name: lastName,
+          phone,
+          company_id: null,
+          is_active: true,
+        });
+
+      if (profileError) {
+        await supabaseAdmin.auth.admin.deleteUser(userId);
+        return new Response(
+          JSON.stringify({ error: 'No se pudo crear perfil del super admin', details: profileError.message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const { error: roleError } = await supabaseAdmin
+        .from('user_roles')
+        .upsert({
+          user_id: userId,
+          role: 'super_admin',
+        });
+
+      if (roleError) {
+        await supabaseAdmin.auth.admin.deleteUser(userId);
+        return new Response(
+          JSON.stringify({ error: 'No se pudo asignar rol super_admin', details: roleError.message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'Super admin inicial creado',
+          user: { id: userId, email },
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     // Authenticate the caller - must be admin
     const authHeader = req.headers.get('Authorization')
@@ -23,8 +146,6 @@ serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
     // Verify caller identity
     const token = authHeader.replace('Bearer ', '')
@@ -49,20 +170,6 @@ serve(async (req) => {
         JSON.stringify({ error: 'Forbidden - admin role required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
-    }
-
-    let requestBody;
-    try {
-      const text = await req.text();
-      if (!text || text.trim() === '') {
-        throw new Error('Empty request body');
-      }
-      requestBody = JSON.parse(text);
-    } catch (parseError) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid JSON in request body' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
     }
 
     // Handle password reset action

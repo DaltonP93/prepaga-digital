@@ -24,7 +24,7 @@ export const useRoutePermissions = () => {
     canViewUsers: isSuperAdmin || isSupervisor,
     canViewCompanies: isSuperAdmin,
     canViewAudit: isSuperAdmin || isAdmin || isSupervisor || isAuditor,
-    canViewExperience: isSuperAdmin,
+    canViewExperience: isSuperAdmin || isAdmin,
     isSuperAdmin,
   };
 };

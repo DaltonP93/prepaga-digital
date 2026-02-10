@@ -7,7 +7,7 @@ import { TrendingUp, Users, DollarSign, Target } from 'lucide-react';
 import { useSales } from '@/hooks/useSales';
 import { useUsers } from '@/hooks/useUsers';
 
-const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', '#8884d8', '#82ca9d', '#ffc658'];
+const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', '#1e3a5f', '#475569', '#64748b'];
 
 const SalesByUserWidget = () => {
   const { data: sales, isLoading: salesLoading } = useSales();
@@ -226,7 +226,7 @@ const SalesByUserWidget = () => {
                     cx="50%"
                     cy="50%"
                     outerRadius={80}
-                    fill="#8884d8"
+                    fill="#1e3a5f"
                     dataKey="value"
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   >

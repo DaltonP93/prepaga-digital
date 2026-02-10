@@ -107,7 +107,7 @@ export default function BrandingManager() {
                 <Input
                   value={formData.primaryColor}
                   onChange={(e) => handleInputChange('primaryColor', e.target.value)}
-                  placeholder="#667eea"
+                  placeholder="#1e3a5f"
                   className="flex-1"
                 />
               </div>
@@ -126,7 +126,7 @@ export default function BrandingManager() {
                 <Input
                   value={formData.secondaryColor}
                   onChange={(e) => handleInputChange('secondaryColor', e.target.value)}
-                  placeholder="#764ba2"
+                  placeholder="#334155"
                   className="flex-1"
                 />
               </div>
@@ -145,7 +145,7 @@ export default function BrandingManager() {
                 <Input
                   value={formData.accentColor}
                   onChange={(e) => handleInputChange('accentColor', e.target.value)}
-                  placeholder="#4ade80"
+                  placeholder="#3b82f6"
                   className="flex-1"
                 />
               </div>

@@ -10,13 +10,25 @@ import { toast } from 'sonner';
 import { Eye, EyeOff, Monitor, Moon, Shield, Sun } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ThemePreference, getStoredThemePreference, setThemePreference } from '@/lib/theme';
+import { supabase } from '@/integrations/supabase/client';
 
 export const SimpleLoginForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isCheckingBootstrap, setIsCheckingBootstrap] = useState(true);
+  const [isBootstrapping, setIsBootstrapping] = useState(false);
+  const [canBootstrapSuperAdmin, setCanBootstrapSuperAdmin] = useState(false);
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() => getStoredThemePreference());
+
+  // Read branding from localStorage (persisted by CompanyBrandingProvider)
+  const brandingLogo = (() => {
+    try { return localStorage.getItem('samap_branding_logo') || ''; } catch { return ''; }
+  })();
+  const brandingName = (() => {
+    try { return localStorage.getItem('samap_branding_name') || 'SAMAP Digital'; } catch { return 'SAMAP Digital'; }
+  })();
   const { user, loading, signIn } = useSimpleAuthContext();
   const navigate = useNavigate();
   const location = useLocation();
@@ -36,6 +48,32 @@ export const SimpleLoginForm = () => {
       navigate(from, { replace: true });
     }
   }, [user, loading, navigate, location.state]);
+
+  useEffect(() => {
+    const checkBootstrapStatus = async () => {
+      setIsCheckingBootstrap(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('create-user', {
+          body: { action: 'can_bootstrap_super_admin' },
+        });
+
+        if (error) {
+          console.error('Error checking super admin bootstrap:', error);
+          setCanBootstrapSuperAdmin(false);
+          return;
+        }
+
+        setCanBootstrapSuperAdmin(Boolean(data?.canBootstrap));
+      } catch (error) {
+        console.error('Unexpected error checking bootstrap status:', error);
+        setCanBootstrapSuperAdmin(false);
+      } finally {
+        setIsCheckingBootstrap(false);
+      }
+    };
+
+    checkBootstrapStatus();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,6 +103,36 @@ export const SimpleLoginForm = () => {
   const handleThemeChange = (value: ThemePreference) => {
     setThemePreferenceState(value);
     setThemePreference(value);
+  };
+
+  const handleBootstrapSuperAdmin = async () => {
+    setIsBootstrapping(true);
+    try {
+      const bootstrapEmail = email.trim() || 'admin@admin.com';
+      const bootstrapPassword = password.trim() || 'admin123';
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          action: 'bootstrap_super_admin',
+          email: bootstrapEmail,
+          password: bootstrapPassword,
+          first_name: 'Super',
+          last_name: 'Admin',
+        },
+      });
+
+      if (error || !data?.success) {
+        const detail = (data && (data.error || data.details)) || error?.message || 'No se pudo crear el super admin inicial';
+        toast.error(detail);
+        return;
+      }
+
+      setCanBootstrapSuperAdmin(false);
+      toast.success(`Super admin creado. Usuario: ${bootstrapEmail} | Contraseña: ${bootstrapPassword}`);
+    } catch (error: any) {
+      toast.error(error.message || 'Error al crear super admin inicial');
+    } finally {
+      setIsBootstrapping(false);
+    }
   };
 
   // Show loading during auth verification
@@ -133,12 +201,16 @@ export const SimpleLoginForm = () => {
             </Button>
           </div>
           <div className="flex justify-center">
-            <div className="p-3 rounded-full bg-primary/10">
-              <Shield className="h-8 w-8 text-primary" />
-            </div>
+            {brandingLogo ? (
+              <img src={brandingLogo} alt={brandingName} className="h-16 max-w-[200px] object-contain" />
+            ) : (
+              <div className="p-3 rounded-full bg-primary/10">
+                <Shield className="h-8 w-8 text-primary" />
+              </div>
+            )}
           </div>
           <CardTitle className="text-2xl font-bold text-foreground">
-            SAMAP Digital
+            {brandingName}
           </CardTitle>
           <CardDescription className="text-muted-foreground">
             Sistema de Firma Digital - Inicia sesión en tu cuenta
@@ -225,6 +297,18 @@ export const SimpleLoginForm = () => {
                 'Iniciar Sesión'
               )}
             </Button>
+
+            {!isCheckingBootstrap && canBootstrapSuperAdmin && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                disabled={isBootstrapping || isLoggingIn}
+                onClick={handleBootstrapSuperAdmin}
+              >
+                {isBootstrapping ? 'Creando super admin inicial...' : 'Crear Super Admin inicial (una sola vez)'}
+              </Button>
+            )}
           </form>
         </CardContent>
       </Card>

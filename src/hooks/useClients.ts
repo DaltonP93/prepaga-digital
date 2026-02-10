@@ -5,6 +5,8 @@ import { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 
+const SUPER_ADMIN_ROLES = ['super_admin', 'admin'];
+
 type Client = Database['public']['Tables']['clients']['Row'];
 type ClientInsert = Database['public']['Tables']['clients']['Insert'];
 type ClientUpdate = Database['public']['Tables']['clients']['Update'];
@@ -36,21 +38,23 @@ const resolveCompanyId = async (profileCompanyId?: string | null, userId?: strin
 };
 
 export const useClients = () => {
-  const { profile, user } = useSimpleAuthContext();
+  const { profile, user, userRole } = useSimpleAuthContext();
+  const isSuperRole = SUPER_ADMIN_ROLES.includes(userRole || '');
 
   return useQuery({
-    queryKey: ['clients', profile?.company_id, user?.id],
+    queryKey: ['clients', profile?.company_id, user?.id, userRole],
     queryFn: async () => {
-      const companyId = await resolveCompanyId(profile?.company_id, user?.id);
       let query = supabase
         .from('clients')
         .select('*')
         .order('created_at', { ascending: false });
 
-      // If we can resolve company_id, keep explicit filter.
-      // If not, let RLS determine visible rows instead of returning an empty list.
-      if (companyId) {
-        query = query.eq('company_id', companyId);
+      // Super admins see all clients across all companies
+      if (!isSuperRole) {
+        const companyId = await resolveCompanyId(profile?.company_id, user?.id);
+        if (companyId) {
+          query = query.eq('company_id', companyId);
+        }
       }
 
       const { data, error } = await query;

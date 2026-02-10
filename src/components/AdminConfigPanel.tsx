@@ -18,8 +18,8 @@ export const AdminConfigPanel: React.FC = () => {
   const [uiFormData, setUiFormData] = useState({
     login_title: uiConfig?.login_title || 'Sistema de Gestión',
     login_subtitle: uiConfig?.login_subtitle || 'Acceso al sistema',
-    primary_color: uiConfig?.primary_color || '#667eea',
-    secondary_color: uiConfig?.secondary_color || '#764ba2',
+    primary_color: uiConfig?.primary_color || '#1e3a5f',
+    secondary_color: uiConfig?.secondary_color || '#334155',
     login_background_url: uiConfig?.login_background_url || '',
     login_logo_url: uiConfig?.login_logo_url || '',
   });
@@ -41,8 +41,8 @@ export const AdminConfigPanel: React.FC = () => {
       setUiFormData({
         login_title: uiConfig.login_title || 'Sistema de Gestión',
         login_subtitle: uiConfig.login_subtitle || 'Acceso al sistema',
-        primary_color: uiConfig.primary_color || '#667eea',
-        secondary_color: uiConfig.secondary_color || '#764ba2',
+        primary_color: uiConfig.primary_color || '#1e3a5f',
+        secondary_color: uiConfig.secondary_color || '#334155',
         login_background_url: uiConfig.login_background_url || '',
         login_logo_url: uiConfig.login_logo_url || '',
       });
@@ -166,7 +166,7 @@ export const AdminConfigPanel: React.FC = () => {
                     <Input
                       value={uiFormData.primary_color}
                       onChange={(e) => handleUiInputChange('primary_color', e.target.value)}
-                      placeholder="#667eea"
+                      placeholder="#1e3a5f"
                     />
                   </div>
                 </div>
@@ -183,7 +183,7 @@ export const AdminConfigPanel: React.FC = () => {
                     <Input
                       value={uiFormData.secondary_color}
                       onChange={(e) => handleUiInputChange('secondary_color', e.target.value)}
-                      placeholder="#764ba2"
+                      placeholder="#334155"
                     />
                   </div>
                 </div>

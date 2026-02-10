@@ -25,7 +25,7 @@ type Client = Database['public']['Tables']['clients']['Row'];
 export function ClientsList() {
   const [showClientForm, setShowClientForm] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
-  const { user, profile } = useSimpleAuthContext();
+  const { user, profile, userRole } = useSimpleAuthContext();
   const { data: clients = [], isLoading } = useClients();
   const deleteClient = useDeleteClient();
 
@@ -77,7 +77,7 @@ export function ClientsList() {
           <CardDescription>
             {clients.length} cliente{clients.length !== 1 ? 's' : ''} registrado{clients.length !== 1 ? 's' : ''}
           </CardDescription>
-          {clients.length === 0 && user && !profile?.company_id && (
+          {clients.length === 0 && user && !profile?.company_id && userRole !== 'super_admin' && (
             <p className="text-sm text-amber-600">
               Tu usuario no tiene `company_id` en `profiles`. Con RLS activo no podrás ver clientes hasta corregirlo.
             </p>
