@@ -7,14 +7,16 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { toast } from 'sonner';
-import { Eye, EyeOff, Shield } from 'lucide-react';
+import { Eye, EyeOff, Monitor, Moon, Shield, Sun } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { ThemePreference, getStoredThemePreference, setThemePreference } from '@/lib/theme';
 
 export const SimpleLoginForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() => getStoredThemePreference());
   const { user, loading, signIn } = useSimpleAuthContext();
   const navigate = useNavigate();
   const location = useLocation();
@@ -60,6 +62,11 @@ export const SimpleLoginForm = () => {
     }
   };
 
+  const handleThemeChange = (value: ThemePreference) => {
+    setThemePreferenceState(value);
+    setThemePreference(value);
+  };
+
   // Show loading during auth verification
   if (loading) {
     console.log('⏳ SimpleLoginForm: Verificando autenticación...');
@@ -93,6 +100,38 @@ export const SimpleLoginForm = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
       <Card className="w-full max-w-md backdrop-blur-sm bg-background/95 border-border/50 shadow-xl">
         <CardHeader className="text-center space-y-4">
+          <div className="flex items-center justify-center gap-1 rounded-xl border border-border/70 bg-muted/60 p-1">
+            <Button
+              type="button"
+              size="sm"
+              variant={themePreference === 'light' ? 'secondary' : 'ghost'}
+              onClick={() => handleThemeChange('light')}
+              className="h-8 px-2"
+            >
+              <Sun className="h-4 w-4 mr-1" />
+              Claro
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={themePreference === 'dark' ? 'secondary' : 'ghost'}
+              onClick={() => handleThemeChange('dark')}
+              className="h-8 px-2"
+            >
+              <Moon className="h-4 w-4 mr-1" />
+              Oscuro
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={themePreference === 'system' ? 'secondary' : 'ghost'}
+              onClick={() => handleThemeChange('system')}
+              className="h-8 px-2"
+            >
+              <Monitor className="h-4 w-4 mr-1" />
+              Sistema
+            </Button>
+          </div>
           <div className="flex justify-center">
             <div className="p-3 rounded-full bg-primary/10">
               <Shield className="h-8 w-8 text-primary" />

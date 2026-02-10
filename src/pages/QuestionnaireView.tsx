@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { useTemplates } from "@/hooks/useTemplates";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { formatCurrency } from "@/lib/utils";
 
 const QuestionnaireView = () => {
   const { token } = useParams<{ token: string }>();
@@ -113,7 +114,7 @@ const QuestionnaireView = () => {
                   <div>
                     <h4 className="font-medium">Plan:</h4>
                     <p>{plan.name}</p>
-                    <p className="text-muted-foreground">${plan.price?.toLocaleString()}</p>
+                    <p className="text-muted-foreground">{formatCurrency(Number(plan.price) || 0)}</p>
                   </div>
                 )}
               </div>

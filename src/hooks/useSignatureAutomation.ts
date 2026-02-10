@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { formatCurrency } from '@/lib/utils';
 
 interface AutomationRule {
   id: string;
@@ -205,7 +206,7 @@ export const useSignatureAutomation = () => {
                     </div>
                     <div class="info-item">
                       <span class="info-label">Precio:</span>
-                      <span class="info-value">$${sale.plans.price}</span>
+                      <span class="info-value">${formatCurrency(Number(sale.plans.price || 0))}</span>
                     </div>
                   </div>
                 </div>

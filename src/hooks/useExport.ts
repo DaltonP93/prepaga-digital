@@ -246,7 +246,7 @@ const generateHTML = (
                   if (value instanceof Date) {
                     value = format(new Date(value), 'dd/MM/yyyy');
                   } else if (typeof value === 'number' && header.includes('amount')) {
-                    value = `$${value.toLocaleString('es-PY')}`;
+                    value = `Gs. ${value.toLocaleString('es-PY')}`;
                   } else if (typeof value === 'boolean') {
                     value = value ? 'Sí' : 'No';
                   }

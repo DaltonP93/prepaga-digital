@@ -9,6 +9,7 @@ import { Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useClients } from '@/hooks/useClients';
 import { usePlans } from '@/hooks/usePlans';
+import { formatCurrency } from '@/lib/utils';
 
 interface SaleBasicTabProps {
   formData: {
@@ -109,7 +110,7 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
             </div>
             {filteredPlans.map((plan) => (
               <SelectItem key={plan.id} value={plan.id}>
-                {plan.name} - Gs. {Number(plan.price)?.toLocaleString('es-PY')}
+                {plan.name} - {formatCurrency(Number(plan.price) || 0)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -138,10 +139,15 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
           onChange={(e) => onChange('total_amount', parseFloat(e.target.value) || 0)}
           placeholder="0"
         />
+        {selectedPlan && (
+          <p className="text-xs text-muted-foreground">
+            Precio de referencia del plan: {formatCurrency(Number(selectedPlan.price) || 0)}
+          </p>
+        )}
       </div>
 
       {/* Signer Selection */}
-      <div className="space-y-4 border rounded-lg p-4">
+      <div className="space-y-4 border border-border/70 rounded-xl p-4 sm:p-5 bg-muted/20">
         <Label className="text-base font-semibold">¿Quién firmará el contrato?</Label>
         <Select value={formData.signer_type || 'titular'} onValueChange={(v) => onChange('signer_type', v)}>
           <SelectTrigger>
@@ -154,7 +160,7 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
         </Select>
 
         {formData.signer_type === 'responsable_pago' && (
-          <div className="space-y-3 pl-2 border-l-2 border-primary/30">
+          <div className="space-y-3 pl-3 border-l-2 border-primary/30">
             <div className="space-y-1">
               <Label>Nombre completo del responsable de pago *</Label>
               <Input

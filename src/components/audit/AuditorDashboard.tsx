@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
+import { formatCurrency } from '@/lib/utils';
 import { 
   CheckCircle, XCircle, Clock, AlertCircle, Eye, Search, 
   FileText, User, DollarSign, Calendar, Filter
@@ -276,11 +277,11 @@ export const AuditorDashboard: React.FC = () => {
               </div>
               <div>
                 <span className="font-medium">Precio: </span>
-                ${selectedSale.plans?.price?.toLocaleString() || 0}
+                {formatCurrency(Number(selectedSale.plans?.price || 0))}
               </div>
               <div>
                 <span className="font-medium">Monto Total: </span>
-                ${selectedSale.total_amount?.toLocaleString() || 0}
+                {formatCurrency(Number(selectedSale.total_amount || 0))}
               </div>
               <div>
                 <span className="font-medium">Contrato #: </span>
@@ -496,7 +497,7 @@ export const AuditorDashboard: React.FC = () => {
                       {getStatusBadge(sale.status, sale.audit_status)}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {sale.plans?.name} • ${sale.total_amount?.toLocaleString() || 0}
+                      {sale.plans?.name} • {formatCurrency(Number(sale.total_amount || 0))}
                       {sale.contract_number && ` • #${sale.contract_number}`}
                     </div>
                     <div className="text-xs text-muted-foreground">

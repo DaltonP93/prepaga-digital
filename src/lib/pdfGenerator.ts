@@ -1,4 +1,6 @@
 
+import { formatCurrency } from '@/lib/utils';
+
 // PDF Generation utilities
 export interface PDFDocument {
   content: string;
@@ -85,7 +87,7 @@ export const generatePDFContent = (document: PDFDocument): string => {
         <h2>Plan Contratado</h2>
         <table>
             <tr><td><strong>Plan</strong></td><td>${plan.name}</td></tr>
-            <tr><td><strong>Precio</strong></td><td>$${plan.price}</td></tr>
+            <tr><td><strong>Precio</strong></td><td>${formatCurrency(plan.price)}</td></tr>
             ${plan.description ? `<tr><td><strong>Descripción</strong></td><td>${plan.description}</td></tr>` : ''}
         </table>
     </div>

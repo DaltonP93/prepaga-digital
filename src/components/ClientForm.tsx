@@ -9,6 +9,7 @@ import { useCreateClient, useUpdateClient } from "@/hooks/useClients";
 import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 import { Database } from "@/integrations/supabase/types";
 import { useEffect } from "react";
+import { toast } from "sonner";
 
 type Client = Database['public']['Tables']['clients']['Row'];
 
@@ -87,12 +88,13 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
       } else {
         await createClient.mutateAsync({
           ...data,
-          company_id: profile?.company_id || '',
+          company_id: profile?.company_id || undefined,
         });
       }
       onOpenChange(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving client:", error);
+      toast.error(error?.message || "No se pudo guardar el cliente");
     }
   };
 

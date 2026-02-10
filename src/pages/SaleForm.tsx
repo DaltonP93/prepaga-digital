@@ -15,6 +15,7 @@ import { usePlans } from '@/hooks/usePlans';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { Loader2, Plus } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
 
 interface SaleFormData {
   client_id: string;
@@ -209,7 +210,7 @@ const SaleForm = () => {
                     </div>
                     {filteredPlans.map((plan) => (
                       <SelectItem key={plan.id} value={plan.id}>
-                        {plan.name} - Gs. {plan.price?.toLocaleString('es-PY')}
+                        {plan.name} - {formatCurrency(Number(plan.price) || 0)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -225,13 +226,13 @@ const SaleForm = () => {
                 <Input
                   id="total_amount"
                   type="number"
-                  step="0.01"
+                  step="1"
                   {...register('total_amount', { 
                     required: 'El monto es requerido',
                     valueAsNumber: true,
                     min: { value: 0, message: 'El monto debe ser mayor a 0' }
                   })}
-                  placeholder="0.00"
+                  placeholder="0"
                 />
                 {errors.total_amount && (
                   <p className="text-sm text-red-500">{errors.total_amount.message}</p>

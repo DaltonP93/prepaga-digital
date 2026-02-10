@@ -95,17 +95,17 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="max-w-5xl mx-auto space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">{isEditing ? 'Editar Venta' : 'Nueva Venta'}</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">{isEditing ? 'Editar Venta' : 'Nueva Venta'}</h1>
           <p className="text-muted-foreground">
             {isEditing
               ? `Contrato: ${sale?.contract_number || sale?.id?.slice(-8)}`
               : 'Complete la información para crear una nueva venta'}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 self-start sm:self-auto">
           <Button variant="outline" onClick={() => navigate('/sales')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver
@@ -120,7 +120,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
       <Card>
         <CardContent className="pt-6">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-2 gap-1.5 h-auto sm:h-11 sm:grid-cols-5">
               <TabsTrigger value="basico">Básico</TabsTrigger>
               <TabsTrigger value="adherentes" disabled={!isEditing}>Adherentes</TabsTrigger>
               <TabsTrigger value="documentos" disabled={!isEditing}>Documentos</TabsTrigger>

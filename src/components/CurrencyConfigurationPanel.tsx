@@ -18,10 +18,6 @@ interface CurrencyFormData {
 
 const currencies = [
   { code: 'GS', symbol: 'Gs.', name: 'Guaraní Paraguayo' },
-  { code: 'USD', symbol: '$', name: 'Dólar Estadounidense' },
-  { code: 'EUR', symbol: '€', name: 'Euro' },
-  { code: 'ARS', symbol: '$', name: 'Peso Argentino' },
-  { code: 'BRL', symbol: 'R$', name: 'Real Brasileño' },
 ];
 
 export const CurrencyConfigurationPanel = () => {
@@ -61,17 +57,9 @@ export const CurrencyConfigurationPanel = () => {
     if (currency) {
       setValue('currency_code', currency.code);
       setValue('currency_symbol', currency.symbol);
-      
-      // Set default formatting based on currency
-      if (currency.code === 'GS') {
-        setValue('decimal_places', 0);
-        setValue('thousand_separator', '.');
-        setValue('decimal_separator', ',');
-      } else {
-        setValue('decimal_places', 2);
-        setValue('thousand_separator', ',');
-        setValue('decimal_separator', '.');
-      }
+      setValue('decimal_places', 0);
+      setValue('thousand_separator', '.');
+      setValue('decimal_separator', ',');
     }
   };
 

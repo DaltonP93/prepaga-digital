@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Trash2, Users, AlertCircle } from 'lucide-react';
 import { useBeneficiaries, useCreateBeneficiary, useDeleteBeneficiary, useUpdateBeneficiary } from '@/hooks/useBeneficiaries';
 import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/utils';
 
 interface SaleAdherentsTabProps {
   saleId?: string;
@@ -140,13 +141,13 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
                 />
               </div>
               <div className="space-y-2">
-                <Label>Monto</Label>
+                <Label>Monto (Gs.)</Label>
                 <Input
                   type="number"
-                  step="0.01"
+                  step="1"
                   value={newBeneficiary.amount}
                   onChange={(e) => setNewBeneficiary(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
-                  placeholder="0.00"
+                  placeholder="0"
                 />
               </div>
             </div>
@@ -171,7 +172,7 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
                   <div className="font-medium">{b.first_name} {b.last_name}</div>
                   <div className="text-sm text-muted-foreground">
                     {b.dni && `DNI: ${b.dni}`} {b.relationship && `• ${b.relationship}`}
-                    {b.amount ? ` • $${Number(b.amount).toLocaleString('es-PY')}` : ''}
+                    {b.amount ? ` • ${formatCurrency(Number(b.amount) || 0)}` : ''}
                   </div>
                 </div>
                 {!disabled && (

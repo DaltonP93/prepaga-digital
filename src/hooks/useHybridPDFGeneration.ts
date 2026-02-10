@@ -9,6 +9,7 @@ import {
   createPDFBlob,
   PDFData 
 } from '@/lib/pdfUtils';
+import { formatCurrency } from '@/lib/utils';
 
 interface HybridPDFOptions extends PDFData {
   filename: string;
@@ -214,7 +215,7 @@ const generateComplexHTML = (data: PDFData): string => {
         <section class="plan-info">
           <h2>Plan Contratado</h2>
           <p><strong>Plan:</strong> ${data.plan.name}</p>
-          <p><strong>Precio:</strong> $${data.plan.price.toLocaleString()}</p>
+          <p><strong>Precio:</strong> ${formatCurrency(data.plan.price)}</p>
           ${data.plan.description ? `<p><strong>Descripción:</strong> ${data.plan.description}</p>` : ''}
         </section>
       ` : ''}

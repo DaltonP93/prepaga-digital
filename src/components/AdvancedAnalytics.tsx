@@ -18,6 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, endOfMonth, subMonths, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { formatCurrency } from '@/lib/utils';
 
 interface AnalyticsData {
   salesTrend: Array<{ name: string; ventas: number; ingresos: number }>;
@@ -328,8 +329,8 @@ const AdvancedAnalytics = () => {
             <CardTitle className="text-sm font-medium">Ticket Promedio</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${analytics.kpis.avgTicket.toLocaleString()}</div>
+            <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(analytics.kpis.avgTicket)}</div>
             <p className="text-xs text-muted-foreground">
               Por venta completada
             </p>
@@ -342,7 +343,7 @@ const AdvancedAnalytics = () => {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${analytics.kpis.customerLifetime.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{formatCurrency(analytics.kpis.customerLifetime)}</div>
             <p className="text-xs text-muted-foreground">
               Promedio por cliente
             </p>
@@ -368,7 +369,7 @@ const AdvancedAnalytics = () => {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${analytics.kpis.monthlyRecurring.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{formatCurrency(analytics.kpis.monthlyRecurring)}</div>
             <p className="text-xs text-muted-foreground">
               Ingresos recurrentes
             </p>
@@ -399,7 +400,7 @@ const AdvancedAnalytics = () => {
                     <XAxis dataKey="name" />
                     <YAxis />
                     <Tooltip formatter={(value, name) => [
-                      name === 'ventas' ? `${value} ventas` : `$${Number(value).toLocaleString()}`,
+                      name === 'ventas' ? `${value} ventas` : formatCurrency(Number(value) || 0),
                       name === 'ventas' ? 'Ventas' : 'Ingresos'
                     ]} />
                     <Area type="monotone" dataKey="ventas" stackId="1" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
@@ -508,7 +509,7 @@ const AdvancedAnalytics = () => {
                     <XAxis dataKey="name" />
                     <YAxis />
                     <Tooltip formatter={(value, name) => [
-                      name === 'count' ? `${value} ventas` : `$${Number(value).toLocaleString()}`,
+                      name === 'count' ? `${value} ventas` : formatCurrency(Number(value) || 0),
                       name === 'count' ? 'Cantidad' : 'Ingresos'
                     ]} />
                     <Bar dataKey="revenue" fill="#8884d8" />

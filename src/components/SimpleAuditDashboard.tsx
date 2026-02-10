@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuditProcesses, useUpdateSaleStatus } from '@/hooks/useSimpleAuditProcess';
 import { CheckCircle, XCircle, Clock, AlertCircle, Eye } from 'lucide-react';
 import { AuditSaleDetails } from '@/components/AuditSaleDetails';
+import { formatCurrency } from '@/lib/utils';
 
 const SimpleAuditDashboard = () => {
   const { data: sales, isLoading } = useAuditProcesses();
@@ -131,7 +132,7 @@ const SimpleAuditDashboard = () => {
                     {getStatusBadge(sale.status)}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    Plan: {sale.plans?.name} - ${sale.plans?.price}
+                    Plan: {sale.plans?.name} - {formatCurrency(Number(sale.plans?.price || 0))}
                   </div>
                 </div>
                 

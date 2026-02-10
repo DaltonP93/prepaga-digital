@@ -192,7 +192,7 @@ const Sales = () => {
                             <div className="font-semibold">
                               {formatCurrency(sale.total_amount || 0)}
                             </div>
-                            <div className="text-sm text-muted-foreground">USD</div>
+                            <div className="text-sm text-muted-foreground">PYG</div>
                           </TableCell>
                           
                           <TableCell>

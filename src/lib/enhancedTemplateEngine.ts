@@ -1,6 +1,7 @@
 // Enhanced Template Engine for dynamic document generation with beneficiaries support
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { formatCurrency as formatPygCurrency } from '@/lib/utils';
 
 export interface BeneficiaryContext {
   nombre: string;
@@ -110,7 +111,15 @@ function calculateAge(birthDate: string | null): number {
  * Format currency with locale
  */
 function formatCurrency(amount: number, currencySymbol = '$'): string {
-  return `${currencySymbol}${amount.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (currencySymbol === '$') {
+    return formatPygCurrency(amount);
+  }
+
+  const sanitizedAmount = amount.toLocaleString('es-PY', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+  return `${currencySymbol} ${sanitizedAmount}`;
 }
 
 /**
@@ -337,7 +346,7 @@ export function getEnhancedTemplateVariables(): { category: string; variables: {
       variables: [
         { key: '{{plan.nombre}}', description: 'Nombre del plan' },
         { key: '{{plan.precio}}', description: 'Precio del plan (número)' },
-        { key: '{{plan.precioFormateado}}', description: 'Precio del plan (formateado con $)' },
+        { key: '{{plan.precioFormateado}}', description: 'Precio del plan (formateado en Gs.)' },
         { key: '{{plan.descripcion}}', description: 'Descripción del plan' },
         { key: '{{plan.cobertura}}', description: 'Detalles de cobertura' },
       ],
@@ -357,7 +366,7 @@ export function getEnhancedTemplateVariables(): { category: string; variables: {
         { key: '{{venta.fecha}}', description: 'Fecha de la venta' },
         { key: '{{venta.fechaFormateada}}', description: 'Fecha formateada (ej: 5 de febrero de 2026)' },
         { key: '{{venta.total}}', description: 'Total de la venta (número)' },
-        { key: '{{venta.totalFormateado}}', description: 'Total formateado con $' },
+        { key: '{{venta.totalFormateado}}', description: 'Total formateado en Gs.' },
         { key: '{{venta.vendedor}}', description: 'Nombre del vendedor' },
         { key: '{{venta.numeroContrato}}', description: 'Número de contrato' },
         { key: '{{venta.numeroSolicitud}}', description: 'Número de solicitud' },

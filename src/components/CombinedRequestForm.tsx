@@ -15,6 +15,7 @@ import { CheckCircle, User, FileText, Signature } from 'lucide-react';
 import { toast } from 'sonner';
 import { HybridPDFControls } from '@/components/HybridPDFControls';
 import { useHybridPDFGeneration } from '@/hooks/useHybridPDFGeneration';
+import { formatCurrency } from '@/lib/utils';
 
 interface FormData {
   personal: {
@@ -271,7 +272,7 @@ export const CombinedRequestForm = ({ onComplete }: { onComplete?: () => void })
                       <h4 className="font-medium">{plan.name}</h4>
                       <p className="text-sm text-muted-foreground">{plan.description}</p>
                       <p className="text-lg font-semibold text-primary">
-                        ${Number(plan.price || 0).toLocaleString()}
+                        {formatCurrency(Number(plan.price || 0))}
                       </p>
                     </div>
                   </label>

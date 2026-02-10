@@ -85,7 +85,7 @@ export const useCurrencySettings = () => {
       ? `${integerWithSeparators}${decimal_separator || ','}${decimalPart}`
       : integerWithSeparators;
     
-    return `${currency_symbol || '$'} ${finalNumber}`;
+    return `${currency_symbol || 'Gs.'} ${finalNumber}`;
   };
 
   return {

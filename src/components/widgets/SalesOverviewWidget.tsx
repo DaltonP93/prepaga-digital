@@ -1,6 +1,7 @@
 import { TrendingUp, Users, DollarSign, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useDashboardStats } from '@/hooks/useDashboard';
+import { formatCurrency } from '@/lib/utils';
 
 const SalesOverviewWidget = () => {
   const { data, isLoading } = useDashboardStats();
@@ -42,7 +43,7 @@ const SalesOverviewWidget = () => {
     },
     {
       title: "Ingresos Totales",
-      value: `$${(data?.totalRevenue || 0).toLocaleString()}`,
+      value: formatCurrency(data?.totalRevenue || 0),
       icon: TrendingUp,
       change: "+15.3%"
     }

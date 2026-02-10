@@ -20,6 +20,7 @@ import {
   Loader2
 } from "lucide-react";
 import DOMPurify from 'dompurify';
+import { formatCurrency } from "@/lib/utils";
 
 const SignatureView = () => {
   const { token } = useParams<{ token: string }>();
@@ -192,7 +193,7 @@ const SignatureView = () => {
               <CardContent className="space-y-2 text-sm">
                 <p className="font-medium">{plan.name}</p>
                 <p className="text-xl font-bold text-primary">
-                  ${Number(plan.price || 0).toLocaleString('es-AR')}
+                  {formatCurrency(Number(plan.price || 0))}
                 </p>
                 {plan.description && (
                   <p className="text-muted-foreground text-xs">{plan.description}</p>
@@ -227,7 +228,7 @@ const SignatureView = () => {
               <div>
                 <p className="text-muted-foreground">Total</p>
                 <p className="font-medium text-primary">
-                  ${Number(sale?.total_amount || 0).toLocaleString('es-AR')}
+                  {formatCurrency(Number(sale?.total_amount || 0))}
                 </p>
               </div>
               <div>

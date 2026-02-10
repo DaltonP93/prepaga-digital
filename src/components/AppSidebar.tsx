@@ -36,7 +36,7 @@ import { useRoutePermissions } from '@/hooks/useRoutePermissions';
 export function AppSidebar() {
   const location = useLocation();
   const permissions = useRoutePermissions();
-  
+
   const menuItems: MainNavItem[] = [
     {
       title: "Dashboard",
@@ -81,7 +81,7 @@ export function AppSidebar() {
       visible: permissions.canViewDocuments,
     },
     {
-      title: "Analytics", 
+      title: "Analytics",
       url: "/analytics",
       icon: BarChart3,
       visible: permissions.canViewAnalytics,
@@ -127,9 +127,10 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader>
         <div className="px-2 py-4">
-          <CardTitle className="text-2xl font-bold text-foreground">
-            {branding?.login_title || "SAMAP Digital"}
-          </CardTitle>
+          <h2 className="text-lg font-semibold text-foreground tracking-tight">
+            SAMAP Digital
+          </h2>
+          <p className="text-xs text-muted-foreground mt-1">Gestión comercial médica</p>
         </div>
       </SidebarHeader>
       <SidebarContent>

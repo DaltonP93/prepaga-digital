@@ -8,8 +8,8 @@ interface LayoutProps {
 export function Layout({ children, title, description }: LayoutProps) {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">{title}</h1>
+      <div className="space-y-1">
+        <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
         {description && (
           <p className="text-muted-foreground">{description}</p>
         )}

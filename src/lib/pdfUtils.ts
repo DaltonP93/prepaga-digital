@@ -1,5 +1,6 @@
 
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { formatCurrency } from '@/lib/utils';
 
 export interface PDFData {
   personal: {
@@ -105,7 +106,7 @@ export const generateSimplePDF = async (data: PDFData): Promise<Uint8Array> => {
     });
     yPosition -= 20;
     
-    page.drawText(`Precio: $${data.plan.price.toLocaleString()}`, {
+    page.drawText(`Precio: ${formatCurrency(data.plan.price)}`, {
       x: 70,
       y: yPosition,
       size: 11,

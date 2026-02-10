@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle, XCircle, Clock, AlertCircle, MessageSquare, Edit, FileText } from 'lucide-react';
 import { SaleForm } from '@/components/SaleForm';
+import { formatCurrency } from '@/lib/utils';
 
 interface AuditSaleDetailsProps {
   sale: any;
@@ -131,7 +132,7 @@ export const AuditSaleDetails: React.FC<AuditSaleDetailsProps> = ({
             </div>
             <div>
               <Label className="text-sm font-medium text-muted-foreground">Precio</Label>
-              <p className="text-sm">${sale.plans?.price || 0}</p>
+              <p className="text-sm">{formatCurrency(Number(sale.plans?.price || 0))}</p>
             </div>
             <div>
               <Label className="text-sm font-medium text-muted-foreground">Descripción</Label>

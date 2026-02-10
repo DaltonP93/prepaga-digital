@@ -14,7 +14,7 @@ interface PaymentButtonProps {
 
 const PaymentButton = ({ 
   amount, 
-  currency = 'usd', 
+  currency = 'pyg', 
   description, 
   planId,
   children,

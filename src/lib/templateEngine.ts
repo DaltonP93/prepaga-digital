@@ -1,4 +1,6 @@
 
+import { formatCurrency } from "@/lib/utils";
+
 // Template Engine for dynamic document generation
 export interface TemplateVariable {
   key: string;
@@ -110,8 +112,8 @@ export const interpolateTemplate = (template: string, context: TemplateContext):
   replaceNestedVariables(context.respuestas, 'respuestas');
 
   // Handle special formatting for currency
-  result = result.replace(/\{\{precio_formateado\}\}/g, `$${context.plan.precio.toLocaleString()}`);
-  result = result.replace(/\{\{total_formateado\}\}/g, `$${context.venta.total.toLocaleString()}`);
+  result = result.replace(/\{\{precio_formateado\}\}/g, formatCurrency(context.plan.precio));
+  result = result.replace(/\{\{total_formateado\}\}/g, formatCurrency(context.venta.total));
 
   return result;
 };
