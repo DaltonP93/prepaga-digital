@@ -33,11 +33,13 @@ import { MainNavItem } from "@/types";
 import { LogoutButton } from './LogoutButton';
 import { useRoutePermissions } from '@/hooks/useRoutePermissions';
 import { useBranding } from './CompanyBrandingProvider';
+import { useState } from 'react';
 
 export function AppSidebar() {
   const location = useLocation();
   const permissions = useRoutePermissions();
   const { logoUrl, companyName } = useBranding();
+  const [logoBroken, setLogoBroken] = useState(false);
 
   const menuItems: MainNavItem[] = [
     {
@@ -113,7 +115,7 @@ export function AppSidebar() {
       title: "Auditoría",
       url: "/audit",
       icon: Shield,
-      visible: permissions.canViewAudit,
+      visible: true,
     },
     {
       title: "Configuración",
@@ -129,9 +131,14 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader>
         <div className="px-2 py-4">
-          {logoUrl ? (
+          {logoUrl && !logoBroken ? (
             <div className="flex items-center gap-2">
-              <img src={logoUrl} alt={companyName} className="h-8 max-w-[120px] object-contain" />
+              <img
+                src={logoUrl}
+                alt={companyName}
+                className="h-8 max-w-[120px] object-contain"
+                onError={() => setLogoBroken(true)}
+              />
               <div className="min-w-0">
                 <h2 className="text-sm font-semibold text-foreground tracking-tight truncate">
                   {companyName || 'SAMAP Digital'}

@@ -13,37 +13,39 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { formatCurrency } from '@/lib/utils';
 import RequireAuth from '@/components/RequireAuth';
 import { useState } from 'react';
+import { useStateTransition } from '@/hooks/useStateTransition';
+import { ALL_SALE_STATUSES, SALE_STATUS_LABELS, type SaleStatus } from '@/types/workflow';
 
 const Sales = () => {
   const { data: sales, isLoading } = useSales();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
+  const { canViewState, canEditState } = useStateTransition();
 
-  const filteredSales = sales?.filter(sale => {
+  const visibleSales = (sales || []).filter((sale) =>
+    canViewState((sale.status || 'borrador') as SaleStatus)
+  );
+
+  const filteredSales = visibleSales.filter(sale => {
     const matchesSearch = sale.clients?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          sale.clients?.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          sale.id?.includes(searchTerm);
     const matchesStatus = statusFilter === 'todos' || sale.status === statusFilter;
     return matchesSearch && matchesStatus;
-  }) || [];
+  });
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'firmado':
       case 'completado':
-      case 'aprobado_para_templates':
         return 'default';
       case 'enviado':
-      case 'en_revision':
-      case 'preparando_documentos':
-      case 'listo_para_enviar':
-      case 'firmado_parcial':
+      case 'en_auditoria':
+      case 'pendiente':
         return 'secondary';
       case 'borrador':
         return 'outline';
       case 'cancelado':
-      case 'rechazado':
-      case 'expirado':
         return 'destructive';
       default:
         return 'outline';
@@ -57,13 +59,8 @@ const Sales = () => {
       enviado: 'Enviado',
       borrador: 'Borrador',
       cancelado: 'Cancelado',
-      en_revision: 'En Revisión',
-      aprobado_para_templates: 'Aprobado',
-      rechazado: 'Rechazado',
-      firmado_parcial: 'Firmado Parcial',
-      expirado: 'Expirado',
-      preparando_documentos: 'Preparando Docs',
-      listo_para_enviar: 'Listo para Enviar',
+      en_auditoria: 'En Auditoría',
+      pendiente: 'Pendiente',
     };
     return map[status] || status;
   };
@@ -115,18 +112,13 @@ const Sales = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos los estados</SelectItem>
-                  <SelectItem value="borrador">Borrador</SelectItem>
-                  <SelectItem value="enviado">Enviado</SelectItem>
-                  <SelectItem value="en_revision">En Revisión</SelectItem>
-                  <SelectItem value="aprobado_para_templates">Aprobado</SelectItem>
-                  <SelectItem value="preparando_documentos">Preparando Docs</SelectItem>
-                  <SelectItem value="listo_para_enviar">Listo para Enviar</SelectItem>
-                  <SelectItem value="firmado">Firmado</SelectItem>
-                  <SelectItem value="firmado_parcial">Firmado Parcial</SelectItem>
-                  <SelectItem value="completado">Completado</SelectItem>
-                  <SelectItem value="rechazado">Rechazado</SelectItem>
-                  <SelectItem value="cancelado">Cancelado</SelectItem>
-                  <SelectItem value="expirado">Expirado</SelectItem>
+                  {ALL_SALE_STATUSES
+                    .filter((state) => canViewState(state))
+                    .map((state) => (
+                      <SelectItem key={state} value={state}>
+                        {SALE_STATUS_LABELS[state]}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
               
@@ -241,12 +233,19 @@ const Sales = () => {
                                     Ver Detalles
                                   </Link>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem asChild>
-                                  <Link to={`/sales/${sale.id}/edit`}>
+                                {canEditState((sale.status || 'borrador') as SaleStatus) ? (
+                                  <DropdownMenuItem asChild>
+                                    <Link to={`/sales/${sale.id}/edit`}>
+                                      <Edit className="mr-2 h-4 w-4" />
+                                      Editar
+                                    </Link>
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem disabled>
                                     <Edit className="mr-2 h-4 w-4" />
-                                    Editar
-                                  </Link>
-                                </DropdownMenuItem>
+                                    Edición bloqueada por estado/rol
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>

@@ -29,12 +29,6 @@ const Dashboard = () => {
   const { data: sales = [], isLoading: salesLoading } = useSales();
   const { data: clients = [], isLoading: clientsLoading } = useClients();
 
-  console.log('📊 Dashboard: Estado actual', { 
-    user: !!user, 
-    loading,
-    email: user?.email 
-  });
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">

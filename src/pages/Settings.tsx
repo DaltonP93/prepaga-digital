@@ -1,6 +1,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   Settings as SettingsIcon,
   User,
@@ -15,6 +18,10 @@ import {
   Wrench,
   Sparkles,
   Users,
+  GitBranch,
+  History,
+  Lock,
+  CheckCircle2,
 } from 'lucide-react';
 import { TestDataManager } from '@/components/TestDataManager';
 import { SessionConfigurationPanel } from '@/components/SessionConfigurationPanel';
@@ -23,24 +30,54 @@ import { CacheMonitor } from '@/components/CacheMonitor';
 import { CurrencyConfigurationPanel } from '@/components/CurrencyConfigurationPanel';
 import { ProfileCompanyAssignmentPanel } from '@/components/ProfileCompanyAssignmentPanel';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
-
-const CategoryTitle = ({ icon: Icon, title, description }: { icon: any; title: string; description: string }) => (
-  <div className="space-y-1">
-    <div className="flex items-center gap-2">
-      <Icon className="h-5 w-5 text-primary" />
-      <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
-    </div>
-    <p className="text-sm text-muted-foreground">{description}</p>
-  </div>
-);
+import { WorkflowConfigPanel } from '@/components/workflow/WorkflowConfigPanel';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Settings() {
-  const { userRole } = useSimpleAuthContext();
+  const { user, userRole, profile } = useSimpleAuthContext();
   const isSuperAdmin = userRole === 'super_admin';
 
+  const { data: canManageWorkflowByRpc = false } = useQuery({
+    queryKey: ['workflow-settings-permission', user?.id],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      if (!user?.id) return false;
+      const [superAdminRes, adminRes] = await Promise.all([
+        supabase.rpc('has_role', { _user_id: user.id, _role: 'super_admin' }),
+        supabase.rpc('has_role', { _user_id: user.id, _role: 'admin' }),
+      ]);
+
+      return Boolean(superAdminRes.data) || Boolean(adminRes.data);
+    },
+    staleTime: 30_000,
+  });
+
+  const canManageWorkflow = userRole === 'super_admin' || userRole === 'admin' || canManageWorkflowByRpc;
+
+  const recentChanges = [
+    {
+      date: '10/02/2026',
+      title: 'Workflow de ventas configurable',
+      detail: 'Se agregó configuración de transiciones por estado, roles que pueden ver/editar y requisitos para avanzar.',
+      status: 'aplicado',
+    },
+    {
+      date: '10/02/2026',
+      title: 'Control de acceso por estado en Ventas',
+      detail: 'La lista de ventas ahora respeta permisos por estado y bloquea edición cuando corresponde.',
+      status: 'aplicado',
+    },
+    {
+      date: '10/02/2026',
+      title: 'Bloqueo de detalle por estado/rol',
+      detail: 'Si el rol no tiene visibilidad del estado, no se muestra el detalle de la venta.',
+      status: 'aplicado',
+    },
+  ];
+
   return (
-    <div className="container mx-auto py-6 space-y-8">
-      <section className="rounded-2xl border border-border/60 bg-gradient-to-br from-background via-background to-primary/10 p-6">
+    <div className="container mx-auto py-6 space-y-6">
+      <section className="rounded-2xl border border-border/60 bg-gradient-to-br from-background via-background to-primary/10 p-6 shadow-sm">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
@@ -48,8 +85,14 @@ export default function Settings() {
               <h1 className="text-3xl font-bold">Configuración</h1>
             </div>
             <p className="text-sm text-muted-foreground max-w-2xl">
-              Centro único de administración del sistema: cuenta, comercial, branding, rendimiento y reglas operativas.
+              Centro único de administración del sistema: cuenta, operación, branding, workflow y mantenimiento.
             </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Badge variant="secondary">Rol actual: {userRole || 'sin rol'}</Badge>
+              <Badge variant={profile?.company_id ? 'default' : 'destructive'}>
+                {profile?.company_id ? 'Empresa asignada' : 'Sin company_id'}
+              </Badge>
+            </div>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" asChild>
@@ -62,183 +105,190 @@ export default function Settings() {
         </div>
       </section>
 
-      <section className="space-y-4">
-        <CategoryTitle
-          icon={Sparkles}
-          title="Cuenta y Seguridad"
-          description="Preferencias personales, autenticación y controles de acceso."
-        />
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <Tabs defaultValue="general" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto gap-1">
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="operacion">Operación</TabsTrigger>
+          <TabsTrigger value="workflow">Workflow</TabsTrigger>
+          <TabsTrigger value="sistema">Sistema</TabsTrigger>
+          <TabsTrigger value="cambios">Últimos cambios</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="general" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><User className="h-5 w-5" /> Perfil</CardTitle>
+                <CardDescription>Datos personales y cuenta</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="outline" className="w-full" asChild>
+                  <Link to="/profile">Editar perfil</Link>
+                </Button>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5" /> Seguridad</CardTitle>
+                <CardDescription>Roles y accesos</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="outline" className="w-full" asChild>
+                  <Link to="/users">Administrar usuarios</Link>
+                </Button>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5" /> Notificaciones</CardTitle>
+                <CardDescription>Preferencias de alertas</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="outline" className="w-full" disabled>Próximamente</Button>
+              </CardContent>
+            </Card>
+          </div>
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Perfil
-              </CardTitle>
-              <CardDescription>Actualiza tus datos personales</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="outline" className="w-full" asChild>
-                <Link to="/profile">Editar perfil</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                Seguridad
-              </CardTitle>
-              <CardDescription>Contraseña y controles de acceso</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="outline" className="w-full" asChild>
-                <Link to="/users">Administrar usuarios</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5" />
-                Notificaciones
-              </CardTitle>
-              <CardDescription>Preferencias de alertas del sistema</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="outline" className="w-full" disabled>
-                Próximamente
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="md:col-span-2 lg:col-span-3">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Configuración de Sesión
-              </CardTitle>
-              <CardDescription>Tiempo de inactividad y cierre automático</CardDescription>
+              <CardTitle className="flex items-center gap-2"><Clock className="h-5 w-5" /> Configuración de sesión</CardTitle>
+              <CardDescription>Inactividad y cierre automático</CardDescription>
             </CardHeader>
             <CardContent>
               <SessionConfigurationPanel />
             </CardContent>
           </Card>
-        </div>
-      </section>
+        </TabsContent>
 
-      <section className="space-y-4">
-        <CategoryTitle
-          icon={CreditCard}
-          title="Comercial y Operación"
-          description="Reglas comerciales, moneda y asignaciones para trabajo multiempresa."
-        />
-        <div className="grid gap-6">
+        <TabsContent value="operacion" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Asignación de Empresa por Usuario
-              </CardTitle>
-              <CardDescription>Define el company_id del perfil para cumplimiento con RLS</CardDescription>
+              <CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5" /> Asignación de empresa</CardTitle>
+              <CardDescription>Define `company_id` por perfil para cumplir RLS</CardDescription>
             </CardHeader>
             <CardContent>
               <ProfileCompanyAssignmentPanel />
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Palette className="h-5 w-5" />
-                Configuración de Moneda
-              </CardTitle>
-              <CardDescription>Formato de precios y símbolo monetario por empresa</CardDescription>
+              <CardTitle className="flex items-center gap-2"><CreditCard className="h-5 w-5" /> Moneda</CardTitle>
+              <CardDescription>Formato comercial por empresa</CardDescription>
             </CardHeader>
             <CardContent>
               <CurrencyConfigurationPanel />
             </CardContent>
           </Card>
-        </div>
-      </section>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5" /> UX / Branding</CardTitle>
+                <CardDescription>Diseño visual y experiencia</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="outline" className="w-full" asChild>
+                  <Link to="/experience">Abrir panel UX/Branding</Link>
+                </Button>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Accesos y roles</CardTitle>
+                <CardDescription>Gestión de permisos</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="outline" className="w-full" asChild>
+                  <Link to="/users">Gestionar accesos</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
-      <section className="space-y-4">
-        <CategoryTitle
-          icon={Palette}
-          title="UX, Branding y Móvil"
-          description="Experiencia visual, identidad de marca y capacidades para app móvil."
-        />
-        <div className="grid gap-6 md:grid-cols-2">
+        <TabsContent value="workflow" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Palette className="h-5 w-5" />
-                Branding y Experiencia
-              </CardTitle>
-              <CardDescription>Colores, logos, login y visual del sistema</CardDescription>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="flex items-center gap-2"><GitBranch className="h-5 w-5" /> Workflow de ventas</CardTitle>
+                <Badge variant={canManageWorkflow ? 'default' : 'outline'}>
+                  {canManageWorkflow ? 'Editable' : 'Solo lectura'}
+                </Badge>
+              </div>
+              <CardDescription>
+                Define qué perfiles pueden ver/editar cada estado y qué condiciones se requieren para avanzar.
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <Button variant="outline" className="w-full" asChild>
-                <Link to="/experience">Abrir panel UX/Branding</Link>
-              </Button>
+            <CardContent className="space-y-3">
+              {!canManageWorkflow && (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+                  <div className="flex items-center gap-2 font-medium">
+                    <Lock className="h-4 w-4" />
+                    Sin permisos para editar workflow
+                  </div>
+                  <p className="text-muted-foreground mt-1">
+                    Este bloque es editable solo para roles `admin` y `super_admin`.
+                  </p>
+                </div>
+              )}
+              {!profile?.company_id && (
+                <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
+                  No hay `company_id` asignado al perfil. Asigna empresa para habilitar configuración por compañía.
+                </div>
+              )}
+              {canManageWorkflow && profile?.company_id && (
+                <WorkflowConfigPanel companyId={profile.company_id} />
+              )}
             </CardContent>
           </Card>
+        </TabsContent>
 
+        <TabsContent value="sistema" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {isSuperAdmin && <TestDataManager />}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Gauge className="h-5 w-5" /> Monitor de cache</CardTitle>
+                <CardDescription>Salud de almacenamiento local</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CacheMonitor />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Trash2 className="h-5 w-5" /> Limpieza y optimización</CardTitle>
+                <CardDescription>Mantenimiento general</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SystemOptimizationPanel />
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="cambios" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Accesos y Roles
-              </CardTitle>
-              <CardDescription>Control de permisos por usuario y equipos</CardDescription>
+              <CardTitle className="flex items-center gap-2"><History className="h-5 w-5" /> Últimos cambios aplicados</CardTitle>
+              <CardDescription>Resumen técnico visible desde el panel de configuración</CardDescription>
             </CardHeader>
-            <CardContent>
-              <Button variant="outline" className="w-full" asChild>
-                <Link to="/users">Gestionar accesos</Link>
-              </Button>
+            <CardContent className="space-y-3">
+              {recentChanges.map((change, idx) => (
+                <div key={`${change.title}-${idx}`} className="rounded-lg border p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium">{change.title}</p>
+                    <Badge variant="secondary">{change.date}</Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">{change.detail}</p>
+                  <div className="flex items-center gap-1 text-xs text-emerald-500 mt-2">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {change.status}
+                  </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <CategoryTitle
-          icon={Wrench}
-          title="Sistema y Mantenimiento"
-          description="Salud técnica, optimización y herramientas operativas internas."
-        />
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {isSuperAdmin && <TestDataManager />}
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Gauge className="h-5 w-5" />
-                Monitor de Cache
-              </CardTitle>
-              <CardDescription>Estado del cache y almacenamiento local</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <CacheMonitor />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Trash2 className="h-5 w-5" />
-                Limpieza del Sistema
-              </CardTitle>
-              <CardDescription>Herramientas de mantenimiento y optimización</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <SystemOptimizationPanel />
-            </CardContent>
-          </Card>
-        </div>
-      </section>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { ProfileWithRole } from '@/types/auth';
+import type { AppRole } from '@/types/roles';
 
 export interface SimpleAuthContextType {
   user: User | null;
@@ -15,11 +16,33 @@ export interface SimpleAuthContextType {
 
 const SimpleAuthContext = createContext<SimpleAuthContextType | undefined>(undefined);
 
+const ROLE_PRIORITY: AppRole[] = [
+  'super_admin',
+  'admin',
+  'supervisor',
+  'auditor',
+  'gestor',
+  'vendedor',
+];
+
+const resolveHighestRole = (roles: string[]): AppRole => {
+  const normalized = roles.filter((role): role is AppRole =>
+    ROLE_PRIORITY.includes(role as AppRole)
+  );
+
+  for (const role of ROLE_PRIORITY) {
+    if (normalized.includes(role)) return role;
+  }
+
+  return 'vendedor';
+};
+
 const fetchProfileData = async (userId: string): Promise<{ profile: ProfileWithRole | null; role: string | null }> => {
   try {
-    const [profileResult, roleResult] = await Promise.all([
+    const [profileResult, roleResult, rpcRoleResult] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
-      supabase.from('user_roles').select('role').eq('user_id', userId).maybeSingle(),
+      supabase.from('user_roles').select('role').eq('user_id', userId),
+      supabase.rpc('get_user_role', { _user_id: userId }),
     ]);
 
     if (profileResult.error) {
@@ -27,7 +50,24 @@ const fetchProfileData = async (userId: string): Promise<{ profile: ProfileWithR
       return { profile: null, role: null };
     }
 
-    const role = roleResult.data?.role || null;
+    const roleList = (roleResult.data || [])
+      .map((entry: any) => entry?.role)
+      .filter((role: any): role is string => typeof role === 'string' && role.length > 0);
+
+    const rpcRole =
+      typeof rpcRoleResult.data === 'string' && rpcRoleResult.data.length > 0
+        ? (rpcRoleResult.data as AppRole)
+        : null;
+
+    const legacyProfileRole =
+      typeof (profileResult.data as any)?.role === 'string' && (profileResult.data as any)?.role.length > 0
+        ? ((profileResult.data as any).role as AppRole)
+        : null;
+
+    const role = roleList.length > 0
+      ? resolveHighestRole(roleList)
+      : rpcRole || legacyProfileRole || null;
+
     const profile: ProfileWithRole | null = profileResult.data
       ? { ...profileResult.data, role }
       : null;

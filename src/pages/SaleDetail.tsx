@@ -12,10 +12,13 @@ import WhatsAppNotificationPanel from '@/components/WhatsAppNotificationPanel';
 import { SignatureLinkGenerator } from '@/components/signature/SignatureLinkGenerator';
 import { DocumentPackageSelector } from '@/components/documents/DocumentPackageSelector';
 import { Loader2, FileText, User, Users, MessageSquare, PenTool, Package } from 'lucide-react';
+import { useStateTransition } from '@/hooks/useStateTransition';
+import type { SaleStatus } from '@/types/workflow';
 
 export default function SaleDetail() {
   const { id } = useParams<{ id: string }>();
   const { data: sale, isLoading } = useSale(id!);
+  const { canViewState } = useStateTransition();
   const [activeTab, setActiveTab] = useState('details');
 
   if (isLoading) {
@@ -31,6 +34,16 @@ export default function SaleDetail() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <p className="text-muted-foreground">Venta no encontrada.</p>
+      </div>
+    );
+  }
+
+  if (!canViewState((sale.status || 'borrador') as SaleStatus)) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <p className="text-muted-foreground">
+          No tienes permisos para visualizar esta venta en su estado actual.
+        </p>
       </div>
     );
   }

@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useCompanyConfiguration } from '@/hooks/useCompanyConfiguration';
 import { useSimpleAuthContext } from './SimpleAuthProvider';
+import { sanitizeMediaUrl } from '@/lib/mediaUrl';
 
 interface BrandingContextType {
   primaryColor: string;
@@ -31,7 +32,7 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
     primaryColor: configuration?.primary_color || '#1e3a5f',
     secondaryColor: configuration?.secondary_color || '#334155',
     accentColor: configuration?.accent_color || '#3b82f6',
-    logoUrl: configuration?.logo_url,
+    logoUrl: sanitizeMediaUrl(configuration?.logo_url),
     companyName: configuration?.name || 'Sistema Digital',
     isLoading,
   };
@@ -75,10 +76,11 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
       document.title = brandingData.companyName;
       
       // Actualizar favicon si existe
-      if (configuration.login_logo_url) {
+      const faviconUrl = sanitizeMediaUrl(configuration.login_logo_url);
+      if (faviconUrl) {
         const favicon = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
         if (favicon) {
-          favicon.href = configuration.login_logo_url;
+          favicon.href = faviconUrl;
         }
       }
 

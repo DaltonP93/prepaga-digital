@@ -13,6 +13,7 @@ import { ForgotPasswordDialog } from './ForgotPasswordDialog';
 import { Link } from 'react-router-dom';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { ThemePreference, getStoredThemePreference, setThemePreference } from '@/lib/theme';
+import { sanitizeMediaUrl } from '@/lib/mediaUrl';
 
 export const LoginForm = () => {
   const [email, setEmail] = useState('');
@@ -21,6 +22,7 @@ export const LoginForm = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() => getStoredThemePreference());
+  const [loginLogoBroken, setLoginLogoBroken] = useState(false);
 
   const { signIn } = useSimpleAuthContext();
   const {
@@ -44,11 +46,7 @@ export const LoginForm = () => {
     setIsLoggingIn(true);
 
     try {
-      console.log('🔑 LoginForm: Iniciando proceso de login...');
-
       await signIn(email, password);
-
-      console.log('✅ LoginForm: Login exitoso');
       resetAttempts();
       toast.success('¡Bienvenido! Has iniciado sesión correctamente.');
 
@@ -67,8 +65,11 @@ export const LoginForm = () => {
     }
   };
 
-  const backgroundStyle = branding?.login_background_url
-    ? { backgroundImage: `url(${branding.login_background_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+  const loginBackgroundUrl = sanitizeMediaUrl(branding?.login_background_url);
+  const loginLogoUrl = sanitizeMediaUrl(branding?.login_logo_url);
+
+  const backgroundStyle = loginBackgroundUrl
+    ? { backgroundImage: `url(${loginBackgroundUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
     : {};
 
   const handleThemeChange = (value: ThemePreference) => {
@@ -112,12 +113,13 @@ export const LoginForm = () => {
               Sistema
             </Button>
           </div>
-          {branding?.login_logo_url && (
+          {loginLogoUrl && !loginLogoBroken && (
             <div className="flex justify-center">
               <img
-                src={branding.login_logo_url}
+                src={loginLogoUrl}
                 alt="Logo"
                 className="h-16 w-auto object-contain"
+                onError={() => setLoginLogoBroken(true)}
               />
             </div>
           )}

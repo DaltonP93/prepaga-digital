@@ -16,17 +16,10 @@ const RequireAuth = ({ children }: RequireAuthProps) => {
   const location = useLocation();
   const [showTimeout, setShowTimeout] = useState(false);
 
-  console.log('🔒 RequireAuth: Verificando acceso', { 
-    user: !!user, 
-    loading,
-    pathname: location.pathname 
-  });
-
   // Timeout de seguridad para evitar carga infinita
   useEffect(() => {
     if (loading) {
       const timeoutId = setTimeout(() => {
-        console.log('⚠️ RequireAuth: Timeout en carga');
         setShowTimeout(true);
       }, 10000); // 10 segundos
 
@@ -75,7 +68,6 @@ const RequireAuth = ({ children }: RequireAuthProps) => {
 
   // Mostrar loading mientras se inicializa la autenticación
   if (loading) {
-    console.log('⏳ RequireAuth: Mostrando loading...', { loading });
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="space-y-4 w-full max-w-md mx-auto p-4">
@@ -96,12 +88,10 @@ const RequireAuth = ({ children }: RequireAuthProps) => {
 
   // Si no hay usuario autenticado, redirigir al login
   if (!user) {
-    console.log('❌ RequireAuth: Usuario no autenticado, redirigiendo a login');
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   // Si hay usuario, mostrar el contenido protegido
-  console.log('✅ RequireAuth: Usuario autenticado, mostrando contenido protegido');
   return <>{children}</>;
 };
 
