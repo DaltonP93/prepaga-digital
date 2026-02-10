@@ -304,8 +304,6 @@ export type Database = {
           id: string
           is_active: boolean | null
           last_name: string
-          latitude: number | null
-          longitude: number | null
           notes: string | null
           phone: string | null
           postal_code: string | null
@@ -325,8 +323,6 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_name: string
-          latitude?: number | null
-          longitude?: number | null
           notes?: string | null
           phone?: string | null
           postal_code?: string | null
@@ -346,8 +342,6 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_name?: string
-          latitude?: number | null
-          longitude?: number | null
           notes?: string | null
           phone?: string | null
           postal_code?: string | null
@@ -437,11 +431,14 @@ export type Database = {
       }
       companies: {
         Row: {
+          accent_color: string | null
           address: string | null
           created_at: string | null
           email: string | null
           id: string
           is_active: boolean | null
+          login_background_url: string | null
+          login_logo_url: string | null
           logo_url: string | null
           name: string
           phone: string | null
@@ -452,11 +449,14 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          accent_color?: string | null
           address?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
           is_active?: boolean | null
+          login_background_url?: string | null
+          login_logo_url?: string | null
           logo_url?: string | null
           name: string
           phone?: string | null
@@ -467,11 +467,14 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          accent_color?: string | null
           address?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
           is_active?: boolean | null
+          login_background_url?: string | null
+          login_logo_url?: string | null
           logo_url?: string | null
           name?: string
           phone?: string | null

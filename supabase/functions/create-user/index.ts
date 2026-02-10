@@ -262,28 +262,33 @@ serve(async (req) => {
     const userId = authData.user.id;
 
     try {
-      // Insert profile directly (service role bypasses RLS)
+      // Update profile (trigger already created it)
       const { error: profileError } = await supabaseAdmin
         .from('profiles')
-        .upsert({
-          id: userId,
+        .update({
           email: email,
           first_name: firstName,
           last_name: lastName,
           phone: phone,
           company_id: companyId,
           is_active: true,
-        });
+        })
+        .eq('id', userId);
 
       if (profileError) {
-        console.error('Profile insert error:', profileError);
+        console.error('Profile update error:', profileError);
         throw profileError;
       }
 
-      // Insert user role
+      // Delete existing roles then insert the correct one
+      await supabaseAdmin
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userId);
+
       const { error: roleError } = await supabaseAdmin
         .from('user_roles')
-        .upsert({
+        .insert({
           user_id: userId,
           role: role,
         });
@@ -308,8 +313,9 @@ serve(async (req) => {
       } catch (cleanupError) {
         console.error('Failed to cleanup auth user:', cleanupError);
       }
+      const errorDetails = profileError instanceof Error ? profileError.message : JSON.stringify(profileError);
       return new Response(
-        JSON.stringify({ error: 'Failed to create user profile', details: String(profileError) }),
+        JSON.stringify({ error: 'Failed to create user profile', details: errorDetails }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
