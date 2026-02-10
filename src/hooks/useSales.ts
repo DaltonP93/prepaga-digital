@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
+import { validateSaleTransition } from '@/lib/workflowValidator';
 
 type Sale = Database['public']['Tables']['sales']['Row'];
 type SaleInsert = Database['public']['Tables']['sales']['Insert'];
@@ -218,6 +219,14 @@ export const useGenerateQuestionnaireLink = () => {
       let expiresAtString = sale.signature_expires_at;
 
       if (!token || !expiresAtString || new Date(expiresAtString) < new Date() || tokenRevoked) {
+        // Validate workflow transition before updating status
+        if (sale.company_id) {
+          const { data: currentUser } = await supabase.auth.getUser();
+          const { data: userProfile } = await supabase.from('profiles').select('role').eq('id', currentUser?.user?.id || '').single();
+          const check = await validateSaleTransition(sale.company_id, sale, 'enviado', (userProfile?.role as any) || 'vendedor');
+          if (!check.allowed) throw new Error(check.reasons.join(', '));
+        }
+
         token = crypto.randomUUID();
         const expiresAtDate = new Date();
         expiresAtDate.setDate(expiresAtDate.getDate() + 7); // Expires in 7 days
@@ -234,7 +243,7 @@ export const useGenerateQuestionnaireLink = () => {
 
         if (updateError) throw updateError;
       }
-      
+
       const questionnaireUrl = `${window.location.origin}/questionnaire/${token}`;
       
       return { sale: saleWithTokenInfo, questionnaireUrl, token };
@@ -310,6 +319,14 @@ export const useGenerateSignatureLink = () => {
       let updatedSale = saleWithTokenInfo;
 
       if (needsNewToken) {
+        // Validate workflow transition before updating status
+        if (sale.company_id) {
+          const { data: currentUser } = await supabase.auth.getUser();
+          const { data: userProfile } = await supabase.from('profiles').select('role').eq('id', currentUser?.user?.id || '').single();
+          const check = await validateSaleTransition(sale.company_id, sale, 'enviado', (userProfile?.role as any) || 'vendedor');
+          if (!check.allowed) throw new Error(check.reasons.join(', '));
+        }
+
         token = crypto.randomUUID();
         const expiresAtDate = new Date();
         expiresAtDate.setDate(expiresAtDate.getDate() + 7); // Expires in 7 days
@@ -365,6 +382,15 @@ export const useRevokeSignatureToken = () => {
 
   return useMutation({
     mutationFn: async ({ saleId, reason }: { saleId: string; reason: string }) => {
+      // Validate workflow transition before revoking
+      const { data: saleForValidation } = await supabase.from('sales').select('*, template_responses(id)').eq('id', saleId).single();
+      if (saleForValidation?.company_id) {
+        const { data: currentUser } = await supabase.auth.getUser();
+        const { data: userProfile } = await supabase.from('profiles').select('role').eq('id', currentUser?.user?.id || '').single();
+        const check = await validateSaleTransition(saleForValidation.company_id, saleForValidation, 'cancelado', (userProfile?.role as any) || 'vendedor');
+        if (!check.allowed) throw new Error(check.reasons.join(', '));
+      }
+
       // Update sales table directly with token revocation info
       const { data, error } = await supabase
         .from('sales')

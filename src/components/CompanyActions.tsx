@@ -7,9 +7,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Edit, Trash2 } from "lucide-react";
+import { MoreHorizontal, Edit, Trash2, GitBranch } from "lucide-react";
 import { CompanyForm } from "@/components/CompanyForm";
+import { WorkflowConfigDialog } from "@/components/workflow/WorkflowConfigDialog";
 import { useDeleteCompany } from "@/hooks/useCompanies";
+import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,9 +31,12 @@ interface CompanyActionsProps {
 }
 
 export function CompanyActions({ company }: CompanyActionsProps) {
+  const { profile } = useSimpleAuthContext();
   const [showEditForm, setShowEditForm] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showWorkflowConfig, setShowWorkflowConfig] = useState(false);
   const deleteCompany = useDeleteCompany();
+  const canConfigureWorkflow = ['admin', 'super_admin'].includes(profile?.role || '');
 
   const handleDelete = async () => {
     await deleteCompany.mutateAsync(company.id);
@@ -51,7 +56,13 @@ export function CompanyActions({ company }: CompanyActionsProps) {
             <Edit className="mr-2 h-4 w-4" />
             Editar
           </DropdownMenuItem>
-          <DropdownMenuItem 
+          {canConfigureWorkflow && (
+            <DropdownMenuItem onClick={() => setShowWorkflowConfig(true)}>
+              <GitBranch className="mr-2 h-4 w-4" />
+              Configurar Flujo
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem
             onClick={() => setShowDeleteDialog(true)}
             className="text-destructive"
           >
@@ -86,6 +97,14 @@ export function CompanyActions({ company }: CompanyActionsProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {canConfigureWorkflow && (
+        <WorkflowConfigDialog
+          open={showWorkflowConfig}
+          onOpenChange={setShowWorkflowConfig}
+          company={company}
+        />
+      )}
     </>
   );
 }

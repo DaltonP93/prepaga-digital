@@ -3,6 +3,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Settings as SettingsIcon, User, Bell, Shield, Database, Clock, Trash2, Gauge, Palette, Building2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { TestDataManager } from '@/components/TestDataManager';
 import { SessionConfigurationPanel } from '@/components/SessionConfigurationPanel';
 import { SystemOptimizationPanel } from '@/components/SystemOptimizationPanel';
@@ -51,6 +52,23 @@ export default function Settings() {
             <CardContent>
               <Button variant="outline" className="w-full">
                 Configurar Notificaciones
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Palette className="h-5 w-5" />
+                UX, Móvil y Branding
+              </CardTitle>
+              <CardDescription>
+                Gestiona colores, logos y experiencia móvil de la plataforma
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button variant="outline" className="w-full" asChild>
+                <Link to="/experience">Abrir experiencia</Link>
               </Button>
             </CardContent>
           </Card>
