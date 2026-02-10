@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LocationPickerMap } from "@/components/ui/LocationPickerMap";
 import { useCreateClient, useUpdateClient } from "@/hooks/useClients";
 import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 import { Database } from "@/integrations/supabase/types";
@@ -47,11 +48,6 @@ interface NominatimResult {
   };
 }
 
-const DEFAULT_MAP_CENTER = {
-  lat: -25.2867,
-  lng: -57.3333,
-};
-
 export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
   const { profile } = useSimpleAuthContext();
   const createClient = useCreateClient();
@@ -76,24 +72,10 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
   const latitudeValue = watch("latitude");
   const longitudeValue = watch("longitude");
 
-  const currentCoords = useMemo(() => {
-    const lat = Number(latitudeValue);
-    const lng = Number(longitudeValue);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      return DEFAULT_MAP_CENTER;
-    }
-    return { lat, lng };
-  }, [latitudeValue, longitudeValue]);
-
   const hasValidCoords = Number.isFinite(Number(latitudeValue)) && Number.isFinite(Number(longitudeValue));
 
-  const mapUrls = useMemo(() => {
-    const { lat, lng } = currentCoords;
-    return {
-      embedUrl: `https://www.openstreetmap.org/export/embed.html?layer=mapnik&marker=${lat}%2C${lng}`,
-      openUrl: `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}`,
-    };
-  }, [currentCoords]);
+  const mapLat = hasValidCoords ? Number(latitudeValue) : null;
+  const mapLng = hasValidCoords ? Number(longitudeValue) : null;
 
   const parseCoordinate = (value: string | undefined, min: number, max: number, label: string): number | null => {
     if (!value || value.trim() === "") return null;
@@ -103,6 +85,38 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
     }
     return parsed;
   };
+
+  const reverseGeocode = useCallback(async (lat: number, lng: number) => {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&addressdetails=1`;
+      const response = await fetch(url, { headers: { Accept: "application/json" } });
+      if (!response.ok) return;
+
+      const data = await response.json();
+      if (!data?.address) return;
+
+      const detectedCity = data.address.city || data.address.town || data.address.village || "";
+      const detectedProvince = data.address.state || "";
+      const detectedAddress = [data.address.road, data.address.house_number, data.address.suburb]
+        .filter(Boolean)
+        .join(" ");
+
+      if (detectedCity) setValue("city", detectedCity, { shouldDirty: true });
+      if (detectedProvince) setValue("province", detectedProvince, { shouldDirty: true });
+      if (detectedAddress) setValue("address", detectedAddress, { shouldDirty: true });
+
+      setLocationLabel(data.display_name || "");
+    } catch {
+      // Reverse geocoding is best-effort, don't block the user
+    }
+  }, [setValue]);
+
+  const handleMapLocationSelect = useCallback((lat: number, lng: number) => {
+    setValue("latitude", lat.toFixed(6), { shouldValidate: true, shouldDirty: true });
+    setValue("longitude", lng.toFixed(6), { shouldValidate: true, shouldDirty: true });
+    setSearchResults([]);
+    reverseGeocode(lat, lng);
+  }, [setValue, reverseGeocode]);
 
   const selectLocationResult = (result: NominatimResult) => {
     const lat = Number(result.lat);
@@ -178,6 +192,7 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
         setValue("latitude", lat.toFixed(6), { shouldValidate: true, shouldDirty: true });
         setValue("longitude", lng.toFixed(6), { shouldValidate: true, shouldDirty: true });
         setLocationLabel("Ubicacion actual del dispositivo");
+        reverseGeocode(lat, lng);
         toast.success("Ubicacion actual aplicada");
       },
       () => toast.error("No se pudo obtener tu ubicacion actual"),
@@ -322,6 +337,12 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
                     value={locationQuery}
                     onChange={(e) => setLocationQuery(e.target.value)}
                     placeholder="Buscar en mapa (direccion, barrio, ciudad)"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleSearchCoordinates();
+                      }
+                    }}
                   />
                   <Button type="button" variant="outline" onClick={handleSearchCoordinates} disabled={isSearchingLocation}>
                     {isSearchingLocation ? "..." : "Buscar"}
@@ -374,18 +395,16 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
                   </div>
                 </div>
 
-                <div className="overflow-hidden rounded border">
-                  <iframe title="Mapa de ubicacion" src={mapUrls.embedUrl} className="h-40 w-full" loading="lazy" />
-                </div>
+                <LocationPickerMap
+                  latitude={mapLat}
+                  longitude={mapLng}
+                  onLocationSelect={handleMapLocationSelect}
+                  className="h-56 w-full"
+                />
 
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground truncate pr-2">
-                    {locationLabel || (hasValidCoords ? "Punto cargado manualmente" : "Sin punto seleccionado")}
-                  </p>
-                  <a href={mapUrls.openUrl} target="_blank" rel="noreferrer" className="text-xs text-primary underline whitespace-nowrap">
-                    Abrir mapa completo
-                  </a>
-                </div>
+                <p className="text-xs text-muted-foreground truncate">
+                  {locationLabel || (hasValidCoords ? "Punto cargado - arrastra el marcador para ajustar" : "Haz click en el mapa para seleccionar ubicacion")}
+                </p>
               </div>
             </TabsContent>
           </Tabs>
@@ -403,4 +422,3 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
     </Dialog>
   );
 }
-
