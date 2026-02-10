@@ -6,9 +6,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { useClients } from '@/hooks/useClients';
 import { usePlans } from '@/hooks/usePlans';
+import { ClientForm } from '@/components/ClientForm';
 import { formatCurrency } from '@/lib/utils';
 
 interface SaleBasicTabProps {
@@ -29,11 +29,12 @@ interface SaleBasicTabProps {
 }
 
 const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, companyId }) => {
-  const navigate = useNavigate();
   const { data: clients } = useClients();
   const { data: plans } = usePlans();
   const [searchClient, setSearchClient] = useState('');
   const [searchPlan, setSearchPlan] = useState('');
+  const [showClientModal, setShowClientModal] = useState(false);
+  const [prevClientCount, setPrevClientCount] = useState<number | null>(null);
 
   const selectedPlan = plans?.find(p => p.id === formData.plan_id);
 
@@ -48,6 +49,17 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
       onChange('company_id', companyId);
     }
   }, [companyId]);
+
+  // Auto-select newly created client when modal closes
+  useEffect(() => {
+    if (prevClientCount !== null && clients && clients.length > prevClientCount) {
+      const newestClient = clients[0];
+      if (newestClient) {
+        onChange('client_id', newestClient.id);
+      }
+      setPrevClientCount(null);
+    }
+  }, [clients, prevClientCount, onChange]);
 
   const filteredClients = clients?.filter(client =>
     `${client.first_name} ${client.last_name}`.toLowerCase().includes(searchClient.toLowerCase()) ||
@@ -86,7 +98,14 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
               </SelectContent>
             </Select>
           </div>
-          <Button type="button" variant="outline" onClick={() => navigate('/clients')}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setPrevClientCount(clients?.length ?? 0);
+              setShowClientModal(true);
+            }}
+          >
             <Plus className="h-4 w-4" />
           </Button>
         </div>
@@ -199,6 +218,11 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
           rows={3}
         />
       </div>
+
+      <ClientForm
+        open={showClientModal}
+        onOpenChange={setShowClientModal}
+      />
     </div>
   );
 };

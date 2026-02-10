@@ -14,6 +14,7 @@ import { useClients } from '@/hooks/useClients';
 import { usePlans } from '@/hooks/usePlans';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
+import { ClientForm } from '@/components/ClientForm';
 import { Loader2, Plus } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
@@ -41,6 +42,8 @@ const SaleForm = () => {
   const [loading, setLoading] = useState(false);
   const [searchClient, setSearchClient] = useState('');
   const [searchPlan, setSearchPlan] = useState('');
+  const [showClientModal, setShowClientModal] = useState(false);
+  const [prevClientCount, setPrevClientCount] = useState<number | null>(null);
 
   const { register, handleSubmit, formState: { errors }, setValue, watch, reset } = useForm<SaleFormData>({
     defaultValues: {
@@ -66,6 +69,18 @@ const SaleForm = () => {
       setValue('company_id', profile.company_id);
     }
   }, [profile, setValue]);
+
+  // Auto-select newly created client when modal closes
+  useEffect(() => {
+    if (prevClientCount !== null && clients && clients.length > prevClientCount) {
+      // The newest client is at index 0 (ordered by created_at desc)
+      const newestClient = clients[0];
+      if (newestClient) {
+        setValue('client_id', newestClient.id);
+      }
+      setPrevClientCount(null);
+    }
+  }, [clients, prevClientCount, setValue]);
 
   useEffect(() => {
     if (isEditing && id && sales) {
@@ -179,7 +194,10 @@ const SaleForm = () => {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => navigate('/clients')}
+                    onClick={() => {
+                      setPrevClientCount(clients?.length ?? 0);
+                      setShowClientModal(true);
+                    }}
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
@@ -268,6 +286,11 @@ const SaleForm = () => {
           </CardContent>
         </Card>
       </div>
+
+      <ClientForm
+        open={showClientModal}
+        onOpenChange={setShowClientModal}
+      />
     </div>
   );
 };

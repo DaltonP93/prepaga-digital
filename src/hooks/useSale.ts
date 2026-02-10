@@ -12,7 +12,6 @@ export const useSale = (saleId: string) => {
           *,
           clients:client_id(first_name, last_name, email, phone, dni),
           plans:plan_id(name, price, description, coverage_details),
-          salesperson:salesperson_id(first_name, last_name, email),
           companies:company_id(name),
           templates:template_id(name, description)
         `)
@@ -20,7 +19,19 @@ export const useSale = (saleId: string) => {
         .single();
 
       if (error) throw error;
-      return data;
+
+      // Fetch salesperson profile separately (no FK exists for salesperson_id)
+      let salesperson = null;
+      if (data.salesperson_id) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('first_name, last_name, email')
+          .eq('id', data.salesperson_id)
+          .single();
+        salesperson = profile;
+      }
+
+      return { ...data, salesperson, profiles: salesperson };
     },
     enabled: !!saleId,
   });
