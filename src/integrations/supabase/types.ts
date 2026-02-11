@@ -1698,7 +1698,7 @@ export type Database = {
           id: string
           ip_addresses: Json | null
           package_id: string | null
-          recipient_email: string
+          recipient_email: string | null
           recipient_id: string | null
           recipient_phone: string | null
           recipient_type: string
@@ -1717,7 +1717,7 @@ export type Database = {
           id?: string
           ip_addresses?: Json | null
           package_id?: string | null
-          recipient_email: string
+          recipient_email?: string | null
           recipient_id?: string | null
           recipient_phone?: string | null
           recipient_type: string
@@ -1736,7 +1736,7 @@ export type Database = {
           id?: string
           ip_addresses?: Json | null
           package_id?: string | null
-          recipient_email?: string
+          recipient_email?: string | null
           recipient_id?: string | null
           recipient_phone?: string | null
           recipient_type?: string

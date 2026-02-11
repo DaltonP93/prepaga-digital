@@ -249,12 +249,13 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
         throw new Error("Debes cargar latitud y longitud juntas");
       }
 
-      const payload = { ...data, latitude, longitude };
+      // Remove latitude/longitude from payload as clients table doesn't have those columns
+      const { latitude: _lat, longitude: _lng, ...cleanData } = data;
 
       if (isEditing && client) {
-        await updateClient.mutateAsync({ id: client.id, ...payload });
+        await updateClient.mutateAsync({ id: client.id, ...cleanData });
       } else {
-        await createClient.mutateAsync({ ...payload, company_id: profile?.company_id || undefined });
+        await createClient.mutateAsync({ ...cleanData, company_id: profile?.company_id || undefined });
       }
 
       onOpenChange(false);

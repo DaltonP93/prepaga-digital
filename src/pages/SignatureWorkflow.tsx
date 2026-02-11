@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, FileText, Users, Send, Copy, ExternalLink, Check, MessageCircle, Download } from 'lucide-react';
 import { useSales } from '@/hooks/useSales';
 import { useSignatureLinks } from '@/hooks/useSignatureLinks';
+import { useBeneficiaries } from '@/hooks/useBeneficiaries';
 import { useCurrencySettings } from '@/hooks/useCurrencySettings';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { useRolePermissions } from '@/hooks/useRolePermissions';
@@ -24,6 +25,7 @@ const SignatureWorkflow = () => {
   const { data: sales = [], isLoading } = useSales();
   const { formatCurrency } = useCurrencySettings();
   const { data: signatureLinks = [], isLoading: linksLoading } = useSignatureLinks(saleId || '');
+  const { data: beneficiaries = [] } = useBeneficiaries(saleId || '');
   
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -56,15 +58,43 @@ const SignatureWorkflow = () => {
     window.open(waUrl, '_blank');
   };
 
-  // Public access with token
+  const getRecipientLabel = (link: any) => {
+    if (link.recipient_type === 'titular') {
+      const client = selectedSale?.clients as any;
+      return `Titular: ${client ? `${client.first_name} ${client.last_name}` : 'Sin datos'}`;
+    }
+    const beneficiary = beneficiaries?.find((b: any) => b.id === link.recipient_id);
+    if (beneficiary) {
+      return `Adherente: ${beneficiary.first_name} ${beneficiary.last_name}`;
+    }
+    return `Adherente: ${link.recipient_email || link.recipient_phone || 'Sin datos'}`;
+  };
+
+  const getRecipientPhone = (link: any) => {
+    if (link.recipient_phone) return link.recipient_phone;
+    if (link.recipient_type === 'titular') {
+      const client = selectedSale?.clients as any;
+      return client?.phone || null;
+    }
+    const beneficiary = beneficiaries?.find((b: any) => b.id === link.recipient_id);
+    return beneficiary?.phone || null;
+  };
+
+  const getRecipientName = (link: any) => {
+    if (link.recipient_type === 'titular') {
+      const client = selectedSale?.clients as any;
+      return client ? `${client.first_name} ${client.last_name}` : 'Cliente';
+    }
+    const beneficiary = beneficiaries?.find((b: any) => b.id === link.recipient_id);
+    return beneficiary ? `${beneficiary.first_name} ${beneficiary.last_name}` : 'Adherente';
+  };
+
   if (token) {
     return (
       <div className="container mx-auto py-6">
         <Card>
           <CardContent className="text-center py-8">
-            <p className="text-muted-foreground">
-              Acceso público al flujo de firmas (implementar lógica específica)
-            </p>
+            <p className="text-muted-foreground">Acceso público al flujo de firmas</p>
           </CardContent>
         </Card>
       </div>
@@ -81,7 +111,6 @@ const SignatureWorkflow = () => {
     );
   }
 
-  // Sales list view
   if (!saleId || !selectedSale) {
     const isSeller = effectiveRole === 'vendedor';
     const canViewAllSales = permissions.sales.viewAll;
@@ -152,9 +181,100 @@ const SignatureWorkflow = () => {
     );
   }
 
-  // Specific sale signature workflow
   const client = selectedSale.clients as any;
   const clientName = client ? `${client.first_name} ${client.last_name}` : 'Sin cliente';
+
+  const titularLinks = signatureLinks?.filter((l: any) => l.recipient_type === 'titular') || [];
+  const adherenteLinks = signatureLinks?.filter((l: any) => l.recipient_type === 'adherente') || [];
+
+  function renderSignatureLinks(links: any[]) {
+    if (linksLoading) {
+      return <p className="text-muted-foreground text-center py-4">Cargando enlaces...</p>;
+    }
+    if (!links || links.length === 0) {
+      return (
+        <div className="text-center py-4 text-muted-foreground">
+          <p>No hay enlaces de firma generados.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        {links.map((link: any) => {
+          const isCompleted = link.status === 'completado';
+          const isExpired = new Date(link.expires_at) < new Date();
+          const phone = getRecipientPhone(link);
+          const name = getRecipientName(link);
+
+          return (
+            <div key={link.id} className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">{getRecipientLabel(link)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Creado: {new Date(link.created_at).toLocaleDateString('es-PY')} • 
+                    Expira: {new Date(link.expires_at).toLocaleDateString('es-PY')}
+                    {link.access_count > 0 && ` • Visto ${link.access_count} vez(es)`}
+                  </p>
+                </div>
+                <Badge variant={
+                  isCompleted ? 'default' :
+                  isExpired ? 'destructive' :
+                  link.status === 'visualizado' ? 'secondary' :
+                  'outline'
+                }>
+                  {isCompleted ? '✓ Firmado' : isExpired ? 'Expirado' : link.status}
+                </Badge>
+              </div>
+
+              {!isCompleted && !isExpired && (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleCopyLink(link.token, link.id)}
+                  >
+                    {copiedId === link.id ? (
+                      <Check className="h-4 w-4 mr-1 text-green-600" />
+                    ) : (
+                      <Copy className="h-4 w-4 mr-1" />
+                    )}
+                    {copiedId === link.id ? 'Copiado' : 'Copiar Enlace'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => window.open(getSignatureUrl(link.token), '_blank')}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-1" />
+                    Abrir
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => handleSendWhatsApp(phone, link.token, name)}
+                  >
+                    <MessageCircle className="h-4 w-4 mr-1" />
+                    Enviar por WhatsApp
+                  </Button>
+                </div>
+              )}
+
+              {isCompleted && (
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline">
+                    <Download className="h-4 w-4 mr-1" />
+                    Descargar Documento Firmado
+                  </Button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-6">
@@ -174,7 +294,6 @@ const SignatureWorkflow = () => {
       </div>
 
       <div className="grid gap-6">
-        {/* Sale Info */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -194,14 +313,7 @@ const SignatureWorkflow = () => {
               </div>
               <div>
                 <p className="font-medium">Estado:</p>
-                <Badge variant={
-                  selectedSale.status === 'completado' ? 'default' :
-                  selectedSale.status === 'firmado' ? 'secondary' :
-                  selectedSale.status === 'enviado' ? 'outline' :
-                  'destructive'
-                }>
-                  {selectedSale.status}
-                </Badge>
+                <Badge>{selectedSale.status}</Badge>
               </div>
               <div>
                 <p className="font-medium">Vendedor:</p>
@@ -216,108 +328,37 @@ const SignatureWorkflow = () => {
           </CardContent>
         </Card>
 
-        {/* Signature Links */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Enlaces de Firma ({signatureLinks?.length || 0})
+              Firma del Titular ({titularLinks.length})
             </CardTitle>
             <CardDescription>
-              Comparte los enlaces con los firmantes por WhatsApp o copia el link
+              El titular recibe todos los documentos (Contrato, DDJJ, Anexos) para revisar y firmar
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {linksLoading ? (
-              <p className="text-muted-foreground text-center py-4">Cargando enlaces...</p>
-            ) : signatureLinks && signatureLinks.length > 0 ? (
-              <div className="space-y-4">
-                {signatureLinks.map((link: any) => {
-                  const recipientLabel = link.recipient_type === 'titular' 
-                    ? `Titular: ${clientName}` 
-                    : `Beneficiario: ${link.recipient_email || link.recipient_phone || 'Sin datos'}`;
-                  const isCompleted = link.status === 'completado';
-                  const isExpired = new Date(link.expires_at) < new Date();
-
-                  return (
-                    <div key={link.id} className="border rounded-lg p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{recipientLabel}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Creado: {new Date(link.created_at).toLocaleDateString('es-PY')} • 
-                            Expira: {new Date(link.expires_at).toLocaleDateString('es-PY')}
-                            {link.access_count > 0 && ` • Visto ${link.access_count} vez(es)`}
-                          </p>
-                        </div>
-                        <Badge variant={
-                          isCompleted ? 'default' :
-                          isExpired ? 'destructive' :
-                          link.status === 'visualizado' ? 'secondary' :
-                          'outline'
-                        }>
-                          {isCompleted ? '✓ Firmado' : isExpired ? 'Expirado' : link.status}
-                        </Badge>
-                      </div>
-
-                      {!isCompleted && !isExpired && (
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleCopyLink(link.token, link.id)}
-                          >
-                            {copiedId === link.id ? (
-                              <Check className="h-4 w-4 mr-1 text-green-600" />
-                            ) : (
-                              <Copy className="h-4 w-4 mr-1" />
-                            )}
-                            {copiedId === link.id ? 'Copiado' : 'Copiar Enlace'}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => window.open(getSignatureUrl(link.token), '_blank')}
-                          >
-                            <ExternalLink className="h-4 w-4 mr-1" />
-                            Abrir
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="bg-green-600 hover:bg-green-700 text-white"
-                            onClick={() => handleSendWhatsApp(
-                              link.recipient_phone || client?.phone,
-                              link.token,
-                              link.recipient_type === 'titular' ? clientName : (link.recipient_email || 'Beneficiario')
-                            )}
-                          >
-                            <MessageCircle className="h-4 w-4 mr-1" />
-                            Enviar por WhatsApp
-                          </Button>
-                        </div>
-                      )}
-
-                      {isCompleted && (
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline">
-                            <Download className="h-4 w-4 mr-1" />
-                            Descargar Documento Firmado
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <FileText className="h-12 w-12 mx-auto mb-4" />
-                <p>No hay enlaces de firma generados aún.</p>
-                <p className="text-sm">Vuelva a la venta y envíe los documentos para firma desde la pestaña Templates.</p>
-              </div>
-            )}
+            {renderSignatureLinks(titularLinks)}
           </CardContent>
         </Card>
+
+        {adherenteLinks.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Firmas de Adherentes ({adherenteLinks.length})
+              </CardTitle>
+              <CardDescription>
+                Cada adherente recibe únicamente su DDJJ de Salud para firmar
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {renderSignatureLinks(adherenteLinks)}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
