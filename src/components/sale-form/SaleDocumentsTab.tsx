@@ -1,4 +1,3 @@
-
 import React, { useCallback, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,13 +9,21 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
+import { ImageLightbox } from '@/components/ui/image-lightbox';
 
 interface SaleDocumentsTabProps {
   saleId?: string;
 }
 
+const isImageType = (fileType: string | null): boolean => {
+  return !!fileType && fileType.startsWith('image/');
+};
+
 const SaleDocumentsTab: React.FC<SaleDocumentsTabProps> = ({ saleId }) => {
   const [fileName, setFileName] = useState('');
+  const [lightboxUrl, setLightboxUrl] = useState('');
+  const [lightboxName, setLightboxName] = useState('');
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: documents, isLoading } = useQuery({
@@ -109,17 +116,33 @@ const SaleDocumentsTab: React.FC<SaleDocumentsTabProps> = ({ saleId }) => {
     maxSize: 10 * 1024 * 1024,
   });
 
-  const handleView = async (fileUrl: string) => {
-    const { data, error } = await supabase.storage.from('documents').createSignedUrl(fileUrl, 3600);
-    if (error || !data) return toast.error('Error al generar enlace');
-    window.open(data.signedUrl, '_blank');
+  const getSignedUrl = async (fileUrl: string, expiresIn = 3600): Promise<string | null> => {
+    const { data, error } = await supabase.storage.from('documents').createSignedUrl(fileUrl, expiresIn);
+    if (error || !data) {
+      toast.error('Error al generar enlace del archivo');
+      return null;
+    }
+    return data.signedUrl;
+  };
+
+  const handleView = async (fileUrl: string, fileType: string | null, docName: string) => {
+    const signedUrl = await getSignedUrl(fileUrl);
+    if (!signedUrl) return;
+
+    if (isImageType(fileType)) {
+      setLightboxUrl(signedUrl);
+      setLightboxName(docName);
+      setLightboxOpen(true);
+    } else {
+      window.open(signedUrl, '_blank');
+    }
   };
 
   const handleDownload = async (fileUrl: string, name: string) => {
-    const { data, error } = await supabase.storage.from('documents').createSignedUrl(fileUrl, 300);
-    if (error || !data) return toast.error('Error al generar enlace');
+    const signedUrl = await getSignedUrl(fileUrl, 300);
+    if (!signedUrl) return;
     const link = document.createElement('a');
-    link.href = data.signedUrl;
+    link.href = signedUrl;
     link.download = name;
     document.body.appendChild(link);
     link.click();
@@ -211,7 +234,7 @@ const SaleDocumentsTab: React.FC<SaleDocumentsTabProps> = ({ saleId }) => {
                     </div>
                   </div>
                   <div className="flex gap-1 shrink-0">
-                    <Button variant="ghost" size="sm" onClick={() => handleView(doc.file_url)}>
+                    <Button variant="ghost" size="sm" onClick={() => handleView(doc.file_url, doc.file_type, doc.file_name)}>
                       <Eye className="h-4 w-4" />
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => handleDownload(doc.file_url, doc.file_name)}>
@@ -237,6 +260,14 @@ const SaleDocumentsTab: React.FC<SaleDocumentsTabProps> = ({ saleId }) => {
           </div>
         )}
       </div>
+
+      {/* Image Lightbox */}
+      <ImageLightbox
+        open={lightboxOpen}
+        onOpenChange={setLightboxOpen}
+        src={lightboxUrl}
+        fileName={lightboxName}
+      />
     </div>
   );
 };
