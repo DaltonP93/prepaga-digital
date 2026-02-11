@@ -277,7 +277,7 @@ const Documents: React.FC = () => {
                       <SelectContent>
                         {sales.map((sale) => (
                           <SelectItem key={sale.id} value={sale.id}>
-                            CON-{sale.id.slice(-4)} - {sale.clients?.first_name} {sale.clients?.last_name}
+                            {sale.contract_number || `CON-${sale.id.slice(-4)}`} - {sale.clients?.first_name} {sale.clients?.last_name}
                           </SelectItem>
                         ))}
                       </SelectContent>
