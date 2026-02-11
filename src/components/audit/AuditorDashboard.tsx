@@ -37,7 +37,8 @@ export const AuditorDashboard: React.FC = () => {
           clients (*),
           plans (*),
           beneficiaries (*),
-          documents (*)
+          documents (*),
+          sale_documents (*)
         `)
         .order('created_at', { ascending: false });
 
@@ -359,13 +360,13 @@ export const AuditorDashboard: React.FC = () => {
             </Card>
           )}
 
-          {/* Documents */}
+          {/* Documents (generated) */}
           {selectedSale.documents?.length > 0 && (
             <Card className="lg:col-span-2">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" />
-                  Documentos ({selectedSale.documents.length})
+                  Documentos Generados ({selectedSale.documents.length})
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -382,6 +383,67 @@ export const AuditorDashboard: React.FC = () => {
                     </div>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Uploaded Sale Documents (attachments) */}
+          {selectedSale.sale_documents?.length > 0 && (
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Documentos Adjuntos ({selectedSale.sale_documents.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {selectedSale.sale_documents.map((doc: any) => (
+                    <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        <div>
+                          <span className="font-medium">{doc.file_name}</span>
+                          {doc.file_size && (
+                            <span className="text-xs text-muted-foreground ml-2">
+                              ({(doc.file_size / 1024).toFixed(1)} KB)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {doc.file_type && (
+                          <Badge variant="outline">{doc.file_type}</Badge>
+                        )}
+                        {doc.file_url && (
+                          <a
+                            href={doc.file_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-primary underline hover:no-underline"
+                          >
+                            Ver
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Show message if no documents at all */}
+          {(!selectedSale.documents?.length && !selectedSale.sale_documents?.length) && (
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Documentos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground text-center py-4">No hay documentos cargados para esta venta</p>
               </CardContent>
             </Card>
           )}
