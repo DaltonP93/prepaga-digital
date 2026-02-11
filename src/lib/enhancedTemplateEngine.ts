@@ -72,6 +72,8 @@ export interface EnhancedTemplateContext {
     numeroContrato: string;
     numeroSolicitud: string;
     cantidadAdherentes: number;
+    fechaInicioContrato: string;
+    fechaInicioContratoFormateada: string;
   };
   firma: {
     enlace: string;
@@ -229,6 +231,8 @@ export function createEnhancedTemplateContext(
       numeroContrato: sale?.contract_number || '',
       numeroSolicitud: sale?.request_number || '',
       cantidadAdherentes: sale?.adherents_count || beneficiaries.length,
+      fechaInicioContrato: sale?.contract_start_date ? formatDate(sale.contract_start_date, 'dd/MM/yyyy') : '',
+      fechaInicioContratoFormateada: sale?.contract_start_date ? formatDate(sale.contract_start_date, "d 'de' MMMM 'de' yyyy") : '',
     },
     firma: {
       enlace: signatureLink ? `${window.location.origin}/firmar/${signatureLink.token}` : '',
@@ -372,6 +376,8 @@ export function getEnhancedTemplateVariables(): { category: string; variables: {
         { key: '{{venta.numeroSolicitud}}', description: 'Número de solicitud' },
         { key: '{{venta.estado}}', description: 'Estado de la venta' },
         { key: '{{venta.cantidadAdherentes}}', description: 'Cantidad de adherentes' },
+        { key: '{{venta.fechaInicioContrato}}', description: 'Fecha inicio contrato (dd/MM/yyyy) - 1er día del mes de aprobación' },
+        { key: '{{venta.fechaInicioContratoFormateada}}', description: 'Fecha inicio contrato formateada' },
       ],
     },
     {

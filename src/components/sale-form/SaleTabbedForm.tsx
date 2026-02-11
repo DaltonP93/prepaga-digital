@@ -1,10 +1,11 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2, Save, Lock, Send } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, Lock, Send, AlertCircle, MessageSquare } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useCreateSale, useUpdateSale } from '@/hooks/useSales';
@@ -34,6 +35,21 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
   const { role } = useRolePermissions();
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('basico');
+
+  // Fetch audit information requests for this sale (visible to vendor)
+  const { data: infoRequests = [] } = useQuery({
+    queryKey: ['information-requests', sale?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('information_requests')
+        .select('*')
+        .eq('sale_id', sale!.id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!sale?.id,
+  });
 
   const isEditing = !!sale?.id;
   const currentStatus = (sale?.status || 'borrador') as SaleStatus;
@@ -141,7 +157,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
               {isEditing ? 'Guardar Cambios' : 'Crear Venta'}
             </Button>
           )}
-          {isEditing && currentStatus === 'borrador' && (role === 'vendedor' || role === 'gestor' || role === 'admin' || role === 'super_admin') && (
+          {isEditing && (currentStatus === 'borrador' || currentStatus === 'rechazado') && (role === 'vendedor' || role === 'gestor' || role === 'admin' || role === 'super_admin') && (
             <Button
               variant="default"
               className="bg-green-600 hover:bg-green-700"
@@ -171,16 +187,16 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                   // Log workflow state
                   await supabase.from('sale_workflow_states').insert({
                     sale_id: sale.id,
-                    previous_status: 'borrador',
+                    previous_status: currentStatus,
                     new_status: 'pendiente',
                     changed_by: profile?.id,
-                    change_reason: 'Enviado a auditoría por el vendedor',
+                    change_reason: currentStatus === 'rechazado' ? 'Reenviado a auditoría tras correcciones' : 'Enviado a auditoría por el vendedor',
                   });
                   await supabase.from('process_traces').insert({
                     sale_id: sale.id,
                     action: 'status_change',
                     user_id: profile?.id,
-                    details: { previous_status: 'borrador', new_status: 'pendiente', reason: 'Enviado a auditoría' },
+                    details: { previous_status: currentStatus, new_status: 'pendiente', reason: currentStatus === 'rechazado' ? 'Reenviado tras correcciones' : 'Enviado a auditoría' },
                   });
                   toast.success('Venta enviada a auditoría');
                   navigate('/sales');
@@ -208,6 +224,41 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
             )}
           </AlertDescription>
         </Alert>
+      )}
+
+      {/* Show audit information requests to vendor */}
+      {isEditing && infoRequests.length > 0 && (
+        <Card className="border-orange-300 bg-orange-50 dark:bg-orange-950/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2 text-orange-700 dark:text-orange-400">
+              <MessageSquare className="h-5 w-5" />
+              Solicitudes de Auditoría ({infoRequests.filter((r: any) => r.status === 'pending').length} pendientes)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {infoRequests.map((req: any) => (
+              <div key={req.id} className="p-3 rounded-lg border border-orange-200 bg-white dark:bg-background space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {new Date(req.created_at).toLocaleDateString('es-PY', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${req.status === 'pending' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
+                    {req.status === 'pending' ? 'Pendiente' : 'Respondido'}
+                  </span>
+                </div>
+                <p className="text-sm font-medium">{req.description}</p>
+                {req.response && (
+                  <p className="text-sm text-muted-foreground">Respuesta: {req.response}</p>
+                )}
+              </div>
+            ))}
+            {currentStatus === 'rechazado' && (
+              <p className="text-sm text-orange-600 dark:text-orange-400">
+                Corrige la información solicitada y vuelve a enviar a auditoría con el botón "Enviar a Auditoría".
+              </p>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       <Card>
