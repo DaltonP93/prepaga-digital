@@ -11,6 +11,8 @@ import { useBeneficiaries } from '@/hooks/useBeneficiaries';
 import { useCurrencySettings } from '@/hooks/useCurrencySettings';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { useRolePermissions } from '@/hooks/useRolePermissions';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 const SignatureWorkflow = () => {
@@ -27,6 +29,22 @@ const SignatureWorkflow = () => {
   const { data: signatureLinks = [], isLoading: linksLoading } = useSignatureLinks(saleId || '');
   const { data: beneficiaries = [] } = useBeneficiaries(saleId || '');
   
+  // Fetch signed documents for this sale
+  const { data: signedDocs = [] } = useQuery({
+    queryKey: ['signed-documents', saleId],
+    queryFn: async () => {
+      if (!saleId) return [];
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('sale_id', saleId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!saleId,
+  });
+
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const selectedSale = saleId ? sales.find(s => s.id === saleId) : null;
@@ -356,6 +374,59 @@ const SignatureWorkflow = () => {
             </CardHeader>
             <CardContent>
               {renderSignatureLinks(adherenteLinks)}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Signed Documents - for vendor to download */}
+        {signedDocs.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Download className="h-5 w-5" />
+                Documentos ({signedDocs.length})
+              </CardTitle>
+              <CardDescription>
+                Documentos generados y firmados disponibles para descarga
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {signedDocs.map((doc: any) => {
+                  const isSigned = doc.status === 'firmado' || doc.signed_at;
+                  const beneficiary = doc.beneficiary_id 
+                    ? beneficiaries?.find((b: any) => b.id === doc.beneficiary_id)
+                    : null;
+
+                  return (
+                    <div key={doc.id} className="border rounded-lg p-3 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-4 w-4 text-primary flex-shrink-0" />
+                        <div>
+                          <p className="font-medium text-sm">{doc.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {doc.document_type || 'Documento'}
+                            {beneficiary && ` • ${beneficiary.first_name} ${beneficiary.last_name}`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={isSigned ? 'default' : 'outline'}>
+                          {isSigned ? '✓ Firmado' : 'Pendiente'}
+                        </Badge>
+                        {doc.file_url && (
+                          <Button size="sm" variant="outline" asChild>
+                            <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
+                              <Download className="h-3 w-3 mr-1" />
+                              Descargar
+                            </a>
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </CardContent>
           </Card>
         )}

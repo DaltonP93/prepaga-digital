@@ -1,5 +1,5 @@
 import { useParams } from "react-router-dom";
-import { useSignatureLinkByToken, useSubmitSignatureLink, useSignatureLinkDocuments } from "@/hooks/useSignatureLinkPublic";
+import { useSignatureLinkByToken, useSubmitSignatureLink, useSignatureLinkDocuments, useAllSignatureLinksPublic } from "@/hooks/useSignatureLinkPublic";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,15 +9,8 @@ import { SimpleLayout } from "@/components/SimpleLayout";
 import { EnhancedSignatureCanvas } from "@/components/signature/EnhancedSignatureCanvas";
 import { useState } from "react";
 import { 
-  FileText, 
-  User, 
-  Calendar, 
-  Building, 
-  CheckCircle, 
-  Clock, 
-  AlertCircle,
-  Shield,
-  Loader2
+  FileText, User, Calendar, Building, CheckCircle, Clock, AlertCircle,
+  Shield, Loader2, Download, Users
 } from "lucide-react";
 import DOMPurify from 'dompurify';
 import { formatCurrency } from "@/lib/utils";
@@ -25,7 +18,12 @@ import { formatCurrency } from "@/lib/utils";
 const SignatureView = () => {
   const { token } = useParams<{ token: string }>();
   const { data: linkData, isLoading, error } = useSignatureLinkByToken(token || '');
-  const { data: documents } = useSignatureLinkDocuments(linkData?.sale_id);
+  const { data: documents } = useSignatureLinkDocuments(
+    linkData?.sale_id, 
+    linkData?.recipient_type, 
+    linkData?.recipient_id
+  );
+  const { data: allLinks } = useAllSignatureLinksPublic(linkData?.sale_id);
   const submitSignature = useSubmitSignatureLink();
   
   const [signatureData, setSignatureData] = useState<string | null>(null);
@@ -33,7 +31,6 @@ const SignatureView = () => {
 
   const handleSignatureComplete = async () => {
     if (!signatureData || !linkData || !termsAccepted) return;
-
     await submitSignature.mutateAsync({
       linkId: linkData.id,
       token: token!,
@@ -41,7 +38,14 @@ const SignatureView = () => {
     });
   };
 
-  // Loading state
+  const handleDownloadSignature = () => {
+    if (!signatureData) return;
+    const link = document.createElement('a');
+    link.download = `firma-${linkData?.recipient_type || 'documento'}-${Date.now()}.png`;
+    link.href = signatureData;
+    link.click();
+  };
+
   if (isLoading) {
     return (
       <SimpleLayout>
@@ -53,7 +57,6 @@ const SignatureView = () => {
     );
   }
 
-  // Error state
   if (error || !linkData) {
     return (
       <SimpleLayout>
@@ -77,11 +80,17 @@ const SignatureView = () => {
     );
   }
 
-  // Already signed state
+  // Already signed state - show download options
   if (linkData.status === 'completado') {
+    const isTitular = linkData.recipient_type === 'titular';
+    // For titular, show all completed signature links
+    const completedAdherenteLinks = isTitular 
+      ? (allLinks || []).filter((l: any) => l.recipient_type === 'adherente' && l.status === 'completado')
+      : [];
+
     return (
       <SimpleLayout>
-        <div className="max-w-2xl mx-auto py-12">
+        <div className="max-w-2xl mx-auto py-12 space-y-6">
           <Card>
             <CardHeader className="text-center">
               <CheckCircle className="h-16 w-16 text-primary mx-auto mb-4" />
@@ -92,11 +101,8 @@ const SignatureView = () => {
                 Su firma ha sido registrada correctamente el{' '}
                 {linkData.completed_at 
                   ? new Date(linkData.completed_at).toLocaleDateString('es-ES', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
+                      day: 'numeric', month: 'long', year: 'numeric',
+                      hour: '2-digit', minute: '2-digit'
                     })
                   : ''
                 }
@@ -106,11 +112,74 @@ const SignatureView = () => {
               <Badge variant="secondary" className="bg-primary/10 text-primary">
                 Proceso completado
               </Badge>
-              <p className="text-sm text-muted-foreground">
-                Recibirás una copia del documento firmado por correo electrónico.
-              </p>
             </CardContent>
           </Card>
+
+          {/* Show documents for download */}
+          {documents && documents.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Download className="h-4 w-4" />
+                  Documentos Firmados
+                </CardTitle>
+                <CardDescription>
+                  {isTitular 
+                    ? 'Aquí puede ver y descargar todos los documentos firmados'
+                    : 'Aquí puede ver su documento firmado'
+                  }
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {documents.map((doc: any) => (
+                  <div key={doc.id} className="border rounded-lg p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-primary" />
+                      <div>
+                        <p className="font-medium text-sm">{doc.name}</p>
+                        <p className="text-xs text-muted-foreground">{doc.document_type || 'Documento'}</p>
+                      </div>
+                    </div>
+                    {doc.file_url && (
+                      <Button size="sm" variant="outline" asChild>
+                        <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
+                          <Download className="h-3 w-3 mr-1" />
+                          Descargar
+                        </a>
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Titular sees adherente completion status */}
+          {isTitular && completedAdherenteLinks.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Firmas de Adherentes
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {completedAdherenteLinks.map((aLink: any) => {
+                  const beneficiary = linkData.sale?.beneficiaries?.find(
+                    (b: any) => b.id === aLink.recipient_id
+                  );
+                  return (
+                    <div key={aLink.id} className="flex items-center justify-between border rounded p-2">
+                      <span className="text-sm">
+                        {beneficiary ? `${beneficiary.first_name} ${beneficiary.last_name}` : 'Adherente'}
+                      </span>
+                      <Badge variant="default">✓ Firmado</Badge>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </SimpleLayout>
     );
@@ -120,6 +189,7 @@ const SignatureView = () => {
   const client = sale?.clients;
   const plan = sale?.plans;
   const company = sale?.companies;
+  const isTitular = linkData.recipient_type === 'titular';
 
   return (
     <SimpleLayout>
@@ -128,11 +198,7 @@ const SignatureView = () => {
         {company && (
           <div className="text-center space-y-2">
             {company.logo_url && (
-              <img 
-                src={company.logo_url} 
-                alt={company.name} 
-                className="h-16 mx-auto object-contain"
-              />
+              <img src={company.logo_url} alt={company.name} className="h-16 mx-auto object-contain" />
             )}
             <h1 className="text-2xl font-bold" style={{ color: company.primary_color || undefined }}>
               {company.name}
@@ -147,9 +213,14 @@ const SignatureView = () => {
               <div className="flex items-center gap-3">
                 <FileText className="h-6 w-6 text-primary" />
                 <div>
-                  <CardTitle>Documento para Firma Digital</CardTitle>
+                  <CardTitle>
+                    {isTitular ? 'Documentos para Firma - Titular' : 'DDJJ de Salud - Adherente'}
+                  </CardTitle>
                   <CardDescription>
-                    Hola, por favor revise la información y firme al final
+                    {isTitular 
+                      ? 'Revise todos los documentos del contrato y firme al final'
+                      : 'Revise su Declaración Jurada de Salud y firme al final'
+                    }
                   </CardDescription>
                 </div>
               </div>
@@ -163,25 +234,22 @@ const SignatureView = () => {
 
         {/* Contract Information */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Client Information */}
           {client && (
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  Titular del Contrato
+                  {isTitular ? 'Titular del Contrato' : 'Información del Contrato'}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <p className="font-medium">{client.first_name} {client.last_name}</p>
                 {client.dni && <p className="text-muted-foreground">DNI: {client.dni}</p>}
-                {client.email && <p className="text-muted-foreground">{client.email}</p>}
-                {client.phone && <p className="text-muted-foreground">{client.phone}</p>}
+                {isTitular && client.email && <p className="text-muted-foreground">{client.email}</p>}
               </CardContent>
             </Card>
           )}
 
-          {/* Plan Information */}
           {plan && (
             <Card>
               <CardHeader className="pb-3">
@@ -195,9 +263,6 @@ const SignatureView = () => {
                 <p className="text-xl font-bold text-primary">
                   {formatCurrency(Number(plan.price || 0))}
                 </p>
-                {plan.description && (
-                  <p className="text-muted-foreground text-xs">{plan.description}</p>
-                )}
               </CardContent>
             </Card>
           )}
@@ -233,7 +298,7 @@ const SignatureView = () => {
               </div>
               <div>
                 <p className="text-muted-foreground">Firmante</p>
-                <p className="font-medium">{linkData.recipient_type}</p>
+                <p className="font-medium capitalize">{linkData.recipient_type}</p>
               </div>
             </div>
           </CardContent>
@@ -243,12 +308,23 @@ const SignatureView = () => {
         {documents && documents.length > 0 && (
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Documentos a Firmar</CardTitle>
+              <CardTitle className="text-base">
+                {isTitular 
+                  ? `Documentos a Firmar (${documents.length})`
+                  : 'Declaración Jurada de Salud'
+                }
+              </CardTitle>
+              <CardDescription>
+                {isTitular 
+                  ? 'Revise todos los documentos antes de firmar'
+                  : 'Revise su declaración jurada antes de firmar'
+                }
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="max-h-[300px]">
+              <ScrollArea className="max-h-[400px]">
                 <div className="space-y-4">
-                  {documents.map((doc) => (
+                  {documents.map((doc: any) => (
                     <div key={doc.id} className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="font-medium">{doc.name}</h4>
@@ -260,10 +336,30 @@ const SignatureView = () => {
                           dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(doc.content) }}
                         />
                       )}
+                      {doc.file_url && (
+                        <Button size="sm" variant="outline" className="mt-2" asChild>
+                          <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
+                            <Download className="h-3 w-3 mr-1" />
+                            Ver documento completo
+                          </a>
+                        </Button>
+                      )}
                     </div>
                   ))}
                 </div>
               </ScrollArea>
+            </CardContent>
+          </Card>
+        )}
+
+        {documents && documents.length === 0 && (
+          <Card>
+            <CardContent className="text-center py-8">
+              <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No hay documentos disponibles para firmar aún.</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Los documentos serán generados por el vendedor. Vuelva a intentar más tarde.
+              </p>
             </CardContent>
           </Card>
         )}
@@ -288,7 +384,6 @@ const SignatureView = () => {
 
             <Separator />
 
-            {/* Terms */}
             <div className="space-y-3">
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
@@ -319,7 +414,7 @@ const SignatureView = () => {
               ) : (
                 <>
                   <CheckCircle className="h-4 w-4 mr-2" />
-                  Firmar Documento
+                  Firmar {isTitular ? 'Todos los Documentos' : 'Declaración Jurada'}
                 </>
               )}
             </Button>

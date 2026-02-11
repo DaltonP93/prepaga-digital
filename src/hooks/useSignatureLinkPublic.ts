@@ -5,9 +5,6 @@ import { useToast } from '@/hooks/use-toast';
 const SUPABASE_URL = "https://ykducvvcjzdpoojxlsig.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrZHVjdnZjanpkcG9vanhsc2lnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwNzgwNzQsImV4cCI6MjA4NTY1NDA3NH0.SpX3e1GgENTB3kpQPPedPds0E13vxDeOmnmFYSJhfPM";
 
-/**
- * Create a Supabase client with the signature token header for RLS policy validation
- */
 const createSignatureClient = (token: string) => {
   return createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     global: {
@@ -17,6 +14,7 @@ const createSignatureClient = (token: string) => {
     },
   });
 };
+
 interface SignatureLinkData {
   id: string;
   sale_id: string;
@@ -58,17 +56,15 @@ interface SignatureLinkData {
       logo_url: string | null;
       primary_color: string | null;
     } | null;
-    profiles: {
-      first_name: string | null;
-      last_name: string | null;
-      email: string | null;
-    } | null;
+    beneficiaries: Array<{
+      id: string;
+      first_name: string;
+      last_name: string;
+      dni: string | null;
+    }>;
   };
 }
 
-/**
- * Hook to fetch signature link data by token (for public signature page)
- */
 export const useSignatureLinkByToken = (token: string) => {
   return useQuery({
     queryKey: ['signature-link-public', token],
@@ -77,7 +73,6 @@ export const useSignatureLinkByToken = (token: string) => {
 
       const signatureClient = createSignatureClient(token);
 
-      // First, get the signature link - custom header validates against RLS policy
       const { data: linkData, error: linkError } = await signatureClient
         .from('signature_links')
         .select('*')
@@ -99,7 +94,7 @@ export const useSignatureLinkByToken = (token: string) => {
         })
         .eq('id', linkData.id);
 
-      // Now get the sale data - sales table has anon SELECT policy via signature_links
+      // Get sale data with beneficiaries
       const { data: saleData, error: saleError } = await signatureClient
         .from('sales')
         .select(`
@@ -124,6 +119,12 @@ export const useSignatureLinkByToken = (token: string) => {
             name,
             logo_url,
             primary_color
+          ),
+          beneficiaries (
+            id,
+            first_name,
+            last_name,
+            dni
           )
         `)
         .eq('id', linkData.sale_id)
@@ -145,9 +146,6 @@ export const useSignatureLinkByToken = (token: string) => {
   });
 };
 
-/**
- * Hook to submit a signature for a signature link
- */
 export const useSubmitSignatureLink = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -177,8 +175,6 @@ export const useSubmitSignatureLink = () => {
         .from('signature_links')
         .update({
           status: 'completado',
-          signature_data: signatureData,
-          signed_ip: clientIp,
           completed_at: new Date().toISOString(),
         })
         .eq('id', linkId)
@@ -190,6 +186,7 @@ export const useSubmitSignatureLink = () => {
         throw error;
       }
 
+      // Log workflow step
       const { data: existingSteps } = await signatureClient
         .from('signature_workflow_steps')
         .select('step_order')
@@ -210,8 +207,47 @@ export const useSubmitSignatureLink = () => {
           data: {
             signed_ip: clientIp,
             user_agent: navigator.userAgent,
+            signature_data_length: signatureData.length,
           },
         });
+
+      // Store signature in documents table for the sale
+      try {
+        await signatureClient
+          .from('documents')
+          .insert({
+            sale_id: data.sale_id,
+            name: `Firma - ${data.recipient_type === 'titular' ? 'Titular' : 'Adherente'}`,
+            document_type: 'firma',
+            content: signatureData,
+            status: 'firmado' as any,
+            signed_at: new Date().toISOString(),
+            beneficiary_id: data.recipient_id || null,
+            requires_signature: false,
+            is_final: true,
+          });
+      } catch (docErr) {
+        console.warn('Could not save signature document:', docErr);
+      }
+
+      // Log in process_traces for audit trail
+      try {
+        await signatureClient
+          .from('process_traces')
+          .insert({
+            sale_id: data.sale_id,
+            action: 'firma_completada',
+            details: {
+              recipient_type: data.recipient_type,
+              recipient_id: data.recipient_id,
+              signed_ip: clientIp,
+              signature_link_id: linkId,
+              completed_at: new Date().toISOString(),
+            },
+          });
+      } catch (traceErr) {
+        console.warn('Could not log process trace:', traceErr);
+      }
 
       return data;
     },
@@ -234,30 +270,62 @@ export const useSubmitSignatureLink = () => {
 };
 
 /**
- * Hook to get documents associated with a signature link
+ * Fetch documents filtered by recipient type:
+ * - titular: sees ALL documents
+ * - adherente: sees only their own DDJJ (filtered by beneficiary_id)
  */
-export const useSignatureLinkDocuments = (saleId: string | undefined) => {
+export const useSignatureLinkDocuments = (
+  saleId: string | undefined, 
+  recipientType?: string,
+  recipientId?: string | null
+) => {
   return useQuery({
-    queryKey: ['signature-link-documents', saleId],
+    queryKey: ['signature-link-documents', saleId, recipientType, recipientId],
     queryFn: async () => {
       if (!saleId) return [];
 
-      // Use default supabase client - documents are accessed via authenticated or public sale context
-      const { createClient } = await import('@supabase/supabase-js');
       const client = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
-      const { data, error } = await client
+      let query = client
         .from('documents')
         .select('*')
         .eq('sale_id', saleId)
-        .eq('requires_signature', true)
         .order('created_at', { ascending: true });
+
+      if (recipientType === 'adherente' && recipientId) {
+        // Adherente only sees documents linked to them (their DDJJ)
+        query = query.eq('beneficiary_id', recipientId);
+      }
+      // Titular sees all documents (no additional filter)
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Error fetching documents:', error);
         throw error;
       }
 
+      return data || [];
+    },
+    enabled: !!saleId,
+  });
+};
+
+/**
+ * Fetch all signature links for a sale to show completion status to titular
+ */
+export const useAllSignatureLinksPublic = (saleId: string | undefined) => {
+  return useQuery({
+    queryKey: ['all-signature-links-public', saleId],
+    queryFn: async () => {
+      if (!saleId) return [];
+      const client = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+      const { data, error } = await client
+        .from('signature_links')
+        .select('*')
+        .eq('sale_id', saleId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
       return data || [];
     },
     enabled: !!saleId,
