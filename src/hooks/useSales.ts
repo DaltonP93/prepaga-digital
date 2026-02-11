@@ -4,6 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
 import { validateSaleTransition } from '@/lib/workflowValidator';
+import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
+
+const ADMIN_ROLES = ['super_admin', 'admin', 'supervisor', 'gestor', 'auditor'];
 
 type Sale = Database['public']['Tables']['sales']['Row'];
 type SaleInsert = Database['public']['Tables']['sales']['Insert'];
@@ -48,11 +51,14 @@ type ExtendedSale = Sale & {
 };
 
 export const useSales = () => {
+  const { user, userRole } = useSimpleAuthContext();
+  const isAdminRole = ADMIN_ROLES.includes(userRole || '');
+
   return useQuery({
-    queryKey: ['sales'],
+    queryKey: ['sales', user?.id, userRole],
     queryFn: async () => {
       // First, get sales with basic relations
-      const { data: salesData, error: salesError } = await supabase
+      let query = supabase
         .from('sales')
         .select(`
           *,
@@ -63,6 +69,12 @@ export const useSales = () => {
         `)
         .order('created_at', { ascending: false });
 
+      // Vendedores only see their own sales
+      if (!isAdminRole && user?.id) {
+        query = query.eq('salesperson_id', user.id);
+      }
+
+      const { data: salesData, error: salesError } = await query;
       if (salesError) throw salesError;
 
       // Get unique salesperson IDs
@@ -89,6 +101,7 @@ export const useSales = () => {
         profiles: sale.salesperson_id ? profilesMap[sale.salesperson_id] : null
       })) as unknown as ExtendedSale[];
     },
+    enabled: !!user,
   });
 };
 
