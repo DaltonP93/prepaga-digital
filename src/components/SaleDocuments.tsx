@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { FileText, Upload, Download, Trash2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDropzone } from 'react-dropzone';
+import { ImageLightbox } from '@/components/ui/image-lightbox';
 
 interface SaleDocument {
   id: string;
@@ -30,16 +31,19 @@ interface SaleDocumentsProps {
   onOpenChange: (open: boolean) => void;
 }
 
+const isImageType = (fileType: string | null): boolean => {
+  return !!fileType && fileType.startsWith('image/');
+};
+
 export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
   saleId,
   open,
   onOpenChange,
 }) => {
-  const [uploadForm, setUploadForm] = useState({
-    file_name: '',
-    observations: '',
-  });
-
+  const [uploadForm, setUploadForm] = useState({ file_name: '', observations: '' });
+  const [lightboxUrl, setLightboxUrl] = useState('');
+  const [lightboxName, setLightboxName] = useState('');
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: documents, isLoading } = useQuery({
@@ -50,7 +54,6 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
         .select('*')
         .eq('sale_id', saleId)
         .order('created_at', { ascending: false });
-
       if (error) throw error;
       return data as SaleDocument[];
     },
@@ -62,7 +65,6 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
 
-      // Subir archivo a storage
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
       const filePath = `sale-documents/${saleId}/${fileName}`;
@@ -70,40 +72,27 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
       const { error: uploadError } = await supabase.storage
         .from('documents')
         .upload(filePath, file);
-
       if (uploadError) throw uploadError;
 
-      // SECURITY: Use signed URLs instead of public URLs for private buckets
-      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-        .from('documents')
-        .createSignedUrl(filePath, 86400); // 24 hour expiry
-
-      if (signedUrlError) throw signedUrlError;
-
-      // Insertar registro en base de datos - store the path for regenerating signed URLs later
       const { data, error } = await supabase
         .from('sale_documents')
         .insert({
           sale_id: saleId,
           file_name: metadata.file_name || file.name,
-          file_url: filePath, // Store path, not full URL
+          file_url: filePath,
           file_size: file.size,
           file_type: file.type,
           uploaded_by: user.id,
         })
         .select()
         .single();
-
       if (error) throw error;
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sale-documents', saleId] });
       toast.success('Documento subido correctamente');
-      setUploadForm({
-        file_name: '',
-        observations: '',
-      });
+      setUploadForm({ file_name: '', observations: '' });
     },
     onError: (error) => {
       console.error('Error uploading document:', error);
@@ -113,11 +102,7 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
 
   const deleteDocument = useMutation({
     mutationFn: async (documentId: string) => {
-      const { error } = await supabase
-        .from('sale_documents')
-        .delete()
-        .eq('id', documentId);
-
+      const { error } = await supabase.from('sale_documents').delete().eq('id', documentId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -148,7 +133,7 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
       'application/msword': ['.doc'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
     },
-    maxSize: 10 * 1024 * 1024, // 10MB
+    maxSize: 10 * 1024 * 1024,
   });
 
   const formatFileSize = (bytes: number | null) => {
@@ -159,19 +144,20 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const handleDownload = async (doc: SaleDocument) => {
-    // SECURITY: Generate signed URL for download
-    const { data: signedUrlData, error } = await supabase.storage
-      .from('documents')
-      .createSignedUrl(doc.file_url, 300); // 5 min expiry for downloads
-
-    if (error || !signedUrlData) {
-      toast.error('Error al generar enlace de descarga');
-      return;
+  const getSignedUrl = async (fileUrl: string, expiresIn = 3600): Promise<string | null> => {
+    const { data, error } = await supabase.storage.from('documents').createSignedUrl(fileUrl, expiresIn);
+    if (error || !data) {
+      toast.error('Error al generar enlace del archivo');
+      return null;
     }
+    return data.signedUrl;
+  };
 
+  const handleDownload = async (doc: SaleDocument) => {
+    const signedUrl = await getSignedUrl(doc.file_url, 300);
+    if (!signedUrl) return;
     const link = window.document.createElement('a');
-    link.href = signedUrlData.signedUrl;
+    link.href = signedUrl;
     link.download = doc.file_name;
     window.document.body.appendChild(link);
     link.click();
@@ -179,154 +165,137 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
   };
 
   const handleView = async (doc: SaleDocument) => {
-    // SECURITY: Generate signed URL for viewing
-    const { data: signedUrlData, error } = await supabase.storage
-      .from('documents')
-      .createSignedUrl(doc.file_url, 3600); // 1 hour expiry for viewing
+    const signedUrl = await getSignedUrl(doc.file_url);
+    if (!signedUrl) return;
 
-    if (error || !signedUrlData) {
-      toast.error('Error al generar enlace de visualización');
-      return;
+    if (isImageType(doc.file_type)) {
+      setLightboxUrl(signedUrl);
+      setLightboxName(doc.file_name);
+      setLightboxOpen(true);
+    } else {
+      window.open(signedUrl, '_blank');
     }
-
-    window.open(signedUrlData.signedUrl, '_blank');
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Digitalizaciones y Documentos
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Digitalizaciones y Documentos
+            </DialogTitle>
+          </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Área de carga de documentos */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Subir Nuevo Documento</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Subir Nuevo Documento</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="file_name">Nombre del Documento</Label>
+                    <Input
+                      id="file_name"
+                      value={uploadForm.file_name}
+                      onChange={(e) => setUploadForm(prev => ({ ...prev, file_name: e.target.value }))}
+                      placeholder="Nombre descriptivo del documento"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <Label htmlFor="file_name">Nombre del Documento</Label>
-                  <Input
-                    id="file_name"
-                    value={uploadForm.file_name}
-                    onChange={(e) => setUploadForm(prev => ({ ...prev, file_name: e.target.value }))}
-                    placeholder="Nombre descriptivo del documento"
+                  <Label htmlFor="observations">Observaciones</Label>
+                  <Textarea
+                    id="observations"
+                    value={uploadForm.observations}
+                    onChange={(e) => setUploadForm(prev => ({ ...prev, observations: e.target.value }))}
+                    placeholder="Observaciones adicionales (opcional)"
                   />
                 </div>
-              </div>
 
-              <div>
-                <Label htmlFor="observations">Observaciones</Label>
-                <Textarea
-                  id="observations"
-                  value={uploadForm.observations}
-                  onChange={(e) => setUploadForm(prev => ({ ...prev, observations: e.target.value }))}
-                  placeholder="Observaciones adicionales (opcional)"
-                />
-              </div>
+                <div
+                  {...getRootProps()}
+                  className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                    isDragActive ? 'border-primary bg-primary/10' : 'border-muted-foreground/25 hover:border-primary/50'
+                  }`}
+                >
+                  <input {...getInputProps()} />
+                  <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  {isDragActive ? (
+                    <p className="text-primary">Suelta el archivo aquí...</p>
+                  ) : (
+                    <div>
+                      <p className="text-lg font-medium">Arrastra y suelta tu archivo aquí</p>
+                      <p className="text-sm text-muted-foreground mt-2">o haz clic para seleccionar un archivo</p>
+                      <p className="text-xs text-muted-foreground mt-2">Formatos soportados: PDF, DOC, DOCX, IMG (Máx. 10MB)</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
-              {/* Dropzone */}
-              <div
-                {...getRootProps()}
-                className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                  isDragActive ? 'border-primary bg-primary/10' : 'border-muted-foreground/25 hover:border-primary/50'
-                }`}
-              >
-                <input {...getInputProps()} />
-                <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                {isDragActive ? (
-                  <p className="text-primary">Suelta el archivo aquí...</p>
-                ) : (
-                  <div>
-                    <p className="text-lg font-medium">Arrastra y suelta tu archivo aquí</p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      o haz clic para seleccionar un archivo
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Formatos soportados: PDF, DOC, DOCX, IMG (Máx. 10MB)
-                    </p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Lista de documentos */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Documentos Subidos</h3>
-            {isLoading ? (
-              <div className="text-center py-8">Cargando documentos...</div>
-            ) : documents && documents.length > 0 ? (
-              <div className="grid gap-4">
-                {documents.map((doc) => (
-                  <Card key={doc.id}>
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-start">
-                        <div className="space-y-2 flex-1">
-                          <div className="flex items-center gap-2">
-                            <FileText className="h-4 w-4" />
-                            <h4 className="font-medium">{doc.file_name}</h4>
-                            {doc.file_type && (
-                              <Badge variant="outline">
-                                {doc.file_type}
-                              </Badge>
-                            )}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Documentos Subidos</h3>
+              {isLoading ? (
+                <div className="text-center py-8">Cargando documentos...</div>
+              ) : documents && documents.length > 0 ? (
+                <div className="grid gap-4">
+                  {documents.map((doc) => (
+                    <Card key={doc.id}>
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-start">
+                          <div className="space-y-2 flex-1">
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
+                              <h4 className="font-medium">{doc.file_name}</h4>
+                              {doc.file_type && (
+                                <Badge variant="outline">{doc.file_type}</Badge>
+                              )}
+                            </div>
+                            <div className="text-sm text-muted-foreground space-y-1">
+                              {doc.file_size && <p>Tamaño: {formatFileSize(doc.file_size)}</p>}
+                              {doc.created_at && <p>Subido: {new Date(doc.created_at).toLocaleString()}</p>}
+                            </div>
                           </div>
-                          
-                          <div className="text-sm text-muted-foreground space-y-1">
-                            {doc.file_size && (
-                              <p>Tamaño: {formatFileSize(doc.file_size)}</p>
-                            )}
-                            {doc.created_at && (
-                              <p>Subido: {new Date(doc.created_at).toLocaleString()}</p>
-                            )}
+                          <div className="flex gap-2">
+                            <Button variant="ghost" size="sm" onClick={() => handleView(doc)}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleDownload(doc)}>
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => deleteDocument.mutate(doc.id)}
+                              disabled={deleteDocument.isPending}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
-
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleView(doc)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDownload(doc)}
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => deleteDocument.mutate(doc.id)}
-                            disabled={deleteDocument.isPending}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                No hay documentos subidos
-              </div>
-            )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">No hay documentos subidos</div>
+              )}
+            </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      <ImageLightbox
+        open={lightboxOpen}
+        onOpenChange={setLightboxOpen}
+        src={lightboxUrl}
+        fileName={lightboxName}
+      />
+    </>
   );
 };

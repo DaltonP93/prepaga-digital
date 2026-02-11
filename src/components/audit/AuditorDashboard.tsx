@@ -14,8 +14,9 @@ import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { formatCurrency } from '@/lib/utils';
 import { 
   CheckCircle, XCircle, Clock, AlertCircle, Eye, Search, 
-  FileText, User, DollarSign, Calendar, Filter
+  FileText, User, DollarSign, Calendar, Filter, Download
 } from 'lucide-react';
+import { ImageLightbox } from '@/components/ui/image-lightbox';
 
 export const AuditorDashboard: React.FC = () => {
   const { toast } = useToast();
@@ -25,6 +26,9 @@ export const AuditorDashboard: React.FC = () => {
   const [auditNotes, setAuditNotes] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [lightboxUrl, setLightboxUrl] = useState('');
+  const [lightboxName, setLightboxName] = useState('');
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   // Fetch sales pending audit
   const { data: sales = [], isLoading } = useQuery({
@@ -273,8 +277,7 @@ export const AuditorDashboard: React.FC = () => {
     infoRequired: sales.filter((s: any) => s.audit_status === 'requiere_info').length,
   };
 
-  if (selectedSale) {
-    return (
+  const detailView = selectedSale ? (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold">Detalle de Auditoría</h2>
@@ -413,18 +416,49 @@ export const AuditorDashboard: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-2">
                         {doc.file_type && (
-                          <Badge variant="outline">{doc.file_type}</Badge>
+                          <Badge variant="outline">{doc.file_type?.split('/').pop()}</Badge>
                         )}
-                        {doc.file_url && (
-                          <a
-                            href={doc.file_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-primary underline hover:no-underline"
-                          >
-                            Ver
-                          </a>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={async () => {
+                            const { data, error } = await supabase.storage
+                              .from('documents')
+                              .createSignedUrl(doc.file_url, 3600);
+                            if (error || !data) {
+                              toast({ title: 'Error', description: 'No se pudo generar el enlace', variant: 'destructive' });
+                              return;
+                            }
+                            if (doc.file_type?.startsWith('image/')) {
+                              setLightboxUrl(data.signedUrl);
+                              setLightboxName(doc.file_name);
+                              setLightboxOpen(true);
+                            } else {
+                              window.open(data.signedUrl, '_blank');
+                            }
+                          }}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Ver
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={async () => {
+                            const { data, error } = await supabase.storage
+                              .from('documents')
+                              .createSignedUrl(doc.file_url, 300);
+                            if (error || !data) return;
+                            const link = document.createElement('a');
+                            link.href = data.signedUrl;
+                            link.download = doc.file_name;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          }}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -493,10 +527,9 @@ export const AuditorDashboard: React.FC = () => {
           </Card>
         </div>
       </div>
-    );
-  }
+  ) : null;
 
-  return (
+  const listView = (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Panel de Auditoría</h1>
@@ -632,5 +665,17 @@ export const AuditorDashboard: React.FC = () => {
         </CardContent>
       </Card>
     </div>
+  );
+
+  return (
+    <>
+      {selectedSale ? detailView : listView}
+      <ImageLightbox
+        open={lightboxOpen}
+        onOpenChange={setLightboxOpen}
+        src={lightboxUrl}
+        fileName={lightboxName}
+      />
+    </>
   );
 };
