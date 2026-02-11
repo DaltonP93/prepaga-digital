@@ -21,9 +21,10 @@ const SignatureView = () => {
   const { data: documents } = useSignatureLinkDocuments(
     linkData?.sale_id, 
     linkData?.recipient_type, 
-    linkData?.recipient_id
+    linkData?.recipient_id,
+    token || undefined
   );
-  const { data: allLinks } = useAllSignatureLinksPublic(linkData?.sale_id);
+  const { data: allLinks } = useAllSignatureLinksPublic(linkData?.sale_id, token || undefined);
   const submitSignature = useSubmitSignatureLink();
   
   const [signatureData, setSignatureData] = useState<string | null>(null);
@@ -390,7 +391,7 @@ const SignatureView = () => {
                   type="checkbox"
                   checked={termsAccepted}
                   onChange={(e) => setTermsAccepted(e.target.checked)}
-                  className="mt-1 h-4 w-4 rounded border-gray-300"
+                  className="mt-1 h-4 w-4 rounded border-border"
                 />
                 <span className="text-sm text-muted-foreground">
                   He leído y acepto los términos y condiciones. Confirmo que la información 

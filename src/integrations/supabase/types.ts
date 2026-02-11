@@ -2434,6 +2434,8 @@ export type Database = {
         Args: { p_sale_id: string }
         Returns: boolean
       }
+      get_sale_id_from_signature_token: { Args: never; Returns: string }
+      get_signature_link_id_from_token: { Args: never; Returns: string }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
