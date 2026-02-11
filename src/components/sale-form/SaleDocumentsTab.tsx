@@ -23,6 +23,7 @@ const SaleDocumentsTab: React.FC<SaleDocumentsTabProps> = ({ saleId }) => {
   const [fileName, setFileName] = useState('');
   const [lightboxUrl, setLightboxUrl] = useState('');
   const [lightboxName, setLightboxName] = useState('');
+  const [lightboxType, setLightboxType] = useState('');
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -129,9 +130,10 @@ const SaleDocumentsTab: React.FC<SaleDocumentsTabProps> = ({ saleId }) => {
     const signedUrl = await getSignedUrl(fileUrl);
     if (!signedUrl) return;
 
-    if (isImageType(fileType)) {
+    if (isImageType(fileType) || fileType === 'application/pdf' || /\.(pdf|doc|docx)$/i.test(docName)) {
       setLightboxUrl(signedUrl);
       setLightboxName(docName);
+      setLightboxType(fileType || '');
       setLightboxOpen(true);
     } else {
       window.open(signedUrl, '_blank');
@@ -267,6 +269,7 @@ const SaleDocumentsTab: React.FC<SaleDocumentsTabProps> = ({ saleId }) => {
         onOpenChange={setLightboxOpen}
         src={lightboxUrl}
         fileName={lightboxName}
+        fileType={lightboxType}
       />
     </div>
   );

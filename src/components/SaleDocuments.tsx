@@ -43,6 +43,7 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
   const [uploadForm, setUploadForm] = useState({ file_name: '', observations: '' });
   const [lightboxUrl, setLightboxUrl] = useState('');
   const [lightboxName, setLightboxName] = useState('');
+  const [lightboxType, setLightboxType] = useState('');
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -168,9 +169,10 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
     const signedUrl = await getSignedUrl(doc.file_url);
     if (!signedUrl) return;
 
-    if (isImageType(doc.file_type)) {
+    if (isImageType(doc.file_type) || doc.file_type === 'application/pdf' || /\.(pdf|doc|docx)$/i.test(doc.file_name)) {
       setLightboxUrl(signedUrl);
       setLightboxName(doc.file_name);
+      setLightboxType(doc.file_type || '');
       setLightboxOpen(true);
     } else {
       window.open(signedUrl, '_blank');
@@ -295,6 +297,7 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
         onOpenChange={setLightboxOpen}
         src={lightboxUrl}
         fileName={lightboxName}
+        fileType={lightboxType}
       />
     </>
   );
