@@ -79,17 +79,82 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
     try {
       setSending(true);
 
-      // Get sale details for client info
+      // Get full sale details with related data
       const { data: sale, error: saleError } = await supabase
         .from('sales')
-        .select('*, clients:client_id(first_name, last_name, email, phone)')
+        .select(`
+          *,
+          clients:client_id(*),
+          plans:plan_id(*),
+          companies:company_id(*)
+        `)
         .eq('id', saleId)
         .single();
 
       if (saleError) throw saleError;
       const client = sale?.clients as any;
+      const plan = sale?.plans as any;
+      const company = sale?.companies as any;
 
-      // Create signature link for titular (sees all documents)
+      // Fetch template contents for all associated templates
+      const templateIds = saleTemplates.map((st: any) => st.templates?.id || st.template_id).filter(Boolean);
+      const { data: templateContents, error: templateError } = await supabase
+        .from('templates')
+        .select('*')
+        .in('id', templateIds);
+
+      if (templateError) throw templateError;
+
+      // Import template engine dynamically
+      const { createTemplateContext, interpolateTemplate } = await import('@/lib/templateEngine');
+      const context = createTemplateContext(client, plan, company, sale);
+
+      // Generate documents for the titular (all templates)
+      for (const template of (templateContents || [])) {
+        const renderedContent = interpolateTemplate(template.content || '', context);
+        
+        await supabase.from('documents').insert({
+          sale_id: saleId,
+          name: template.name,
+          document_type: template.name.toLowerCase().includes('ddjj') || template.name.toLowerCase().includes('declaración') ? 'ddjj_salud' : 'contrato',
+          content: renderedContent,
+          status: 'pendiente' as any,
+          requires_signature: true,
+          beneficiary_id: null, // Titular documents have no beneficiary_id
+        });
+      }
+
+      // Generate DDJJ documents per beneficiary (adherente)
+      const ddjiTemplates = (templateContents || []).filter(t => 
+        t.name.toLowerCase().includes('ddjj') || t.name.toLowerCase().includes('declaración')
+      );
+
+      if (beneficiaries && beneficiaries.length > 0 && ddjiTemplates.length > 0) {
+        for (const b of beneficiaries) {
+          if (b.signature_required !== false && !b.is_primary) {
+            for (const ddjiTemplate of ddjiTemplates) {
+              // Create context with beneficiary data replacing client data
+              const beneficiaryContext = createTemplateContext(
+                { first_name: b.first_name, last_name: b.last_name, email: b.email, phone: b.phone, dni: b.dni, address: b.address, birth_date: b.birth_date },
+                plan, company, sale
+              );
+              const renderedContent = interpolateTemplate(ddjiTemplate.content || '', beneficiaryContext);
+
+              await supabase.from('documents').insert({
+                sale_id: saleId,
+                name: `${ddjiTemplate.name} - ${b.first_name} ${b.last_name}`,
+                document_type: 'ddjj_salud',
+                content: renderedContent,
+                status: 'pendiente' as any,
+                requires_signature: true,
+                beneficiary_id: b.id,
+              });
+            }
+          }
+        }
+      }
+
+      // Create signature link for titular
       await createSignatureLink.mutateAsync({
         saleId,
         recipientType: 'titular',
@@ -97,7 +162,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         recipientPhone: client?.phone || undefined,
       });
 
-      // Create separate signature links for each adherente (sees only their own DDJJ)
+      // Create separate signature links for each adherente
       if (beneficiaries && beneficiaries.length > 0) {
         for (const b of beneficiaries) {
           if (b.signature_required !== false && !b.is_primary) {
@@ -128,9 +193,8 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         .eq('id', saleId);
 
       queryClient.invalidateQueries({ queryKey: ['sales'] });
-      toast.success('Documentos enviados para firma. Redirigiendo al flujo de firmas...');
+      toast.success('Documentos generados y enviados para firma. Redirigiendo...');
       
-      // Navigate to signature workflow for this sale
       navigate(`/signature-workflow/${saleId}`);
     } catch (error: any) {
       toast.error(error.message || 'Error al enviar documentos');

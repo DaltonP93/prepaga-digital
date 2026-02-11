@@ -277,26 +277,29 @@ export const useSubmitSignatureLink = () => {
 export const useSignatureLinkDocuments = (
   saleId: string | undefined, 
   recipientType?: string,
-  recipientId?: string | null
+  recipientId?: string | null,
+  token?: string
 ) => {
   return useQuery({
     queryKey: ['signature-link-documents', saleId, recipientType, recipientId],
     queryFn: async () => {
       if (!saleId) return [];
 
-      const client = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+      // Use token-authenticated client so RLS policies work
+      const client = token 
+        ? createSignatureClient(token)
+        : createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
       let query = client
         .from('documents')
         .select('*')
         .eq('sale_id', saleId)
+        .neq('document_type', 'firma') // Exclude signature images
         .order('created_at', { ascending: true });
 
       if (recipientType === 'adherente' && recipientId) {
-        // Adherente only sees documents linked to them (their DDJJ)
         query = query.eq('beneficiary_id', recipientId);
       }
-      // Titular sees all documents (no additional filter)
 
       const { data, error } = await query;
 
@@ -314,12 +317,14 @@ export const useSignatureLinkDocuments = (
 /**
  * Fetch all signature links for a sale to show completion status to titular
  */
-export const useAllSignatureLinksPublic = (saleId: string | undefined) => {
+export const useAllSignatureLinksPublic = (saleId: string | undefined, token?: string) => {
   return useQuery({
     queryKey: ['all-signature-links-public', saleId],
     queryFn: async () => {
       if (!saleId) return [];
-      const client = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+      const client = token
+        ? createSignatureClient(token)
+        : createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
       const { data, error } = await client
         .from('signature_links')
         .select('*')
