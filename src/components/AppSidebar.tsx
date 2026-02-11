@@ -85,6 +85,12 @@ export function AppSidebar() {
       visible: permissions.canViewDocuments,
     },
     {
+      title: "Auditoría",
+      url: "/audit",
+      icon: Shield,
+      visible: permissions.canViewAudit,
+    },
+    {
       title: "Analytics",
       url: "/analytics",
       icon: BarChart3,
@@ -110,12 +116,6 @@ export function AppSidebar() {
       url: "/companies",
       icon: Building2,
       visible: permissions.canViewCompanies,
-    },
-    {
-      title: "Auditoría",
-      url: "/audit",
-      icon: Shield,
-      visible: true,
     },
     {
       title: "Configuración",

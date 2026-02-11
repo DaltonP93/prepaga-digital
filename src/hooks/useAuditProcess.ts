@@ -3,8 +3,27 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
 import { validateSaleTransition } from '@/lib/workflowValidator';
+import type { AppRole } from '@/types/roles';
 
 type SaleStatus = Database['public']['Enums']['sale_status'];
+
+const ROLE_PRIORITY: AppRole[] = ['super_admin', 'admin', 'supervisor', 'auditor', 'financiero', 'gestor', 'vendedor'];
+
+const resolveEffectiveRoleForUser = async (userId?: string | null, fallback: AppRole = 'auditor'): Promise<AppRole> => {
+  if (!userId) return fallback;
+
+  const checks = await Promise.all(
+    ROLE_PRIORITY.map((role) => supabase.rpc('has_role', { _user_id: userId, _role: role }))
+  );
+
+  for (let i = 0; i < ROLE_PRIORITY.length; i += 1) {
+    if (checks[i]?.data) {
+      return ROLE_PRIORITY[i];
+    }
+  }
+
+  return fallback;
+};
 
 export const useAuditProcesses = () => {
   return useQuery({
@@ -49,8 +68,8 @@ export const useCreateAuditProcess = () => {
       // Validate workflow transition before updating status
       const { data: sale } = await supabase.from('sales').select('*, template_responses(id)').eq('id', saleId).single();
       if (sale?.company_id) {
-        const { data: profile } = await supabase.from('profiles').select('role').eq('id', auditorId).single();
-        const check = await validateSaleTransition(sale.company_id, sale, 'en_auditoria', (profile?.role as any) || 'auditor');
+        const auditorRole = await resolveEffectiveRoleForUser(auditorId, 'auditor');
+        const check = await validateSaleTransition(sale.company_id, sale, 'en_auditoria', auditorRole);
         if (!check.allowed) throw new Error(check.reasons.join(', '));
       }
 
@@ -114,17 +133,17 @@ export const useUpdateAuditProcess = () => {
       let saleStatus: SaleStatus = 'enviado';
 
       if (status === 'approved') {
-        saleStatus = 'completado';
+        saleStatus = 'aprobado_para_templates' as SaleStatus;
       } else if (status === 'rejected') {
-        saleStatus = 'cancelado';
+        saleStatus = 'rechazado' as SaleStatus;
       }
 
       // Validate workflow transition
       const { data: saleData } = await supabase.from('sales').select('*, template_responses(id)').eq('id', auditProcess.sale_id).single();
       if (saleData?.company_id) {
         const { data: currentUser } = await supabase.auth.getUser();
-        const { data: userProfile } = await supabase.from('profiles').select('role').eq('id', currentUser?.user?.id || '').single();
-        const check = await validateSaleTransition(saleData.company_id, saleData, saleStatus, (userProfile?.role as any) || 'auditor');
+        const currentRole = await resolveEffectiveRoleForUser(currentUser?.user?.id, 'auditor');
+        const check = await validateSaleTransition(saleData.company_id, saleData, saleStatus, currentRole);
         if (!check.allowed) throw new Error(check.reasons.join(', '));
       }
 

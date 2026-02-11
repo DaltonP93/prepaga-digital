@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SimpleAuthProvider } from "@/components/SimpleAuthProvider";
 import { CompanyBrandingProvider } from "@/components/CompanyBrandingProvider";
 import { SimpleProtectedRoute } from "@/components/SimpleProtectedRoute";
+import { RoleProtectedRoute } from "@/components/RoleProtectedRoute";
 import { SimpleLoginForm } from "@/components/SimpleLoginForm";
 import MainLayout from "@/layouts/MainLayout";
 import Dashboard from "@/pages/Dashboard";
@@ -78,9 +79,30 @@ const App = () => {
                   <Route path="signature-workflow/:saleId" element={<SignatureWorkflow />} />
                   <Route path="analytics" element={<Analytics />} />
                   <Route path="profile" element={<Profile />} />
-                  <Route path="users" element={<Users />} />
-                  <Route path="companies" element={<Companies />} />
-                  <Route path="audit" element={<AuditDashboard />} />
+                  <Route
+                    path="users"
+                    element={
+                      <RoleProtectedRoute allowedRoles={['super_admin', 'admin', 'supervisor']}>
+                        <Users />
+                      </RoleProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="companies"
+                    element={
+                      <RoleProtectedRoute allowedRoles={['super_admin']}>
+                        <Companies />
+                      </RoleProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="audit"
+                    element={
+                      <RoleProtectedRoute allowedRoles={['super_admin', 'admin', 'supervisor', 'auditor']}>
+                        <AuditDashboard />
+                      </RoleProtectedRoute>
+                    }
+                  />
                   <Route path="settings" element={<Settings />} />
                   <Route path="experience" element={<Experience />} />
                   <Route path="*" element={<NotFound />} />

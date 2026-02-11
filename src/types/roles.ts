@@ -1,5 +1,5 @@
 // Roles de la aplicación
-export type AppRole = 'super_admin' | 'admin' | 'supervisor' | 'auditor' | 'gestor' | 'vendedor';
+export type AppRole = 'super_admin' | 'admin' | 'supervisor' | 'auditor' | 'gestor' | 'vendedor' | 'financiero';
 
 // Permisos por recurso
 export interface RolePermissions {
@@ -647,6 +647,95 @@ export const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
       viewAllMetrics: false,
     },
   },
+
+  financiero: {
+    companies: {
+      create: false,
+      read: false,
+      update: false,
+      delete: false,
+      switch: false,
+    },
+    users: {
+      create: false,
+      read: false,
+      update: false,
+      delete: false,
+      assignRoles: false,
+      viewAll: false,
+    },
+    plans: {
+      create: false,
+      read: false,
+      update: false,
+      delete: false,
+      updatePricing: false,
+    },
+    templates: {
+      create: false,
+      read: false,
+      update: false,
+      delete: false,
+      design: false,
+      publish: false,
+    },
+    clients: {
+      create: false,
+      read: false,
+      update: false,
+      delete: false,
+      viewAll: false,
+      export: false,
+    },
+    sales: {
+      create: false,
+      read: false,
+      update: false,
+      delete: false,
+      viewAll: false,
+      changeStatus: false,
+      sendSignature: false,
+      resendSignature: false,
+      viewSignatures: false,
+    },
+    documents: {
+      create: false,
+      read: false,
+      update: false,
+      delete: false,
+      upload: false,
+      download: false,
+      generate: false,
+      sign: false,
+    },
+    audit: {
+      access: false,
+      approve: false,
+      reject: false,
+      viewAll: false,
+      assignAuditor: false,
+    },
+    communications: {
+      sendWhatsApp: false,
+      sendEmail: false,
+      sendSMS: false,
+      viewHistory: false,
+      createCampaigns: false,
+    },
+    settings: {
+      company: false,
+      integrations: false,
+      billing: false,
+      currencies: false,
+      ui: false,
+    },
+    analytics: {
+      viewDashboard: true,
+      viewReports: true,
+      exportReports: true,
+      viewAllMetrics: true,
+    },
+  },
 };
 
 // Etiquetas de roles para UI
@@ -657,6 +746,7 @@ export const ROLE_LABELS: Record<AppRole, string> = {
   auditor: 'Auditor',
   gestor: 'Gestor',
   vendedor: 'Vendedor',
+  financiero: 'Financiero',
 };
 
 // Colores de roles para badges
@@ -667,4 +757,5 @@ export const ROLE_COLORS: Record<AppRole, string> = {
   auditor: 'bg-amber-500',
   gestor: 'bg-teal-500',
   vendedor: 'bg-green-500',
+  financiero: 'bg-emerald-600',
 };

@@ -4,9 +4,15 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2, Save } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, Lock } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useCreateSale, useUpdateSale } from '@/hooks/useSales';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
+import { useStateTransition } from '@/hooks/useStateTransition';
+import { useRolePermissions } from '@/hooks/useRolePermissions';
+import { AuditCommentsPanel } from '@/components/audit/AuditCommentsPanel';
+import { SALE_STATUS_LABELS } from '@/types/workflow';
+import type { SaleStatus } from '@/types/workflow';
 import { toast } from 'sonner';
 import SaleBasicTab from './SaleBasicTab';
 import SaleAdherentsTab from './SaleAdherentsTab';
@@ -23,10 +29,16 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
   const createSale = useCreateSale();
   const updateSale = useUpdateSale();
   const { profile } = useSimpleAuthContext();
+  const { canEditState } = useStateTransition();
+  const { role } = useRolePermissions();
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('basico');
 
   const isEditing = !!sale?.id;
+  const currentStatus = (sale?.status || 'borrador') as SaleStatus;
+  const isEditAllowed = !isEditing || canEditState(currentStatus);
+  const isAuditorOrAbove = role === 'auditor' || role === 'admin' || role === 'super_admin';
+  const statusLabel = SALE_STATUS_LABELS[currentStatus] || currentStatus;
 
   const [formData, setFormData] = useState({
     client_id: sale?.client_id || '',
@@ -110,31 +122,50 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-            {isEditing ? 'Guardar Cambios' : 'Crear Venta'}
-          </Button>
+          {isEditAllowed && (
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              {isEditing ? 'Guardar Cambios' : 'Crear Venta'}
+            </Button>
+          )}
         </div>
       </div>
+
+      {!isEditAllowed && isEditing && (
+        <Alert variant="default" className="border-amber-300 bg-amber-50">
+          <Lock className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-800">
+            Esta venta está en estado <strong>{statusLabel}</strong> y no puede ser editada con tu rol actual.
+            {role === 'vendedor' && currentStatus !== 'borrador' && currentStatus !== 'rechazado' && (
+              <> Solo puedes editar ventas en estado Borrador o Rechazado.</>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Card>
         <CardContent className="pt-6">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2 gap-1.5 h-auto sm:h-11 sm:grid-cols-5">
+            <TabsList className="grid w-full grid-cols-2 gap-1.5 h-auto sm:h-11 sm:grid-cols-5 lg:grid-cols-6">
               <TabsTrigger value="basico">Básico</TabsTrigger>
               <TabsTrigger value="adherentes" disabled={!isEditing}>Adherentes</TabsTrigger>
               <TabsTrigger value="documentos" disabled={!isEditing}>Documentos</TabsTrigger>
               <TabsTrigger value="ddjj" disabled={!isEditing}>DDJJ Salud</TabsTrigger>
               <TabsTrigger value="templates" disabled={!isEditing}>Templates</TabsTrigger>
+              {isEditing && isAuditorOrAbove && (
+                <TabsTrigger value="auditoria">Auditoría</TabsTrigger>
+              )}
             </TabsList>
 
             <div className="mt-6">
               <TabsContent value="basico">
-                <SaleBasicTab
-                  formData={formData}
-                  onChange={handleChange}
-                  companyId={profile?.company_id || undefined}
-                />
+                <fieldset disabled={!isEditAllowed}>
+                  <SaleBasicTab
+                    formData={formData}
+                    onChange={handleChange}
+                    companyId={profile?.company_id || undefined}
+                  />
+                </fieldset>
               </TabsContent>
 
               <TabsContent value="adherentes">
@@ -155,6 +186,12 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                   auditStatus={sale?.audit_status}
                 />
               </TabsContent>
+
+              {isEditing && isAuditorOrAbove && (
+                <TabsContent value="auditoria">
+                  <AuditCommentsPanel saleId={sale.id} saleStatus={currentStatus} />
+                </TabsContent>
+              )}
             </div>
           </Tabs>
         </CardContent>

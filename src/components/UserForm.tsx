@@ -12,6 +12,7 @@ import { useCompanies } from "@/hooks/useCompanies";
 import { PermissionManager } from "./PermissionManager";
 import { toast } from "sonner";
 import { Key } from "lucide-react";
+import { useRolePermissions } from "@/hooks/useRolePermissions";
 
 interface UserFormProps {
   open: boolean;
@@ -25,7 +26,7 @@ interface UserFormData {
   first_name: string;
   last_name: string;
   phone?: string;
-  role: 'super_admin' | 'admin' | 'supervisor' | 'auditor' | 'gestor' | 'vendedor';
+  role: 'super_admin' | 'admin' | 'supervisor' | 'auditor' | 'gestor' | 'vendedor' | 'financiero';
   company_id: string;
 }
 
@@ -41,6 +42,7 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
   const resetPassword = useResetUserPassword();
+  const { isAdmin, isSuperAdmin } = useRolePermissions();
   const isEditing = !!user;
   const [activeTab, setActiveTab] = useState("basic");
   const [newPassword, setNewPassword] = useState("");
@@ -70,8 +72,29 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
     }
   }, [user, reset]);
 
+  const canManageUsers = isAdmin || isSuperAdmin;
+  const availableRoles: UserFormData['role'][] = isSuperAdmin
+    ? ['vendedor', 'auditor', 'supervisor', 'gestor', 'financiero', 'admin', 'super_admin']
+    : ['vendedor', 'auditor', 'supervisor', 'gestor', 'financiero', 'admin'];
+
+  const targetCurrentRole = getUserRole(user);
+  const canEditThisUser = canManageUsers && (isSuperAdmin || targetCurrentRole !== 'super_admin');
+
   const onSubmit = async (data: UserFormData) => {
     try {
+      if (!canManageUsers) {
+        toast.error('No tienes permisos para gestionar usuarios.');
+        return;
+      }
+      if (!canEditThisUser) {
+        toast.error('No puedes editar un usuario con rol super admin.');
+        return;
+      }
+      if (data.role === 'super_admin' && !isSuperAdmin) {
+        toast.error('Solo un super admin puede asignar el rol super admin.');
+        return;
+      }
+
       if (isEditing && user) {
         await updateUser.mutateAsync({
           id: user.id,
@@ -189,12 +212,17 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
                     <SelectValue placeholder="Seleccionar rol" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="vendedor">Vendedor</SelectItem>
-                    <SelectItem value="auditor">Auditor</SelectItem>
-                    <SelectItem value="supervisor">Supervisor</SelectItem>
-                    <SelectItem value="gestor">Gestor</SelectItem>
-                    <SelectItem value="admin">Administrador</SelectItem>
-                    <SelectItem value="super_admin">Super Administrador</SelectItem>
+                    {availableRoles.map((role) => (
+                      <SelectItem key={role} value={role}>
+                        {role === 'vendedor' && 'Vendedor'}
+                        {role === 'auditor' && 'Auditor'}
+                        {role === 'supervisor' && 'Supervisor'}
+                        {role === 'gestor' && 'Gestor'}
+                        {role === 'financiero' && 'Financiero'}
+                        {role === 'admin' && 'Administrador'}
+                        {role === 'super_admin' && 'Super Administrador'}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -262,9 +290,13 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
                 </Button>
                 <Button 
                   type="submit" 
-                  disabled={createUser.isPending || updateUser.isPending}
+                  disabled={createUser.isPending || updateUser.isPending || !canEditThisUser}
                 >
-                  {(createUser.isPending || updateUser.isPending) ? "Guardando..." : "Guardar"}
+                  {(createUser.isPending || updateUser.isPending)
+                    ? "Guardando..."
+                    : !canEditThisUser
+                      ? "Sin permisos"
+                      : "Guardar"}
                 </Button>
               </div>
             </form>

@@ -8,20 +8,20 @@ import { Plus, Search, Building2, Users, FileText, Palette } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useCompanies } from "@/hooks/useCompanies";
-import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 import { CompanyForm } from "@/components/CompanyForm";
 import { CompanyActions } from "@/components/CompanyActions";
 import { CompanyBrandingForm } from "@/components/CompanyBrandingForm";
+import { useRolePermissions } from "@/hooks/useRolePermissions";
 
 const Companies = () => {
-  const { profile } = useSimpleAuthContext();
+  const { isSuperAdmin, isAdmin } = useRolePermissions();
   const { data: companies, isLoading } = useCompanies();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showBrandingForm, setShowBrandingForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const canCreateCompany = profile?.role === 'super_admin';
-  const canManageBranding = ['admin', 'super_admin'].includes(profile?.role || '');
+  const canCreateCompany = isSuperAdmin;
+  const canManageBranding = isSuperAdmin || isAdmin;
   
   const filteredCompanies = companies?.filter(company =>
     company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

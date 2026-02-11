@@ -1,22 +1,9 @@
 import { useMemo } from 'react';
-import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
-import { ROLE_PERMISSIONS, ROLE_LABELS, ROLE_COLORS, type AppRole, type RolePermissions } from '@/types/roles';
+import { type RolePermissions } from '@/types/roles';
+import { useEffectiveRole } from '@/hooks/useEffectiveRole';
 
 export const useRolePermissions = () => {
-  const { profile, userRole } = useSimpleAuthContext();
-  
-  const currentRole = useMemo((): AppRole => {
-    // Priorizar el rol de userRole (viene de user_roles table)
-    if (userRole && userRole in ROLE_PERMISSIONS) {
-      return userRole as AppRole;
-    }
-    // Fallback a vendedor
-    return 'vendedor';
-  }, [userRole]);
-
-  const permissions = useMemo((): RolePermissions => {
-    return ROLE_PERMISSIONS[currentRole];
-  }, [currentRole]);
+  const { role: currentRole, roleLabel, roleColor, permissions, isLoadingRole } = useEffectiveRole();
 
   /**
    * Verifica si el usuario tiene permiso para una acción específica en un recurso
@@ -89,8 +76,8 @@ export const useRolePermissions = () => {
 
   return {
     role: currentRole,
-    roleLabel: ROLE_LABELS[currentRole],
-    roleColor: ROLE_COLORS[currentRole],
+    roleLabel,
+    roleColor,
     permissions,
     can,
     canAny,
@@ -98,6 +85,7 @@ export const useRolePermissions = () => {
     canManage,
     isAdmin,
     isSuperAdmin,
+    isLoadingRole,
   };
 };
 

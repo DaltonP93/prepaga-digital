@@ -1,59 +1,31 @@
 
-import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useRolePermissions } from '@/hooks/useRolePermissions';
 
 export const useRoutePermissions = () => {
-  const { user, userRole } = useSimpleAuthContext();
-
-  const { data: roleFlags, isLoading: isResolvingRole } = useQuery({
-    queryKey: ['route-role-flags', user?.id],
-    enabled: !!user?.id,
-    staleTime: 30_000,
-    queryFn: async () => {
-      if (!user?.id) {
-        return { isSuperAdmin: false, isAdmin: false, isSupervisor: false, isAuditor: false };
-      }
-
-      const [superAdminRes, adminRes, supervisorRes, auditorRes] = await Promise.all([
-        supabase.rpc('has_role', { _user_id: user.id, _role: 'super_admin' }),
-        supabase.rpc('has_role', { _user_id: user.id, _role: 'admin' }),
-        supabase.rpc('has_role', { _user_id: user.id, _role: 'supervisor' }),
-        supabase.rpc('has_role', { _user_id: user.id, _role: 'auditor' }),
-      ]);
-
-      return {
-        isSuperAdmin: Boolean(superAdminRes.data),
-        isAdmin: Boolean(adminRes.data),
-        isSupervisor: Boolean(supervisorRes.data),
-        isAuditor: Boolean(auditorRes.data),
-      };
-    },
-  });
-
-  const isSuperAdmin = roleFlags?.isSuperAdmin || userRole === 'super_admin';
-  const isAdmin = roleFlags?.isAdmin || userRole === 'admin';
-  const isSupervisor = roleFlags?.isSupervisor || userRole === 'supervisor';
-  const isAuditor = roleFlags?.isAuditor || userRole === 'auditor';
+  const { role, permissions, isSuperAdmin, isAdmin, isLoadingRole } = useRolePermissions();
+  const isSupervisor = role === 'supervisor';
+  const isAuditor = role === 'auditor';
+  const isFinanciero = role === 'financiero';
 
   return {
     canViewDashboard: true,
-    canViewSales: true,
-    canCreateSales: true,
-    canEditSales: true,
-    canDeleteSales: isSuperAdmin || isAdmin,
-    canViewClients: true,
-    canCreateClients: true,
-    canViewPlans: true,
-    canViewDocuments: true,
-    canViewTemplates: true,
-    canViewAnalytics: isSuperAdmin || isAdmin || isSupervisor,
-    canViewUsers: isSuperAdmin || isSupervisor,
+    canViewSales: !isFinanciero,
+    canCreateSales: permissions.sales.create && !isFinanciero,
+    canEditSales: permissions.sales.update && !isFinanciero,
+    canDeleteSales: (isSuperAdmin || isAdmin) && !isFinanciero,
+    canViewClients: !isFinanciero,
+    canCreateClients: permissions.clients.create && !isFinanciero,
+    canViewPlans: !isFinanciero,
+    canViewDocuments: !isFinanciero,
+    canViewTemplates: !isFinanciero,
+    canViewAnalytics: permissions.analytics.viewDashboard || isSuperAdmin || isAdmin || isSupervisor || isFinanciero,
+    canViewUsers: permissions.users.read || isSuperAdmin,
     canViewCompanies: isSuperAdmin,
-    canViewAudit: isSuperAdmin || isAdmin || isSupervisor || isAuditor || isResolvingRole,
-    canViewSettings: true,
-    canViewExperience: isSuperAdmin || isAdmin,
+    canViewAudit: (permissions.audit.access || isSuperAdmin || isAdmin || isSupervisor || isAuditor || isLoadingRole) && !isFinanciero,
+    canViewSettings: !isFinanciero,
+    canViewExperience: (permissions.settings.ui || isSuperAdmin || isAdmin) && !isFinanciero,
     isSuperAdmin,
-    isResolvingRole,
+    isFinanciero,
+    isResolvingRole: isLoadingRole,
   };
 };

@@ -14,7 +14,7 @@ import { useTemplates, useDeleteTemplate } from "@/hooks/useTemplates";
 import { Database } from "@/integrations/supabase/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
+import { useRolePermissions } from "@/hooks/useRolePermissions";
 
 type Template = Database["public"]["Tables"]["templates"]["Row"];
 type ExtendedTemplate = Template & {
@@ -26,7 +26,7 @@ const Templates = () => {
   const navigate = useNavigate();
   const { templates = [], isLoading } = useTemplates();
   const deleteTemplate = useDeleteTemplate();
-  const { profile } = useSimpleAuthContext();
+  const { can } = useRolePermissions();
 
   const [showTemplateForm, setShowTemplateForm] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
@@ -71,7 +71,7 @@ const Templates = () => {
     });
 
   const canDeleteTemplate = () => {
-    return ["super_admin", "admin", "gestor"].includes(profile?.role || "");
+    return can('templates', 'delete');
   };
 
   const totalTemplates = typedTemplates.length;
@@ -296,4 +296,3 @@ const Templates = () => {
 };
 
 export default Templates;
-

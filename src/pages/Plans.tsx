@@ -8,14 +8,14 @@ import { Badge } from '@/components/ui/badge';
 import { PlanForm } from '@/components/PlanForm';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { useCurrencySettings } from '@/hooks/useCurrencySettings';
+import { useRolePermissions } from '@/hooks/useRolePermissions';
 
 const Plans = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingPlan, setEditingPlan] = useState(null);
-  const { profile, userRole } = useSimpleAuthContext();
   const { formatCurrency } = useCurrencySettings();
+  const { can } = useRolePermissions();
   const queryClient = useQueryClient();
 
   const { data: plans, isLoading, error } = useQuery({
@@ -68,7 +68,9 @@ const Plans = () => {
     setEditingPlan(null);
   };
 
-  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+  const canCreatePlan = can('plans', 'create');
+  const canEditPlan = can('plans', 'update');
+  const canDeletePlan = can('plans', 'delete');
 
   if (isLoading) {
     return (
@@ -89,7 +91,7 @@ const Plans = () => {
             Gestión de planes de seguro
           </p>
         </div>
-        {isAdmin && (
+        {canCreatePlan && (
           <Button onClick={() => setShowForm(true)} className="gap-2">
             <Plus className="h-4 w-4" />
             Nuevo Plan
@@ -106,23 +108,27 @@ const Plans = () => {
                   <CardTitle>{plan.name}</CardTitle>
                   <CardDescription>{plan.description}</CardDescription>
                 </div>
-                {isAdmin && (
+                {(canEditPlan || canDeletePlan) && (
                   <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEdit(plan)}
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(plan.id)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {canEditPlan && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(plan)}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {canDeletePlan && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(plan.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>

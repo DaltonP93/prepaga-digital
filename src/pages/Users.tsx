@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { UserPlus, Pencil, UserCheck, UserX } from "lucide-react";
 import { UserForm } from "@/components/UserForm";
 import { useUsers, useUpdateUser, UserWithRole } from "@/hooks/useUsers";
+import { useRolePermissions } from "@/hooks/useRolePermissions";
 
 const getRoleBadgeVariant = (role: string) => {
   switch (role) {
@@ -45,6 +46,8 @@ const Users = () => {
   const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
   const { data: users = [], isLoading } = useUsers();
   const updateUser = useUpdateUser();
+  const { isAdmin, isSuperAdmin } = useRolePermissions();
+  const canManageUsers = isAdmin || isSuperAdmin;
 
   const handleEditUser = (user: UserWithRole) => {
     setEditingUser(user);
@@ -86,7 +89,11 @@ const Users = () => {
               Gestiona los usuarios del sistema y sus roles
             </p>
           </div>
-          <Button onClick={() => setShowUserForm(true)}>
+          <Button
+            onClick={() => setShowUserForm(true)}
+            disabled={!canManageUsers}
+            title={!canManageUsers ? 'Sin permisos para crear usuarios' : ''}
+          >
             <UserPlus className="mr-2 h-4 w-4" />
             Agregar Usuario
           </Button>
@@ -139,6 +146,8 @@ const Users = () => {
                             variant="outline"
                             size="sm"
                             onClick={() => handleEditUser(user)}
+                            disabled={!canManageUsers}
+                            title={!canManageUsers ? 'Sin permisos para editar usuarios' : ''}
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -146,6 +155,8 @@ const Users = () => {
                             variant={user.is_active ? "destructive" : "default"}
                             size="sm"
                             onClick={() => handleToggleUserStatus(user)}
+                            disabled={!canManageUsers}
+                            title={!canManageUsers ? 'Sin permisos para cambiar estado del usuario' : ''}
                           >
                             {user.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
                           </Button>

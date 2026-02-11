@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import {
   Settings as SettingsIcon,
   User,
@@ -31,28 +30,12 @@ import { CurrencyConfigurationPanel } from '@/components/CurrencyConfigurationPa
 import { ProfileCompanyAssignmentPanel } from '@/components/ProfileCompanyAssignmentPanel';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { WorkflowConfigPanel } from '@/components/workflow/WorkflowConfigPanel';
-import { supabase } from '@/integrations/supabase/client';
+import { useRolePermissions } from '@/hooks/useRolePermissions';
 
 export default function Settings() {
-  const { user, userRole, profile } = useSimpleAuthContext();
-  const isSuperAdmin = userRole === 'super_admin';
-
-  const { data: canManageWorkflowByRpc = false } = useQuery({
-    queryKey: ['workflow-settings-permission', user?.id],
-    enabled: !!user?.id,
-    queryFn: async () => {
-      if (!user?.id) return false;
-      const [superAdminRes, adminRes] = await Promise.all([
-        supabase.rpc('has_role', { _user_id: user.id, _role: 'super_admin' }),
-        supabase.rpc('has_role', { _user_id: user.id, _role: 'admin' }),
-      ]);
-
-      return Boolean(superAdminRes.data) || Boolean(adminRes.data);
-    },
-    staleTime: 30_000,
-  });
-
-  const canManageWorkflow = userRole === 'super_admin' || userRole === 'admin' || canManageWorkflowByRpc;
+  const { profile } = useSimpleAuthContext();
+  const { role, roleLabel, isSuperAdmin, isAdmin, isLoadingRole } = useRolePermissions();
+  const canManageWorkflow = isSuperAdmin || isAdmin;
 
   const recentChanges = [
     {
@@ -88,7 +71,9 @@ export default function Settings() {
               Centro único de administración del sistema: cuenta, operación, branding, workflow y mantenimiento.
             </p>
             <div className="flex flex-wrap gap-2 pt-1">
-              <Badge variant="secondary">Rol actual: {userRole || 'sin rol'}</Badge>
+              <Badge variant="secondary">
+                Rol actual: {isLoadingRole ? 'resolviendo...' : roleLabel || role || 'sin rol'}
+              </Badge>
               <Badge variant={profile?.company_id ? 'default' : 'destructive'}>
                 {profile?.company_id ? 'Empresa asignada' : 'Sin company_id'}
               </Badge>

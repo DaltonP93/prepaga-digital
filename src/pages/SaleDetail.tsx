@@ -11,15 +11,19 @@ import { BeneficiariesManager } from '@/components/BeneficiariesManager';
 import WhatsAppNotificationPanel from '@/components/WhatsAppNotificationPanel';
 import { SignatureLinkGenerator } from '@/components/signature/SignatureLinkGenerator';
 import { DocumentPackageSelector } from '@/components/documents/DocumentPackageSelector';
-import { Loader2, FileText, User, Users, MessageSquare, PenTool, Package } from 'lucide-react';
+import { AuditCommentsPanel } from '@/components/audit/AuditCommentsPanel';
+import { Loader2, FileText, User, Users, MessageSquare, PenTool, Package, ClipboardCheck } from 'lucide-react';
 import { useStateTransition } from '@/hooks/useStateTransition';
+import { useRolePermissions } from '@/hooks/useRolePermissions';
 import type { SaleStatus } from '@/types/workflow';
 
 export default function SaleDetail() {
   const { id } = useParams<{ id: string }>();
   const { data: sale, isLoading } = useSale(id!);
-  const { canViewState } = useStateTransition();
+  const { canViewState, canEditState } = useStateTransition();
+  const { role } = useRolePermissions();
   const [activeTab, setActiveTab] = useState('details');
+  const showAuditPanel = role === 'auditor' || role === 'admin' || role === 'super_admin';
 
   if (isLoading) {
     return (
@@ -93,6 +97,12 @@ export default function SaleDetail() {
             <MessageSquare className="h-4 w-4" />
             WhatsApp
           </TabsTrigger>
+          {showAuditPanel && (
+            <TabsTrigger value="audit" className="flex items-center gap-1.5">
+              <ClipboardCheck className="h-4 w-4" />
+              Auditoría
+            </TabsTrigger>
+          )}
           <TabsTrigger value="requirements">Requisitos</TabsTrigger>
           <TabsTrigger value="notes">Notas</TabsTrigger>
         </TabsList>
@@ -128,6 +138,12 @@ export default function SaleDetail() {
             clientName={clientName}
           />
         </TabsContent>
+
+        {showAuditPanel && (
+          <TabsContent value="audit">
+            <AuditCommentsPanel saleId={id!} saleStatus={sale.status || undefined} />
+          </TabsContent>
+        )}
 
         <TabsContent value="requirements">
           <RequirementsManager saleId={id!} />

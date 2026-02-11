@@ -1,8 +1,9 @@
 import { useCallback } from 'react';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { useWorkflowConfig } from '@/hooks/useWorkflowConfig';
+import { useEffectiveRole } from '@/hooks/useEffectiveRole';
 import { toast } from 'sonner';
-import type { SaleStatus, TransitionRule, WorkflowConfig, AppRole } from '@/types/workflow';
+import type { SaleStatus, TransitionRule, WorkflowConfig } from '@/types/workflow';
 
 /** Minimal sale shape needed for condition evaluation */
 export interface SaleForTransition {
@@ -53,7 +54,7 @@ export interface TransitionCheckResult {
 
 export const useStateTransition = () => {
   const { profile } = useSimpleAuthContext();
-  const role = (profile?.role as AppRole) || 'vendedor';
+  const { role } = useEffectiveRole();
   const { data: configRow } = useWorkflowConfig(profile?.company_id);
 
   const isWorkflowActive = configRow?.is_active ?? false;

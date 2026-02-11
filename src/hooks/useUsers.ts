@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Database } from '@/integrations/supabase/types';
+import type { AppRole } from '@/types/roles';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];
@@ -13,7 +14,7 @@ interface CreateUserParams {
   first_name: string;
   last_name: string;
   phone?: string;
-  role: 'super_admin' | 'admin' | 'supervisor' | 'auditor' | 'gestor' | 'vendedor';
+  role: 'super_admin' | 'admin' | 'supervisor' | 'auditor' | 'gestor' | 'vendedor' | 'financiero';
   company_id?: string;
 }
 
@@ -21,6 +22,28 @@ export interface UserWithRole extends Profile {
   companies: { name: string } | null;
   user_roles: { role: string }[] | null;
 }
+
+const ROLE_PRIORITY: AppRole[] = [
+  'super_admin',
+  'admin',
+  'supervisor',
+  'auditor',
+  'financiero',
+  'gestor',
+  'vendedor',
+];
+
+const resolveHighestRole = (roles: string[]): AppRole => {
+  const normalized = roles.filter((role): role is AppRole =>
+    ROLE_PRIORITY.includes(role as AppRole)
+  );
+
+  for (const role of ROLE_PRIORITY) {
+    if (normalized.includes(role)) return role;
+  }
+
+  return 'vendedor';
+};
 
 export const useUsers = () => {
   return useQuery({
@@ -43,12 +66,18 @@ export const useUsers = () => {
         .select('user_id, role')
         .in('user_id', userIds);
 
-      const roleMap = new Map<string, string>();
-      roles?.forEach(r => roleMap.set(r.user_id, r.role));
+      const groupedRoles = new Map<string, string[]>();
+      roles?.forEach((r) => {
+        const current = groupedRoles.get(r.user_id) || [];
+        current.push(r.role);
+        groupedRoles.set(r.user_id, current);
+      });
 
       return profiles.map(p => ({
         ...p,
-        user_roles: roleMap.has(p.id) ? [{ role: roleMap.get(p.id)! }] : null,
+        user_roles: groupedRoles.has(p.id)
+          ? [{ role: resolveHighestRole(groupedRoles.get(p.id) || []) }]
+          : null,
       })) as UserWithRole[];
     },
   });
@@ -105,6 +134,38 @@ export const useUpdateUser = () => {
 
   return useMutation({
     mutationFn: async ({ id, role, ...profileUpdates }: ProfileUpdate & { id: string; role?: string }) => {
+      const { data: actorData } = await supabase.auth.getUser();
+      const actorId = actorData.user?.id;
+      if (!actorId) throw new Error('Sesión inválida. Inicia sesión nuevamente.');
+
+      const [actorSuperAdminRes, actorAdminRes, targetRolesRes] = await Promise.all([
+        supabase.rpc('has_role', { _user_id: actorId, _role: 'super_admin' }),
+        supabase.rpc('has_role', { _user_id: actorId, _role: 'admin' }),
+        supabase.from('user_roles').select('role').eq('user_id', id),
+      ]);
+
+      const actorIsSuperAdmin = Boolean(actorSuperAdminRes.data);
+      const actorIsAdmin = Boolean(actorAdminRes.data);
+      const actorCanManageRoles = actorIsSuperAdmin || actorIsAdmin;
+
+      const targetCurrentRoles = (targetRolesRes.data || [])
+        .map((entry: any) => entry?.role)
+        .filter((value: any): value is string => typeof value === 'string' && value.length > 0);
+      const targetCurrentRole = targetCurrentRoles.length > 0 ? resolveHighestRole(targetCurrentRoles) : 'vendedor';
+
+      // Restricciones RBAC para modificaciones de rol
+      if (role) {
+        if (!actorCanManageRoles) {
+          throw new Error('No tienes permisos para modificar roles de usuario.');
+        }
+        if (targetCurrentRole === 'super_admin' && !actorIsSuperAdmin) {
+          throw new Error('Solo un super admin puede modificar usuarios con rol super admin.');
+        }
+        if (role === 'super_admin' && !actorIsSuperAdmin) {
+          throw new Error('Solo un super admin puede asignar el rol super admin.');
+        }
+      }
+
       // Update profile fields (exclude role)
       const { error: profileError } = await supabase
         .from('profiles')
@@ -129,6 +190,20 @@ export const useUpdateUser = () => {
           .insert({ user_id: id, role: role as any });
 
         if (insertError) throw insertError;
+
+        // Audit log for RBAC changes (best effort)
+        const targetCompanyId = (profileUpdates.company_id as string | null | undefined) ?? null;
+        const action = targetCurrentRole === role ? 'USER_ROLE_RECONFIRMED' : 'USER_ROLE_CHANGED';
+        await supabase.from('audit_logs').insert({
+          action,
+          entity_type: 'user_roles',
+          entity_id: id,
+          old_values: { role: targetCurrentRole },
+          new_values: { role },
+          user_id: actorId,
+          company_id: targetCompanyId,
+          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+        } as any);
       }
 
       return { id };

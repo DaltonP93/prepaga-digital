@@ -9,9 +9,11 @@ import { useClients } from "@/hooks/useClients";
 import { useTemplates } from "@/hooks/useTemplates";
 import { usePlans } from "@/hooks/usePlans";
 import { useCompanies } from "@/hooks/useCompanies";
+import { useRolePermissions } from "@/hooks/useRolePermissions";
 
 export function RoleDashboard() {
   const { profile } = useSimpleAuthContext();
+  const { role: effectiveRole, roleLabel } = useRolePermissions();
   const { data: sales = [] } = useSales();
   const { data: clients = [] } = useClients();
   const { templates = [] } = useTemplates();
@@ -28,7 +30,7 @@ export function RoleDashboard() {
    * 
    * Never rely on these client-side checks for security - RLS is the enforcement layer.
    */
-  const userRole = profile.role || 'vendedor';
+  const userRole = effectiveRole || profile.role || 'vendedor';
   const isVendedor = userRole === 'vendedor';
   const isGestorOrAdmin = ['gestor', 'admin', 'super_admin'].includes(userRole);
 
@@ -92,10 +94,7 @@ export function RoleDashboard() {
               </h2>
               <div className="flex items-center space-x-2">
                 <Badge variant="secondary">
-                  {userRole === 'super_admin' && 'Super Admin'}
-                  {userRole === 'admin' && 'Administrador'}
-                  {userRole === 'gestor' && 'Gestor'}
-                  {userRole === 'vendedor' && 'Vendedor'}
+                  {roleLabel}
                 </Badge>
                 {userCompany && (
                   <span className="text-sm text-muted-foreground">

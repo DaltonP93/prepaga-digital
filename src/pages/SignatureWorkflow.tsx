@@ -8,6 +8,7 @@ import { ArrowLeft, FileText, Users, Send } from 'lucide-react';
 import { useSales } from '@/hooks/useSales';
 import { useCurrencySettings } from '@/hooks/useCurrencySettings';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
+import { useRolePermissions } from '@/hooks/useRolePermissions';
 
 const SignatureWorkflow = () => {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ const SignatureWorkflow = () => {
   
   // Use only SimpleAuthContext since that's what's available in the app
   const { profile } = useSimpleAuthContext();
+  const { role: effectiveRole, permissions } = useRolePermissions();
   
   const { data: sales = [], isLoading } = useSales();
   const { settings, formatCurrency } = useCurrencySettings();
@@ -59,10 +61,13 @@ const SignatureWorkflow = () => {
 
   // If no specific sale selected, show sales list
   if (!saleId || !selectedSale) {
+    const isSeller = effectiveRole === 'vendedor';
+    const canViewAllSales = permissions.sales.viewAll;
+
     const availableSales = sales.filter(sale => 
       ['enviado', 'firmado'].includes(sale.status) || 
-      (profile?.role === 'vendedor' && sale.salesperson_id === profile.id) ||
-      ['admin', 'super_admin', 'gestor'].includes(profile?.role || '')
+      (isSeller && sale.salesperson_id === profile?.id) ||
+      canViewAllSales
     );
 
     return (
