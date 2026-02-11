@@ -71,8 +71,8 @@ const SignatureWorkflow = () => {
     );
     const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
     const waUrl = cleanPhone
-      ? `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${message}`
-      : `https://web.whatsapp.com/send?text=${message}`;
+      ? `https://wa.me/${cleanPhone}?text=${message}`
+      : `https://wa.me/?text=${message}`;
     window.open(waUrl, '_blank');
   };
 
