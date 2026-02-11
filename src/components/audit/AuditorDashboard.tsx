@@ -28,6 +28,7 @@ export const AuditorDashboard: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [lightboxUrl, setLightboxUrl] = useState('');
   const [lightboxName, setLightboxName] = useState('');
+  const [lightboxType, setLightboxType] = useState('');
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
   // Fetch sales pending audit
@@ -111,6 +112,18 @@ export const AuditorDashboard: React.FC = () => {
         user_id: profile?.id,
         details: { audit_notes: auditNotes, new_status: 'pendiente' },
       });
+
+      // Notify vendedor
+      const saleData = sales.find((s: any) => s.id === saleId);
+      if (saleData?.salesperson_id) {
+        await supabase.from('notifications').insert({
+          user_id: saleData.salesperson_id,
+          title: 'Venta aprobada por auditoría',
+          message: `La venta #${saleData.contract_number || saleId.slice(-4)} ha sido aprobada. ${auditNotes || ''}`,
+          type: 'success',
+          link: `/sales/${saleId}/edit`,
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['audit-sales'] });
@@ -167,6 +180,18 @@ export const AuditorDashboard: React.FC = () => {
         user_id: profile?.id,
         details: { audit_notes: auditNotes, new_status: 'rechazado' },
       });
+
+      // Notify vendedor
+      const saleData = sales.find((s: any) => s.id === saleId);
+      if (saleData?.salesperson_id) {
+        await supabase.from('notifications').insert({
+          user_id: saleData.salesperson_id,
+          title: 'Venta rechazada por auditoría',
+          message: `La venta #${saleData.contract_number || saleId.slice(-4)} fue rechazada. Motivo: ${auditNotes}`,
+          type: 'error',
+          link: `/sales/${saleId}/edit`,
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['audit-sales'] });
@@ -221,6 +246,18 @@ export const AuditorDashboard: React.FC = () => {
         user_id: profile?.id,
         details: { audit_notes: auditNotes },
       });
+
+      // Notify vendedor
+      const saleData = sales.find((s: any) => s.id === saleId);
+      if (saleData?.salesperson_id) {
+        await supabase.from('notifications').insert({
+          user_id: saleData.salesperson_id,
+          title: 'Solicitud de información - Auditoría',
+          message: `Se requiere información adicional para la venta #${saleData.contract_number || saleId.slice(-4)}: ${auditNotes}`,
+          type: 'warning',
+          link: `/sales/${saleId}/edit`,
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['audit-sales'] });
@@ -432,6 +469,12 @@ export const AuditorDashboard: React.FC = () => {
                             if (doc.file_type?.startsWith('image/')) {
                               setLightboxUrl(data.signedUrl);
                               setLightboxName(doc.file_name);
+                              setLightboxType(doc.file_type || '');
+                              setLightboxOpen(true);
+                            } else if (doc.file_type === 'application/pdf' || /\.(pdf|doc|docx)$/i.test(doc.file_name)) {
+                              setLightboxUrl(data.signedUrl);
+                              setLightboxName(doc.file_name);
+                              setLightboxType(doc.file_type || '');
                               setLightboxOpen(true);
                             } else {
                               window.open(data.signedUrl, '_blank');
@@ -675,6 +718,7 @@ export const AuditorDashboard: React.FC = () => {
         onOpenChange={setLightboxOpen}
         src={lightboxUrl}
         fileName={lightboxName}
+        fileType={lightboxType}
       />
     </>
   );
