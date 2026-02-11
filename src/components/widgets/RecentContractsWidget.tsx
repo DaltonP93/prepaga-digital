@@ -96,7 +96,7 @@ const RecentContractsWidget = () => {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="font-semibold text-primary">
-                      CON-{sale.id?.slice(-4)}
+                      {sale.contract_number || `CON-${sale.id?.slice(-4)}`}
                     </div>
                     <Badge variant={getStatusBadgeVariant(sale.status || 'borrador')}>
                       {sale.status === 'firmado' ? 'Firmado' :

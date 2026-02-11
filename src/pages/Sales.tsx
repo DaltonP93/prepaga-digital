@@ -155,7 +155,7 @@ const Sales = () => {
                           <TableCell>
                             <div className="space-y-1">
                               <div className="font-medium text-primary">
-                                CON-{sale.id?.slice(-4)}
+                                {sale.contract_number || `CON-${sale.id?.slice(-4)}`}
                               </div>
                               <div className="text-sm text-muted-foreground">
                                 {sale.plans?.name || 'Sin plan'}
