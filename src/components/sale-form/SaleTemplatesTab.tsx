@@ -114,8 +114,8 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       const { data: saleForValidation } = await supabase.from('sales').select('*, template_responses(id)').eq('id', saleId).single();
       if (saleForValidation?.company_id) {
         const { data: currentUser } = await supabase.auth.getUser();
-        const { data: userProfile } = await supabase.from('profiles').select('role').eq('id', currentUser?.user?.id || '').single();
-        const check = await validateSaleTransition(saleForValidation.company_id, saleForValidation, 'enviado', (userProfile?.role as any) || 'vendedor');
+        const { data: userRoleData } = await supabase.rpc('get_user_role', { _user_id: currentUser?.user?.id || '' });
+        const check = await validateSaleTransition(saleForValidation.company_id, saleForValidation, 'enviado', (userRoleData as any) || 'vendedor');
         if (!check.allowed) throw new Error(check.reasons.join(', '));
       }
 

@@ -7,13 +7,13 @@ import type { AppRole } from '@/types/roles';
 
 type SaleStatus = Database['public']['Enums']['sale_status'];
 
-const ROLE_PRIORITY: AppRole[] = ['super_admin', 'admin', 'supervisor', 'auditor', 'financiero', 'gestor', 'vendedor'];
+const ROLE_PRIORITY: string[] = ['super_admin', 'admin', 'supervisor', 'auditor', 'financiero', 'gestor', 'vendedor'];
 
-const resolveEffectiveRoleForUser = async (userId?: string | null, fallback: AppRole = 'auditor'): Promise<AppRole> => {
+const resolveEffectiveRoleForUser = async (userId?: string | null, fallback: string = 'auditor'): Promise<string> => {
   if (!userId) return fallback;
 
   const checks = await Promise.all(
-    ROLE_PRIORITY.map((role) => supabase.rpc('has_role', { _user_id: userId, _role: role }))
+    ROLE_PRIORITY.map((role) => supabase.rpc('has_role', { _user_id: userId, _role: role as any }))
   );
 
   for (let i = 0; i < ROLE_PRIORITY.length; i += 1) {
@@ -68,7 +68,7 @@ export const useCreateAuditProcess = () => {
       // Validate workflow transition before updating status
       const { data: sale } = await supabase.from('sales').select('*, template_responses(id)').eq('id', saleId).single();
       if (sale?.company_id) {
-        const auditorRole = await resolveEffectiveRoleForUser(auditorId, 'auditor');
+        const auditorRole = await resolveEffectiveRoleForUser(auditorId, 'auditor') as AppRole;
         const check = await validateSaleTransition(sale.company_id, sale, 'en_auditoria', auditorRole);
         if (!check.allowed) throw new Error(check.reasons.join(', '));
       }
@@ -142,7 +142,7 @@ export const useUpdateAuditProcess = () => {
       const { data: saleData } = await supabase.from('sales').select('*, template_responses(id)').eq('id', auditProcess.sale_id).single();
       if (saleData?.company_id) {
         const { data: currentUser } = await supabase.auth.getUser();
-        const currentRole = await resolveEffectiveRoleForUser(currentUser?.user?.id, 'auditor');
+        const currentRole = await resolveEffectiveRoleForUser(currentUser?.user?.id, 'auditor') as AppRole;
         const check = await validateSaleTransition(saleData.company_id, saleData, saleStatus, currentRole);
         if (!check.allowed) throw new Error(check.reasons.join(', '));
       }

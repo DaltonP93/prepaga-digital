@@ -62,11 +62,11 @@ export async function validateSaleTransition(
     .maybeSingle();
 
   // If no config or error, allow (backward compatible)
-  if (error || !configRow || !configRow.is_active) {
+  if (error || !configRow || !(configRow as any).is_active) {
     return { allowed: true, reasons: [], rule: null };
   }
 
-  const config = configRow.workflow_config as WorkflowConfig;
+  const config = (configRow as any).workflow_config as WorkflowConfig;
   if (!config?.transitions) {
     return { allowed: true, reasons: [], rule: null };
   }

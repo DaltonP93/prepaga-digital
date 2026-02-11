@@ -39,7 +39,7 @@ export const useAuditComments = (saleId?: string) => {
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, email, role')
+          .select('id, first_name, last_name, email')
           .in('id', userIds);
 
         profilesMap = (profiles || []).reduce((acc, p) => {
