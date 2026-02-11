@@ -49,7 +49,9 @@ export const AuditorDashboard: React.FC = () => {
 
       // Filter by sale status for audit
       if (statusFilter === 'pending') {
-        query = query.eq('status', 'en_auditoria');
+        query = query.in('status', ['pendiente', 'en_auditoria']);
+      } else if (statusFilter === 'borrador') {
+        query = query.eq('status', 'borrador');
       } else if (statusFilter === 'aprobado') {
         query = query.eq('audit_status', 'aprobado');
       } else if (statusFilter === 'rechazado') {
@@ -57,8 +59,8 @@ export const AuditorDashboard: React.FC = () => {
       } else if (statusFilter === 'requiere_info') {
         query = query.eq('audit_status', 'requiere_info');
       } else {
-        // 'all' - show all sales that are or were in audit
-        query = query.or('status.eq.en_auditoria,audit_status.neq.null');
+        // 'all' - show all sales
+        query = query.or('status.eq.pendiente,status.eq.en_auditoria,status.eq.borrador,audit_status.neq.null');
       }
 
       const { data, error } = await query;
@@ -79,9 +81,12 @@ export const AuditorDashboard: React.FC = () => {
     },
   });
 
-  // Approve sale - changes status to 'pendiente' (approved, ready for next steps)
+  // Approve sale - changes status to 'aprobado_para_templates' (approved, ready for next steps)
   const approveSale = useMutation({
     mutationFn: async (saleId: string) => {
+      const saleData = sales.find((s: any) => s.id === saleId);
+      const previousStatus = saleData?.status || 'pendiente';
+
       const { error } = await supabase
         .from('sales')
         .update({
@@ -89,7 +94,7 @@ export const AuditorDashboard: React.FC = () => {
           auditor_id: profile?.id,
           audited_at: new Date().toISOString(),
           audit_notes: auditNotes || 'Aprobado sin observaciones',
-          status: 'pendiente',
+          status: 'aprobado_para_templates' as any,
         })
         .eq('id', saleId);
 
@@ -98,8 +103,8 @@ export const AuditorDashboard: React.FC = () => {
       // Log workflow state change
       await supabase.from('sale_workflow_states').insert({
         sale_id: saleId,
-        previous_status: 'en_auditoria',
-        new_status: 'pendiente',
+        previous_status: previousStatus,
+        new_status: 'aprobado_para_templates',
         changed_by: profile?.id,
         change_reason: `Aprobado por auditor: ${auditNotes || 'Sin observaciones'}`,
         metadata: { audit_notes: auditNotes },
@@ -110,11 +115,11 @@ export const AuditorDashboard: React.FC = () => {
         sale_id: saleId,
         action: 'audit_approved',
         user_id: profile?.id,
-        details: { audit_notes: auditNotes, new_status: 'pendiente' },
+        details: { audit_notes: auditNotes, new_status: 'aprobado_para_templates' },
       });
 
       // Notify vendedor
-      const saleData = sales.find((s: any) => s.id === saleId);
+      // saleData already declared above
       if (saleData?.salesperson_id) {
         await supabase.from('notifications').insert({
           user_id: saleData.salesperson_id,
@@ -132,7 +137,7 @@ export const AuditorDashboard: React.FC = () => {
       setAuditNotes('');
       toast({
         title: 'Venta aprobada',
-        description: 'La venta ha sido aprobada y pasa a estado Pendiente.',
+        description: 'La venta ha sido aprobada y pasa a estado Aprobado.',
       });
     },
     onError: (error: any) => {
@@ -150,6 +155,8 @@ export const AuditorDashboard: React.FC = () => {
       if (!auditNotes.trim()) {
         throw new Error('Debe proporcionar un motivo de rechazo');
       }
+      const saleData = sales.find((s: any) => s.id === saleId);
+      const previousStatus = saleData?.status || 'pendiente';
 
       const { error } = await supabase
         .from('sales')
@@ -167,7 +174,7 @@ export const AuditorDashboard: React.FC = () => {
       // Log workflow state change
       await supabase.from('sale_workflow_states').insert({
         sale_id: saleId,
-        previous_status: 'en_auditoria',
+        previous_status: previousStatus,
         new_status: 'rechazado',
         changed_by: profile?.id,
         change_reason: `Rechazado: ${auditNotes}`,
@@ -182,7 +189,7 @@ export const AuditorDashboard: React.FC = () => {
       });
 
       // Notify vendedor
-      const saleData = sales.find((s: any) => s.id === saleId);
+      // saleData already declared above
       if (saleData?.salesperson_id) {
         await supabase.from('notifications').insert({
           user_id: saleData.salesperson_id,
@@ -220,6 +227,9 @@ export const AuditorDashboard: React.FC = () => {
         throw new Error('Debe especificar qué información adicional necesita');
       }
 
+      const saleData = sales.find((s: any) => s.id === saleId);
+      const previousStatus = saleData?.status || 'pendiente';
+
       const { error } = await supabase
         .from('sales')
         .update({
@@ -243,7 +253,7 @@ export const AuditorDashboard: React.FC = () => {
       // Log workflow state change
       await supabase.from('sale_workflow_states').insert({
         sale_id: saleId,
-        previous_status: 'en_auditoria',
+        previous_status: previousStatus,
         new_status: 'rechazado',
         changed_by: profile?.id,
         change_reason: `Información requerida: ${auditNotes}`,
@@ -259,7 +269,7 @@ export const AuditorDashboard: React.FC = () => {
       });
 
       // Notify vendedor
-      const saleData = sales.find((s: any) => s.id === saleId);
+      // saleData already declared above
       if (saleData?.salesperson_id) {
         await supabase.from('notifications').insert({
           user_id: saleData.salesperson_id,
@@ -284,10 +294,13 @@ export const AuditorDashboard: React.FC = () => {
 
   const getStatusBadge = (status: string, auditStatus: string | null) => {
     switch (status) {
+      case 'borrador':
+        return <Badge variant="outline"><Clock className="h-3 w-3 mr-1" />Borrador</Badge>;
       case 'en_auditoria':
-        return <Badge variant="outline" className="text-yellow-600 border-yellow-600"><Clock className="h-3 w-3 mr-1" />En Auditoría</Badge>;
       case 'pendiente':
-        return <Badge className="bg-green-600"><CheckCircle className="h-3 w-3 mr-1" />Pendiente (Aprobado)</Badge>;
+        return <Badge variant="outline" className="text-yellow-600 border-yellow-600"><Clock className="h-3 w-3 mr-1" />Pendiente</Badge>;
+      case 'aprobado_para_templates':
+        return <Badge className="bg-green-600"><CheckCircle className="h-3 w-3 mr-1" />Aprobado</Badge>;
       case 'enviado':
         return <Badge variant="outline" className="text-blue-600">Enviado</Badge>;
       case 'firmado':
@@ -319,7 +332,7 @@ export const AuditorDashboard: React.FC = () => {
 
   // Stats
   const stats = {
-    pending: sales.filter((s: any) => s.status === 'en_auditoria').length,
+    pending: sales.filter((s: any) => s.status === 'pendiente' || s.status === 'en_auditoria').length,
     approved: sales.filter((s: any) => s.audit_status === 'aprobado').length,
     rejected: sales.filter((s: any) => s.audit_status === 'rechazado' || s.status === 'rechazado').length,
     infoRequired: sales.filter((s: any) => s.audit_status === 'requiere_info').length,
@@ -660,6 +673,7 @@ export const AuditorDashboard: React.FC = () => {
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="pending">Pendientes</SelectItem>
+                <SelectItem value="borrador">Borradores</SelectItem>
                 <SelectItem value="aprobado">Aprobados</SelectItem>
                 <SelectItem value="rechazado">Rechazados</SelectItem>
                 <SelectItem value="requiere_info">Info Requerida</SelectItem>
