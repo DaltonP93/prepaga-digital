@@ -25,7 +25,7 @@ export const AuditorDashboard: React.FC = () => {
   const [selectedSale, setSelectedSale] = useState<any>(null);
   const [auditNotes, setAuditNotes] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('pending');
   const [lightboxUrl, setLightboxUrl] = useState('');
   const [lightboxName, setLightboxName] = useState('');
   const [lightboxType, setLightboxType] = useState('');
@@ -226,6 +226,7 @@ export const AuditorDashboard: React.FC = () => {
           audit_status: 'requiere_info',
           auditor_id: profile?.id,
           audit_notes: auditNotes,
+          status: 'rechazado' as any,
         })
         .eq('id', saleId);
 
@@ -239,12 +240,22 @@ export const AuditorDashboard: React.FC = () => {
         requested_by: profile?.id,
       });
 
+      // Log workflow state change
+      await supabase.from('sale_workflow_states').insert({
+        sale_id: saleId,
+        previous_status: 'en_auditoria',
+        new_status: 'rechazado',
+        changed_by: profile?.id,
+        change_reason: `Información requerida: ${auditNotes}`,
+        metadata: { audit_notes: auditNotes, reason: 'requiere_info' },
+      });
+
       // Log to process traces
       await supabase.from('process_traces').insert({
         sale_id: saleId,
         action: 'audit_request_info',
         user_id: profile?.id,
-        details: { audit_notes: auditNotes },
+        details: { audit_notes: auditNotes, new_status: 'rechazado' },
       });
 
       // Notify vendedor
