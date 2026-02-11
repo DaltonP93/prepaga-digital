@@ -93,7 +93,7 @@ export const useCreateSignatureLink = () => {
           sale_id: saleId,
           token,
           recipient_type: recipientType,
-          recipient_email: recipientEmail || null,
+          recipient_email: recipientEmail || '',
           recipient_phone: recipientPhone || null,
           recipient_id: beneficiaryId || null,
           expires_at: expiresAt.toISOString(),

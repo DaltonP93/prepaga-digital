@@ -89,22 +89,22 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       if (saleError) throw saleError;
       const client = sale?.clients as any;
 
-      // Create signature link for titular
+      // Create signature link for titular (sees all documents)
       await createSignatureLink.mutateAsync({
         saleId,
         recipientType: 'titular',
-        recipientEmail: client?.email || undefined,
+        recipientEmail: client?.email || '',
         recipientPhone: client?.phone || undefined,
       });
 
-      // Create signature links for each beneficiary
+      // Create separate signature links for each adherente (sees only their own DDJJ)
       if (beneficiaries && beneficiaries.length > 0) {
         for (const b of beneficiaries) {
-          if (b.signature_required !== false) {
+          if (b.signature_required !== false && !b.is_primary) {
             await createSignatureLink.mutateAsync({
               saleId,
-              recipientType: 'beneficiario',
-              recipientEmail: b.email || undefined,
+              recipientType: 'adherente',
+              recipientEmail: b.email || '',
               recipientPhone: b.phone || undefined,
               beneficiaryId: b.id,
             });
