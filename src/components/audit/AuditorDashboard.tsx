@@ -87,6 +87,10 @@ export const AuditorDashboard: React.FC = () => {
       const saleData = sales.find((s: any) => s.id === saleId);
       const previousStatus = saleData?.status || 'pendiente';
 
+      // Calculate contract_start_date: first day of the approval month
+      const now = new Date();
+      const contractStartDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+
       const { error } = await supabase
         .from('sales')
         .update({
@@ -95,7 +99,8 @@ export const AuditorDashboard: React.FC = () => {
           audited_at: new Date().toISOString(),
           audit_notes: auditNotes || 'Aprobado sin observaciones',
           status: 'aprobado_para_templates' as any,
-        })
+          contract_start_date: contractStartDate,
+        } as any)
         .eq('id', saleId);
 
       if (error) throw error;
