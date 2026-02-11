@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { ROLE_PERMISSIONS, ROLE_LABELS, ROLE_COLORS, type AppRole } from '@/types/roles';
 
-const ROLE_PRIORITY: AppRole[] = [
+const ROLE_PRIORITY: string[] = [
   'super_admin',
   'admin',
   'supervisor',
@@ -57,8 +57,8 @@ export const useEffectiveRole = () => {
   });
 
   const effectiveRole = useMemo<AppRole>(() => {
-    for (const role of ROLE_PRIORITY) {
-      if (roleFlags?.[role]) return role;
+    for (const r of ROLE_PRIORITY) {
+      if (roleFlags?.[r as keyof typeof roleFlags]) return r as AppRole;
     }
 
     if (userRole && userRole in ROLE_PERMISSIONS) {

@@ -27,7 +27,7 @@ export const usePushNotifications = () => {
   const checkSubscription = async () => {
     try {
       const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
+      const subscription = await (registration as any).pushManager.getSubscription();
       
       if (subscription) {
         setIsSubscribed(true);
@@ -68,7 +68,7 @@ export const usePushNotifications = () => {
       }
 
       const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.subscribe({
+      const subscription = await (registration as any).pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(
           'BEl62iUYgUivxIkv69yViEuiBIa40HI80NkhVCXoNWQRGBx3mLDqjSjrn8BXGMVfWLksNGh0bJ4lWGbwvbIFYmM'
@@ -110,7 +110,7 @@ export const usePushNotifications = () => {
     setIsLoading(true);
     try {
       const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
+      const subscription = await (registration as any).pushManager.getSubscription();
       
       if (subscription) {
         await subscription.unsubscribe();

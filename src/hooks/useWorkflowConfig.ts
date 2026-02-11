@@ -24,7 +24,7 @@ export const useWorkflowConfig = (companyId: string | undefined) => {
         .maybeSingle();
 
       if (error) throw error;
-      return data as WorkflowConfigRow | null;
+      return data as unknown as WorkflowConfigRow | null;
     },
     enabled: !!companyId,
   });

@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_comments: {
+        Row: {
+          audit_action: string | null
+          comment: string
+          created_at: string
+          id: string
+          sale_id: string
+          sale_status_at_comment: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          audit_action?: string | null
+          comment: string
+          created_at?: string
+          id?: string
+          sale_id: string
+          sale_status_at_comment?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          audit_action?: string | null
+          comment?: string
+          created_at?: string
+          id?: string
+          sale_id?: string
+          sale_status_at_comment?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_comments_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -2399,6 +2440,7 @@ export type Database = {
         | "vendedor"
         | "supervisor"
         | "auditor"
+        | "financiero"
       document_status: "pendiente" | "firmado" | "vencido"
       sale_status:
         | "borrador"
@@ -2408,6 +2450,14 @@ export type Database = {
         | "cancelado"
         | "pendiente"
         | "en_auditoria"
+        | "rechazado"
+        | "aprobado_para_templates"
+        | "preparando_documentos"
+        | "esperando_ddjj"
+        | "en_revision"
+        | "listo_para_enviar"
+        | "firmado_parcial"
+        | "expirado"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2542,6 +2592,7 @@ export const Constants = {
         "vendedor",
         "supervisor",
         "auditor",
+        "financiero",
       ],
       document_status: ["pendiente", "firmado", "vencido"],
       sale_status: [
@@ -2552,6 +2603,14 @@ export const Constants = {
         "cancelado",
         "pendiente",
         "en_auditoria",
+        "rechazado",
+        "aprobado_para_templates",
+        "preparando_documentos",
+        "esperando_ddjj",
+        "en_revision",
+        "listo_para_enviar",
+        "firmado_parcial",
+        "expirado",
       ],
     },
   },

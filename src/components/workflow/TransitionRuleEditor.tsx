@@ -31,8 +31,8 @@ interface TransitionRuleEditorProps {
 }
 
 export function TransitionRuleEditor({ open, onOpenChange, rule, onSave }: TransitionRuleEditorProps) {
-  const [from, setFrom] = useState(rule?.from || "borrador");
-  const [to, setTo] = useState(rule?.to || "enviado");
+  const [from, setFrom] = useState<string>(rule?.from || "borrador");
+  const [to, setTo] = useState<string>(rule?.to || "enviado");
   const [allowedRoles, setAllowedRoles] = useState<AppRole[]>(rule?.allowed_roles || []);
   const [conditions, setConditions] = useState(rule?.conditions || []);
   const [requireNote, setRequireNote] = useState(rule?.require_note || false);

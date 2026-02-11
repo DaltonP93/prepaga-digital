@@ -37,25 +37,43 @@ export const AuditorDashboard: React.FC = () => {
           clients (*),
           plans (*),
           beneficiaries (*),
-          documents (*),
-          profiles:salesperson_id (first_name, last_name, email)
+          documents (*)
         `)
         .order('created_at', { ascending: false });
 
-      // Filter by audit status
+      // Filter by sale status for audit
       if (statusFilter === 'pending') {
-        query = query.in('audit_status', ['pendiente', null]);
-      } else if (statusFilter !== 'all') {
-        query = query.eq('audit_status', statusFilter);
+        query = query.eq('status', 'en_auditoria');
+      } else if (statusFilter === 'aprobado') {
+        query = query.eq('audit_status', 'aprobado');
+      } else if (statusFilter === 'rechazado') {
+        query = query.eq('audit_status', 'rechazado');
+      } else if (statusFilter === 'requiere_info') {
+        query = query.eq('audit_status', 'requiere_info');
+      } else {
+        // 'all' - show all sales that are or were in audit
+        query = query.or('status.eq.en_auditoria,audit_status.neq.null');
       }
 
       const { data, error } = await query;
       if (error) throw error;
-      return data;
+
+      // Fetch salesperson profiles separately
+      const salespersonIds = [...new Set((data || []).map((s: any) => s.salesperson_id).filter(Boolean))];
+      let profilesMap: Record<string, any> = {};
+      if (salespersonIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email')
+          .in('id', salespersonIds);
+        profilesMap = (profiles || []).reduce((acc: any, p: any) => { acc[p.id] = p; return acc; }, {});
+      }
+
+      return (data || []).map((s: any) => ({ ...s, profiles: profilesMap[s.salesperson_id] || null }));
     },
   });
 
-  // Approve sale
+  // Approve sale - changes status to 'pendiente' (approved, ready for next steps)
   const approveSale = useMutation({
     mutationFn: async (saleId: string) => {
       const { error } = await supabase
@@ -65,7 +83,7 @@ export const AuditorDashboard: React.FC = () => {
           auditor_id: profile?.id,
           audited_at: new Date().toISOString(),
           audit_notes: auditNotes || 'Aprobado sin observaciones',
-          status: 'completado',
+          status: 'pendiente',
         })
         .eq('id', saleId);
 
@@ -74,20 +92,29 @@ export const AuditorDashboard: React.FC = () => {
       // Log workflow state change
       await supabase.from('sale_workflow_states').insert({
         sale_id: saleId,
-        previous_status: selectedSale?.status,
-        new_status: 'completado',
+        previous_status: 'en_auditoria',
+        new_status: 'pendiente',
         changed_by: profile?.id,
-        change_reason: 'Aprobado por auditor',
+        change_reason: `Aprobado por auditor: ${auditNotes || 'Sin observaciones'}`,
         metadata: { audit_notes: auditNotes },
+      });
+
+      // Log to process traces
+      await supabase.from('process_traces').insert({
+        sale_id: saleId,
+        action: 'audit_approved',
+        user_id: profile?.id,
+        details: { audit_notes: auditNotes, new_status: 'pendiente' },
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['audit-sales'] });
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
       setSelectedSale(null);
       setAuditNotes('');
       toast({
         title: 'Venta aprobada',
-        description: 'La venta ha sido aprobada y completada.',
+        description: 'La venta ha sido aprobada y pasa a estado Pendiente.',
       });
     },
     onError: (error: any) => {
@@ -99,7 +126,7 @@ export const AuditorDashboard: React.FC = () => {
     },
   });
 
-  // Reject sale
+  // Reject sale - returns to 'rechazado' so vendedor can fix and resubmit
   const rejectSale = useMutation({
     mutationFn: async (saleId: string) => {
       if (!auditNotes.trim()) {
@@ -113,7 +140,7 @@ export const AuditorDashboard: React.FC = () => {
           auditor_id: profile?.id,
           audited_at: new Date().toISOString(),
           audit_notes: auditNotes,
-          status: 'cancelado',
+          status: 'rechazado' as any,
         })
         .eq('id', saleId);
 
@@ -122,19 +149,28 @@ export const AuditorDashboard: React.FC = () => {
       // Log workflow state change
       await supabase.from('sale_workflow_states').insert({
         sale_id: saleId,
-        previous_status: selectedSale?.status,
-        new_status: 'cancelado',
+        previous_status: 'en_auditoria',
+        new_status: 'rechazado',
         changed_by: profile?.id,
         change_reason: `Rechazado: ${auditNotes}`,
+      });
+
+      // Log to process traces
+      await supabase.from('process_traces').insert({
+        sale_id: saleId,
+        action: 'audit_rejected',
+        user_id: profile?.id,
+        details: { audit_notes: auditNotes, new_status: 'rechazado' },
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['audit-sales'] });
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
       setSelectedSale(null);
       setAuditNotes('');
       toast({
         title: 'Venta rechazada',
-        description: 'La venta ha sido rechazada.',
+        description: 'La venta ha sido rechazada y devuelta al vendedor.',
         variant: 'destructive',
       });
     },
@@ -172,9 +208,18 @@ export const AuditorDashboard: React.FC = () => {
         description: auditNotes,
         requested_by: profile?.id,
       });
+
+      // Log to process traces
+      await supabase.from('process_traces').insert({
+        sale_id: saleId,
+        action: 'audit_request_info',
+        user_id: profile?.id,
+        details: { audit_notes: auditNotes },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['audit-sales'] });
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
       setSelectedSale(null);
       setAuditNotes('');
       toast({
@@ -185,22 +230,25 @@ export const AuditorDashboard: React.FC = () => {
   });
 
   const getStatusBadge = (status: string, auditStatus: string | null) => {
-    if (auditStatus === 'aprobado') {
-      return <Badge className="bg-green-600"><CheckCircle className="h-3 w-3 mr-1" />Aprobado</Badge>;
-    }
-    if (auditStatus === 'rechazado') {
-      return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Rechazado</Badge>;
-    }
-    if (auditStatus === 'requiere_info') {
-      return <Badge variant="outline" className="text-orange-600"><AlertCircle className="h-3 w-3 mr-1" />Info Requerida</Badge>;
-    }
-
     switch (status) {
-      case 'firmado':
-        return <Badge variant="outline" className="text-blue-600"><Clock className="h-3 w-3 mr-1" />Pendiente Auditoría</Badge>;
+      case 'en_auditoria':
+        return <Badge variant="outline" className="text-yellow-600 border-yellow-600"><Clock className="h-3 w-3 mr-1" />En Auditoría</Badge>;
+      case 'pendiente':
+        return <Badge className="bg-green-600"><CheckCircle className="h-3 w-3 mr-1" />Pendiente (Aprobado)</Badge>;
       case 'enviado':
-        return <Badge variant="outline" className="text-yellow-600">Enviado</Badge>;
+        return <Badge variant="outline" className="text-blue-600">Enviado</Badge>;
+      case 'firmado':
+        return <Badge variant="outline" className="text-indigo-600">Firmado</Badge>;
+      case 'completado':
+        return <Badge className="bg-green-700"><CheckCircle className="h-3 w-3 mr-1" />Completado</Badge>;
+      case 'rechazado':
+        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Rechazado</Badge>;
+      case 'cancelado':
+        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Cancelado</Badge>;
       default:
+        if (auditStatus === 'requiere_info') {
+          return <Badge variant="outline" className="text-orange-600"><AlertCircle className="h-3 w-3 mr-1" />Info Requerida</Badge>;
+        }
         return <Badge variant="outline">{status}</Badge>;
     }
   };
@@ -218,9 +266,9 @@ export const AuditorDashboard: React.FC = () => {
 
   // Stats
   const stats = {
-    pending: sales.filter((s: any) => !s.audit_status || s.audit_status === 'pendiente').length,
+    pending: sales.filter((s: any) => s.status === 'en_auditoria').length,
     approved: sales.filter((s: any) => s.audit_status === 'aprobado').length,
-    rejected: sales.filter((s: any) => s.audit_status === 'rechazado').length,
+    rejected: sales.filter((s: any) => s.audit_status === 'rechazado' || s.status === 'rechazado').length,
     infoRequired: sales.filter((s: any) => s.audit_status === 'requiere_info').length,
   };
 

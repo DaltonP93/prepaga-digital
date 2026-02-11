@@ -69,7 +69,7 @@ const fetchProfileData = async (userId: string): Promise<{ profile: ProfileWithR
       : rpcRole || legacyProfileRole || null;
 
     const profile: ProfileWithRole | null = profileResult.data
-      ? { ...profileResult.data, role }
+      ? { ...profileResult.data, role: role as ProfileWithRole['role'] }
       : null;
 
     return { profile, role: role || 'vendedor' };

@@ -219,8 +219,8 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
         address: client.address || "",
         city: client.city || "",
         province: client.province || "",
-        latitude: client.latitude?.toString() || "",
-        longitude: client.longitude?.toString() || "",
+        latitude: "",
+        longitude: "",
       });
       return;
     }
