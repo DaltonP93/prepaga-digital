@@ -16,7 +16,7 @@ export const useAuditProcesses = () => {
           clients:client_id(first_name, last_name, email),
           plans:plan_id(name, price)
         `)
-        .in('status', ['borrador', 'enviado'])
+        .in('status', ['en_auditoria'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;

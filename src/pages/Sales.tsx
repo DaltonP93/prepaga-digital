@@ -1,9 +1,10 @@
 
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
-import { Plus, Search, Filter, MoreHorizontal, FileText, Eye, Edit } from 'lucide-react';
+import { Plus, Search, Filter, MoreHorizontal, FileText, Eye, Edit, Trash2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Link } from 'react-router-dom';
-import { useSales } from '@/hooks/useSales';
+import { useSales, useDeleteSale } from '@/hooks/useSales';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -15,12 +16,15 @@ import RequireAuth from '@/components/RequireAuth';
 import { useState } from 'react';
 import { useStateTransition } from '@/hooks/useStateTransition';
 import { ALL_SALE_STATUSES, SALE_STATUS_LABELS, type SaleStatus } from '@/types/workflow';
+import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 
 const Sales = () => {
   const { data: sales, isLoading } = useSales();
+  const deleteSale = useDeleteSale();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
   const { canViewState, canEditState } = useStateTransition();
+  const { profile } = useSimpleAuthContext();
 
   const visibleSales = (sales || []).filter((sale) =>
     canViewState((sale.status || 'borrador') as SaleStatus)
@@ -245,6 +249,33 @@ const Sales = () => {
                                     <Edit className="mr-2 h-4 w-4" />
                                     Edición bloqueada por estado/rol
                                   </DropdownMenuItem>
+                                )}
+                                {sale.salesperson_id === profile?.id && ['borrador', 'rechazado'].includes(sale.status || '') && (
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive">
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Eliminar
+                                      </DropdownMenuItem>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>¿Eliminar esta venta?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Esta acción no se puede deshacer. Se eliminará la venta y todos sus datos asociados.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() => deleteSale.mutate(sale.id)}
+                                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                        >
+                                          Eliminar
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
                                 )}
                               </DropdownMenuContent>
                             </DropdownMenu>
