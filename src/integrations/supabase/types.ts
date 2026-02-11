@@ -1549,6 +1549,10 @@ export type Database = {
           audit_status: string | null
           audited_at: string | null
           auditor_id: string | null
+          billing_email: string | null
+          billing_phone: string | null
+          billing_razon_social: string | null
+          billing_ruc: string | null
           client_id: string | null
           company_id: string
           contract_number: string | null
@@ -1582,6 +1586,10 @@ export type Database = {
           audit_status?: string | null
           audited_at?: string | null
           auditor_id?: string | null
+          billing_email?: string | null
+          billing_phone?: string | null
+          billing_razon_social?: string | null
+          billing_ruc?: string | null
           client_id?: string | null
           company_id: string
           contract_number?: string | null
@@ -1615,6 +1623,10 @@ export type Database = {
           audit_status?: string | null
           audited_at?: string | null
           auditor_id?: string | null
+          billing_email?: string | null
+          billing_phone?: string | null
+          billing_razon_social?: string | null
+          billing_ruc?: string | null
           client_id?: string | null
           company_id?: string
           contract_number?: string | null

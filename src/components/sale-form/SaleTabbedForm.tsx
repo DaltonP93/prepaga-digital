@@ -4,8 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2, Save, Lock } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, Lock, Send } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { supabase } from '@/integrations/supabase/client';
 import { useCreateSale, useUpdateSale } from '@/hooks/useSales';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { useStateTransition } from '@/hooks/useStateTransition';
@@ -51,6 +52,10 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
     signer_name: (sale as any)?.signer_name || '',
     signer_dni: (sale as any)?.signer_dni || '',
     signer_relationship: (sale as any)?.signer_relationship || '',
+    billing_razon_social: (sale as any)?.billing_razon_social || '',
+    billing_ruc: (sale as any)?.billing_ruc || '',
+    billing_email: (sale as any)?.billing_email || '',
+    billing_phone: (sale as any)?.billing_phone || '',
   });
 
   const handleChange = (field: string, value: any) => {
@@ -78,6 +83,10 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           signer_name: formData.signer_type === 'responsable_pago' ? formData.signer_name : null,
           signer_dni: formData.signer_type === 'responsable_pago' ? formData.signer_dni : null,
           signer_relationship: formData.signer_type === 'responsable_pago' ? formData.signer_relationship : null,
+          billing_razon_social: formData.billing_razon_social || null,
+          billing_ruc: formData.billing_ruc || null,
+          billing_email: formData.billing_email || null,
+          billing_phone: formData.billing_phone || null,
         } as any);
         toast.success('Venta actualizada');
       } else {
@@ -94,6 +103,10 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           signer_name: formData.signer_type === 'responsable_pago' ? formData.signer_name : null,
           signer_dni: formData.signer_type === 'responsable_pago' ? formData.signer_dni : null,
           signer_relationship: formData.signer_type === 'responsable_pago' ? formData.signer_relationship : null,
+          billing_razon_social: formData.billing_razon_social || null,
+          billing_ruc: formData.billing_ruc || null,
+          billing_email: formData.billing_email || null,
+          billing_phone: formData.billing_phone || null,
         } as any);
         toast.success('Venta creada exitosamente');
         navigate(`/sales/${result.id}/edit`);
@@ -117,7 +130,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
               : 'Complete la información para crear una nueva venta'}
           </p>
         </div>
-        <div className="flex gap-2 self-start sm:self-auto">
+        <div className="flex gap-2 self-start sm:self-auto flex-wrap">
           <Button variant="outline" onClick={() => navigate('/sales')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver
@@ -126,6 +139,60 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
             <Button onClick={handleSave} disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
               {isEditing ? 'Guardar Cambios' : 'Crear Venta'}
+            </Button>
+          )}
+          {isEditing && currentStatus === 'borrador' && (role === 'vendedor' || role === 'gestor' || role === 'admin' || role === 'super_admin') && (
+            <Button
+              variant="default"
+              className="bg-green-600 hover:bg-green-700"
+              disabled={saving}
+              onClick={async () => {
+                if (!formData.client_id || !formData.plan_id) {
+                  toast.error('Debe tener cliente y plan asignados antes de enviar a auditoría');
+                  return;
+                }
+                try {
+                  setSaving(true);
+                  // First save current changes
+                  await updateSale.mutateAsync({
+                    id: sale.id,
+                    client_id: formData.client_id,
+                    plan_id: formData.plan_id,
+                    company_id: formData.company_id,
+                    total_amount: formData.total_amount,
+                    notes: formData.notes,
+                    requires_adherents: formData.requires_adherents,
+                    status: 'pendiente' as any,
+                    billing_razon_social: formData.billing_razon_social || null,
+                    billing_ruc: formData.billing_ruc || null,
+                    billing_email: formData.billing_email || null,
+                    billing_phone: formData.billing_phone || null,
+                  } as any);
+                  // Log workflow state
+                  await supabase.from('sale_workflow_states').insert({
+                    sale_id: sale.id,
+                    previous_status: 'borrador',
+                    new_status: 'pendiente',
+                    changed_by: profile?.id,
+                    change_reason: 'Enviado a auditoría por el vendedor',
+                  });
+                  await supabase.from('process_traces').insert({
+                    sale_id: sale.id,
+                    action: 'status_change',
+                    user_id: profile?.id,
+                    details: { previous_status: 'borrador', new_status: 'pendiente', reason: 'Enviado a auditoría' },
+                  });
+                  toast.success('Venta enviada a auditoría');
+                  navigate('/sales');
+                } catch (error: any) {
+                  toast.error(error.message || 'Error al enviar a auditoría');
+                } finally {
+                  setSaving(false);
+                }
+              }}
+            >
+              <Send className="h-4 w-4 mr-2" />
+              Enviar a Auditoría
             </Button>
           )}
         </div>

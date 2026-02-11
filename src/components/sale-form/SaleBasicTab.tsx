@@ -23,6 +23,10 @@ interface SaleBasicTabProps {
     signer_name: string;
     signer_dni: string;
     signer_relationship: string;
+    billing_razon_social: string;
+    billing_ruc: string;
+    billing_email: string;
+    billing_phone: string;
   };
   onChange: (field: string, value: any) => void;
   companyId?: string;
@@ -206,6 +210,46 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
             </div>
           </div>
         )}
+      </div>
+
+      {/* Datos de Facturación */}
+      <div className="space-y-4 border border-border/70 rounded-xl p-4 sm:p-5 bg-muted/20">
+        <Label className="text-base font-semibold">Datos de Facturación</Label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <Label>Razón Social</Label>
+            <Input
+              value={formData.billing_razon_social || ''}
+              onChange={(e) => onChange('billing_razon_social', e.target.value)}
+              placeholder="Razón Social"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>R.U.C.</Label>
+            <Input
+              value={formData.billing_ruc || ''}
+              onChange={(e) => onChange('billing_ruc', e.target.value)}
+              placeholder="Número de RUC"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Correo electrónico</Label>
+            <Input
+              type="email"
+              value={formData.billing_email || ''}
+              onChange={(e) => onChange('billing_email', e.target.value)}
+              placeholder="email@ejemplo.com"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Celular</Label>
+            <Input
+              value={formData.billing_phone || ''}
+              onChange={(e) => onChange('billing_phone', e.target.value)}
+              placeholder="Número de celular"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Notes */}

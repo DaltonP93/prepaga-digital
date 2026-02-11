@@ -65,6 +65,8 @@ const Sales = () => {
       cancelado: 'Cancelado',
       en_auditoria: 'En Auditoría',
       pendiente: 'Pendiente',
+      rechazado: 'Rechazado',
+      aprobado_para_templates: 'Aprobado',
     };
     return map[status] || status;
   };
