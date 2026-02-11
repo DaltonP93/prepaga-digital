@@ -1,14 +1,16 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, FileText, Users, Send } from 'lucide-react';
+import { ArrowLeft, FileText, Users, Send, Copy, ExternalLink, Check, MessageCircle, Download } from 'lucide-react';
 import { useSales } from '@/hooks/useSales';
+import { useSignatureLinks } from '@/hooks/useSignatureLinks';
 import { useCurrencySettings } from '@/hooks/useCurrencySettings';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { useRolePermissions } from '@/hooks/useRolePermissions';
+import { toast } from 'sonner';
 
 const SignatureWorkflow = () => {
   const navigate = useNavigate();
@@ -16,25 +18,46 @@ const SignatureWorkflow = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   
-  // Use only SimpleAuthContext since that's what's available in the app
   const { profile } = useSimpleAuthContext();
   const { role: effectiveRole, permissions } = useRolePermissions();
   
   const { data: sales = [], isLoading } = useSales();
-  const { settings, formatCurrency } = useCurrencySettings();
+  const { formatCurrency } = useCurrencySettings();
+  const { data: signatureLinks = [], isLoading: linksLoading } = useSignatureLinks(saleId || '');
   
-  const [selectedSale, setSelectedSale] = useState<any>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (saleId && sales.length > 0) {
-      const sale = sales.find(s => s.id === saleId);
-      setSelectedSale(sale);
+  const selectedSale = saleId ? sales.find(s => s.id === saleId) : null;
+
+  const getSignatureUrl = (linkToken: string) => {
+    return `${window.location.origin}/firmar/${linkToken}`;
+  };
+
+  const handleCopyLink = async (linkToken: string, linkId: string) => {
+    try {
+      await navigator.clipboard.writeText(getSignatureUrl(linkToken));
+      setCopiedId(linkId);
+      toast.success('Enlace copiado al portapapeles');
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      toast.error('No se pudo copiar el enlace');
     }
-  }, [saleId, sales]);
+  };
 
-  // If accessed with token (public access), handle differently
+  const handleSendWhatsApp = (phone: string | null, linkToken: string, recipientName: string) => {
+    const url = getSignatureUrl(linkToken);
+    const message = encodeURIComponent(
+      `Hola ${recipientName}, le enviamos el enlace para firmar los documentos de su contrato:\n\n${url}\n\nPor favor ingrese al enlace para revisar y firmar los documentos. Gracias.`
+    );
+    const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
+    const waUrl = cleanPhone
+      ? `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${message}`
+      : `https://web.whatsapp.com/send?text=${message}`;
+    window.open(waUrl, '_blank');
+  };
+
+  // Public access with token
   if (token) {
-    // Public signature access logic would go here
     return (
       <div className="container mx-auto py-6">
         <Card>
@@ -48,24 +71,23 @@ const SignatureWorkflow = () => {
     );
   }
 
-  // Protected access - show sales list or specific sale
   if (isLoading) {
     return (
       <div className="container mx-auto py-6">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
         </div>
       </div>
     );
   }
 
-  // If no specific sale selected, show sales list
+  // Sales list view
   if (!saleId || !selectedSale) {
     const isSeller = effectiveRole === 'vendedor';
     const canViewAllSales = permissions.sales.viewAll;
 
     const availableSales = sales.filter(sale => 
-      ['enviado', 'firmado'].includes(sale.status) || 
+      ['enviado', 'firmado', 'completado'].includes(sale.status) || 
       (isSeller && sale.salesperson_id === profile?.id) ||
       canViewAllSales
     );
@@ -75,32 +97,25 @@ const SignatureWorkflow = () => {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold">Flujo de Firmas</h1>
-            <p className="text-muted-foreground">
-              Gestiona el proceso de firma de documentos
-            </p>
+            <p className="text-muted-foreground">Gestiona el proceso de firma de documentos</p>
           </div>
           <Button onClick={() => navigate('/sales')} variant="outline">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Volver a Ventas
           </Button>
         </div>
-
         <div className="grid gap-4">
           {availableSales.length === 0 ? (
             <Card>
               <CardContent className="text-center py-8">
                 <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-muted-foreground mb-4">
-                  No hay ventas disponibles para firma
-                </p>
-                <Button onClick={() => navigate('/sales')}>
-                  Ir a Ventas
-                </Button>
+                <p className="text-muted-foreground mb-4">No hay ventas disponibles para firma</p>
+                <Button onClick={() => navigate('/sales')}>Ir a Ventas</Button>
               </CardContent>
             </Card>
           ) : (
             availableSales.map((sale) => (
-              <Card key={sale.id} className="cursor-pointer hover:shadow-md transition-shadow">
+              <Card key={sale.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/signature-workflow/${sale.id}`)}>
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <div>
@@ -108,7 +123,7 @@ const SignatureWorkflow = () => {
                         {sale.clients ? `${sale.clients.first_name} ${sale.clients.last_name}` : 'Sin cliente'}
                       </CardTitle>
                       <CardDescription>
-                        Plan: {sale.plans?.name || 'Sin plan'} • {formatCurrency(sale.total_amount || 0)}
+                        {sale.contract_number || sale.id.substring(0, 8)} • Plan: {sale.plans?.name || 'Sin plan'} • {formatCurrency(sale.total_amount || 0)}
                       </CardDescription>
                     </div>
                     <Badge variant={
@@ -122,11 +137,8 @@ const SignatureWorkflow = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex justify-between items-center">
-                    <div className="text-sm text-muted-foreground">
-                      ID: {sale.id.substring(0, 8)}...
-                    </div>
-                    <Button onClick={() => navigate(`/signature-workflow/${sale.id}`)}>
+                  <div className="flex justify-end">
+                    <Button size="sm">
                       <Send className="w-4 h-4 mr-2" />
                       Gestionar Firma
                     </Button>
@@ -140,14 +152,17 @@ const SignatureWorkflow = () => {
     );
   }
 
-  // Show specific sale signature workflow
+  // Specific sale signature workflow
+  const client = selectedSale.clients as any;
+  const clientName = client ? `${client.first_name} ${client.last_name}` : 'Sin cliente';
+
   return (
     <div className="container mx-auto py-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold">Flujo de Firma</h1>
           <p className="text-muted-foreground">
-            {selectedSale.clients ? `${selectedSale.clients.first_name} ${selectedSale.clients.last_name}` : 'Sin cliente'}
+            {clientName} • {selectedSale.contract_number || selectedSale.id.substring(0, 8)}
           </p>
         </div>
         <div className="flex gap-2">
@@ -159,6 +174,7 @@ const SignatureWorkflow = () => {
       </div>
 
       <div className="grid gap-6">
+        {/* Sale Info */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -191,7 +207,7 @@ const SignatureWorkflow = () => {
                 <p className="font-medium">Vendedor:</p>
                 <p className="text-muted-foreground">
                   {selectedSale.salesperson ? 
-                    `${selectedSale.salesperson.first_name} ${selectedSale.salesperson.last_name}` : 
+                    `${(selectedSale.salesperson as any).first_name} ${(selectedSale.salesperson as any).last_name}` : 
                     'No asignado'
                   }
                 </p>
@@ -200,18 +216,106 @@ const SignatureWorkflow = () => {
           </CardContent>
         </Card>
 
-        {/* Add signature workflow components here */}
+        {/* Signature Links */}
         <Card>
           <CardHeader>
-            <CardTitle>Proceso de Firma</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Enlaces de Firma ({signatureLinks?.length || 0})
+            </CardTitle>
             <CardDescription>
-              Gestiona el flujo de firma para esta venta
+              Comparte los enlaces con los firmantes por WhatsApp o copia el link
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">
-              Componentes del flujo de firma se implementarán aquí
-            </p>
+            {linksLoading ? (
+              <p className="text-muted-foreground text-center py-4">Cargando enlaces...</p>
+            ) : signatureLinks && signatureLinks.length > 0 ? (
+              <div className="space-y-4">
+                {signatureLinks.map((link: any) => {
+                  const recipientLabel = link.recipient_type === 'titular' 
+                    ? `Titular: ${clientName}` 
+                    : `Beneficiario: ${link.recipient_email || link.recipient_phone || 'Sin datos'}`;
+                  const isCompleted = link.status === 'completado';
+                  const isExpired = new Date(link.expires_at) < new Date();
+
+                  return (
+                    <div key={link.id} className="border rounded-lg p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{recipientLabel}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Creado: {new Date(link.created_at).toLocaleDateString('es-PY')} • 
+                            Expira: {new Date(link.expires_at).toLocaleDateString('es-PY')}
+                            {link.access_count > 0 && ` • Visto ${link.access_count} vez(es)`}
+                          </p>
+                        </div>
+                        <Badge variant={
+                          isCompleted ? 'default' :
+                          isExpired ? 'destructive' :
+                          link.status === 'visualizado' ? 'secondary' :
+                          'outline'
+                        }>
+                          {isCompleted ? '✓ Firmado' : isExpired ? 'Expirado' : link.status}
+                        </Badge>
+                      </div>
+
+                      {!isCompleted && !isExpired && (
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleCopyLink(link.token, link.id)}
+                          >
+                            {copiedId === link.id ? (
+                              <Check className="h-4 w-4 mr-1 text-green-600" />
+                            ) : (
+                              <Copy className="h-4 w-4 mr-1" />
+                            )}
+                            {copiedId === link.id ? 'Copiado' : 'Copiar Enlace'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => window.open(getSignatureUrl(link.token), '_blank')}
+                          >
+                            <ExternalLink className="h-4 w-4 mr-1" />
+                            Abrir
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            onClick={() => handleSendWhatsApp(
+                              link.recipient_phone || client?.phone,
+                              link.token,
+                              link.recipient_type === 'titular' ? clientName : (link.recipient_email || 'Beneficiario')
+                            )}
+                          >
+                            <MessageCircle className="h-4 w-4 mr-1" />
+                            Enviar por WhatsApp
+                          </Button>
+                        </div>
+                      )}
+
+                      {isCompleted && (
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline">
+                            <Download className="h-4 w-4 mr-1" />
+                            Descargar Documento Firmado
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <FileText className="h-12 w-12 mx-auto mb-4" />
+                <p>No hay enlaces de firma generados aún.</p>
+                <p className="text-sm">Vuelva a la venta y envíe los documentos para firma desde la pestaña Templates.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

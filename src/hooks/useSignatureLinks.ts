@@ -75,7 +75,6 @@ export const useCreateSignatureLink = () => {
       recipientPhone,
       expirationDays = 7,
       beneficiaryId,
-      documentPackageId,
     }: {
       saleId: string;
       recipientType: string;
@@ -83,7 +82,6 @@ export const useCreateSignatureLink = () => {
       recipientPhone?: string;
       expirationDays?: number;
       beneficiaryId?: string;
-      documentPackageId?: string;
     }) => {
       const token = crypto.randomUUID();
       const expiresAt = new Date();
@@ -97,8 +95,7 @@ export const useCreateSignatureLink = () => {
           recipient_type: recipientType,
           recipient_email: recipientEmail || null,
           recipient_phone: recipientPhone || null,
-          beneficiary_id: beneficiaryId || null,
-          document_package_id: documentPackageId || null,
+          recipient_id: beneficiaryId || null,
           expires_at: expiresAt.toISOString(),
           status: 'pendiente',
         })
@@ -148,13 +145,17 @@ export const useCompleteSignatureLink = () => {
       if (fetchError) throw fetchError;
 
       // Update signature link
+      const updateData: any = {
+        status: 'completado',
+        completed_at: new Date().toISOString(),
+      };
+      if (signedIp) {
+        updateData.ip_addresses = [signedIp];
+      }
+
       const { error: updateError } = await supabase
         .from('signature_links')
-        .update({
-          status: 'completado',
-          completed_at: new Date().toISOString(),
-          signed_ip: signedIp,
-        })
+        .update(updateData)
         .eq('id', linkId);
 
       if (updateError) throw updateError;

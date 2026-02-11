@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +21,7 @@ interface SaleTemplatesTabProps {
 }
 
 const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus, disabled }) => {
+  const navigate = useNavigate();
   const { templates } = useTemplates();
   const queryClient = useQueryClient();
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
@@ -27,7 +29,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
   const createSignatureLink = useCreateSignatureLink();
   const { data: beneficiaries } = useBeneficiaries(saleId || '');
 
-  const isApproved = auditStatus === 'aprobado';
+  const isApproved = auditStatus === 'aprobado' || auditStatus === 'aprobado_para_templates';
 
   const { data: saleTemplates, isLoading } = useQuery({
     queryKey: ['sale-templates', saleId],
@@ -126,7 +128,10 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         .eq('id', saleId);
 
       queryClient.invalidateQueries({ queryKey: ['sales'] });
-      toast.success('Documentos enviados para firma. Se generaron los enlaces de firma para el titular y los adherentes.');
+      toast.success('Documentos enviados para firma. Redirigiendo al flujo de firmas...');
+      
+      // Navigate to signature workflow for this sale
+      navigate(`/signature-workflow/${saleId}`);
     } catch (error: any) {
       toast.error(error.message || 'Error al enviar documentos');
     } finally {

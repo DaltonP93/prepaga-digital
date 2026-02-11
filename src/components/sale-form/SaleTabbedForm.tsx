@@ -226,8 +226,8 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
         </Alert>
       )}
 
-      {/* Show audit information requests to vendor */}
-      {isEditing && infoRequests.length > 0 && (
+      {/* Show audit information requests to vendor - only for pre-approval states */}
+      {isEditing && infoRequests.length > 0 && ['borrador', 'pendiente', 'rechazado', 'en_auditoria'].includes(currentStatus) && (
         <Card className="border-orange-300 bg-orange-50 dark:bg-orange-950/20">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2 text-orange-700 dark:text-orange-400">
