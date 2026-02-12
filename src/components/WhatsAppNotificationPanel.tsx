@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Card,
   CardContent,
@@ -22,7 +24,8 @@ import {
   useSendWhatsAppNotification,
   useWhatsAppNotifications,
 } from "@/hooks/useWhatsAppNotifications";
-import { MessageSquare, Send, Clock, CheckCircle, XCircle, Eye } from "lucide-react";
+import { useCompanyApiConfiguration } from "@/hooks/useCompanyApiConfiguration";
+import { MessageSquare, Send, Clock, CheckCircle, XCircle, Eye, Link2, ExternalLink } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -36,12 +39,18 @@ interface WhatsAppNotificationPanelProps {
   saleId: string;
   clientPhone?: string;
   clientName?: string;
+  companyName?: string;
+  signatureUrl?: string;
+  signatureExpiration?: string;
 }
 
 const WhatsAppNotificationPanel = ({
   saleId,
   clientPhone = "",
   clientName = "",
+  companyName = "",
+  signatureUrl: propSignatureUrl,
+  signatureExpiration: propSignatureExpiration,
 }: WhatsAppNotificationPanelProps) => {
   const [phone, setPhone] = useState(clientPhone);
   const [message, setMessage] = useState("");
@@ -52,9 +61,48 @@ const WhatsAppNotificationPanel = ({
 
   const sendNotification = useSendWhatsAppNotification();
   const { data: notifications, isLoading } = useWhatsAppNotifications(saleId);
+  const { configuration: apiConfig } = useCompanyApiConfiguration();
+
+  const currentProvider = apiConfig?.whatsapp_provider || "wame_fallback";
+  const providerLabels: Record<string, string> = {
+    meta: "Meta API",
+    twilio: "Twilio",
+    wame_fallback: "wa.me Manual",
+  };
+  const isManualMode = currentProvider === "wame_fallback";
+
+  // Fetch active signature links for auto-URL inclusion
+  const { data: signatureLinks } = useQuery({
+    queryKey: ["signature-links-for-whatsapp", saleId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("signature_links")
+        .select("token, expires_at, status, recipient_type")
+        .eq("sale_id", saleId)
+        .eq("status", "pendiente")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!saleId,
+  });
+
+  // Get active signature URL + expiration
+  const activeLink = signatureLinks?.[0];
+  const signatureUrl = propSignatureUrl || (activeLink
+    ? `${window.location.origin}/firmar/${activeLink.token}`
+    : "");
+  const signatureExpiration = propSignatureExpiration || (activeLink
+    ? new Date(activeLink.expires_at).toLocaleString("es-PY", {
+        day: "2-digit", month: "2-digit", year: "numeric",
+        hour: "2-digit", minute: "2-digit",
+      })
+    : "");
 
   const predefinedMessages = {
-    signature: `Hola ${clientName}, tu contrato está listo para firma. Haz clic en el enlace para completar el proceso: `,
+    signature: signatureUrl
+      ? `Hola ${clientName}, tu contrato está listo para firma. Haz clic en el enlace para completar el proceso:\n\n${signatureUrl}\n\nEste enlace vence el ${signatureExpiration}. Si tienes dudas, contáctanos.`
+      : `Hola ${clientName}, tu contrato está listo para firma. Genera un enlace de firma primero desde la pestaña de firma digital.`,
     questionnaire: `Hola ${clientName}, necesitamos que completes un breve cuestionario antes de proceder. Accede aquí: `,
     general: `Hola ${clientName}, tienes una actualización importante sobre tu proceso. Revisa aquí: `,
   };
@@ -62,12 +110,31 @@ const WhatsAppNotificationPanel = ({
   const handleSendNotification = () => {
     if (!phone || !message || !profile?.company_id) return;
 
+    // Build template data for the Edge Function
+    const templateData: Record<string, string> = {
+      clientName: clientName || "Cliente",
+      companyName: companyName || "SAMAP",
+      message,
+    };
+
+    // Map notification type to Edge Function template name
+    let templateName = "general";
+    if (notificationType === "signature" && signatureUrl) {
+      templateName = "signature_link";
+      templateData.signatureUrl = signatureUrl;
+      templateData.expirationDate = signatureExpiration;
+    } else if (notificationType === "questionnaire") {
+      templateName = "questionnaire";
+    }
+
     sendNotification.mutate({
       saleId,
       recipientPhone: phone,
       messageContent: message,
       companyId: profile.company_id,
       notificationType,
+      templateName,
+      templateData,
     });
 
     setMessage("");
@@ -79,6 +146,8 @@ const WhatsAppNotificationPanel = ({
         return <Clock className="h-4 w-4" />;
       case "sent":
         return <Send className="h-4 w-4" />;
+      case "sent_manual":
+        return <ExternalLink className="h-4 w-4" />;
       case "delivered":
         return <CheckCircle className="h-4 w-4" />;
       case "read":
@@ -96,6 +165,8 @@ const WhatsAppNotificationPanel = ({
         return "secondary";
       case "sent":
         return "outline";
+      case "sent_manual":
+        return "outline";
       case "delivered":
         return "default";
       case "read":
@@ -107,6 +178,18 @@ const WhatsAppNotificationPanel = ({
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "pending": return "Pendiente";
+      case "sent": return "Enviado";
+      case "sent_manual": return "Enviado (manual)";
+      case "delivered": return "Entregado";
+      case "read": return "Leído";
+      case "failed": return "Error";
+      default: return status;
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Enviar nueva notificación */}
@@ -115,9 +198,14 @@ const WhatsAppNotificationPanel = ({
           <CardTitle className="flex items-center gap-2">
             <MessageSquare className="h-5 w-5" />
             Enviar Notificación WhatsApp
+            <Badge variant={isManualMode ? "secondary" : "default"} className="text-[10px] ml-1">
+              {providerLabels[currentProvider]}
+            </Badge>
           </CardTitle>
           <CardDescription>
-            Envía enlaces de firma o cuestionarios directamente al cliente
+            {isManualMode
+              ? "Se abrirá WhatsApp Web con el mensaje pre-cargado para envío manual"
+              : "Envía enlaces de firma o cuestionarios directamente al cliente"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -159,7 +247,7 @@ const WhatsAppNotificationPanel = ({
               onChange={(e) => setMessage(e.target.value)}
               rows={4}
             />
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button
                 variant="outline"
                 size="sm"
@@ -167,6 +255,17 @@ const WhatsAppNotificationPanel = ({
               >
                 Usar mensaje predefinido
               </Button>
+              {notificationType === "signature" && signatureUrl && (
+                <div className="flex items-center gap-1 text-xs text-green-600">
+                  <Link2 className="h-3 w-3" />
+                  URL de firma incluida (vence: {signatureExpiration})
+                </div>
+              )}
+              {notificationType === "signature" && !signatureUrl && (
+                <div className="text-xs text-amber-600">
+                  No hay enlace de firma activo. Genere uno primero.
+                </div>
+              )}
             </div>
           </div>
 
@@ -178,7 +277,12 @@ const WhatsAppNotificationPanel = ({
             {sendNotification.isPending ? (
               <>
                 <Clock className="h-4 w-4 mr-2 animate-spin" />
-                Enviando...
+                {isManualMode ? "Abriendo WhatsApp..." : "Enviando..."}
+              </>
+            ) : isManualMode ? (
+              <>
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Abrir en WhatsApp
               </>
             ) : (
               <>
@@ -213,7 +317,7 @@ const WhatsAppNotificationPanel = ({
                       <div className="flex items-center gap-2">
                         {getStatusIcon(notification.status)}
                         <Badge variant={getStatusColor(notification.status) as any}>
-                          {notification.status}
+                          {getStatusLabel(notification.status)}
                         </Badge>
                       </div>
                       <span className="text-xs text-muted-foreground">
@@ -257,7 +361,7 @@ const WhatsAppNotificationPanel = ({
                           <div>
                             <p className="text-sm font-medium">Estado:</p>
                             <Badge variant={getStatusColor(notification.status) as any}>
-                              {notification.status}
+                              {getStatusLabel(notification.status)}
                             </Badge>
                           </div>
                         </div>

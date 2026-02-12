@@ -22,7 +22,7 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [expirationDays, setExpirationDays] = useState(7);
+  const [expirationDays, setExpirationDays] = useState(1);
 
   // Fetch existing signature links
   const { data: signatureLinks = [], isLoading } = useQuery({
@@ -94,8 +94,8 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
 
   // Resend notification
   const resendNotification = useMutation({
-    mutationFn: async (linkId: string) => {
-      // Get user's company_id
+    mutationFn: async (linkData: any) => {
+      // 1. Get user's company_id
       const { data: { user } } = await supabase.auth.getUser();
       const { data: profile } = await supabase
         .from('profiles')
@@ -105,23 +105,60 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
 
       if (!profile?.company_id) throw new Error('No company found');
 
-      // Log the WhatsApp message
-      const { error } = await supabase
-        .from('whatsapp_messages')
-        .insert({
-          company_id: profile.company_id,
-          phone_number: clientPhone || '',
-          message_type: 'signature_request',
-          message_body: `Recordatorio de firma - Enlace: ${window.location.origin}/firmar/${linkId}`,
-          status: 'pending',
-        });
+      // 2. Get sale details
+      const { data: sale, error: saleError } = await supabase
+        .from('sales')
+        .select('*, clients(*), companies(*)')
+        .eq('id', saleId)
+        .single();
 
-      if (error) throw error;
+      if (saleError || !sale) throw new Error('Venta no encontrada');
+
+      // 3. Build link and format expiration
+      const link = `${window.location.origin}/firmar/${linkData.token}`;
+      const expirationDate = new Date(linkData.expires_at).toLocaleString('es-ES', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+      // 4. CALL EDGE FUNCTION to send WhatsApp
+      const { data, error } = await supabase.functions.invoke('send-whatsapp', {
+        body: {
+          to: sale.clients.phone,
+          templateName: 'reminder',
+          templateData: {
+            clientName: `${sale.clients.first_name} ${sale.clients.last_name}`,
+            companyName: sale.companies?.name || 'SAMAP',
+            signatureUrl: link,
+            expirationDate: expirationDate,
+          },
+          saleId: saleId,
+          companyId: profile.company_id,
+          messageType: 'reminder',
+        },
+      });
+
+      if (error) {
+        console.error('Error sending WhatsApp:', error);
+        throw new Error(error.message || 'Error al enviar mensaje de WhatsApp');
+      }
+
+      return data;
     },
     onSuccess: () => {
       toast({
         title: 'Notificación enviada',
-        description: 'Se ha enviado el recordatorio de firma.',
+        description: 'Se ha enviado el recordatorio de firma por WhatsApp.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'No se pudo enviar la notificación.',
+        variant: 'destructive',
       });
     },
   });
@@ -235,7 +272,7 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => resendNotification.mutate(link.id)}
+                      onClick={() => resendNotification.mutate(link)}
                       disabled={resendNotification.isPending}
                     >
                       <RefreshCw className="h-4 w-4" />

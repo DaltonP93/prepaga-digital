@@ -21,6 +21,7 @@ import {
   History,
   Lock,
   CheckCircle2,
+  Plug,
 } from 'lucide-react';
 import { TestDataManager } from '@/components/TestDataManager';
 import { SessionConfigurationPanel } from '@/components/SessionConfigurationPanel';
@@ -30,6 +31,7 @@ import { CurrencyConfigurationPanel } from '@/components/CurrencyConfigurationPa
 import { ProfileCompanyAssignmentPanel } from '@/components/ProfileCompanyAssignmentPanel';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { WorkflowConfigPanel } from '@/components/workflow/WorkflowConfigPanel';
+import { AdminConfigPanel } from '@/components/AdminConfigPanel';
 import { useRolePermissions } from '@/hooks/useRolePermissions';
 
 export default function Settings() {
@@ -91,9 +93,13 @@ export default function Settings() {
       </section>
 
       <Tabs defaultValue="general" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto gap-1">
+        <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 h-auto gap-1">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="operacion">Operación</TabsTrigger>
+          <TabsTrigger value="integraciones" className="flex items-center gap-1">
+            <Plug className="h-3.5 w-3.5" />
+            Integraciones
+          </TabsTrigger>
           <TabsTrigger value="workflow">Workflow</TabsTrigger>
           <TabsTrigger value="sistema">Sistema</TabsTrigger>
           <TabsTrigger value="cambios">Últimos cambios</TabsTrigger>
@@ -187,6 +193,26 @@ export default function Settings() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="integraciones" className="space-y-4">
+          {canManageWorkflow ? (
+            <AdminConfigPanel />
+          ) : (
+            <Card>
+              <CardContent className="p-6">
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+                  <div className="flex items-center gap-2 font-medium">
+                    <Lock className="h-4 w-4" />
+                    Sin permisos para configurar integraciones
+                  </div>
+                  <p className="text-muted-foreground mt-1">
+                    Solo roles admin y super_admin pueden configurar APIs externas.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="workflow" className="space-y-4">

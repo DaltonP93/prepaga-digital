@@ -27,10 +27,8 @@ serve(async (req) => {
 
     // Authenticate the request
     const authHeader = req.headers.get('Authorization')
-    
-    // Allow internal calls (from schedule-reminders) with service role key
     const isInternalCall = authHeader === `Bearer ${supabaseServiceKey}`
-    
+
     if (!isInternalCall) {
       if (!authHeader?.startsWith('Bearer ')) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -42,9 +40,8 @@ serve(async (req) => {
       const anonClient = createClient(supabaseUrl, supabaseAnonKey, {
         global: { headers: { Authorization: authHeader } }
       })
-      const token = authHeader.replace('Bearer ', '')
-      const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token)
-      if (claimsError || !claimsData?.claims?.sub) {
+      const { data: { user }, error: userError } = await anonClient.auth.getUser()
+      if (userError || !user) {
         return new Response(JSON.stringify({ error: 'Invalid token' }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -66,21 +63,105 @@ serve(async (req) => {
       })
     }
 
-    // Get company WhatsApp settings
+    // Get company WhatsApp settings including provider
     const { data: companySettings, error: settingsError } = await supabase
       .from('company_settings')
-      .select('whatsapp_api_key, whatsapp_phone_id')
+      .select('whatsapp_api_key, whatsapp_phone_id, whatsapp_provider, twilio_account_sid, twilio_auth_token, twilio_whatsapp_number')
       .eq('company_id', companyId)
       .single()
 
-    if (settingsError || !companySettings?.whatsapp_api_key) {
-      console.error('Company WhatsApp settings not found:', settingsError)
-      
+    const provider = companySettings?.whatsapp_provider || 'wame_fallback'
+    const message = buildMessageFromTemplate(templateName, templateData)
+
+    // Route by provider
+    if (provider === 'wame_fallback' || (!companySettings && provider !== 'meta' && provider !== 'twilio')) {
+      // wa.me fallback: return URL for frontend to open
+      const formattedPhone = to.replace(/[\s+\-()]/g, '')
+      const wameUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`
+
+      // Log the message attempt
       await supabase.from('whatsapp_messages').insert({
         sale_id: saleId,
         phone_number: to,
         message_type: messageType,
-        message_body: buildMessageFromTemplate(templateName, templateData),
+        message_body: message,
+        status: 'manual',
+        company_id: companyId,
+      })
+
+      return new Response(JSON.stringify({
+        success: true,
+        fallback: true,
+        provider: 'wame_fallback',
+        wameUrl,
+        message,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (provider === 'twilio') {
+      // Twilio WhatsApp
+      if (!companySettings?.twilio_account_sid || !companySettings?.twilio_auth_token || !companySettings?.twilio_whatsapp_number) {
+        await supabase.from('whatsapp_messages').insert({
+          sale_id: saleId,
+          phone_number: to,
+          message_type: messageType,
+          message_body: message,
+          status: 'failed',
+          error_message: 'Twilio credentials not configured',
+          company_id: companyId,
+        })
+
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Twilio not configured for this company'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        })
+      }
+
+      const twilioResult = await sendViaTwilio(
+        companySettings.twilio_account_sid,
+        companySettings.twilio_auth_token,
+        companySettings.twilio_whatsapp_number,
+        to,
+        message
+      )
+
+      await supabase.from('whatsapp_messages').insert({
+        sale_id: saleId,
+        phone_number: to,
+        message_type: messageType,
+        message_body: message,
+        status: twilioResult.success ? 'sent' : 'failed',
+        error_message: twilioResult.error || null,
+        whatsapp_message_id: twilioResult.messageId || null,
+        company_id: companyId,
+        sent_at: twilioResult.success ? new Date().toISOString() : null,
+      })
+
+      return new Response(JSON.stringify({
+        success: twilioResult.success,
+        provider: 'twilio',
+        messageId: twilioResult.messageId,
+        error: twilioResult.error,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: twilioResult.success ? 200 : 500,
+      })
+    }
+
+    // Default: Meta Business API
+    if (!companySettings?.whatsapp_api_key || !companySettings?.whatsapp_phone_id) {
+      console.error('Company WhatsApp settings not found:', settingsError)
+
+      await supabase.from('whatsapp_messages').insert({
+        sale_id: saleId,
+        phone_number: to,
+        message_type: messageType,
+        message_body: message,
         status: 'failed',
         error_message: 'WhatsApp API key not configured for this company',
         company_id: companyId,
@@ -95,16 +176,14 @@ serve(async (req) => {
       })
     }
 
-    const message = buildMessageFromTemplate(templateName, templateData)
-
-    const whatsappResponse = await sendWhatsAppMessage(
+    const whatsappResponse = await sendViaMetaAPI(
       companySettings.whatsapp_api_key,
       companySettings.whatsapp_phone_id,
       to,
       message
     )
 
-    const { data: messageLog, error: logError } = await supabase
+    const { data: messageLog } = await supabase
       .from('whatsapp_messages')
       .insert({
         sale_id: saleId,
@@ -120,15 +199,12 @@ serve(async (req) => {
       .select()
       .single()
 
-    if (logError) {
-      console.error('Error logging WhatsApp message:', logError)
-    }
-
     return new Response(JSON.stringify({
       success: whatsappResponse.success,
+      provider: 'meta',
       messageId: whatsappResponse.messageId,
       logId: messageLog?.id,
-      error: whatsappResponse.error
+      error: whatsappResponse.error,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
@@ -162,8 +238,7 @@ function buildMessageFromTemplate(templateName: string, data: Record<string, str
   }
 
   let message = templates[templateName] || templates.general
-  
-  // Replace placeholders with actual data
+
   Object.entries(data).forEach(([key, value]) => {
     message = message.replace(new RegExp(`{{${key}}}`, 'g'), value)
   })
@@ -171,15 +246,14 @@ function buildMessageFromTemplate(templateName: string, data: Record<string, str
   return message
 }
 
-// Send message via WhatsApp Business API
-async function sendWhatsAppMessage(
+// Send message via Meta Business API (Facebook Graph API)
+async function sendViaMetaAPI(
   apiKey: string,
   phoneId: string,
   to: string,
   message: string
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
-    // Format phone number (remove + and spaces)
     const formattedPhone = to.replace(/[\s+\-()]/g, '')
 
     const response = await fetch(
@@ -202,7 +276,7 @@ async function sendWhatsAppMessage(
     const result = await response.json()
 
     if (!response.ok) {
-      console.error('WhatsApp API error:', result)
+      console.error('WhatsApp Meta API error:', result)
       return {
         success: false,
         error: result.error?.message || 'Failed to send WhatsApp message'
@@ -214,10 +288,63 @@ async function sendWhatsAppMessage(
       messageId: result.messages?.[0]?.id
     }
   } catch (error) {
-    console.error('Error calling WhatsApp API:', error)
+    console.error('Error calling Meta WhatsApp API:', error)
     return {
       success: false,
       error: error.message || 'Network error sending WhatsApp message'
+    }
+  }
+}
+
+// Send message via Twilio WhatsApp API
+async function sendViaTwilio(
+  accountSid: string,
+  authToken: string,
+  fromNumber: string,
+  to: string,
+  message: string
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  try {
+    const formattedTo = to.replace(/[\s\-()]/g, '')
+    const formattedFrom = fromNumber.replace(/[\s\-()]/g, '')
+
+    const body = new URLSearchParams({
+      To: `whatsapp:${formattedTo}`,
+      From: `whatsapp:${formattedFrom}`,
+      Body: message,
+    })
+
+    const response = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Basic ' + btoa(`${accountSid}:${authToken}`),
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: body.toString(),
+      }
+    )
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      console.error('Twilio API error:', result)
+      return {
+        success: false,
+        error: result.message || 'Failed to send via Twilio'
+      }
+    }
+
+    return {
+      success: true,
+      messageId: result.sid,
+    }
+  } catch (error) {
+    console.error('Error calling Twilio API:', error)
+    return {
+      success: false,
+      error: error.message || 'Network error sending via Twilio'
     }
   }
 }

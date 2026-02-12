@@ -46,45 +46,99 @@ export const useSendWhatsAppNotification = () => {
       recipientPhone,
       messageContent,
       companyId,
+      notificationType,
+      templateName,
+      templateData,
     }: {
       saleId: string;
       recipientPhone: string;
       messageContent: string;
       companyId: string;
       notificationType?: string;
+      templateName?: string;
+      templateData?: Record<string, string>;
     }) => {
-      const { data, error } = await supabase
+      // 1. Insert notification record as "pending"
+      const { data: notification, error: insertError } = await supabase
         .from("whatsapp_notifications")
         .insert({
           sale_id: saleId,
           phone_number: recipientPhone,
           message: messageContent,
-          status: "sent",
+          status: "pending",
           company_id: companyId,
-          sent_at: new Date().toISOString(),
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (insertError) throw insertError;
 
-      // Here you would integrate with actual WhatsApp API
-      console.log("WhatsApp notification sent:", {
-        phone: recipientPhone,
-        message: messageContent,
-      });
+      // 2. Call Edge Function to actually send via WhatsApp Business API
+      const edgePayload: Record<string, unknown> = {
+        to: recipientPhone,
+        templateName: templateName || notificationType || "general",
+        templateData: templateData || { message: messageContent },
+        saleId,
+        companyId,
+        messageType: notificationType || "general",
+      };
 
-      return data;
+      const { data: edgeResult, error: edgeError } = await supabase.functions.invoke(
+        "send-whatsapp",
+        { body: edgePayload }
+      );
+
+      // 3. Update notification status based on Edge Function result
+      if (edgeError) {
+        await supabase
+          .from("whatsapp_notifications")
+          .update({
+            status: "failed",
+            error_message: edgeError.message || "Error al invocar Edge Function",
+          })
+          .eq("id", notification.id);
+        throw new Error(edgeError.message || "Error al enviar WhatsApp");
+      }
+
+      // 4. Handle wa.me fallback: open WhatsApp Web with pre-loaded message
+      if (edgeResult?.fallback && edgeResult?.wameUrl) {
+        await supabase
+          .from("whatsapp_notifications")
+          .update({
+            status: "sent_manual",
+            sent_at: new Date().toISOString(),
+          })
+          .eq("id", notification.id);
+
+        // Open WhatsApp Web in new tab
+        window.open(edgeResult.wameUrl, "_blank");
+
+        return { ...notification, status: "sent_manual", provider: "wame_fallback", edgeResult };
+      }
+
+      await supabase
+        .from("whatsapp_notifications")
+        .update({
+          status: "sent",
+          sent_at: new Date().toISOString(),
+        })
+        .eq("id", notification.id);
+
+      return { ...notification, status: "sent", provider: edgeResult?.provider || "meta", edgeResult };
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({
         queryKey: ["whatsapp-notifications", variables.saleId],
       });
-      toast.success("Notificación WhatsApp enviada correctamente");
+      if (data?.provider === "wame_fallback") {
+        toast.success("WhatsApp Web abierto. Presiona 'Enviar' en la pestaña de WhatsApp.");
+      } else {
+        toast.success("Notificación WhatsApp enviada correctamente");
+      }
     },
     onError: (error: any) => {
       console.error("Error sending WhatsApp notification:", error);
-      toast.error("Error al enviar notificación WhatsApp");
+      toast.error(error.message || "Error al enviar notificación WhatsApp");
     },
   });
 };

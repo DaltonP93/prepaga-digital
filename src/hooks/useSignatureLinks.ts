@@ -73,7 +73,7 @@ export const useCreateSignatureLink = () => {
       recipientType,
       recipientEmail,
       recipientPhone,
-      expirationDays = 7,
+      expirationDays = 1,
       beneficiaryId,
     }: {
       saleId: string;
