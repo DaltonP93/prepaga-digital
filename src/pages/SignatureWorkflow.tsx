@@ -4,7 +4,8 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, FileText, Users, Send, Copy, Check, MessageCircle, Download, RefreshCw, Eye, Clock, CheckCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { ArrowLeft, FileText, Users, Send, Copy, Check, MessageCircle, Download, RefreshCw, Eye, Clock, CheckCircle, Info, Monitor, Smartphone, Tablet, Globe } from 'lucide-react';
 import { useSales } from '@/hooks/useSales';
 import { useSignatureLinks, useResendSignatureLink } from '@/hooks/useSignatureLinks';
 import { useBeneficiaries } from '@/hooks/useBeneficiaries';
@@ -54,7 +55,27 @@ const SignatureWorkflow = () => {
     enabled: !!saleId,
   });
 
+  // Fetch workflow steps for detail view
+  const { data: workflowSteps = [] } = useQuery({
+    queryKey: ['signature-workflow-steps', saleId],
+    queryFn: async () => {
+      if (!saleId) return [];
+      // Get all signature link IDs for this sale
+      const linkIds = signatureLinks?.map((l: any) => l.id) || [];
+      if (linkIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('signature_workflow_steps')
+        .select('*')
+        .in('signature_link_id', linkIds)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!saleId && signatureLinks && signatureLinks.length > 0,
+  });
+
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [detailLink, setDetailLink] = useState<any>(null);
 
   const selectedSale = saleId ? sales.find(s => s.id === saleId) : null;
 
@@ -181,6 +202,18 @@ const SignatureWorkflow = () => {
       }
     }
     return Array.from(byRecipient.values());
+  };
+
+  const detectDevice = (userAgent: string | undefined) => {
+    if (!userAgent) return { type: 'Desconocido', icon: Globe };
+    const ua = userAgent.toLowerCase();
+    if (/tablet|ipad/i.test(ua)) return { type: 'Tablet', icon: Tablet };
+    if (/mobile|android|iphone/i.test(ua)) return { type: 'Móvil', icon: Smartphone };
+    return { type: 'Escritorio', icon: Monitor };
+  };
+
+  const getStepsForLink = (linkId: string) => {
+    return workflowSteps.filter((s: any) => s.signature_link_id === linkId);
   };
 
   if (token) {
@@ -394,6 +427,14 @@ const SignatureWorkflow = () => {
                     <RefreshCw className={`h-4 w-4 mr-1 ${resendLink.isPending ? 'animate-spin' : ''}`} />
                     Reenviar
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => { e.stopPropagation(); setDetailLink(link); }}
+                  >
+                    <Info className="h-4 w-4 mr-1" />
+                    Ver Detalles
+                  </Button>
                 </div>
               )}
 
@@ -409,6 +450,14 @@ const SignatureWorkflow = () => {
                     <RefreshCw className={`h-4 w-4 mr-1 ${resendLink.isPending ? 'animate-spin' : ''}`} />
                     Regenerar Enlace
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => { e.stopPropagation(); setDetailLink(link); }}
+                  >
+                    <Info className="h-4 w-4 mr-1" />
+                    Ver Detalles
+                  </Button>
                 </div>
               )}
 
@@ -422,6 +471,14 @@ const SignatureWorkflow = () => {
                   >
                     <Download className="h-4 w-4 mr-1" />
                     Descargar Documento Firmado
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => { e.stopPropagation(); setDetailLink(link); }}
+                  >
+                    <Info className="h-4 w-4 mr-1" />
+                    Ver Detalles
                   </Button>
                 </div>
               )}
@@ -578,6 +635,113 @@ const SignatureWorkflow = () => {
           </Card>
         )}
       </div>
+
+      {/* Detail Dialog */}
+      <Dialog open={!!detailLink} onOpenChange={(open) => !open && setDetailLink(null)}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5" />
+              Detalles del Enlace de Firma
+            </DialogTitle>
+            <DialogDescription>
+              {detailLink && getRecipientLabel(detailLink)}
+            </DialogDescription>
+          </DialogHeader>
+          {detailLink && (
+            <div className="space-y-4">
+              {/* General Info */}
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Estado</p>
+                  <Badge variant={detailLink.status === 'completado' ? 'default' : 'outline'}>
+                    {detailLink.status === 'completado' ? '✓ Firmado' : detailLink.status}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Creado</p>
+                  <p className="font-medium">{new Date(detailLink.created_at).toLocaleString('es-PY')}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Expira</p>
+                  <p className="font-medium">{new Date(detailLink.expires_at).toLocaleString('es-PY')}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Accesos</p>
+                  <p className="font-medium">{detailLink.access_count || 0} veces</p>
+                </div>
+                {detailLink.accessed_at && (
+                  <div>
+                    <p className="text-muted-foreground">Último acceso</p>
+                    <p className="font-medium">{new Date(detailLink.accessed_at).toLocaleString('es-PY')}</p>
+                  </div>
+                )}
+                {detailLink.completed_at && (
+                  <div>
+                    <p className="text-muted-foreground">Firmado el</p>
+                    <p className="font-medium">{new Date(detailLink.completed_at).toLocaleString('es-PY')}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* IP Addresses */}
+              {detailLink.ip_addresses && (
+                <div>
+                  <p className="text-sm font-medium mb-1 flex items-center gap-1">
+                    <Globe className="h-3.5 w-3.5" /> Direcciones IP
+                  </p>
+                  <div className="bg-muted rounded p-2 text-xs font-mono">
+                    {Array.isArray(detailLink.ip_addresses)
+                      ? detailLink.ip_addresses.join(', ')
+                      : typeof detailLink.ip_addresses === 'string'
+                        ? detailLink.ip_addresses
+                        : JSON.stringify(detailLink.ip_addresses)
+                    }
+                  </div>
+                </div>
+              )}
+
+              {/* Workflow Steps */}
+              {(() => {
+                const steps = getStepsForLink(detailLink.id);
+                if (steps.length === 0) return null;
+                return (
+                  <div>
+                    <p className="text-sm font-medium mb-2">Historial de Actividad</p>
+                    <div className="space-y-2">
+                      {steps.map((step: any) => {
+                        const stepData = step.data || {};
+                        const device = detectDevice(stepData.user_agent);
+                        const DeviceIcon = device.icon;
+                        return (
+                          <div key={step.id} className="border rounded p-3 text-xs space-y-1">
+                            <div className="flex items-center justify-between">
+                              <Badge variant="outline" className="text-[10px]">{step.step_type}</Badge>
+                              <span className="text-muted-foreground">
+                                {new Date(step.completed_at || step.created_at).toLocaleString('es-PY')}
+                              </span>
+                            </div>
+                            {stepData.signed_ip && (
+                              <p className="text-muted-foreground">IP: {stepData.signed_ip}</p>
+                            )}
+                            {stepData.user_agent && (
+                              <div className="flex items-center gap-1 text-muted-foreground">
+                                <DeviceIcon className="h-3 w-3" />
+                                <span>{device.type}</span>
+                                <span className="truncate max-w-[200px]">— {stepData.user_agent.substring(0, 80)}…</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
