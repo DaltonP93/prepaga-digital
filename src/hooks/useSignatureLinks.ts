@@ -225,3 +225,65 @@ export const useRevokeSignatureLink = () => {
     },
   });
 };
+
+export const useResendSignatureLink = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (oldLink: {
+      id: string;
+      sale_id: string;
+      recipient_type: string;
+      recipient_id: string | null;
+      recipient_email: string;
+      recipient_phone: string | null;
+    }) => {
+      // 1. Revoke old link
+      await supabase
+        .from('signature_links')
+        .update({
+          status: 'revocado',
+          expires_at: new Date().toISOString(),
+        })
+        .eq('id', oldLink.id);
+
+      // 2. Create new link with same recipient data
+      const token = crypto.randomUUID();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 1);
+
+      const { data, error } = await supabase
+        .from('signature_links')
+        .insert({
+          sale_id: oldLink.sale_id,
+          token,
+          recipient_type: oldLink.recipient_type,
+          recipient_email: oldLink.recipient_email || '',
+          recipient_phone: oldLink.recipient_phone || null,
+          recipient_id: oldLink.recipient_id || null,
+          expires_at: expiresAt.toISOString(),
+          status: 'pendiente',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['signature-links', data.sale_id] });
+      toast({
+        title: 'Enlace reenviado',
+        description: 'Se ha generado un nuevo enlace de firma.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'No se pudo reenviar el enlace.',
+        variant: 'destructive',
+      });
+    },
+  });
+};

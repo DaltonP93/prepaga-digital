@@ -230,6 +230,87 @@ export const useSubmitSignatureLink = () => {
         console.warn('Could not save signature document:', docErr);
       }
 
+      // Build final signed documents with embedded signature
+      try {
+        const recipientType = data.recipient_type;
+        const recipientId = data.recipient_id;
+
+        let docsQuery = signatureClient
+          .from('documents')
+          .select('*')
+          .eq('sale_id', data.sale_id)
+          .neq('document_type', 'firma')
+          .eq('is_final', false);
+
+        if (recipientType === 'adherente' && recipientId) {
+          docsQuery = docsQuery.eq('beneficiary_id', recipientId);
+        } else if (recipientType === 'titular') {
+          docsQuery = docsQuery.is('beneficiary_id', null);
+        }
+
+        const { data: docsToSign, error: docsError } = await docsQuery;
+        if (docsError) throw docsError;
+
+        if (docsToSign && docsToSign.length > 0) {
+          const nowIso = new Date().toISOString();
+          const safeSignedAt = new Date().toLocaleString('es-PY');
+
+          const finalDocs = docsToSign.map((doc) => {
+            const originalContent = doc.content?.trim()
+              ? doc.content
+              : `
+                  <div>
+                    <h3>${doc.name}</h3>
+                    <p>Documento firmado digitalmente.</p>
+                    ${doc.file_url ? `<p><strong>Archivo original:</strong> ${doc.file_url}</p>` : ''}
+                  </div>
+                `;
+
+            const signatureBlock = `
+              <hr style="margin:24px 0;border:none;border-top:1px solid #d1d5db;" />
+              <section style="padding:16px;border:1px solid #e5e7eb;border-radius:8px;background:#fafafa;">
+                <h4 style="margin:0 0 8px 0;font-size:14px;">Firma Digital Incrustada</h4>
+                <p style="margin:0 0 8px 0;font-size:12px;color:#4b5563;">
+                  Firmado el: ${safeSignedAt}
+                </p>
+                <img src="${signatureData}" alt="Firma digital" style="max-width:280px;border:1px solid #d1d5db;border-radius:4px;background:#fff;" />
+              </section>
+            `;
+
+            return {
+              sale_id: doc.sale_id,
+              beneficiary_id: doc.beneficiary_id,
+              name: `${doc.name} (Firmado)`,
+              document_type: doc.document_type ? `${doc.document_type}_firmado` : 'documento_firmado',
+              document_type_id: doc.document_type_id,
+              generated_from_template: doc.generated_from_template,
+              requires_signature: false,
+              is_final: true,
+              status: 'firmado' as const,
+              signed_at: nowIso,
+              signed_by: null,
+              signature_data: signatureData,
+              file_url: null,
+              content: `${originalContent}${signatureBlock}`,
+              version: (doc.version || 1) + 1,
+            };
+          });
+
+          await signatureClient.from('documents').insert(finalDocs as any);
+
+          await signatureClient
+            .from('documents')
+            .update({
+              status: 'firmado',
+              signed_at: nowIso,
+              signature_data: signatureData,
+            } as any)
+            .in('id', docsToSign.map((d) => d.id));
+        }
+      } catch (signedDocsErr) {
+        console.warn('Could not build signed final documents:', signedDocsErr);
+      }
+
       // Log in process_traces for audit trail
       try {
         await signatureClient

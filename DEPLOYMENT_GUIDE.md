@@ -60,6 +60,29 @@ TWILIO_AUTH_TOKEN=...
 TWILIO_PHONE_NUMBER=+1...
 ```
 
+### **4. URL pública para enlaces de firma/WhatsApp (RECOMENDADO)**
+Para que los enlaces enviados por WhatsApp funcionen correctamente después de publicar:
+
+```bash
+# En tu hosting frontend (Vercel/Netlify/etc)
+VITE_PUBLIC_APP_URL=https://tu-dominio.com
+```
+
+Si no está configurado, el sistema usa `window.location.origin`.
+
+### **5. Webhook de WhatsApp (Meta/Twilio)**
+Para actualizar estados `sent/delivered/read/failed` en `whatsapp_messages`:
+
+```text
+https://ykducvvcjzdpoojxlsig.supabase.co/functions/v1/whatsapp-webhook
+```
+
+- **Meta**:
+  - Verificación GET usa `WHATSAPP_WEBHOOK_VERIFY_TOKEN` (secret en Supabase).
+  - Eventos recomendados: `messages`.
+- **Twilio**:
+  - Configurar `Status Callback URL` al mismo endpoint.
+
 ---
 
 ## 🚀 Pasos para Deployment
@@ -69,6 +92,7 @@ TWILIO_PHONE_NUMBER=+1...
 - ✅ RLS habilitado en todas las tablas
 - ✅ Edge Functions deployadas
 - ⚠️ Agregar `STRIPE_SECRET_KEY` en secrets
+- ⚠️ Agregar `WHATSAPP_WEBHOOK_VERIFY_TOKEN` si usas Meta webhook
 
 ### **2. Configuración de Autenticación**
 1. Ir a **Supabase Dashboard > Authentication > Settings**

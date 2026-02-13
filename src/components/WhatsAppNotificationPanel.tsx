@@ -25,6 +25,7 @@ import {
   useWhatsAppNotifications,
 } from "@/hooks/useWhatsAppNotifications";
 import { useCompanyApiConfiguration } from "@/hooks/useCompanyApiConfiguration";
+import { getSignatureLinkUrl } from "@/lib/appUrls";
 import { MessageSquare, Send, Clock, CheckCircle, XCircle, Eye, Link2, ExternalLink } from "lucide-react";
 import {
   Dialog,
@@ -90,7 +91,7 @@ const WhatsAppNotificationPanel = ({
   // Get active signature URL + expiration
   const activeLink = signatureLinks?.[0];
   const signatureUrl = propSignatureUrl || (activeLink
-    ? `${window.location.origin}/firmar/${activeLink.token}`
+    ? getSignatureLinkUrl(activeLink.token)
     : "");
   const signatureExpiration = propSignatureExpiration || (activeLink
     ? new Date(activeLink.expires_at).toLocaleString("es-PY", {

@@ -4,32 +4,41 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, FileText, Users, Send, Copy, ExternalLink, Check, MessageCircle, Download } from 'lucide-react';
+import { ArrowLeft, FileText, Users, Send, Copy, Check, MessageCircle, Download, RefreshCw, Eye, Clock, CheckCircle } from 'lucide-react';
 import { useSales } from '@/hooks/useSales';
-import { useSignatureLinks } from '@/hooks/useSignatureLinks';
+import { useSignatureLinks, useResendSignatureLink } from '@/hooks/useSignatureLinks';
 import { useBeneficiaries } from '@/hooks/useBeneficiaries';
 import { useCurrencySettings } from '@/hooks/useCurrencySettings';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { useRolePermissions } from '@/hooks/useRolePermissions';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getSignatureLinkUrl } from '@/lib/appUrls';
 import { toast } from 'sonner';
+
+const formatDateTimePY = (dateStr: string) => {
+  return new Date(dateStr).toLocaleString('es-PY', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+};
 
 const SignatureWorkflow = () => {
   const navigate = useNavigate();
   const { saleId } = useParams();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
-  
+
   const { profile } = useSimpleAuthContext();
   const { role: effectiveRole, permissions } = useRolePermissions();
-  
+
   const { data: sales = [], isLoading } = useSales();
   const { formatCurrency } = useCurrencySettings();
   const { data: signatureLinks = [], isLoading: linksLoading } = useSignatureLinks(saleId || '');
   const { data: beneficiaries = [] } = useBeneficiaries(saleId || '');
-  
-  // Fetch signed documents for this sale
+  const resendLink = useResendSignatureLink();
+
+  // Fetch documents for this sale
   const { data: signedDocs = [] } = useQuery({
     queryKey: ['signed-documents', saleId],
     queryFn: async () => {
@@ -50,7 +59,7 @@ const SignatureWorkflow = () => {
   const selectedSale = saleId ? sales.find(s => s.id === saleId) : null;
 
   const getSignatureUrl = (linkToken: string) => {
-    return `${window.location.origin}/firmar/${linkToken}`;
+    return getSignatureLinkUrl(linkToken);
   };
 
   const handleCopyLink = async (linkToken: string, linkId: string) => {
@@ -74,6 +83,60 @@ const SignatureWorkflow = () => {
       ? `https://wa.me/${cleanPhone}?text=${message}`
       : `https://wa.me/?text=${message}`;
     window.open(waUrl, '_blank');
+  };
+
+  const handleResendLink = (link: any) => {
+    resendLink.mutate({
+      id: link.id,
+      sale_id: link.sale_id,
+      recipient_type: link.recipient_type,
+      recipient_id: link.recipient_id,
+      recipient_email: link.recipient_email || '',
+      recipient_phone: link.recipient_phone,
+    });
+  };
+
+  const handleDownloadContent = (doc: any) => {
+    if (!doc?.content) return;
+    const htmlContent = `<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>${doc.name}</title></head>
+<body style="font-family: Arial, sans-serif; padding: 24px;">${doc.content}</body>
+</html>`;
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${doc.name || 'documento'}.html`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadSignedDocs = (link: any) => {
+    // Find signed (final) documents for this recipient
+    const recipientDocs = signedDocs.filter((doc: any) => {
+      if (doc.document_type === 'firma') return false;
+      if (!doc.is_final) return false;
+      if (link.recipient_type === 'adherente' && link.recipient_id) {
+        return doc.beneficiary_id === link.recipient_id;
+      }
+      return !doc.beneficiary_id;
+    });
+
+    if (recipientDocs.length === 0) {
+      toast.error('No se encontraron documentos firmados');
+      return;
+    }
+
+    recipientDocs.forEach((doc: any) => {
+      if (doc.file_url) {
+        window.open(doc.file_url, '_blank');
+      } else if (doc.content) {
+        handleDownloadContent(doc);
+      }
+    });
   };
 
   const getRecipientLabel = (link: any) => {
@@ -107,12 +170,25 @@ const SignatureWorkflow = () => {
     return beneficiary ? `${beneficiary.first_name} ${beneficiary.last_name}` : 'Adherente';
   };
 
+  // Get the most recent active link for each recipient (skip revoked old ones)
+  const getActiveLinks = (links: any[]) => {
+    const byRecipient = new Map<string, any>();
+    // Links come sorted by created_at DESC, so first match per recipient is newest
+    for (const link of links) {
+      const key = link.recipient_type === 'titular' ? 'titular' : `adherente-${link.recipient_id}`;
+      if (!byRecipient.has(key)) {
+        byRecipient.set(key, link);
+      }
+    }
+    return Array.from(byRecipient.values());
+  };
+
   if (token) {
     return (
       <div className="container mx-auto py-6">
         <Card>
           <CardContent className="text-center py-8">
-            <p className="text-muted-foreground">Acceso público al flujo de firmas</p>
+            <p className="text-muted-foreground">Acceso publico al flujo de firmas</p>
           </CardContent>
         </Card>
       </div>
@@ -133,8 +209,8 @@ const SignatureWorkflow = () => {
     const isSeller = effectiveRole === 'vendedor';
     const canViewAllSales = permissions.sales.viewAll;
 
-    const availableSales = sales.filter(sale => 
-      ['enviado', 'firmado', 'completado'].includes(sale.status) || 
+    const availableSales = sales.filter(sale =>
+      ['enviado', 'firmado', 'completado'].includes(sale.status) ||
       (isSeller && sale.salesperson_id === profile?.id) ||
       canViewAllSales
     );
@@ -202,8 +278,8 @@ const SignatureWorkflow = () => {
   const client = selectedSale.clients as any;
   const clientName = client ? `${client.first_name} ${client.last_name}` : 'Sin cliente';
 
-  const titularLinks = signatureLinks?.filter((l: any) => l.recipient_type === 'titular') || [];
-  const adherenteLinks = signatureLinks?.filter((l: any) => l.recipient_type === 'adherente') || [];
+  const titularLinks = getActiveLinks(signatureLinks?.filter((l: any) => l.recipient_type === 'titular') || []);
+  const adherenteLinks = getActiveLinks(signatureLinks?.filter((l: any) => l.recipient_type === 'adherente') || []);
 
   function renderSignatureLinks(links: any[]) {
     if (linksLoading) {
@@ -221,32 +297,73 @@ const SignatureWorkflow = () => {
       <div className="space-y-4">
         {links.map((link: any) => {
           const isCompleted = link.status === 'completado';
-          const isExpired = new Date(link.expires_at) < new Date();
+          const isExpired = !isCompleted && new Date(link.expires_at) < new Date();
+          const isRevoked = link.status === 'revocado';
+          const isActive = !isCompleted && !isExpired && !isRevoked;
           const phone = getRecipientPhone(link);
           const name = getRecipientName(link);
 
           return (
             <div key={link.id} className="border rounded-lg p-4 space-y-3">
+              {/* Header */}
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium">{getRecipientLabel(link)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Creado: {new Date(link.created_at).toLocaleDateString('es-PY')} • 
-                    Expira: {new Date(link.expires_at).toLocaleDateString('es-PY')}
-                    {link.access_count > 0 && ` • Visto ${link.access_count} vez(es)`}
-                  </p>
                 </div>
                 <Badge variant={
                   isCompleted ? 'default' :
-                  isExpired ? 'destructive' :
+                  isExpired || isRevoked ? 'destructive' :
                   link.status === 'visualizado' ? 'secondary' :
                   'outline'
                 }>
-                  {isCompleted ? '✓ Firmado' : isExpired ? 'Expirado' : link.status}
+                  {isCompleted ? '✓ Firmado' : isExpired ? 'Expirado' : isRevoked ? 'Revocado' : link.status === 'visualizado' ? 'Visualizado' : 'Pendiente'}
                 </Badge>
               </div>
 
-              {!isCompleted && !isExpired && (
+              {/* Timeline de rastreo */}
+              <div className="flex items-center gap-1 text-xs">
+                {/* Step 1: Creado */}
+                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                  <Clock className="h-3 w-3" />
+                  <span>Creado: {formatDateTimePY(link.created_at)}</span>
+                </div>
+                <div className="w-4 h-px bg-border" />
+
+                {/* Step 2: Visualizado */}
+                {link.accessed_at ? (
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                    <Eye className="h-3 w-3" />
+                    <span>Visto: {formatDateTimePY(link.accessed_at)} ({link.access_count}x)</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-muted text-muted-foreground border">
+                    <Eye className="h-3 w-3" />
+                    <span>No visto</span>
+                  </div>
+                )}
+                <div className="w-4 h-px bg-border" />
+
+                {/* Step 3: Firmado */}
+                {isCompleted && link.completed_at ? (
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-50 text-green-700 border border-green-200">
+                    <CheckCircle className="h-3 w-3" />
+                    <span>Firmado: {formatDateTimePY(link.completed_at)}</span>
+                  </div>
+                ) : isExpired ? (
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-red-50 text-red-600 border border-red-200">
+                    <Clock className="h-3 w-3" />
+                    <span>Expirado: {formatDateTimePY(link.expires_at)}</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-muted text-muted-foreground border">
+                    <CheckCircle className="h-3 w-3" />
+                    <span>Pendiente</span>
+                  </div>
+                )}
+              </div>
+
+              {/* 3 Botones: Copiar, WhatsApp, Reenviar (para enlaces activos) */}
+              {isActive && (
                 <div className="flex flex-wrap gap-2">
                   <Button
                     size="sm"
@@ -262,26 +379,47 @@ const SignatureWorkflow = () => {
                   </Button>
                   <Button
                     size="sm"
-                    variant="outline"
-                    onClick={() => window.open(getSignatureUrl(link.token), '_blank')}
-                  >
-                    <ExternalLink className="h-4 w-4 mr-1" />
-                    Abrir
-                  </Button>
-                  <Button
-                    size="sm"
                     className="bg-green-600 hover:bg-green-700 text-white"
                     onClick={() => handleSendWhatsApp(phone, link.token, name)}
                   >
                     <MessageCircle className="h-4 w-4 mr-1" />
                     Enviar por WhatsApp
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleResendLink(link)}
+                    disabled={resendLink.isPending}
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-1 ${resendLink.isPending ? 'animate-spin' : ''}`} />
+                    Reenviar
+                  </Button>
                 </div>
               )}
 
+              {/* Para expirados/revocados: solo Reenviar */}
+              {(isExpired || isRevoked) && (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={() => handleResendLink(link)}
+                    disabled={resendLink.isPending}
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-1 ${resendLink.isPending ? 'animate-spin' : ''}`} />
+                    Regenerar Enlace
+                  </Button>
+                </div>
+              )}
+
+              {/* Para completados: Descargar firmado */}
               {isCompleted && (
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleDownloadSignedDocs(link)}
+                  >
                     <Download className="h-4 w-4 mr-1" />
                     Descargar Documento Firmado
                   </Button>
@@ -316,7 +454,7 @@ const SignatureWorkflow = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              Información de la Venta
+              Informacion de la Venta
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -336,8 +474,8 @@ const SignatureWorkflow = () => {
               <div>
                 <p className="font-medium">Vendedor:</p>
                 <p className="text-muted-foreground">
-                  {selectedSale.salesperson ? 
-                    `${(selectedSale.salesperson as any).first_name} ${(selectedSale.salesperson as any).last_name}` : 
+                  {selectedSale.salesperson ?
+                    `${(selectedSale.salesperson as any).first_name} ${(selectedSale.salesperson as any).last_name}` :
                     'No asignado'
                   }
                 </p>
@@ -369,7 +507,7 @@ const SignatureWorkflow = () => {
                 Firmas de Adherentes ({adherenteLinks.length})
               </CardTitle>
               <CardDescription>
-                Cada adherente recibe únicamente su DDJJ de Salud para firmar
+                Cada adherente recibe unicamente su DDJJ de Salud para firmar
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -378,7 +516,7 @@ const SignatureWorkflow = () => {
           </Card>
         )}
 
-        {/* Signed Documents - for vendor to download */}
+        {/* Documents section */}
         {signedDocs.length > 0 && (
           <Card>
             <CardHeader>
@@ -394,9 +532,10 @@ const SignatureWorkflow = () => {
               <div className="space-y-3">
                 {signedDocs.map((doc: any) => {
                   const isSigned = doc.status === 'firmado' || doc.signed_at;
-                  const beneficiary = doc.beneficiary_id 
+                  const beneficiary = doc.beneficiary_id
                     ? beneficiaries?.find((b: any) => b.id === doc.beneficiary_id)
                     : null;
+                  const canDownload = doc.file_url || doc.content;
 
                   return (
                     <div key={doc.id} className="border rounded-lg p-3 flex items-center justify-between">
@@ -414,12 +553,20 @@ const SignatureWorkflow = () => {
                         <Badge variant={isSigned ? 'default' : 'outline'}>
                           {isSigned ? '✓ Firmado' : 'Pendiente'}
                         </Badge>
-                        {doc.file_url && (
-                          <Button size="sm" variant="outline" asChild>
-                            <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
-                              <Download className="h-3 w-3 mr-1" />
-                              Descargar
-                            </a>
+                        {canDownload && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              if (doc.file_url) {
+                                window.open(doc.file_url, '_blank');
+                              } else {
+                                handleDownloadContent(doc);
+                              }
+                            }}
+                          >
+                            <Download className="h-3 w-3 mr-1" />
+                            Descargar
                           </Button>
                         )}
                       </div>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useCompanyConfiguration } from '@/hooks/useCompanyConfiguration';
 import { useCompanyApiConfiguration, WhatsAppProvider } from '@/hooks/useCompanyApiConfiguration';
+import { getWhatsAppWebhookUrl } from '@/lib/appUrls';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Settings, Palette, MessageSquare, Mail, Smartphone, Eye, CheckCircle, XCircle, ExternalLink } from 'lucide-react';
+import { Settings, Palette, MessageSquare, Mail, Smartphone, Eye, CheckCircle, XCircle, ExternalLink, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const AdminConfigPanel: React.FC = () => {
@@ -105,6 +106,7 @@ export const AdminConfigPanel: React.FC = () => {
   };
 
   const providerStatus = getProviderStatus();
+  const webhookUrl = getWhatsAppWebhookUrl();
 
   if (uiLoading || apiLoading) {
     return (
@@ -376,6 +378,33 @@ export const AdminConfigPanel: React.FC = () => {
                     <p><strong>Ventajas:</strong> No requiere API ni cuenta Business</p>
                     <p><strong>Limitación:</strong> Requiere acción manual del usuario para enviar</p>
                   </div>
+                </div>
+              )}
+
+              {(apiFormData.whatsapp_provider === 'meta' || apiFormData.whatsapp_provider === 'twilio') && (
+                <div className="space-y-2 p-4 rounded-lg border bg-muted/30">
+                  <Label className="text-sm font-medium">URL de Webhook</Label>
+                  <div className="flex gap-2">
+                    <Input value={webhookUrl} readOnly />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(webhookUrl);
+                          toast.success('Webhook URL copiada');
+                        } catch {
+                          toast.error('No se pudo copiar la URL');
+                        }
+                      }}
+                    >
+                      <Copy className="h-4 w-4 mr-1" />
+                      Copiar
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Usa esta URL en Meta/Twilio para recibir estados de entrega y lectura.
+                  </p>
                 </div>
               )}
             </CardContent>

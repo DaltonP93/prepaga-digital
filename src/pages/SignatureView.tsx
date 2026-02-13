@@ -30,6 +30,32 @@ const SignatureView = () => {
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
 
+  const handleDownloadSignedContent = (doc: any) => {
+    if (!doc?.content) return;
+    const htmlContent = `
+      <!doctype html>
+      <html lang="es">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>${doc.name}</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; padding: 24px;">
+        ${doc.content}
+      </body>
+      </html>
+    `;
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${doc.name || 'documento-firmado'}.html`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const handleSignatureComplete = async () => {
     if (!signatureData || !linkData || !termsAccepted) return;
     await submitSignature.mutateAsync({
@@ -141,14 +167,22 @@ const SignatureView = () => {
                         <p className="text-xs text-muted-foreground">{doc.document_type || 'Documento'}</p>
                       </div>
                     </div>
-                    {doc.file_url && (
-                      <Button size="sm" variant="outline" asChild>
-                        <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
+                    <div className="flex items-center gap-2">
+                      {doc.file_url && (
+                        <Button size="sm" variant="outline" asChild>
+                          <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
+                            <Download className="h-3 w-3 mr-1" />
+                            Descargar
+                          </a>
+                        </Button>
+                      )}
+                      {!doc.file_url && doc.content && (
+                        <Button size="sm" variant="outline" onClick={() => handleDownloadSignedContent(doc)}>
                           <Download className="h-3 w-3 mr-1" />
-                          Descargar
-                        </a>
-                      </Button>
-                    )}
+                          Descargar firmado
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </CardContent>

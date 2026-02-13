@@ -3,6 +3,9 @@ project_id = "ykducvvcjzdpoojxlsig"
 [functions.send-whatsapp]
 verify_jwt = false
 
+[functions.whatsapp-webhook]
+verify_jwt = false
+
 [functions.schedule-reminders]
 verify_jwt = false
 
