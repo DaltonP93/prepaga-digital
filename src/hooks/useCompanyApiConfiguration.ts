@@ -91,7 +91,7 @@ export const useCompanyApiConfiguration = () => {
 
       const { data, error } = await supabase
         .from('company_settings')
-        .upsert(dbUpdates)
+        .upsert(dbUpdates as any)
         .select()
         .single();
 

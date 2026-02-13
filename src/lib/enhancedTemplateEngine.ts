@@ -75,6 +75,12 @@ export interface EnhancedTemplateContext {
     fechaInicioContrato: string;
     fechaInicioContratoFormateada: string;
   };
+  facturacion: {
+    razonSocial: string;
+    ruc: string;
+    email: string;
+    telefono: string;
+  };
   firma: {
     enlace: string;
     token: string;
@@ -234,6 +240,12 @@ export function createEnhancedTemplateContext(
       fechaInicioContrato: sale?.contract_start_date ? formatDate(sale.contract_start_date, 'dd/MM/yyyy') : '',
       fechaInicioContratoFormateada: sale?.contract_start_date ? formatDate(sale.contract_start_date, "d 'de' MMMM 'de' yyyy") : '',
     },
+    facturacion: {
+      razonSocial: sale?.billing_razon_social || '',
+      ruc: sale?.billing_ruc || '',
+      email: sale?.billing_email || '',
+      telefono: sale?.billing_phone || '',
+    },
     firma: {
       enlace: signatureLink ? `${window.location.origin}/firmar/${signatureLink.token}` : '',
       token: signatureLink?.token || '',
@@ -280,6 +292,7 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
   replaceNestedVariables(context.plan, 'plan');
   replaceNestedVariables(context.empresa, 'empresa');
   replaceNestedVariables(context.venta, 'venta');
+  replaceNestedVariables(context.facturacion, 'facturacion');
   replaceNestedVariables(context.firma, 'firma');
   replaceNestedVariables(context.fecha, 'fecha');
   
@@ -288,6 +301,24 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     replaceNestedVariables(context.beneficiarioPrincipal, 'beneficiarioPrincipal');
     replaceNestedVariables(context.beneficiarioPrincipal, 'titular');
   }
+
+  // Legacy aliases for backward compatibility with existing templates
+  const legacyAliases: Record<string, string> = {
+    '{{titular_nombre}}': context.cliente.nombreCompleto,
+    '{{titular_email}}': context.cliente.email,
+    '{{titular_telefono}}': context.cliente.telefono,
+    '{{titular_dni}}': context.cliente.dni,
+    '{{titular_direccion}}': context.cliente.direccion,
+    '{{monto_total}}': context.venta.totalFormateado,
+    '{{razon_social}}': context.facturacion.razonSocial,
+    '{{ruc}}': context.facturacion.ruc,
+    '{{billing_email}}': context.facturacion.email,
+    '{{billing_telefono}}': context.facturacion.telefono,
+  };
+  Object.entries(legacyAliases).forEach(([placeholder, value]) => {
+    const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    result = result.replace(regex, String(value || ''));
+  });
 
   // Replace responses
   if (context.respuestas) {
@@ -378,6 +409,15 @@ export function getEnhancedTemplateVariables(): { category: string; variables: {
         { key: '{{venta.cantidadAdherentes}}', description: 'Cantidad de adherentes' },
         { key: '{{venta.fechaInicioContrato}}', description: 'Fecha inicio contrato (dd/MM/yyyy) - 1er día del mes de aprobación' },
         { key: '{{venta.fechaInicioContratoFormateada}}', description: 'Fecha inicio contrato formateada' },
+      ],
+    },
+    {
+      category: 'Facturación',
+      variables: [
+        { key: '{{facturacion.razonSocial}}', description: 'Razón Social para facturación' },
+        { key: '{{facturacion.ruc}}', description: 'R.U.C. para facturación' },
+        { key: '{{facturacion.email}}', description: 'Email de facturación' },
+        { key: '{{facturacion.telefono}}', description: 'Teléfono de facturación' },
       ],
     },
     {

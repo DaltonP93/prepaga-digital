@@ -656,6 +656,44 @@ export type Database = {
           },
         ]
       }
+      company_workflow_config: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          id: string
+          is_active: boolean
+          updated_at: string | null
+          updated_by: string | null
+          workflow_config: Json
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean
+          updated_at?: string | null
+          updated_by?: string | null
+          workflow_config?: Json
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean
+          updated_at?: string | null
+          updated_by?: string | null
+          workflow_config?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_workflow_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       countries: {
         Row: {
           code: string
