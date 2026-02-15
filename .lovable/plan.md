@@ -168,21 +168,27 @@
 Todos los módulos están implementados y funcionales:
 
 1. **Autenticación** - Login, registro, recuperación de contraseña, validación de contraseñas filtradas
-2. **Gestión de Ventas** - CRUD completo con workflow de estados
-3. **Firma Digital** - Enlaces únicos, canvas mejorado, flujo completo
+2. **Gestión de Ventas** - CRUD completo con workflow de estados, auto-cálculo de montos, empresa fija
+3. **Firma Digital** - Enlaces únicos, canvas mejorado, flujo completo, realtime updates
 4. **Beneficiarios** - Datos extendidos, documentos, firmas múltiples
-5. **Templates** - Editor visual, variables dinámicas, vista previa en vivo
+5. **Templates** - Editor visual, variables dinámicas, vista previa en vivo, DDJJ integrada
 6. **WhatsApp** - Notificaciones, recordatorios, templates de mensajes
-7. **Auditoría** - Panel de auditor, aprobación/rechazo, trazabilidad
-8. **Permisos** - 6 roles con control granular de acceso
-9. **Storage** - Bucket privado con RLS por company_id
-10. **Seguridad** - Validación HaveIBeenPwned, fortaleza de contraseñas
+7. **Email** - Notificaciones via Resend (send-notification edge function)
+8. **Auditoría** - Panel de auditor, aprobación/rechazo, trazabilidad
+9. **Permisos** - 6 roles con control granular de acceso
+10. **Storage** - Bucket privado con RLS por company_id
+11. **Seguridad** - Validación HaveIBeenPwned, fortaleza de contraseñas
+12. **DDJJ → Templates** - Preguntas de salud sincronizadas con template_responses para interpolación
+13. **Realtime** - Suscripciones en tiempo real para actualización de firmas
+14. **Reenvío** - Regeneración de enlaces expirados con revocación automática del anterior
+15. **Auto-advance** - Trigger activo que avanza la venta a 'firmado' cuando todas las firmas completan
 
 ---
 
 ## 🔧 Configuración Opcional (Usuario)
 
 1. **WhatsApp API**: Configurar `whatsapp_api_key` y `whatsapp_phone_id` en `company_settings`
+2. **Email**: Secret `RESEND_API_KEY` ya configurado para envío de notificaciones
 
 ---
 
