@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +12,7 @@ import { useBeneficiaries } from '@/hooks/useBeneficiaries';
 import { useCurrencySettings } from '@/hooks/useCurrencySettings';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { useRolePermissions } from '@/hooks/useRolePermissions';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { getSignatureLinkUrl } from '@/lib/appUrls';
 import { toast } from 'sonner';
@@ -38,6 +38,25 @@ const SignatureWorkflow = () => {
   const { data: signatureLinks = [], isLoading: linksLoading } = useSignatureLinks(saleId || '');
   const { data: beneficiaries = [] } = useBeneficiaries(saleId || '');
   const resendLink = useResendSignatureLink();
+  const queryClient = useQueryClient();
+
+  // Realtime subscription for signature_links updates
+  useEffect(() => {
+    if (!saleId) return;
+    const channel = supabase
+      .channel(`signature-links-${saleId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'signature_links', filter: `sale_id=eq.${saleId}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['signature-links', saleId] });
+          queryClient.invalidateQueries({ queryKey: ['signed-documents', saleId] });
+          queryClient.invalidateQueries({ queryKey: ['sales'] });
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [saleId, queryClient]);
 
   // Fetch documents for this sale
   const { data: signedDocs = [] } = useQuery({
