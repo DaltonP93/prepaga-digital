@@ -39,21 +39,29 @@ const SignatureView = () => {
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>${doc.name}</title>
+        <style>
+          @page { size: A4; margin: 20mm; }
+          body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 12px; line-height: 1.6; color: #333; margin: 0; padding: 20px; }
+          img { max-width: 280px; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+        </style>
       </head>
-      <body style="font-family: Arial, sans-serif; padding: 24px;">
+      <body>
         ${doc.content}
       </body>
       </html>
     `;
-    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${doc.name || 'documento-firmado'}.html`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    // Open in new window and trigger print dialog (generates PDF)
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        printWindow.print();
+      };
+    }
   };
 
   const handleSignatureComplete = async () => {
@@ -179,7 +187,7 @@ const SignatureView = () => {
                       {!doc.file_url && doc.content && (
                         <Button size="sm" variant="outline" onClick={() => handleDownloadSignedContent(doc)}>
                           <Download className="h-3 w-3 mr-1" />
-                          Descargar firmado
+                          Descargar PDF
                         </Button>
                       )}
                     </div>
