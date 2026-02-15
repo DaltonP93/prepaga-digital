@@ -35,6 +35,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
   const { role } = useRolePermissions();
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('basico');
+  const [tabErrors, setTabErrors] = useState<Record<string, string>>({});
 
   // Fetch audit information requests for this sale (visible to vendor)
   const { data: infoRequests = [] } = useQuery({
@@ -76,6 +77,32 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
 
   const handleChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear tab errors when user makes changes
+    setTabErrors({});
+  };
+
+  const validateBasicTab = (): string | null => {
+    if (!formData.client_id) return 'Debe seleccionar un cliente';
+    if (!formData.plan_id) return 'Debe seleccionar un plan';
+    return null;
+  };
+
+  const handleTabChange = (newTab: string) => {
+    // Validate current tab before allowing navigation forward
+    const tabOrder = ['basico', 'adherentes', 'documentos', 'ddjj', 'templates', 'auditoria'];
+    const currentIndex = tabOrder.indexOf(activeTab);
+    const newIndex = tabOrder.indexOf(newTab);
+
+    // Only validate when moving forward from basico
+    if (currentIndex === 0 && newIndex > 0 && isEditing === false) {
+      const error = validateBasicTab();
+      if (error) {
+        setTabErrors({ basico: error });
+        toast.error(error);
+        return;
+      }
+    }
+    setActiveTab(newTab);
   };
 
   const handleSave = async () => {
@@ -263,7 +290,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
 
       <Card>
         <CardContent className="pt-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList className="grid w-full grid-cols-2 gap-1.5 h-auto sm:h-11 sm:grid-cols-5 lg:grid-cols-6">
               <TabsTrigger value="basico">Básico</TabsTrigger>
               <TabsTrigger value="adherentes" disabled={!isEditing}>Adherentes</TabsTrigger>

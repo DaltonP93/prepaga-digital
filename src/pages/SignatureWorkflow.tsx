@@ -121,18 +121,26 @@ const SignatureWorkflow = () => {
     if (!doc?.content) return;
     const htmlContent = `<!doctype html>
 <html lang="es">
-<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>${doc.name}</title></head>
-<body style="font-family: Arial, sans-serif; padding: 24px;">${doc.content}</body>
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>${doc.name}</title>
+<style>
+  @page { size: A4; margin: 20mm; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 12px; line-height: 1.6; color: #333; margin: 0; padding: 20px; }
+  img { max-width: 280px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+  @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+</style>
+</head>
+<body>${doc.content}</body>
 </html>`;
-    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${doc.name || 'documento'}.html`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        printWindow.print();
+      };
+    }
   };
 
   const handleDownloadSignedDocs = (link: any) => {

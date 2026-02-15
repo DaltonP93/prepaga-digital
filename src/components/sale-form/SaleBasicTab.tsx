@@ -42,17 +42,19 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
 
   const selectedPlan = plans?.find(p => p.id === formData.plan_id);
 
+  // Auto-set company from logged-in user (always)
+  useEffect(() => {
+    if (companyId) {
+      onChange('company_id', companyId);
+    }
+  }, [companyId]);
+
+  // Auto-calculate total from plan price (readonly)
   useEffect(() => {
     if (selectedPlan) {
       onChange('total_amount', Number(selectedPlan.price) || 0);
     }
   }, [selectedPlan]);
-
-  useEffect(() => {
-    if (companyId && !formData.company_id) {
-      onChange('company_id', companyId);
-    }
-  }, [companyId]);
 
   // Auto-select newly created client when modal closes
   useEffect(() => {
@@ -152,19 +154,21 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
         <Label htmlFor="requires_adherents">¿Requiere adherentes/grupo familiar?</Label>
       </div>
 
-      {/* Total Amount */}
+      {/* Total Amount - READONLY, auto-calculated */}
       <div className="space-y-2">
         <Label>Monto Total (Gs.) *</Label>
         <Input
           type="number"
           step="1"
           value={formData.total_amount}
-          onChange={(e) => onChange('total_amount', parseFloat(e.target.value) || 0)}
+          readOnly
+          disabled
+          className="bg-muted cursor-not-allowed"
           placeholder="0"
         />
         {selectedPlan && (
           <p className="text-xs text-muted-foreground">
-            Precio de referencia del plan: {formatCurrency(Number(selectedPlan.price) || 0)}
+            Calculado automáticamente del plan: {formatCurrency(Number(selectedPlan.price) || 0)}
           </p>
         )}
       </div>
