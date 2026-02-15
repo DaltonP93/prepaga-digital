@@ -27,6 +27,8 @@ import { DraggablePlaceholdersSidebar } from './DraggablePlaceholdersSidebar';
 import { ImageManager } from './ImageManager';
 import { useBranding } from './CompanyBrandingProvider';
 import { useToast } from '@/hooks/use-toast';
+import { SignatureFieldExtension } from './editor/SignatureFieldExtension';
+import { DynamicPlaceholderExtension } from './editor/DynamicPlaceholderExtension';
 
 export interface TipTapEditorProps {
   initialContent?: string;
@@ -60,9 +62,7 @@ export interface TipTapEditorAPI {
   focus: () => void;
 }
 
-const DynamicPlaceholder = (window as any).DynamicPlaceholder;
-const ResizableImage = (window as any).ResizableImage;
-const SignatureField = (window as any).SignatureField;
+// Extensions are now properly imported above
 
 const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref) => {
   const { 
@@ -136,9 +136,8 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
       TableRow.configure(),
       TableHeader.configure(),
       TableCell.configure(),
-      DynamicPlaceholder,
-      ResizableImage,
-      SignatureField
+      DynamicPlaceholderExtension,
+      SignatureFieldExtension,
     ],
     content: content || initialContent || '<p>Escribe algo...</p>',
     onUpdate: ({ editor }) => {
