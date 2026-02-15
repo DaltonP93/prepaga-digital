@@ -149,17 +149,18 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
 
       if (templateError) throw templateError;
 
-      // Fetch questionnaire responses for the sale
+      // Fetch questionnaire responses for the sale (with question placeholder_names)
       const { data: templateResponses } = await supabase
         .from('template_responses')
-        .select('*')
+        .select('*, template_questions:question_id(placeholder_name)')
         .eq('sale_id', saleId);
 
-      // Build responses map
+      // Build responses map keyed by placeholder_name
       const responsesMap: Record<string, any> = {};
       (templateResponses || []).forEach((tr: any) => {
-        if (tr.responses && typeof tr.responses === 'object') {
-          Object.assign(responsesMap, tr.responses);
+        const placeholderName = tr.template_questions?.placeholder_name;
+        if (placeholderName && tr.response_value) {
+          responsesMap[placeholderName] = tr.response_value;
         }
       });
 

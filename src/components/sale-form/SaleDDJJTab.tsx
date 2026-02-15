@@ -310,11 +310,57 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
       if (error) throw error;
       return { realId: beneficiaryId, wasVirtual: false };
     },
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       queryClient.invalidateQueries({ queryKey: ['beneficiaries'] });
 
+      const savedId = result.wasVirtual ? result.realId : result.realId;
+      const d = getData(result.wasVirtual ? 'virtual-titular' : result.realId);
+
+      // Sync DDJJ answers to template_responses for template engine interpolation
+      try {
+        if (saleId) {
+          const { data: ddjiQuestions } = await supabase
+            .from('template_questions')
+            .select('id, placeholder_name, sort_order')
+            .eq('template_id', '784e7d0e-8001-48a6-a44d-945722293fc4')
+            .order('sort_order');
+
+          if (ddjiQuestions && ddjiQuestions.length > 0) {
+            for (const q of ddjiQuestions) {
+              let responseValue = '';
+              if (q.placeholder_name?.startsWith('ddjj_pregunta_')) {
+                const idx = parseInt(q.placeholder_name.replace('ddjj_pregunta_', '')) - 1;
+                responseValue = d.answers[idx] === 'si'
+                  ? `Sí${d.details[idx] ? ': ' + d.details[idx] : ''}`
+                  : d.answers[idx] === 'no' ? 'No' : '';
+              } else if (q.placeholder_name === 'ddjj_peso') {
+                responseValue = d.peso || '';
+              } else if (q.placeholder_name === 'ddjj_altura') {
+                responseValue = d.altura || '';
+              } else if (q.placeholder_name === 'ddjj_fuma') {
+                responseValue = d.habits[0] ? 'Sí' : 'No';
+              } else if (q.placeholder_name === 'ddjj_vapea') {
+                responseValue = d.habits[1] ? 'Sí' : 'No';
+              } else if (q.placeholder_name === 'ddjj_alcohol') {
+                responseValue = d.habits[2] ? 'Sí' : 'No';
+              } else if (q.placeholder_name === 'ddjj_menstruacion') {
+                responseValue = d.lastMenstruation || 'N/A';
+              }
+
+              await supabase.from('template_responses').upsert({
+                sale_id: saleId,
+                template_id: '784e7d0e-8001-48a6-a44d-945722293fc4',
+                question_id: q.id,
+                response_value: responseValue,
+              }, { onConflict: 'sale_id,template_id,question_id', ignoreDuplicates: false });
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Error syncing DDJJ to template_responses:', e);
+      }
+
       if (result.wasVirtual) {
-        // Transfer health data from virtual to the real beneficiary ID
         setHealthData(prev => {
           const virtualData = prev['virtual-titular'];
           const next = { ...prev };

@@ -461,6 +461,24 @@ export function getEnhancedTemplateVariables(): { category: string; variables: {
         { key: '{{montoFormateado}}', description: 'Monto de cobertura (dentro del loop)' },
       ],
     },
+    {
+      category: 'DDJJ Salud',
+      variables: [
+        { key: '{{respuestas.ddjj_pregunta_1}}', description: 'Enfermedades crónicas (Sí/No + detalle)' },
+        { key: '{{respuestas.ddjj_pregunta_2}}', description: 'Trastorno mental/neurológico (Sí/No + detalle)' },
+        { key: '{{respuestas.ddjj_pregunta_3}}', description: 'Enfermedad cardiovascular (Sí/No + detalle)' },
+        { key: '{{respuestas.ddjj_pregunta_4}}', description: 'Quistes/tumores/oncológicas (Sí/No + detalle)' },
+        { key: '{{respuestas.ddjj_pregunta_5}}', description: 'Internaciones/cirugías (Sí/No + detalle)' },
+        { key: '{{respuestas.ddjj_pregunta_6}}', description: 'Medicamentos/tratamientos (Sí/No + detalle)' },
+        { key: '{{respuestas.ddjj_pregunta_7}}', description: 'Otras enfermedades (Sí/No + detalle)' },
+        { key: '{{respuestas.ddjj_peso}}', description: 'Peso en kg' },
+        { key: '{{respuestas.ddjj_altura}}', description: 'Estatura en cm' },
+        { key: '{{respuestas.ddjj_fuma}}', description: 'Fuma (Sí/No)' },
+        { key: '{{respuestas.ddjj_vapea}}', description: 'Vapea (Sí/No)' },
+        { key: '{{respuestas.ddjj_alcohol}}', description: 'Consume alcohol (Sí/No)' },
+        { key: '{{respuestas.ddjj_menstruacion}}', description: 'Última menstruación/embarazo' },
+      ],
+    },
   ];
 }
 
