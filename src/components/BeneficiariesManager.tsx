@@ -20,11 +20,16 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
   const [editingBeneficiary, setEditingBeneficiary] = useState<any>(null);
   const [expandedBeneficiary, setExpandedBeneficiary] = useState<string | null>(null);
 
-  const { data: beneficiaries = [], isLoading } = useBeneficiaries(saleId);
+  const { data: allBeneficiaries = [], isLoading } = useBeneficiaries(saleId);
   const createBeneficiary = useCreateBeneficiary();
   const updateBeneficiary = useUpdateBeneficiary();
   const deleteBeneficiary = useDeleteBeneficiary();
   const { formatCurrency } = useCurrencySettings();
+
+  // Filter out the titular — only show adherentes
+  const beneficiaries = allBeneficiaries.filter(
+    (b: any) => b.relationship !== 'titular' && !b.is_primary
+  );
 
   const handleEdit = (beneficiary: any) => {
     setEditingBeneficiary(beneficiary);
@@ -108,9 +113,9 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
       <CardHeader>
         <div className="flex justify-between items-center">
           <div>
-            <CardTitle>Beneficiarios / Adherentes</CardTitle>
+            <CardTitle>Adherentes</CardTitle>
             <CardDescription>
-              Gestiona los beneficiarios de esta venta ({beneficiaries.length} registrados)
+              Gestiona los adherentes del titular ({beneficiaries.length} registrados)
             </CardDescription>
           </div>
           <Button onClick={() => setShowForm(true)} disabled={showForm}>

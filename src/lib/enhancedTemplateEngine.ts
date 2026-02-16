@@ -309,11 +309,18 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     '{{titular_telefono}}': context.cliente.telefono,
     '{{titular_dni}}': context.cliente.dni,
     '{{titular_direccion}}': context.cliente.direccion,
+    '{{titular_ciudad}}': context.cliente.ciudad,
+    '{{titular_provincia}}': context.cliente.provincia,
+    '{{titular_fecha_nacimiento}}': context.cliente.fechaNacimiento,
+    '{{titular_edad}}': String(context.cliente.edad),
     '{{monto_total}}': context.venta.totalFormateado,
     '{{razon_social}}': context.facturacion.razonSocial,
     '{{ruc}}': context.facturacion.ruc,
     '{{billing_email}}': context.facturacion.email,
     '{{billing_telefono}}': context.facturacion.telefono,
+    '{{fecha_actual}}': context.fecha.actualFormateada,
+    '{{numero_contrato}}': context.venta.numeroContrato,
+    '{{vendedor_nombre}}': context.venta.vendedor,
   };
   Object.entries(legacyAliases).forEach(([placeholder, value]) => {
     const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
@@ -334,7 +341,7 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
   result = result.replace(beneficiariesLoopRegex, (_, content) => {
     return context.beneficiarios.map((beneficiary, index) => {
       let itemResult = content;
-      // Replace beneficiary-specific placeholders
+      // Replace beneficiary-specific placeholders (Spanish names from BeneficiaryContext)
       Object.keys(beneficiary).forEach(key => {
         const value = (beneficiary as any)[key];
         const placeholder = `{{${key}}}`;
@@ -343,8 +350,35 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
           itemResult = itemResult.replace(regex, String(value));
         }
       });
-      // Replace index
+
+      // English aliases for templates that use DB column names directly
+      const englishAliases: Record<string, string> = {
+        '{{first_name}}': beneficiary.nombre,
+        '{{last_name}}': beneficiary.apellido,
+        '{{full_name}}': beneficiary.nombreCompleto,
+        '{{birth_date}}': beneficiary.fechaNacimiento,
+        '{{gender}}': beneficiary.genero,
+        '{{amount}}': String(beneficiary.monto),
+        '{{relationship}}': beneficiary.parentesco,
+        '{{email}}': beneficiary.email,
+        '{{phone}}': beneficiary.telefono,
+        '{{address}}': beneficiary.direccion,
+        '{{city}}': beneficiary.ciudad,
+        '{{occupation}}': beneficiary.ocupacion,
+        '{{marital_status}}': beneficiary.estadoCivil,
+        '{{document_number}}': beneficiary.dni,
+        '{{age}}': String(beneficiary.edad),
+        '{{formatted_amount}}': beneficiary.montoFormateado,
+      };
+      Object.entries(englishAliases).forEach(([placeholder, value]) => {
+        const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+        itemResult = itemResult.replace(regex, value || '');
+      });
+
+      // Replace index (both Spanish and English)
       itemResult = itemResult.replace(/\{\{indice\}\}/gi, String(index + 1));
+      itemResult = itemResult.replace(/\{\{_index\}\}/gi, String(index + 1));
+      itemResult = itemResult.replace(/\{\{index\}\}/gi, String(index + 1));
       return itemResult;
     }).join('');
   });
@@ -426,6 +460,8 @@ export function getEnhancedTemplateVariables(): { category: string; variables: {
         { key: '{{firma.enlace}}', description: 'Enlace para firma digital' },
         { key: '{{firma.fechaExpiracion}}', description: 'Fecha de expiración del enlace' },
         { key: '{{firma.estado}}', description: 'Estado de la firma' },
+        { key: '{{firma_contratante}}', description: 'Campo de firma del contratante (se reemplaza con la imagen de firma al firmar)' },
+        { key: '{{firma_adherente}}', description: 'Campo de firma del adherente (se reemplaza con la imagen de firma al firmar)' },
       ],
     },
     {
@@ -456,9 +492,21 @@ export function getEnhancedTemplateVariables(): { category: string; variables: {
         { key: '{{#beneficiarios}}...{{/beneficiarios}}', description: 'Loop para listar todos los beneficiarios' },
         { key: '{{indice}}', description: 'Número del beneficiario (dentro del loop)' },
         { key: '{{nombreCompleto}}', description: 'Nombre completo (dentro del loop)' },
+        { key: '{{nombre}}', description: 'Nombre (dentro del loop)' },
+        { key: '{{apellido}}', description: 'Apellido (dentro del loop)' },
+        { key: '{{fechaNacimiento}}', description: 'Fecha de nacimiento (dentro del loop)' },
+        { key: '{{genero}}', description: 'Género (dentro del loop)' },
         { key: '{{parentesco}}', description: 'Parentesco (dentro del loop)' },
         { key: '{{edad}}', description: 'Edad (dentro del loop)' },
-        { key: '{{montoFormateado}}', description: 'Monto de cobertura (dentro del loop)' },
+        { key: '{{monto}}', description: 'Monto numérico (dentro del loop)' },
+        { key: '{{montoFormateado}}', description: 'Monto de cobertura formateado (dentro del loop)' },
+        { key: '{{dni}}', description: 'DNI/Documento (dentro del loop)' },
+        { key: '{{first_name}}', description: 'Nombre - alias inglés (dentro del loop)' },
+        { key: '{{last_name}}', description: 'Apellido - alias inglés (dentro del loop)' },
+        { key: '{{birth_date}}', description: 'Fecha nac. - alias inglés (dentro del loop)' },
+        { key: '{{gender}}', description: 'Género - alias inglés (dentro del loop)' },
+        { key: '{{relationship}}', description: 'Parentesco - alias inglés (dentro del loop)' },
+        { key: '{{amount}}', description: 'Monto - alias inglés (dentro del loop)' },
       ],
     },
     {

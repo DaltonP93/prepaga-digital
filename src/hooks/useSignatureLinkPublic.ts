@@ -266,16 +266,46 @@ export const useSubmitSignatureLink = () => {
                   </div>
                 `;
 
-            const signatureBlock = `
-              <hr style="margin:24px 0;border:none;border-top:1px solid #d1d5db;" />
-              <section style="padding:16px;border:1px solid #e5e7eb;border-radius:8px;background:#fafafa;">
-                <h4 style="margin:0 0 8px 0;font-size:14px;">Firma Digital Incrustada</h4>
-                <p style="margin:0 0 8px 0;font-size:12px;color:#4b5563;">
-                  Firmado el: ${safeSignedAt}
-                </p>
-                <img src="${signatureData}" alt="Firma digital" style="max-width:280px;border:1px solid #d1d5db;border-radius:4px;background:#fff;" />
-              </section>
+            // Inline signature image to replace placeholder in template
+            const signatureImg = `<img src="${signatureData}" alt="Firma digital" style="max-width:280px;max-height:120px;display:block;" />`;
+            const signatureImgWithDate = `
+              <div style="text-align:center;">
+                ${signatureImg}
+                <p style="margin:4px 0 0 0;font-size:10px;color:#6b7280;">Firmado el: ${safeSignedAt}</p>
+              </div>
             `;
+
+            // Try to replace signature placeholders in the document content
+            // Supports: {{firma_contratante}}, {{firma_titular}}, {{firma_adherente}}
+            const placeholderPatterns = recipientType === 'adherente'
+              ? [/\{\{firma_adherente\}\}/gi, /\{\{firma_contratante\}\}/gi, /\{\{firma_titular\}\}/gi]
+              : [/\{\{firma_contratante\}\}/gi, /\{\{firma_titular\}\}/gi];
+
+            let finalContent = originalContent;
+            let placeholderFound = false;
+
+            for (const pattern of placeholderPatterns) {
+              if (pattern.test(finalContent)) {
+                finalContent = finalContent.replace(pattern, signatureImgWithDate);
+                placeholderFound = true;
+                break;
+              }
+            }
+
+            // Fallback: if no placeholder found, append signature block at the end
+            if (!placeholderFound) {
+              const signatureBlock = `
+                <hr style="margin:24px 0;border:none;border-top:1px solid #d1d5db;" />
+                <section style="padding:16px;border:1px solid #e5e7eb;border-radius:8px;background:#fafafa;">
+                  <h4 style="margin:0 0 8px 0;font-size:14px;">Firma Digital Incrustada</h4>
+                  <p style="margin:0 0 8px 0;font-size:12px;color:#4b5563;">
+                    Firmado el: ${safeSignedAt}
+                  </p>
+                  ${signatureImg}
+                </section>
+              `;
+              finalContent = `${finalContent}${signatureBlock}`;
+            }
 
             return {
               sale_id: doc.sale_id,
@@ -291,7 +321,7 @@ export const useSubmitSignatureLink = () => {
               signed_by: null,
               signature_data: signatureData,
               file_url: null,
-              content: `${originalContent}${signatureBlock}`,
+              content: finalContent,
               version: (doc.version || 1) + 1,
             };
           });
