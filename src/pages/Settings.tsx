@@ -32,6 +32,7 @@ import { ProfileCompanyAssignmentPanel } from '@/components/ProfileCompanyAssign
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { WorkflowConfigPanel } from '@/components/workflow/WorkflowConfigPanel';
 import { AdminConfigPanel } from '@/components/AdminConfigPanel';
+import { MenuConfigPanel } from '@/components/MenuConfigPanel';
 import { useRolePermissions } from '@/hooks/useRolePermissions';
 
 export default function Settings() {
@@ -193,6 +194,7 @@ export default function Settings() {
               </CardContent>
             </Card>
           </div>
+          {canManageWorkflow && <MenuConfigPanel />}
         </TabsContent>
 
         <TabsContent value="integraciones" className="space-y-4">

@@ -33,3 +33,4 @@ dist-ssr
 *.sw?
 SKILL.md
 CLAUDE.md
+.mcp.json

@@ -32,98 +32,124 @@ import {
 import { MainNavItem } from "@/types";
 import { LogoutButton } from './LogoutButton';
 import { useRoutePermissions } from '@/hooks/useRoutePermissions';
+import { useMenuVisibility } from '@/hooks/useMenuConfig';
 import { useBranding } from './CompanyBrandingProvider';
 import { useState } from 'react';
 
 export function AppSidebar() {
   const location = useLocation();
   const permissions = useRoutePermissions();
+  const { isVisible: isMenuVisible } = useMenuVisibility();
   const { logoUrl, companyName } = useBranding();
   const [logoBroken, setLogoBroken] = useState(false);
 
-  const menuItems: MainNavItem[] = [
+  // Apply base permissions first, then menu config override
+  const applyMenuConfig = (items: (MainNavItem & { routeKey: string })[]) => {
+    return items.filter(item => {
+      if (!item.visible) return false;
+      const configValue = isMenuVisible(item.routeKey);
+      // null = no config or super_admin, use base permission
+      if (configValue === null) return true;
+      return configValue;
+    });
+  };
+
+  const menuItems = applyMenuConfig([
     {
       title: "Dashboard",
       url: "/dashboard",
       icon: LayoutDashboard,
       visible: permissions.canViewDashboard,
+      routeKey: 'dashboard',
     },
     {
       title: "Ventas",
       url: "/sales",
       icon: ShoppingBag,
       visible: permissions.canViewSales,
+      routeKey: 'sales',
     },
     {
       title: "Clientes",
       url: "/clients",
       icon: Users,
       visible: permissions.canViewClients,
+      routeKey: 'clients',
     },
     {
       title: "Planes",
       url: "/plans",
       icon: CreditCard,
       visible: permissions.canViewPlans,
+      routeKey: 'plans',
     },
     {
       title: "Documentos",
       url: "/documents",
       icon: FileText,
       visible: permissions.canViewDocuments,
+      routeKey: 'documents',
     },
     {
       title: "Templates",
       url: "/templates",
       icon: FileImage,
       visible: permissions.canViewTemplates,
+      routeKey: 'templates',
     },
     {
       title: "Flujo de Firmas",
       url: "/signature-workflow",
       icon: Workflow,
       visible: permissions.canViewDocuments,
+      routeKey: 'signature-workflow',
     },
     {
       title: "Auditoría",
       url: "/audit",
       icon: Shield,
       visible: permissions.canViewAudit,
+      routeKey: 'audit',
     },
     {
       title: "Analytics",
       url: "/analytics",
       icon: BarChart3,
       visible: permissions.canViewAnalytics,
+      routeKey: 'analytics',
     },
     {
       title: "Mi Perfil",
       url: "/profile",
       icon: User,
       visible: true,
+      routeKey: 'profile',
     },
-  ].filter(item => item.visible);
+  ]);
 
-  const adminItems: MainNavItem[] = [
+  const adminItems = applyMenuConfig([
     {
       title: "Usuarios",
       url: "/users",
       icon: UserCog,
       visible: permissions.canViewUsers,
+      routeKey: 'users',
     },
     {
       title: "Empresas",
       url: "/companies",
       icon: Building2,
       visible: permissions.canViewCompanies,
+      routeKey: 'companies',
     },
     {
       title: "Configuración",
       url: "/settings",
       icon: Settings,
       visible: permissions.canViewSettings,
+      routeKey: 'settings',
     }
-  ].filter(item => item.visible);
+  ]);
 
   const allMenuItems = [...menuItems, ...adminItems];
 
