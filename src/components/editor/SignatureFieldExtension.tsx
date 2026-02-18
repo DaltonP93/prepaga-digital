@@ -166,6 +166,62 @@ const MiniSignatureCanvas: React.FC<{
   );
 };
 
+// ── Resize Handle Hook ─────────────────────────────────────────────────
+
+const useResizable = (
+  initialWidth: number,
+  initialHeight: number,
+  onResize: (w: number, h: number) => void,
+  containerRef: React.RefObject<HTMLDivElement>
+) => {
+  const isResizing = useRef(false);
+  const startPos = useRef({ x: 0, y: 0, w: 0, h: 0 });
+  const corner = useRef<'se' | 'e' | 's'>('se');
+
+  const onMouseDown = useCallback((e: React.MouseEvent, dir: 'se' | 'e' | 's') => {
+    e.preventDefault();
+    e.stopPropagation();
+    isResizing.current = true;
+    corner.current = dir;
+    const el = containerRef.current;
+    if (!el) return;
+    startPos.current = { x: e.clientX, y: e.clientY, w: el.offsetWidth, h: el.offsetHeight };
+
+    const onMove = (ev: MouseEvent) => {
+      if (!isResizing.current) return;
+      const dx = ev.clientX - startPos.current.x;
+      const dy = ev.clientY - startPos.current.y;
+      let newW = startPos.current.w;
+      let newH = startPos.current.h;
+      if (corner.current === 'e' || corner.current === 'se') newW = Math.max(150, startPos.current.w + dx);
+      if (corner.current === 's' || corner.current === 'se') newH = Math.max(100, startPos.current.h + dy);
+      if (el) {
+        el.style.width = `${newW}px`;
+        el.style.height = `${newH}px`;
+      }
+    };
+
+    const onUp = () => {
+      isResizing.current = false;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      const el = containerRef.current;
+      if (el) {
+        // Convert width to percentage of parent
+        const parent = el.parentElement;
+        const parentWidth = parent ? parent.offsetWidth : el.offsetWidth;
+        const pct = Math.round(Math.min(100, Math.max(20, (el.offsetWidth / parentWidth) * 100)));
+        onResize(pct, el.offsetHeight);
+      }
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [containerRef, onResize]);
+
+  return { onMouseDown };
+};
+
 // ── Main Component ─────────────────────────────────────────────────────
 
 const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
@@ -179,8 +235,17 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
   const [showToken, setShowToken] = useState(node.attrs.showToken);
   const [width, setWidth] = useState(node.attrs.width || 100);
   const [height, setHeight] = useState(node.attrs.height || 200);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const [previewSigned, setPreviewSigned] = useState(false);
+
+  const handleResize = useCallback((newWidthPct: number, newHeightPx: number) => {
+    setWidth(newWidthPct);
+    setHeight(newHeightPx);
+    updateAttributes({ width: newWidthPct, height: newHeightPx });
+  }, [updateAttributes]);
+
+  const { onMouseDown } = useResizable(width, height, handleResize, containerRef as React.RefObject<HTMLDivElement>);
 
   const handleSave = () => {
     updateAttributes({ label, signatureType, signerRole, required, showSignerInfo, showDate, showToken, width, height });
@@ -199,8 +264,9 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
   return (
     <NodeViewWrapper className="signature-field-wrapper">
       <div
-        style={{ width: `${width}%`, minHeight: `${height}px` }}
-        className={`border-2 border-dashed rounded-lg my-4 p-4 transition-colors relative ${
+        ref={containerRef}
+        style={{ width: `${width}%`, height: `${height}px` }}
+        className={`border-2 border-dashed rounded-lg my-4 p-4 transition-colors relative overflow-hidden ${
           selected ? 'border-primary bg-primary/5' : 'border-amber-400 bg-amber-50'
         }`}
       >
@@ -208,10 +274,35 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
         <div
           contentEditable={false}
           data-drag-handle
-          className="absolute top-2 left-2 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+          className="absolute top-2 left-2 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground z-10"
           title="Arrastrar para mover"
         >
-          <GripVertical className="h-4 w-4" />
+          <GripVertical className="h-5 w-5" />
+        </div>
+
+        {/* Resize handles */}
+        {/* Right edge */}
+        <div
+          contentEditable={false}
+          onMouseDown={(e) => onMouseDown(e, 'e')}
+          className="absolute top-0 right-0 w-2 h-full cursor-ew-resize z-10 hover:bg-primary/20 transition-colors"
+        />
+        {/* Bottom edge */}
+        <div
+          contentEditable={false}
+          onMouseDown={(e) => onMouseDown(e, 's')}
+          className="absolute bottom-0 left-0 h-2 w-full cursor-ns-resize z-10 hover:bg-primary/20 transition-colors"
+        />
+        {/* Bottom-right corner */}
+        <div
+          contentEditable={false}
+          onMouseDown={(e) => onMouseDown(e, 'se')}
+          className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize z-20 flex items-center justify-center"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" className="text-muted-foreground">
+            <path d="M9 1v8H1" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            <path d="M9 5v4H5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
         </div>
 
         {/* Header */}
@@ -224,6 +315,7 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
             </Badge>
           </div>
           <div className="flex items-center gap-1">
+            <span className="text-[10px] text-muted-foreground mr-1">{width}% × {height}px</span>
             <Button variant="ghost" size="sm" onClick={() => setIsEditing(!isEditing)} className="h-7 w-7 p-0">
               <Settings className="h-4 w-4" />
             </Button>
@@ -261,21 +353,6 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
               </Select>
             </div>
 
-            {/* Size controls */}
-            <div className="space-y-3">
-              <Label className="text-xs font-medium flex items-center gap-1">
-                <Maximize2 className="h-3 w-3" /> Tamaño del Campo
-              </Label>
-              <div>
-                <Label className="text-xs">Ancho: {width}%</Label>
-                <Slider value={[width]} onValueChange={([v]) => setWidth(v)} min={30} max={100} step={5} className="mt-1" />
-              </div>
-              <div>
-                <Label className="text-xs">Alto: {height}px</Label>
-                <Slider value={[height]} onValueChange={([v]) => setHeight(v)} min={100} max={500} step={10} className="mt-1" />
-              </div>
-            </div>
-
             <div className="space-y-3">
               <Label className="text-xs font-medium">Opciones de Firma Electrónica</Label>
               <div className="flex items-center justify-between">
@@ -299,7 +376,7 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
             <Button onClick={handleSave} size="sm" className="w-full">Guardar Configuración</Button>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 overflow-auto" style={{ maxHeight: `${height - 60}px` }}>
             <div className="text-sm font-medium text-center">
               {label} {required && <span className="text-destructive">*</span>}
             </div>
@@ -316,7 +393,7 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
                   onSign={() => setPreviewSigned(true)}
                   onClear={() => setPreviewSigned(false)}
                   signed={previewSigned}
-                  canvasHeight={height}
+                  canvasHeight={Math.min(height - 100, 200)}
                 />
               </div>
             )}
