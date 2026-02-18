@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
-import { Settings, PenTool, ShieldCheck, RotateCcw, User, Calendar, Hash, GripVertical, Maximize2 } from 'lucide-react';
+import { Settings, PenTool, ShieldCheck, RotateCcw, User, Calendar, Hash, GripVertical, AlignLeft, AlignRight, AlignCenter } from 'lucide-react';
 
 // ── TipTap Node Extension ──────────────────────────────────────────────
 
@@ -30,16 +30,23 @@ export const SignatureFieldExtension = Node.create({
       showSignerInfo: { default: true },
       showDate: { default: true },
       showToken: { default: true },
-      width: { default: 100 },  // percentage
-      height: { default: 200 }, // px
+      width: { default: 100 },
+      height: { default: 200 },
+      float: { default: 'none' }, // none, left, right
     };
   },
+
+
+
 
   parseHTML() {
     return [{ tag: 'div[data-signature-field]' }];
   },
 
   renderHTML({ HTMLAttributes }) {
+    const floatStyle = HTMLAttributes.float === 'left' ? 'float: left; margin-right: 16px;'
+      : HTMLAttributes.float === 'right' ? 'float: right; margin-left: 16px;'
+      : '';
     return [
       'div',
       {
@@ -51,8 +58,9 @@ export const SignatureFieldExtension = Node.create({
         'data-show-signer-info': HTMLAttributes.showSignerInfo,
         'data-show-date': HTMLAttributes.showDate,
         'data-show-token': HTMLAttributes.showToken,
-        style: `width: ${HTMLAttributes.width}%; min-height: ${HTMLAttributes.height}px;`,
-        class: 'signature-field my-4 p-4 border-2 border-dashed border-primary/40 rounded-lg bg-primary/5',
+        'data-float': HTMLAttributes.float,
+        style: `width: ${HTMLAttributes.width}%; min-height: ${HTMLAttributes.height}px; display: inline-block; vertical-align: top; ${floatStyle}`,
+        class: 'signature-field my-2 p-4 border-2 border-dashed border-primary/40 rounded-lg bg-primary/5',
       },
       ['div', { class: 'text-center text-sm text-muted-foreground' }, HTMLAttributes.label],
     ];
@@ -236,6 +244,7 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
   const [width, setWidth] = useState(node.attrs.width || 100);
   const [height, setHeight] = useState(node.attrs.height || 200);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [floatDir, setFloatDir] = useState<'none' | 'left' | 'right'>(node.attrs.float || 'none');
 
   const [previewSigned, setPreviewSigned] = useState(false);
 
@@ -248,8 +257,14 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
   const { onMouseDown } = useResizable(width, height, handleResize, containerRef as React.RefObject<HTMLDivElement>);
 
   const handleSave = () => {
-    updateAttributes({ label, signatureType, signerRole, required, showSignerInfo, showDate, showToken, width, height });
+    updateAttributes({ label, signatureType, signerRole, required, showSignerInfo, showDate, showToken, width, height, float: floatDir });
     setIsEditing(false);
+  };
+
+  const toggleFloat = (dir: 'none' | 'left' | 'right') => {
+    const newDir = floatDir === dir ? 'none' : dir;
+    setFloatDir(newDir);
+    updateAttributes({ float: newDir });
   };
 
   const signerRoleLabels: Record<string, string> = {
@@ -262,11 +277,18 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
   const previewTimestamp = '2026-02-15T12:00:00.000Z';
 
   return (
-    <NodeViewWrapper className="signature-field-wrapper">
+    <NodeViewWrapper className="signature-field-wrapper" style={{
+      float: floatDir !== 'none' ? floatDir : undefined,
+      display: 'inline-block',
+      verticalAlign: 'top',
+      marginRight: floatDir === 'left' ? '16px' : undefined,
+      marginLeft: floatDir === 'right' ? '16px' : undefined,
+      width: `${width}%`,
+    }}>
       <div
         ref={containerRef}
-        style={{ width: `${width}%`, height: `${height}px` }}
-        className={`border-2 border-dashed rounded-lg my-4 p-4 transition-colors relative overflow-hidden ${
+        style={{ width: '100%', height: `${height}px` }}
+        className={`border-2 border-dashed rounded-lg my-2 p-4 transition-colors relative overflow-hidden ${
           selected ? 'border-primary bg-primary/5' : 'border-amber-400 bg-amber-50'
         }`}
       >
@@ -309,13 +331,40 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
         <div className="flex items-center justify-between mb-3 pl-6">
           <div className="flex items-center gap-2">
             <PenTool className="h-4 w-4 text-amber-600" />
-            <span className="text-amber-700 font-semibold text-sm">Campo de Firma</span>
+            <span className="text-amber-700 font-semibold text-sm">Firma</span>
             <Badge variant="outline" className="text-[10px] px-1.5 py-0">
               {signatureType === 'digital' ? 'Digital' : signatureType === 'electronic' ? 'Electrónica' : 'Ambas'}
             </Badge>
           </div>
-          <div className="flex items-center gap-1">
-            <span className="text-[10px] text-muted-foreground mr-1">{width}% × {height}px</span>
+          <div className="flex items-center gap-0.5">
+            <Button
+              variant={floatDir === 'left' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => toggleFloat('left')}
+              className="h-6 w-6 p-0"
+              title="Acoplar a la izquierda"
+            >
+              <AlignLeft className="h-3 w-3" />
+            </Button>
+            <Button
+              variant={floatDir === 'none' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => { setFloatDir('none'); updateAttributes({ float: 'none' }); }}
+              className="h-6 w-6 p-0"
+              title="Bloque completo"
+            >
+              <AlignCenter className="h-3 w-3" />
+            </Button>
+            <Button
+              variant={floatDir === 'right' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => toggleFloat('right')}
+              className="h-6 w-6 p-0"
+              title="Acoplar a la derecha"
+            >
+              <AlignRight className="h-3 w-3" />
+            </Button>
+            <span className="text-[10px] text-muted-foreground mx-1">{width}%</span>
             <Button variant="ghost" size="sm" onClick={() => setIsEditing(!isEditing)} className="h-7 w-7 p-0">
               <Settings className="h-4 w-4" />
             </Button>
