@@ -576,6 +576,7 @@ export type Database = {
           email_from_address: string | null
           email_from_name: string | null
           id: string
+          menu_config: Json | null
           sms_api_key: string | null
           sms_sender_id: string | null
           updated_at: string | null
@@ -589,6 +590,7 @@ export type Database = {
           email_from_address?: string | null
           email_from_name?: string | null
           id?: string
+          menu_config?: Json | null
           sms_api_key?: string | null
           sms_sender_id?: string | null
           updated_at?: string | null
@@ -602,6 +604,7 @@ export type Database = {
           email_from_address?: string | null
           email_from_name?: string | null
           id?: string
+          menu_config?: Json | null
           sms_api_key?: string | null
           sms_sender_id?: string | null
           updated_at?: string | null
