@@ -78,7 +78,7 @@ export function MenuConfigPanel() {
   }
 
   const configurableItems = MENU_ITEMS.filter(
-    item => !item.alwaysVisible && !('superAdminOnly' in item && item.superAdminOnly)
+    item => !('alwaysVisible' in item && item.alwaysVisible) && !('superAdminOnly' in item && item.superAdminOnly)
   );
 
   return (
