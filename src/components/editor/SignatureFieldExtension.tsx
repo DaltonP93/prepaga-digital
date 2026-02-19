@@ -374,7 +374,7 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
         </div>
 
         {isEditing ? (
-          <div className="space-y-4 bg-background rounded-lg p-3 border">
+          <div className="space-y-4 bg-background rounded-lg p-3 border" onPointerDown={(e) => e.stopPropagation()}>
             <div>
               <Label className="text-xs font-medium">Etiqueta</Label>
               <Input value={label} onChange={(e) => setLabel(e.target.value)} className="text-sm mt-1" placeholder="Ej: Firma del Cliente" />
