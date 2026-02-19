@@ -372,6 +372,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
 
         <TabsContent value="preview" className="space-y-4">
           <LiveTemplatePreview
+            templateId={template?.id}
             content={watch("content")}
             onDownloadPDF={() => {
               downloadDocument({
