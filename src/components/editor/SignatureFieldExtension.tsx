@@ -18,6 +18,8 @@ export const SignatureFieldExtension = Node.create({
   group: 'block',
   atom: true,
   draggable: true,
+  inline: false,
+  selectable: true,
 
   addAttributes() {
     return {
@@ -425,7 +427,7 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
             <Button onClick={handleSave} size="sm" className="w-full">Guardar Configuración</Button>
           </div>
         ) : (
-          <div className="space-y-3 overflow-auto" style={{ maxHeight: `${height - 60}px` }}>
+          <div className="space-y-2 overflow-auto" style={{ maxHeight: `${height - 60}px` }}>
             <div className="text-sm font-medium text-center">
               {label} {required && <span className="text-destructive">*</span>}
             </div>
@@ -434,31 +436,42 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
             </div>
 
             {(signatureType === 'digital' || signatureType === 'both') && (
-              <div className="bg-white rounded-lg border p-3">
-                <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+              <div className="bg-background rounded-lg border p-2">
+                <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
                   <PenTool className="h-3 w-3" /> Firma Digital (manuscrita)
                 </div>
                 <MiniSignatureCanvas
                   onSign={() => setPreviewSigned(true)}
                   onClear={() => setPreviewSigned(false)}
                   signed={previewSigned}
-                  canvasHeight={Math.min(height - 100, 200)}
+                  canvasHeight={Math.min(height - 120, 160)}
                 />
               </div>
             )}
 
+            {/* Aclaración y C.I. N.º – datos del firmante */}
+            <div className="border-t border-border pt-2 space-y-1">
+              <div className="flex items-center gap-2 text-xs">
+                <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                <span className="text-muted-foreground whitespace-nowrap">Aclaración:</span>
+                <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px] truncate">
+                  {signerRole === 'empresa' ? '{{representante_nombre}}' : signerRole === 'testigo' ? '{{testigo_nombre}}' : '{{titular_nombre}}'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <Hash className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                <span className="text-muted-foreground whitespace-nowrap">C.I. N.º:</span>
+                <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px] truncate">
+                  {signerRole === 'empresa' ? '{{representante_dni}}' : signerRole === 'testigo' ? '{{testigo_dni}}' : '{{titular_dni}}'}
+                </span>
+              </div>
+            </div>
+
             {(signatureType === 'electronic' || signatureType === 'both') && (
-              <div className="bg-white rounded-lg border p-3 space-y-2">
-                <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-                  <ShieldCheck className="h-3 w-3" /> Firma Electrónica (datos automáticos)
+              <div className="bg-background rounded-lg border p-2 space-y-1">
+                <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                  <ShieldCheck className="h-3 w-3" /> Firma Electrónica
                 </div>
-                {showSignerInfo && (
-                  <div className="flex items-center gap-2 text-xs">
-                    <User className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-muted-foreground">Firmante:</span>
-                    <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px]">{'{{nombre_firmante}}'}</span>
-                  </div>
-                )}
                 {showDate && (
                   <div className="flex items-center gap-2 text-xs">
                     <Calendar className="h-3 w-3 text-muted-foreground" />
@@ -469,12 +482,12 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
                 {showToken && (
                   <div className="flex items-center gap-2 text-xs">
                     <Hash className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-muted-foreground">Token UUID:</span>
-                    <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px]">{previewToken}</span>
+                    <span className="text-muted-foreground">Token:</span>
+                    <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px] truncate">{previewToken}</span>
                   </div>
                 )}
-                <div className="text-[10px] text-muted-foreground mt-2 border-t pt-2">
-                  Conforme a <strong>RFC 4122</strong> (UUID) · <strong>ISO 8601</strong> (Timestamp) · <strong>eIDAS / ESIGN Act</strong>
+                <div className="text-[10px] text-muted-foreground mt-1 border-t pt-1">
+                  <strong>RFC 4122</strong> · <strong>ISO 8601</strong> · <strong>eIDAS</strong>
                 </div>
               </div>
             )}
