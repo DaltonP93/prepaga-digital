@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { Upload, FileText, Trash2, Loader2, GripVertical } from "lucide-react";
+import { Upload, FileText, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 
 interface TemplateAttachment {
   id: string;
@@ -25,6 +26,7 @@ export function TemplateAnnexesManager({ templateId }: TemplateAnnexesManagerPro
   const [attachments, setAttachments] = useState<TemplateAttachment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const { profile } = useAuth();
 
   const fetchAttachments = async () => {
     setIsLoading(true);
@@ -48,11 +50,17 @@ export function TemplateAnnexesManager({ templateId }: TemplateAnnexesManagerPro
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    if (!profile?.company_id) {
+      toast.error("No se pudo determinar la empresa. Intente recargar la página.");
+      return;
+    }
+
     setIsUploading(true);
     try {
       for (const file of Array.from(files)) {
         const fileExt = file.name.split(".").pop();
-        const filePath = `template-annexes/${templateId}/${Date.now()}-${file.name}`;
+        // Use company_id as first folder to match storage RLS policies
+        const filePath = `${profile.company_id}/template-annexes/${templateId}/${Date.now()}-${file.name}`;
 
         const { error: uploadError } = await supabase.storage
           .from("documents")
@@ -63,11 +71,6 @@ export function TemplateAnnexesManager({ templateId }: TemplateAnnexesManagerPro
           continue;
         }
 
-        const { data: urlData } = supabase.storage
-          .from("documents")
-          .getPublicUrl(filePath);
-
-        // Since bucket is private, we use the path for signed URLs later
         const { error: insertError } = await supabase
           .from("template_attachments" as any)
           .insert({
