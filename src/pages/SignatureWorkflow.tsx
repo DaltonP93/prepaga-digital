@@ -488,9 +488,9 @@ const SignatureWorkflow = () => {
                 </div>
               )}
 
-              {/* Para completados: Descargar firmado */}
+              {/* Para completados: Descargar firmado + Reenviar */}
               {isCompleted && (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button
                     size="sm"
                     variant="outline"
@@ -498,6 +498,15 @@ const SignatureWorkflow = () => {
                   >
                     <Download className="h-4 w-4 mr-1" />
                     Descargar Documento Firmado
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleResendLink(link)}
+                    disabled={resendLink.isPending}
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-1 ${resendLink.isPending ? 'animate-spin' : ''}`} />
+                    Reenviar
                   </Button>
                   <Button
                     size="sm"
