@@ -15,7 +15,8 @@ import { QuestionBuilder } from "@/components/QuestionBuilder";
 import { QuestionCopyDialog } from "@/components/QuestionCopyDialog";
 import { EnhancedPlaceholdersPanel } from "@/components/templates/EnhancedPlaceholdersPanel";
 import { LiveTemplatePreview } from "@/components/templates/LiveTemplatePreview";
-import { FileText, Settings, Eye, HelpCircle, Copy, Code, Sparkles, ChevronLeft, ChevronRight, Wand2 } from "lucide-react";
+import { TemplateAnnexesManager } from "@/components/templates/TemplateAnnexesManager";
+import { FileText, Settings, Eye, HelpCircle, Copy, Code, Sparkles, ChevronLeft, ChevronRight, Wand2, Paperclip } from "lucide-react";
 import { useCreateTemplate, useUpdateTemplate } from "@/hooks/useTemplates";
 import { useTemplateQuestions } from "@/hooks/useTemplateQuestions";
 import { useEnhancedPDFGeneration } from "@/hooks/useEnhancedPDFGeneration";
@@ -39,7 +40,7 @@ interface TemplateFormData {
   is_global: boolean;
 }
 
-const TAB_ORDER = ["setup", "content", "variables", "questions", "preview"] as const;
+const TAB_ORDER = ["setup", "content", "variables", "questions", "annexes", "preview"] as const;
 type TabKey = (typeof TAB_ORDER)[number];
 
 const QUICK_START_TEMPLATES = [
@@ -214,26 +215,30 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
       </div>
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="setup" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
-            Configuración
+            <span className="hidden sm:inline">Configuración</span>
           </TabsTrigger>
           <TabsTrigger value="content" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
-            Diseñador
+            <span className="hidden sm:inline">Diseñador</span>
           </TabsTrigger>
           <TabsTrigger value="variables" className="flex items-center gap-2">
             <Code className="h-4 w-4" />
-            Variables
+            <span className="hidden sm:inline">Variables</span>
           </TabsTrigger>
           <TabsTrigger value="questions" className="flex items-center gap-2">
             <HelpCircle className="h-4 w-4" />
-            Preguntas
+            <span className="hidden sm:inline">Preguntas</span>
+          </TabsTrigger>
+          <TabsTrigger value="annexes" className="flex items-center gap-2">
+            <Paperclip className="h-4 w-4" />
+            <span className="hidden sm:inline">Anexos</span>
           </TabsTrigger>
           <TabsTrigger value="preview" className="flex items-center gap-2">
             <Eye className="h-4 w-4" />
-            Vista previa
+            <span className="hidden sm:inline">Vista previa</span>
           </TabsTrigger>
         </TabsList>
 
@@ -351,6 +356,18 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="annexes" className="space-y-4">
+          {isEditing && template ? (
+            <TemplateAnnexesManager templateId={template.id} />
+          ) : (
+            <Card>
+              <CardContent className="text-center py-8">
+                <p className="text-muted-foreground">Guarde el template primero para poder adjuntar anexos.</p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="preview" className="space-y-4">
