@@ -1993,6 +1993,47 @@ export type Database = {
           },
         ]
       }
+      template_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          sort_order: number | null
+          template_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          sort_order?: number | null
+          template_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          sort_order?: number | null
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_attachments_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       template_comments: {
         Row: {
           comment_text: string
