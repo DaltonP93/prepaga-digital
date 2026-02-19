@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,8 +13,12 @@ import {
   RefreshCw,
   Smartphone,
   Monitor,
-  Printer
+  Printer,
+  Paperclip,
+  ExternalLink,
+  Loader2
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import DOMPurify from 'dompurify';
 import { 
   createEnhancedTemplateContext, 
@@ -22,8 +26,17 @@ import {
   generateBeneficiariesTable,
 } from "@/lib/enhancedTemplateEngine";
 
+interface TemplateAttachment {
+  id: string;
+  file_name: string;
+  file_url: string;
+  file_type: string | null;
+  file_size: number | null;
+}
+
 interface LiveTemplatePreviewProps {
   content: string;
+  templateId?: string;
   sampleData?: {
     client?: any;
     plan?: any;
@@ -118,6 +131,7 @@ const defaultSampleData = {
 
 export const LiveTemplatePreview: React.FC<LiveTemplatePreviewProps> = ({
   content,
+  templateId,
   sampleData = defaultSampleData,
   className = "",
   onDownloadPDF,
@@ -125,6 +139,38 @@ export const LiveTemplatePreview: React.FC<LiveTemplatePreviewProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile' | 'print'>('desktop');
   const [showRaw, setShowRaw] = useState(false);
+  const [annexes, setAnnexes] = useState<TemplateAttachment[]>([]);
+  const [annexesLoading, setAnnexesLoading] = useState(false);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+
+  // Fetch annexes for this template
+  useEffect(() => {
+    if (!templateId) return;
+    setAnnexesLoading(true);
+    supabase
+      .from("template_attachments" as any)
+      .select("*")
+      .eq("template_id", templateId)
+      .order("sort_order", { ascending: true })
+      .then(({ data }) => {
+        setAnnexes((data as unknown as TemplateAttachment[]) || []);
+        setAnnexesLoading(false);
+      });
+  }, [templateId]);
+
+  const openAnnex = async (annex: TemplateAttachment) => {
+    if (signedUrls[annex.id]) {
+      window.open(signedUrls[annex.id], '_blank');
+      return;
+    }
+    const { data } = await supabase.storage
+      .from("documents")
+      .createSignedUrl(annex.file_url, 3600);
+    if (data?.signedUrl) {
+      setSignedUrls(prev => ({ ...prev, [annex.id]: data.signedUrl }));
+      window.open(data.signedUrl, '_blank');
+    }
+  };
 
   // Create context and interpolate content
   const { processedContent, context } = useMemo(() => {
@@ -237,6 +283,39 @@ export const LiveTemplatePreview: React.FC<LiveTemplatePreviewProps> = ({
                       __html: DOMPurify.sanitize(processedContent) 
                     }}
                   />
+                ) : annexes.length > 0 ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Paperclip className="h-4 w-4 text-primary" />
+                      <p className="text-sm font-medium">Anexos adjuntos ({annexes.length})</p>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Este template no tiene contenido del diseñador. Los siguientes anexos se enviarán directamente al cliente.
+                    </p>
+                    <div className="space-y-2">
+                      {annexes.map((annex) => (
+                        <div key={annex.id} className="flex items-center justify-between border rounded-lg p-3">
+                          <div className="flex items-center gap-3">
+                            <FileText className="h-5 w-5 text-primary flex-shrink-0" />
+                            <div>
+                              <p className="text-sm font-medium">{annex.file_name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {annex.file_type || 'archivo'}{annex.file_size ? ` • ${(annex.file_size / 1024).toFixed(1)} KB` : ''}
+                              </p>
+                            </div>
+                          </div>
+                          <Button variant="outline" size="sm" onClick={() => openAnnex(annex)}>
+                            <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                            Ver
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : annexesLoading ? (
+                  <div className="flex justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
                 ) : (
                   <div className="text-center text-muted-foreground py-12">
                     <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
