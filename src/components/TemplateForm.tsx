@@ -28,6 +28,7 @@ interface TemplateFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   template?: Template | null;
+  mode?: "dialog" | "inline";
 }
 
 interface TemplateFormData {
@@ -93,7 +94,8 @@ const QUICK_START_TEMPLATES = [
   },
 ];
 
-export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps) {
+export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: TemplateFormProps) {
+  const isInlineMode = mode === "inline";
   const createTemplate = useCreateTemplate();
   const updateTemplate = useUpdateTemplate();
   const isEditing = !!template;
@@ -196,226 +198,233 @@ export function TemplateForm({ open, onOpenChange, template }: TemplateFormProps
   const hasPrevTab = activeIndex > 0;
   const hasNextTab = activeIndex < TAB_ORDER.length - 1;
 
+  const formContent = (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <div className="rounded-xl border border-border/60 bg-gradient-to-r from-background to-primary/10 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold">Asistente de diseño</p>
+            <p className="text-xs text-muted-foreground">Flujo guiado para crear templates robustos en pocos pasos.</p>
+          </div>
+          <Badge variant="secondary" className="gap-1">
+            <Sparkles className="h-3 w-3" />
+            Paso {activeIndex + 1} de {TAB_ORDER.length}
+          </Badge>
+        </div>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)} className="w-full">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="setup" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Configuración
+          </TabsTrigger>
+          <TabsTrigger value="content" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Diseñador
+          </TabsTrigger>
+          <TabsTrigger value="variables" className="flex items-center gap-2">
+            <Code className="h-4 w-4" />
+            Variables
+          </TabsTrigger>
+          <TabsTrigger value="questions" className="flex items-center gap-2">
+            <HelpCircle className="h-4 w-4" />
+            Preguntas
+          </TabsTrigger>
+          <TabsTrigger value="preview" className="flex items-center gap-2">
+            <Eye className="h-4 w-4" />
+            Vista previa
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="setup" className="space-y-4">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <Card className="xl:col-span-2">
+              <CardHeader>
+                <CardTitle>Información Básica</CardTitle>
+                <CardDescription>Define nombre, descripción y estado del template.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Nombre del Template</Label>
+                  <Input id="name" {...register("name", { required: "El nombre es requerido" })} />
+                  {errors.name && <span className="text-sm text-destructive">{errors.name.message}</span>}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">Descripción</Label>
+                  <Textarea id="description" {...register("description")} placeholder="Describe el propósito de este template..." />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Template Activo</Label>
+                    <p className="text-sm text-muted-foreground">Los templates inactivos no aparecerán en selección.</p>
+                  </div>
+                  <Switch checked={watch("active")} onCheckedChange={(checked) => setValue("active", checked)} />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Arranque Rápido</CardTitle>
+                <CardDescription>Comienza con una estructura profesional predefinida.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {QUICK_START_TEMPLATES.map((preset) => (
+                  <button
+                    key={preset.key}
+                    type="button"
+                    onClick={() => applyQuickStart(preset.content)}
+                    className="w-full rounded-lg border p-3 text-left hover:bg-muted/50 transition-colors"
+                  >
+                    <p className="text-sm font-medium">{preset.label}</p>
+                    <p className="text-xs text-muted-foreground">{preset.description}</p>
+                  </button>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="content" className="space-y-4">
+          <Card className="h-[620px]">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <CardTitle>Diseñador Visual</CardTitle>
+                  <CardDescription>Construye el documento principal con formato profesional.</CardDescription>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("variables")}>
+                  <Wand2 className="h-4 w-4 mr-2" />
+                  Insertar variables
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0 h-[540px]">
+              <TemplateDesigner
+                template={template}
+                content={watch("content")}
+                onContentChange={handleContentChange}
+                dynamicFields={dynamicFields}
+                onDynamicFieldsChange={handleDynamicFieldsChange}
+                templateQuestions={questions || []}
+                templateId={template?.id}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="variables" className="space-y-4">
+          <EnhancedPlaceholdersPanel
+            onPlaceholderInsert={(placeholder) => {
+              const currentContent = watch("content");
+              setValue("content", `${currentContent} ${placeholder}`.trim());
+            }}
+          />
+        </TabsContent>
+
+        <TabsContent value="questions" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Preguntas del Template</CardTitle>
+                  <CardDescription>Configura las preguntas dinámicas del proceso de firma.</CardDescription>
+                </div>
+                {isEditing && (
+                  <Button type="button" variant="outline" onClick={() => setShowCopyDialog(true)} className="flex items-center gap-2">
+                    <Copy className="h-4 w-4" />
+                    Copiar Preguntas
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isEditing ? (
+                <QuestionBuilder templateId={template.id} />
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Guarda el template primero para poder agregar preguntas.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="preview" className="space-y-4">
+          <LiveTemplatePreview
+            content={watch("content")}
+            onDownloadPDF={() => {
+              downloadDocument({
+                htmlContent: watch("content"),
+                filename: watch("name") || "template",
+                documentType: "contract",
+              });
+            }}
+            isGeneratingPDF={isGenerating}
+          />
+        </TabsContent>
+      </Tabs>
+
+      <Separator />
+
+      <div className="flex items-center justify-between">
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!hasPrevTab}
+            onClick={() => setActiveTab(TAB_ORDER[Math.max(activeIndex - 1, 0)])}
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Anterior
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!hasNextTab}
+            onClick={() => setActiveTab(TAB_ORDER[Math.min(activeIndex + 1, TAB_ORDER.length - 1)])}
+          >
+            Siguiente
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button type="submit" disabled={createTemplate.isPending || updateTemplate.isPending}>
+            {createTemplate.isPending || updateTemplate.isPending ? "Guardando..." : "Guardar"}
+          </Button>
+        </div>
+      </div>
+    </form>
+  );
+
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent 
-          className="max-w-7xl max-h-[95vh] overflow-y-auto"
-          onPointerDownOutside={(e) => e.preventDefault()}
-          onInteractOutside={(e) => e.preventDefault()}
-        >
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              {isEditing ? "Editor Profesional de Template" : "Nuevo Template Profesional"}
-            </DialogTitle>
-          </DialogHeader>
-
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            <div className="rounded-xl border border-border/60 bg-gradient-to-r from-background to-primary/10 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold">Asistente de diseño</p>
-                  <p className="text-xs text-muted-foreground">Flujo guiado para crear templates robustos en pocos pasos.</p>
-                </div>
-                <Badge variant="secondary" className="gap-1">
-                  <Sparkles className="h-3 w-3" />
-                  Paso {activeIndex + 1} de {TAB_ORDER.length}
-                </Badge>
-              </div>
-            </div>
-
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)} className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
-                <TabsTrigger value="setup" className="flex items-center gap-2">
-                  <Settings className="h-4 w-4" />
-                  Configuración
-                </TabsTrigger>
-                <TabsTrigger value="content" className="flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Diseñador
-                </TabsTrigger>
-                <TabsTrigger value="variables" className="flex items-center gap-2">
-                  <Code className="h-4 w-4" />
-                  Variables
-                </TabsTrigger>
-                <TabsTrigger value="questions" className="flex items-center gap-2">
-                  <HelpCircle className="h-4 w-4" />
-                  Preguntas
-                </TabsTrigger>
-                <TabsTrigger value="preview" className="flex items-center gap-2">
-                  <Eye className="h-4 w-4" />
-                  Vista previa
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="setup" className="space-y-4">
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-                  <Card className="xl:col-span-2">
-                    <CardHeader>
-                      <CardTitle>Información Básica</CardTitle>
-                      <CardDescription>Define nombre, descripción y estado del template.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Nombre del Template</Label>
-                        <Input id="name" {...register("name", { required: "El nombre es requerido" })} />
-                        {errors.name && <span className="text-sm text-red-500">{errors.name.message}</span>}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="description">Descripción</Label>
-                        <Textarea id="description" {...register("description")} placeholder="Describe el propósito de este template..." />
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label className="text-base">Template Activo</Label>
-                          <p className="text-sm text-muted-foreground">Los templates inactivos no aparecerán en selección.</p>
-                        </div>
-                        <Switch checked={watch("active")} onCheckedChange={(checked) => setValue("active", checked)} />
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Arranque Rápido</CardTitle>
-                      <CardDescription>Comienza con una estructura profesional predefinida.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {QUICK_START_TEMPLATES.map((preset) => (
-                        <button
-                          key={preset.key}
-                          type="button"
-                          onClick={() => applyQuickStart(preset.content)}
-                          className="w-full rounded-lg border p-3 text-left hover:bg-muted/50 transition-colors"
-                        >
-                          <p className="text-sm font-medium">{preset.label}</p>
-                          <p className="text-xs text-muted-foreground">{preset.description}</p>
-                        </button>
-                      ))}
-                    </CardContent>
-                  </Card>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="content" className="space-y-4">
-                <Card className="h-[620px]">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <CardTitle>Diseñador Visual</CardTitle>
-                        <CardDescription>Construye el documento principal con formato profesional.</CardDescription>
-                      </div>
-                      <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("variables")}>
-                        <Wand2 className="h-4 w-4 mr-2" />
-                        Insertar variables
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-0 h-[540px]">
-                    <TemplateDesigner
-                      template={template}
-                      content={watch("content")}
-                      onContentChange={handleContentChange}
-                      dynamicFields={dynamicFields}
-                      onDynamicFieldsChange={handleDynamicFieldsChange}
-                      templateQuestions={questions || []}
-                      templateId={template?.id}
-                    />
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="variables" className="space-y-4">
-                <EnhancedPlaceholdersPanel
-                  onPlaceholderInsert={(placeholder) => {
-                    const currentContent = watch("content");
-                    setValue("content", `${currentContent} ${placeholder}`.trim());
-                  }}
-                />
-              </TabsContent>
-
-              <TabsContent value="questions" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle>Preguntas del Template</CardTitle>
-                        <CardDescription>Configura las preguntas dinámicas del proceso de firma.</CardDescription>
-                      </div>
-                      {isEditing && (
-                        <Button type="button" variant="outline" onClick={() => setShowCopyDialog(true)} className="flex items-center gap-2">
-                          <Copy className="h-4 w-4" />
-                          Copiar Preguntas
-                        </Button>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {isEditing ? (
-                      <QuestionBuilder templateId={template.id} />
-                    ) : (
-                      <div className="text-center py-8">
-                        <p className="text-muted-foreground">Guarda el template primero para poder agregar preguntas.</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="preview" className="space-y-4">
-                <LiveTemplatePreview
-                  content={watch("content")}
-                  onDownloadPDF={() => {
-                    downloadDocument({
-                      htmlContent: watch("content"),
-                      filename: watch("name") || "template",
-                      documentType: "contract",
-                    });
-                  }}
-                  isGeneratingPDF={isGenerating}
-                />
-              </TabsContent>
-            </Tabs>
-
-            <Separator />
-
-            <DialogFooter className="flex items-center justify-between sm:justify-between">
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!hasPrevTab}
-                  onClick={() => setActiveTab(TAB_ORDER[Math.max(activeIndex - 1, 0)])}
-                >
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Anterior
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!hasNextTab}
-                  onClick={() => setActiveTab(TAB_ORDER[Math.min(activeIndex + 1, TAB_ORDER.length - 1)])}
-                >
-                  Siguiente
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
-
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={createTemplate.isPending || updateTemplate.isPending}>
-                  {createTemplate.isPending || updateTemplate.isPending ? "Guardando..." : "Guardar"}
-                </Button>
-              </div>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {isInlineMode ? (
+        formContent
+      ) : (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+          <DialogContent 
+            className="max-w-7xl max-h-[95vh] overflow-y-auto"
+            onPointerDownOutside={(e) => e.preventDefault()}
+            onInteractOutside={(e) => e.preventDefault()}
+          >
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                {isEditing ? "Editor Profesional de Template" : "Nuevo Template Profesional"}
+              </DialogTitle>
+            </DialogHeader>
+            {formContent}
+          </DialogContent>
+        </Dialog>
+      )}
 
       {isEditing && template && (
         <QuestionCopyDialog open={showCopyDialog} onOpenChange={setShowCopyDialog} targetTemplateId={template.id} />

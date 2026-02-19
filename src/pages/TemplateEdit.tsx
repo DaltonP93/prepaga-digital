@@ -62,6 +62,7 @@ export default function TemplateEdit() {
         </div>
 
         <TemplateForm 
+          mode="inline"
           open={true} 
           onOpenChange={(open) => !open && navigate('/templates')}
           template={template}
