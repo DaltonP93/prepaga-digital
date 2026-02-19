@@ -42,7 +42,26 @@ export const SignatureFieldExtension = Node.create({
 
 
   parseHTML() {
-    return [{ tag: 'div[data-signature-field]' }];
+    return [{
+      tag: 'div[data-signature-field]',
+      getAttrs: (dom: HTMLElement) => {
+        const style = dom.getAttribute('style') || '';
+        const widthMatch = style.match(/width:\s*(\d+)%/);
+        const heightMatch = style.match(/min-height:\s*(\d+)px/);
+        return {
+          signatureType: dom.getAttribute('data-signature-type') || 'both',
+          signerRole: dom.getAttribute('data-signer-role') || 'cliente',
+          label: dom.getAttribute('data-label') || 'Firma del Cliente',
+          required: dom.getAttribute('data-required') !== 'false',
+          showSignerInfo: dom.getAttribute('data-show-signer-info') !== 'false',
+          showDate: dom.getAttribute('data-show-date') !== 'false',
+          showToken: dom.getAttribute('data-show-token') !== 'false',
+          float: dom.getAttribute('data-float') || 'none',
+          width: widthMatch ? parseInt(widthMatch[1], 10) : 100,
+          height: heightMatch ? parseInt(heightMatch[1], 10) : 200,
+        };
+      },
+    }];
   },
 
   renderHTML({ HTMLAttributes }) {
