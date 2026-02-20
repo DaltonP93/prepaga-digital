@@ -1,10 +1,9 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, FileSignature, Plus, Trash2, Lock, Send, Loader2, Eye, FileText, User, ChevronDown, ChevronUp } from 'lucide-react';
+import { AlertCircle, FileSignature, Plus, Trash2, Lock, Send, Loader2, Eye, FileText, User, ChevronDown, ChevronUp, Paperclip, ExternalLink } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTemplates } from '@/hooks/useTemplates';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -54,6 +53,8 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
   const [previewDoc, setPreviewDoc] = useState<any>(null);
   const createSignatureLink = useCreateSignatureLink();
   const { data: beneficiaries } = useBeneficiaries(saleId || '');
+  const [annexSignedUrls, setAnnexSignedUrls] = useState<Record<string, string>>({});
+  const [expandedAnnexes, setExpandedAnnexes] = useState<Record<string, boolean>>({});
 
   const isApproved = auditStatus === 'aprobado' || auditStatus === 'aprobado_para_templates';
 
@@ -64,13 +65,54 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       if (!saleId) return [];
       const { data, error } = await supabase
         .from('sale_templates')
-        .select('*, templates:template_id(id, name, description)')
+        .select('*, templates:template_id(id, name, description, content)')
         .eq('sale_id', saleId);
       if (error) throw error;
       return data || [];
     },
     enabled: !!saleId,
   });
+
+  // Fetch annexes for all associated template IDs
+  const templateIds = saleTemplates?.map((st: any) => st.templates?.id || st.template_id).filter(Boolean) || [];
+  const { data: templateAnnexes } = useQuery({
+    queryKey: ['sale-template-annexes', templateIds],
+    queryFn: async () => {
+      if (templateIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('template_attachments' as any)
+        .select('*')
+        .in('template_id', templateIds)
+        .order('sort_order', { ascending: true });
+      if (error) throw error;
+      return (data as any[]) || [];
+    },
+    enabled: templateIds.length > 0,
+  });
+
+  // Load signed URL for an annex
+  const loadAnnexSignedUrl = async (annex: any) => {
+    if (annexSignedUrls[annex.id]) return annexSignedUrls[annex.id];
+    const { data } = await supabase.storage
+      .from('documents')
+      .createSignedUrl(annex.file_url, 3600);
+    if (data?.signedUrl) {
+      setAnnexSignedUrls(prev => ({ ...prev, [annex.id]: data.signedUrl }));
+      return data.signedUrl;
+    }
+    return null;
+  };
+
+  // Auto-load signed URLs for PDF annexes
+  useEffect(() => {
+    if (!templateAnnexes?.length) return;
+    templateAnnexes.forEach((annex: any) => {
+      const isPDF = annex.file_type === 'application/pdf' || annex.file_name?.endsWith('.pdf');
+      if (isPDF && !annexSignedUrls[annex.id]) {
+        loadAnnexSignedUrl(annex);
+      }
+    });
+  }, [templateAnnexes]);
 
   // Fetch generated documents for this sale
   const { data: generatedDocs } = useQuery({
@@ -347,26 +389,97 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         <div className="text-center py-8 text-muted-foreground">Cargando templates...</div>
       ) : saleTemplates && saleTemplates.length > 0 ? (
         <div className="space-y-2">
-          {saleTemplates.map((st: any) => (
-            <Card key={st.id}>
-              <CardContent className="flex items-center justify-between py-3 px-4">
-                <div className="flex items-center gap-2">
-                  <div>
-                    <div className="font-medium flex items-center gap-2">
-                      {st.templates?.name || 'Template'}
-                      {getTemplateTypeBadge(st.templates?.name || '')}
+          {saleTemplates.map((st: any) => {
+            const tplId = st.templates?.id || st.template_id;
+            const hasContent = !!(st.templates?.content?.trim());
+            const tplAnnexes = (templateAnnexes || []).filter((a: any) => a.template_id === tplId);
+            const isAnnexOnly = !hasContent && tplAnnexes.length > 0;
+            const isExpanded = expandedAnnexes[st.id] || false;
+
+            return (
+              <Card key={st.id}>
+                <CardContent className="py-3 px-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <div className="font-medium flex items-center gap-2">
+                          {st.templates?.name || 'Template'}
+                          {getTemplateTypeBadge(st.templates?.name || '')}
+                          {isAnnexOnly && (
+                            <Badge variant="outline" className="text-xs border-primary/30 text-primary">
+                              <Paperclip className="h-3 w-3 mr-1" />
+                              Anexo PDF
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-sm text-muted-foreground">{st.templates?.description || ''}</div>
+                      </div>
                     </div>
-                    <div className="text-sm text-muted-foreground">{st.templates?.description || ''}</div>
+                    <div className="flex items-center gap-1">
+                      {tplAnnexes.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setExpandedAnnexes(prev => ({ ...prev, [st.id]: !isExpanded }))}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          {isExpanded ? 'Ocultar' : 'Ver'} ({tplAnnexes.length})
+                        </Button>
+                      )}
+                      {!disabled && !generatedDocs?.length && (
+                        <Button type="button" variant="ghost" size="sm" onClick={() => removeTemplate.mutate(st.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-                {!disabled && !generatedDocs?.length && (
-                  <Button type="button" variant="ghost" size="sm" onClick={() => removeTemplate.mutate(st.id)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+
+                  {/* Inline annexes viewer */}
+                  {isExpanded && tplAnnexes.length > 0 && (
+                    <div className="space-y-3 pt-2 border-t">
+                      {tplAnnexes.map((annex: any) => {
+                        const isPDF = annex.file_type === 'application/pdf' || annex.file_name?.endsWith('.pdf');
+                        const url = annexSignedUrls[annex.id];
+                        return (
+                          <div key={annex.id} className="border rounded-lg overflow-hidden">
+                            <div className="flex items-center justify-between bg-muted/50 px-3 py-2 border-b">
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-primary flex-shrink-0" />
+                                <span className="text-sm font-medium">{annex.file_name}</span>
+                              </div>
+                              <Button variant="outline" size="sm" onClick={async () => {
+                                const signedUrl = url || await loadAnnexSignedUrl(annex);
+                                if (signedUrl) window.open(signedUrl, '_blank');
+                              }}>
+                                <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                                Abrir
+                              </Button>
+                            </div>
+                            {isPDF && url ? (
+                              <iframe
+                                src={`${url}#toolbar=1&navpanes=0`}
+                                className="w-full h-[400px] bg-muted/30"
+                                title={annex.file_name}
+                              />
+                            ) : isPDF && !url ? (
+                              <div className="flex items-center justify-center py-6">
+                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                              </div>
+                            ) : (
+                              <div className="p-3 text-center text-sm text-muted-foreground">
+                                {annex.file_type || 'Archivo'}{annex.file_size ? ` • ${(annex.file_size / 1024).toFixed(1)} KB` : ''}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       ) : (
         <div className="text-center py-8 text-muted-foreground">
