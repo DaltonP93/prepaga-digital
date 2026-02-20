@@ -5,11 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DocuSealForm } from "@/components/DocuSealForm";
 import TipTapEditor from "@/components/TipTapEditor";
 import { TemplateVariables } from "@/components/TemplateVariables";
 import { DraggablePlaceholdersSidebar } from "@/components/DraggablePlaceholdersSidebar";
-import { Save, Eye, FileText, PenTool } from "lucide-react";
+import { Save, Eye, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import DOMPurify from 'dompurify';
 
@@ -89,14 +88,6 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
     const questionPlaceholder = `{{question_${question.id}}}`;
     const newContent = templateData.content + " " + questionPlaceholder;
     handleContentChange(newContent);
-  };
-
-  const handleDocuSealCompleted = (data: any) => {
-    toast({
-      title: "Documento completado en DocuSeal",
-      description: "El documento ha sido procesado exitosamente.",
-    });
-    console.log("DocuSeal completion data:", data);
   };
 
   const handleVariableSelect = (variable: string) => {
@@ -182,10 +173,6 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
             <FileText className="h-4 w-4" />
             Editor de Contenido
           </TabsTrigger>
-          <TabsTrigger value="docuseal" className="flex items-center gap-2">
-            <PenTool className="h-4 w-4" />
-            DocuSeal
-          </TabsTrigger>
           <TabsTrigger value="preview" className="flex items-center gap-2">
             <Eye className="h-4 w-4" />
             Vista Previa
@@ -228,25 +215,6 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
           <TemplateVariables 
             onVariableSelect={handleVariableSelect}
           />
-        </TabsContent>
-
-        <TabsContent value="docuseal" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>DocuSeal - Diseño de Firma Digital</CardTitle>
-              <p className="text-muted-foreground">
-                Utiliza DocuSeal para crear documentos con campos de firma digital
-              </p>
-            </CardHeader>
-            <CardContent>
-              <DocuSealForm
-                src="https://docuseal.com/d/LEVGR9rhZYf86M"
-                email="dalton.perez+test@saa.com.py"
-                onCompleted={handleDocuSealCompleted}
-                className="w-full min-h-[600px]"
-              />
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="preview" className="space-y-6">

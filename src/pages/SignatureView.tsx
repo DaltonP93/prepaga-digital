@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import PublicLayout from "@/layouts/PublicLayout";
 import { EnhancedSignatureCanvas } from "@/components/signature/EnhancedSignatureCanvas";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { 
   FileText, User, Calendar, Building, CheckCircle, Clock, AlertCircle,
   Shield, Loader2, Download, Users, PenTool
@@ -29,7 +29,34 @@ const SignatureView = () => {
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [showSignaturePanel, setShowSignaturePanel] = useState(false);
+  const [signwellCompleted, setSignwellCompleted] = useState(false);
   const signatureSectionRef = useRef<HTMLDivElement>(null);
+
+  // Check if this link has a SignWell signing URL
+  const signwellSigningUrl = (linkData as any)?.signwell_signing_url;
+
+  // Listen for SignWell postMessage events (embedded signing completion)
+  const handleSignWellMessage = useCallback((event: MessageEvent) => {
+    // SignWell sends a postMessage when signing is complete
+    if (event.data?.type === 'signwell_event' && event.data?.event === 'completed') {
+      setSignwellCompleted(true);
+      // Submit as signwell_completed
+      if (linkData && token) {
+        submitSignature.mutate({
+          linkId: linkData.id,
+          token: token,
+          signatureData: 'signwell_completed',
+        });
+      }
+    }
+  }, [linkData, token]);
+
+  useEffect(() => {
+    if (signwellSigningUrl) {
+      window.addEventListener('message', handleSignWellMessage);
+      return () => window.removeEventListener('message', handleSignWellMessage);
+    }
+  }, [signwellSigningUrl, handleSignWellMessage]);
 
   const handleDownloadSignedContent = (doc: any) => {
     if (!doc?.content) return;
@@ -375,65 +402,94 @@ const SignatureView = () => {
         {/* Signature Section - only visible after clicking Firmar */}
         {showSignaturePanel && (
           <div ref={signatureSectionRef}>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  Firma Digital
-                </CardTitle>
-                <CardDescription>
-                  Dibuje su firma en el área a continuación. Esta firma tendrá validez legal.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <EnhancedSignatureCanvas
-                  onSignatureChange={setSignatureData}
-                  width={600}
-                  height={200}
-                />
-
-                <Separator />
-
-                <div className="space-y-3">
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={termsAccepted}
-                      onChange={(e) => setTermsAccepted(e.target.checked)}
-                      className="mt-1 h-4 w-4 rounded border-border"
+            {signwellSigningUrl && !signwellCompleted ? (
+              /* SignWell Embedded Signing via iframe */
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="h-5 w-5" />
+                    Firma Electrónica
+                  </CardTitle>
+                  <CardDescription>
+                    Firme el documento a través de la plataforma segura SignWell.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="w-full border rounded-lg overflow-hidden" style={{ height: '700px' }}>
+                    <iframe
+                      src={signwellSigningUrl}
+                      title="SignWell Firma"
+                      className="w-full h-full border-0"
+                      allow="camera; microphone"
                     />
-                    <span className="text-sm text-muted-foreground">
-                      He leído y acepto los términos y condiciones. Confirmo que la información 
-                      proporcionada es correcta y completa. Autorizo el procesamiento de mis datos 
-                      personales según la política de privacidad.
-                    </span>
-                  </label>
-                </div>
+                  </div>
+                  <p className="text-xs text-center text-muted-foreground mt-4">
+                    Complete la firma en el formulario de arriba. La página se actualizará automáticamente.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              /* Canvas-based signature (default / fallback) */
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="h-5 w-5" />
+                    Firma Digital
+                  </CardTitle>
+                  <CardDescription>
+                    Dibuje su firma en el área a continuación. Esta firma tendrá validez legal.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <EnhancedSignatureCanvas
+                    onSignatureChange={setSignatureData}
+                    width={600}
+                    height={200}
+                  />
 
-                <Button
-                  onClick={handleSignatureComplete}
-                  disabled={!signatureData || !termsAccepted || submitSignature.isPending}
-                  className="w-full"
-                  size="lg"
-                >
-                  {submitSignature.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Procesando firma...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Firmar {isTitular ? 'Todos los Documentos' : 'Declaración Jurada'}
-                    </>
-                  )}
-                </Button>
+                  <Separator />
 
-                <p className="text-xs text-center text-muted-foreground">
-                  Al firmar, se registrará su IP y hora de firma por seguridad.
-                </p>
-              </CardContent>
-            </Card>
+                  <div className="space-y-3">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={termsAccepted}
+                        onChange={(e) => setTermsAccepted(e.target.checked)}
+                        className="mt-1 h-4 w-4 rounded border-border"
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        He leído y acepto los términos y condiciones. Confirmo que la información
+                        proporcionada es correcta y completa. Autorizo el procesamiento de mis datos
+                        personales según la política de privacidad.
+                      </span>
+                    </label>
+                  </div>
+
+                  <Button
+                    onClick={handleSignatureComplete}
+                    disabled={!signatureData || !termsAccepted || submitSignature.isPending}
+                    className="w-full"
+                    size="lg"
+                  >
+                    {submitSignature.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Procesando firma...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Firmar {isTitular ? 'Todos los Documentos' : 'Declaración Jurada'}
+                      </>
+                    )}
+                  </Button>
+
+                  <p className="text-xs text-center text-muted-foreground">
+                    Al firmar, se registrará su IP y hora de firma por seguridad.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
       </div>

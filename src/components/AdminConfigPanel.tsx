@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Settings, Palette, MessageSquare, Mail, Smartphone, Eye, CheckCircle, XCircle, ExternalLink, Copy } from 'lucide-react';
+import { Settings, Palette, MessageSquare, Mail, Smartphone, Eye, CheckCircle, XCircle, ExternalLink, Copy, PenTool, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export const AdminConfigPanel: React.FC = () => {
@@ -38,7 +39,10 @@ export const AdminConfigPanel: React.FC = () => {
     email_api_key: apiConfig?.email_api_key || '',
     email_from_address: apiConfig?.email_from_address || '',
     email_from_name: apiConfig?.email_from_name || '',
+    signwell_enabled: apiConfig?.signwell_enabled || false,
+    signwell_api_key: apiConfig?.signwell_api_key || '',
   });
+  const [signwellTesting, setSignwellTesting] = useState(false);
 
   React.useEffect(() => {
     if (uiConfig) {
@@ -68,6 +72,8 @@ export const AdminConfigPanel: React.FC = () => {
         email_api_key: apiConfig.email_api_key || '',
         email_from_address: apiConfig.email_from_address || '',
         email_from_name: apiConfig.email_from_name || '',
+        signwell_enabled: apiConfig.signwell_enabled || false,
+        signwell_api_key: apiConfig.signwell_api_key || '',
       });
     }
   }, [apiConfig]);
@@ -121,7 +127,7 @@ export const AdminConfigPanel: React.FC = () => {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="whatsapp" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="ui" className="flex items-center gap-2">
             <Palette className="h-4 w-4" />
             Interfaz
@@ -137,6 +143,10 @@ export const AdminConfigPanel: React.FC = () => {
           <TabsTrigger value="email" className="flex items-center gap-2">
             <Mail className="h-4 w-4" />
             Email
+          </TabsTrigger>
+          <TabsTrigger value="signwell" className="flex items-center gap-2">
+            <PenTool className="h-4 w-4" />
+            Firma Digital
           </TabsTrigger>
         </TabsList>
 
@@ -461,6 +471,114 @@ export const AdminConfigPanel: React.FC = () => {
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* SignWell / Firma Digital Tab */}
+        <TabsContent value="signwell" className="space-y-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div className="space-y-1">
+                <CardTitle className="flex items-center gap-2">
+                  Firma Digital - SignWell
+                  {apiFormData.signwell_enabled && apiFormData.signwell_api_key ? (
+                    <Badge variant="default" className="bg-green-600 text-xs">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Activo
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="text-xs">
+                      Deshabilitado
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  Firma electrónica con validez legal via SignWell. Cuando está habilitado, los clientes firman documentos via SignWell en lugar del canvas manual.
+                </CardDescription>
+              </div>
+              <Button onClick={handleApiSave} disabled={apiUpdating}>
+                {apiUpdating ? 'Guardando...' : 'Guardar'}
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="signwell_enabled"
+                  checked={apiFormData.signwell_enabled}
+                  onCheckedChange={(checked) => handleApiInputChange('signwell_enabled', checked)}
+                />
+                <Label htmlFor="signwell_enabled">Habilitar firma electrónica SignWell</Label>
+              </div>
+
+              {apiFormData.signwell_enabled && (
+                <div className="space-y-4 p-4 rounded-lg border bg-muted/30">
+                  <div>
+                    <Label htmlFor="signwell_api_key">API Key de SignWell</Label>
+                    <Input
+                      id="signwell_api_key"
+                      type="password"
+                      value={apiFormData.signwell_api_key}
+                      onChange={(e) => handleApiInputChange('signwell_api_key', e.target.value)}
+                      placeholder="Tu API Key de SignWell"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Obtén tu API key en signwell.com &gt; Settings &gt; API
+                    </p>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      setSignwellTesting(true);
+                      try {
+                        const { data, error } = await supabase.functions.invoke('signwell-proxy', {
+                          body: { action: 'test_connection' },
+                        });
+                        if (error) throw error;
+                        if (data?.success) {
+                          toast.success('Conexión exitosa con SignWell');
+                        } else {
+                          toast.error(data?.error || 'No se pudo conectar con SignWell');
+                        }
+                      } catch (err: any) {
+                        toast.error(err.message || 'Error al probar conexión');
+                      } finally {
+                        setSignwellTesting(false);
+                      }
+                    }}
+                    disabled={!apiFormData.signwell_api_key || signwellTesting}
+                  >
+                    {signwellTesting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Probando...
+                      </>
+                    ) : (
+                      'Probar conexión'
+                    )}
+                  </Button>
+                </div>
+              )}
+
+              <div className="p-4 rounded-lg border bg-muted/30 space-y-2">
+                <h4 className="font-medium">Pricing de SignWell</h4>
+                <div className="text-sm space-y-1 text-muted-foreground">
+                  <p>- Plan gratuito: 1 documento/mes</p>
+                  <p>- Plan Personal: $8/mes - 25 documentos</p>
+                  <p>- Plan Business: $24/mes - documentos ilimitados</p>
+                  <p>- API: $0.75 por documento (pay-as-you-go)</p>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-lg border bg-muted/30 space-y-2">
+                <h4 className="font-medium">Comportamiento</h4>
+                <div className="text-sm space-y-1 text-muted-foreground">
+                  <p><strong>Habilitado:</strong> Al generar un enlace de firma, se crea un documento en SignWell y el cliente firma via la plataforma de SignWell (iframe integrado).</p>
+                  <p><strong>Deshabilitado:</strong> El sistema usa la firma por canvas manual (comportamiento actual).</p>
+                  <p><strong>Fallback:</strong> Si falla la creación en SignWell, el sistema vuelve al canvas automáticamente.</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

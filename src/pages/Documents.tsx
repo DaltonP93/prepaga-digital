@@ -5,10 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDocuments } from "@/hooks/useDocuments";
 import { SearchAndFilters, FilterOptions } from "@/components/SearchAndFilters";
 import { DocumentPreview } from "@/components/DocumentPreview";
-import { DocuSealForm } from "@/components/DocuSealForm";
 import { Plus, FileText, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,7 +27,6 @@ const Documents: React.FC = () => {
   });
   const [selectedDocument, setSelectedDocument] = useState<any>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [activeTab, setActiveTab] = useState("documents");
 
   // Form state for new document
   const [docName, setDocName] = useState("");
@@ -52,7 +49,7 @@ const Documents: React.FC = () => {
 
   const handleSubmitDocument = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!docName.trim()) {
       toast({
         title: "Error",
@@ -82,16 +79,8 @@ const Documents: React.FC = () => {
     setShowCreateForm(false);
   };
 
-  const handleDocuSealCompleted = (data: any) => {
-    toast({
-      title: "Documento completado",
-      description: "El documento de DocuSeal ha sido completado exitosamente.",
-    });
-    console.log("DocuSeal completion data:", data);
-  };
-
   const filteredDocuments = documents?.filter((doc: any) => {
-    const matchesSearch = !filters.search || 
+    const matchesSearch = !filters.search ||
       doc.name?.toLowerCase().includes(filters.search.toLowerCase()) ||
       doc.content?.toLowerCase().includes(filters.search.toLowerCase());
 
@@ -128,274 +117,239 @@ const Documents: React.FC = () => {
         </Button>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList>
-          <TabsTrigger value="documents" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Documentos Internos
-          </TabsTrigger>
-          <TabsTrigger value="docuseal" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            DocuSeal
-          </TabsTrigger>
-        </TabsList>
+      {/* Search and Filters */}
+      <SearchAndFilters
+        filters={filters}
+        onFiltersChange={setFilters}
+        statusOptions={[
+          { value: "draft", label: "Borrador" },
+          { value: "published", label: "Publicado" },
+          { value: "archived", label: "Archivado" },
+        ]}
+        companyOptions={[
+          { value: "contract", label: "Contrato" },
+          { value: "policy", label: "Póliza" },
+          { value: "report", label: "Reporte" },
+        ]}
+        planOptions={[]}
+        showExport={true}
+        onExport={() => {
+          toast({
+            title: "Exportando",
+            description: "Preparando la exportación de documentos...",
+          });
+        }}
+      />
 
-        <TabsContent value="documents" className="space-y-6">
-          {/* Search and Filters */}
-          <SearchAndFilters
-            filters={filters}
-            onFiltersChange={setFilters}
-            statusOptions={[
-              { value: "draft", label: "Borrador" },
-              { value: "published", label: "Publicado" },
-              { value: "archived", label: "Archivado" },
-            ]}
-            companyOptions={[
-              { value: "contract", label: "Contrato" },
-              { value: "policy", label: "Póliza" },
-              { value: "report", label: "Reporte" },
-            ]}
-            planOptions={[]}
-            showExport={true}
-            onExport={() => {
-              toast({
-                title: "Exportando",
-                description: "Preparando la exportación de documentos...",
-              });
-            }}
-          />
-
-          {/* Main Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Documents List */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Lista de Documentos ({filteredDocuments.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {filteredDocuments.length > 0 ? (
-                  <div className="space-y-4">
-                    {filteredDocuments.map((doc: any) => (
-                      <div
-                        key={doc.id}
-                        className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                          selectedDocument?.id === doc.id
-                            ? "border-primary bg-primary/5"
-                            : "hover:border-primary/50"
-                        }`}
-                        onClick={() => {
-                          setSelectedDocument(doc);
-                          setShowCreateForm(false);
+      {/* Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Documents List */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Lista de Documentos ({filteredDocuments.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {filteredDocuments.length > 0 ? (
+              <div className="space-y-4">
+                {filteredDocuments.map((doc: any) => (
+                  <div
+                    key={doc.id}
+                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                      selectedDocument?.id === doc.id
+                        ? "border-primary bg-primary/5"
+                        : "hover:border-primary/50"
+                    }`}
+                    onClick={() => {
+                      setSelectedDocument(doc);
+                      setShowCreateForm(false);
+                    }}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-medium">{doc.name}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {doc.document_type}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(doc.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm('¿Está seguro de que desea eliminar este documento?')) {
+                            deleteDocument(doc.id);
+                          }
                         }}
                       >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-medium">{doc.name}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {doc.document_type}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(doc.created_at).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (confirm('¿Está seguro de que desea eliminar este documento?')) {
-                                deleteDocument(doc.id);
-                              }
-                            }}
-                          >
-                            Eliminar
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                        Eliminar
+                      </Button>
+                    </div>
                   </div>
-                ) : (
-                  <p className="text-muted-foreground text-center py-8">
-                    No hay documentos disponibles
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Document Preview/Create Form */}
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  {selectedDocument
-                    ? "Vista Previa del Documento"
-                    : "Selecciona un documento"}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {selectedDocument ? (
-                  <DocumentPreview
-                    content={selectedDocument.content || ""}
-                    dynamicFields={selectedDocument.dynamic_fields || []}
-                    templateType={selectedDocument.document_type || "document"}
-                    templateName={selectedDocument.name || "documento"}
-                  />
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p>Selecciona un documento de la lista para ver la vista previa</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Create Document Dialog */}
-          <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle>Crear Nuevo Documento</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmitDocument} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="docName">Nombre del Documento *</Label>
-                  <Input
-                    id="docName"
-                    value={docName}
-                    onChange={(e) => setDocName(e.target.value)}
-                    placeholder="Ingrese el nombre del documento"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="docSaleId">Venta Asociada *</Label>
-                  {sales && sales.length > 0 ? (
-                    <Select value={docSaleId} onValueChange={setDocSaleId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona una venta" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {sales.map((sale) => (
-                          <SelectItem key={sale.id} value={sale.id}>
-                            {sale.contract_number || `CON-${sale.id.slice(-4)}`} - {sale.clients?.first_name} {sale.clients?.last_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Alert>
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>
-                        No hay ventas disponibles. Primero debes crear una venta.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="docType">Tipo de Documento</Label>
-                  <Select value={docType} onValueChange={setDocType}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona el tipo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="contract">Contrato</SelectItem>
-                      <SelectItem value="policy">Póliza</SelectItem>
-                      <SelectItem value="declaration">Declaración</SelectItem>
-                      <SelectItem value="report">Reporte</SelectItem>
-                      <SelectItem value="certificate">Certificado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="docContent">Contenido</Label>
-                  <Textarea
-                    id="docContent"
-                    value={docContent}
-                    onChange={(e) => setDocContent(e.target.value)}
-                    placeholder="Ingrese el contenido del documento"
-                    rows={6}
-                  />
-                </div>
-
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setShowCreateForm(false)}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={!docSaleId}>
-                    Crear Documento
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-
-          {/* Statistics */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Total Documentos</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{documents?.length || 0}</div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Borradores</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {documents?.filter((doc: any) => doc.status === "draft").length || 0}
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Publicados</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {documents?.filter((doc: any) => doc.status === "published").length || 0}
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Archivados</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {documents?.filter((doc: any) => doc.status === "archived").length || 0}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="docuseal" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>DocuSeal - Firma Digital</CardTitle>
-              <p className="text-muted-foreground">
-                Utiliza DocuSeal para firmar documentos digitalmente
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-center py-8">
+                No hay documentos disponibles
               </p>
-            </CardHeader>
-            <CardContent>
-              <DocuSealForm
-                src="https://docuseal.com/d/LEVGR9rhZYf86M"
-                email="dalton.perez+test@saa.com.py"
-                onCompleted={handleDocuSealCompleted}
-                className="w-full"
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Document Preview/Create Form */}
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              {selectedDocument
+                ? "Vista Previa del Documento"
+                : "Selecciona un documento"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {selectedDocument ? (
+              <DocumentPreview
+                content={selectedDocument.content || ""}
+                dynamicFields={selectedDocument.dynamic_fields || []}
+                templateType={selectedDocument.document_type || "document"}
+                templateName={selectedDocument.name || "documento"}
               />
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>Selecciona un documento de la lista para ver la vista previa</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Create Document Dialog */}
+      <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Crear Nuevo Documento</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmitDocument} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="docName">Nombre del Documento *</Label>
+              <Input
+                id="docName"
+                value={docName}
+                onChange={(e) => setDocName(e.target.value)}
+                placeholder="Ingrese el nombre del documento"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="docSaleId">Venta Asociada *</Label>
+              {sales && sales.length > 0 ? (
+                <Select value={docSaleId} onValueChange={setDocSaleId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona una venta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sales.map((sale) => (
+                      <SelectItem key={sale.id} value={sale.id}>
+                        {sale.contract_number || `CON-${sale.id.slice(-4)}`} - {sale.clients?.first_name} {sale.clients?.last_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    No hay ventas disponibles. Primero debes crear una venta.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="docType">Tipo de Documento</Label>
+              <Select value={docType} onValueChange={setDocType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona el tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="contract">Contrato</SelectItem>
+                  <SelectItem value="policy">Póliza</SelectItem>
+                  <SelectItem value="declaration">Declaración</SelectItem>
+                  <SelectItem value="report">Reporte</SelectItem>
+                  <SelectItem value="certificate">Certificado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="docContent">Contenido</Label>
+              <Textarea
+                id="docContent"
+                value={docContent}
+                onChange={(e) => setDocContent(e.target.value)}
+                placeholder="Ingrese el contenido del documento"
+                rows={6}
+              />
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowCreateForm(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={!docSaleId}>
+                Crear Documento
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total Documentos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{documents?.length || 0}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Borradores</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {documents?.filter((doc: any) => doc.status === "draft").length || 0}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Publicados</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {documents?.filter((doc: any) => doc.status === "published").length || 0}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Archivados</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {documents?.filter((doc: any) => doc.status === "archived").length || 0}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

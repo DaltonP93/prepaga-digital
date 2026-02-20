@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Link, Copy, Send, CheckCircle, Clock, ExternalLink, RefreshCw } from 'lucide-react';
+import { Link, Copy, Send, CheckCircle, Clock, ExternalLink, RefreshCw, PenTool } from 'lucide-react';
+import { useSignWellConfig, useSignWellCreateDocument } from '@/hooks/useSignWell';
 
 interface SignatureLinkGeneratorProps {
   saleId: string;
@@ -23,6 +24,8 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [expirationDays, setExpirationDays] = useState(1);
+  const { isEnabled: signwellEnabled } = useSignWellConfig();
+  const signwellCreate = useSignWellCreateDocument();
 
   // Fetch existing signature links
   const { data: signatureLinks = [], isLoading } = useQuery({
@@ -48,28 +51,63 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + expirationDays);
 
+      const insertData: Record<string, any> = {
+        sale_id: saleId,
+        token,
+        recipient_type: recipientType,
+        recipient_email: clientEmail || null,
+        recipient_phone: clientPhone || null,
+        expires_at: expiresAt.toISOString(),
+        status: 'pendiente',
+      };
+
+      // If SignWell is enabled and we have an email, create SignWell document
+      if (signwellEnabled && clientEmail) {
+        try {
+          // Get sale documents to send to SignWell
+          const { data: saleDocs } = await supabase
+            .from('documents')
+            .select('name, content, file_url')
+            .eq('sale_id', saleId)
+            .neq('document_type', 'firma')
+            .eq('is_final', false)
+            .limit(1);
+
+          const docToSign = saleDocs?.[0];
+
+          if (docToSign) {
+            const result = await signwellCreate.mutateAsync({
+              name: docToSign.name || 'Documento SAMAP',
+              fileUrl: docToSign.file_url || undefined,
+              recipients: [{ name: clientEmail.split('@')[0], email: clientEmail }],
+            });
+
+            insertData.signwell_document_id = result.document_id;
+            insertData.signwell_signing_url = result.signing_url;
+          }
+        } catch (swErr) {
+          // Fallback silently to canvas if SignWell fails
+          console.warn('SignWell create failed, falling back to canvas:', swErr);
+        }
+      }
+
       const { data, error } = await supabase
         .from('signature_links')
-        .insert({
-          sale_id: saleId,
-          token,
-          recipient_type: recipientType,
-          recipient_email: clientEmail || null,
-          recipient_phone: clientPhone || null,
-          expires_at: expiresAt.toISOString(),
-          status: 'pendiente',
-        })
+        .insert(insertData as any)
         .select()
         .single();
 
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['signature-links', saleId] });
+      const isSignWell = !!(data as any).signwell_document_id;
       toast({
         title: 'Enlace generado',
-        description: 'El enlace de firma ha sido creado exitosamente.',
+        description: isSignWell
+          ? 'Enlace de firma SignWell creado exitosamente.'
+          : 'El enlace de firma ha sido creado exitosamente.',
       });
     },
     onError: (error: any) => {
@@ -198,6 +236,12 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
         <CardTitle className="flex items-center gap-2">
           <Link className="h-5 w-5" />
           Enlaces de Firma Digital
+          {signwellEnabled && (
+            <Badge variant="default" className="bg-green-600 text-xs">
+              <PenTool className="h-3 w-3 mr-1" />
+              SignWell activo
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -244,6 +288,12 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
                   <div className="flex items-center gap-2">
                     <span className="font-medium capitalize">{link.recipient_type}</span>
                     {getStatusBadge(link.status, link.expires_at)}
+                    {link.signwell_document_id && (
+                      <Badge variant="outline" className="text-xs text-green-600">
+                        <PenTool className="h-3 w-3 mr-1" />
+                        SignWell
+                      </Badge>
+                    )}
                   </div>
                   <div className="text-xs text-muted-foreground space-y-0.5">
                     <p>Creado: {formatDate(link.created_at)}</p>

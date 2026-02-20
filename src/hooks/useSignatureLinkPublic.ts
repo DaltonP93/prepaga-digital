@@ -196,6 +196,8 @@ export const useSubmitSignatureLink = () => {
 
       const nextStepOrder = (existingSteps?.[0]?.step_order || 0) + 1;
 
+      const isSignWellCompletion = signatureData === 'signwell_completed';
+
       await signatureClient
         .from('signature_workflow_steps')
         .insert({
@@ -208,10 +210,36 @@ export const useSubmitSignatureLink = () => {
             signed_ip: clientIp,
             user_agent: navigator.userAgent,
             signature_data_length: signatureData.length,
+            signwell: isSignWellCompletion,
           },
         });
 
-      // Store signature in documents table for the sale
+      // For SignWell completions, skip canvas-specific document embedding
+      // SignWell handles the signed PDF on their platform
+      if (isSignWellCompletion) {
+        // Log in process_traces for audit trail
+        try {
+          await signatureClient
+            .from('process_traces')
+            .insert({
+              sale_id: data.sale_id,
+              action: 'firma_completada',
+              details: {
+                recipient_type: data.recipient_type,
+                recipient_id: data.recipient_id,
+                signed_ip: clientIp,
+                signature_link_id: linkId,
+                completed_at: new Date().toISOString(),
+                provider: 'signwell',
+              },
+            });
+        } catch (traceErr) {
+          console.warn('Could not log process trace:', traceErr);
+        }
+        return data;
+      }
+
+      // Store signature in documents table for the sale (canvas flow)
       try {
         await signatureClient
           .from('documents')
@@ -230,7 +258,7 @@ export const useSubmitSignatureLink = () => {
         console.warn('Could not save signature document:', docErr);
       }
 
-      // Build final signed documents with embedded signature
+      // Build final signed documents with embedded signature (canvas flow)
       try {
         const recipientType = data.recipient_type;
         const recipientId = data.recipient_id;

@@ -19,6 +19,8 @@ export interface CompanyApiConfig {
   email_api_key: string;
   email_from_address: string;
   email_from_name: string;
+  signwell_enabled: boolean;
+  signwell_api_key: string;
 }
 
 export const useCompanyApiConfiguration = () => {
@@ -61,6 +63,8 @@ export const useCompanyApiConfiguration = () => {
         email_api_key: data.email_api_key || '',
         email_from_address: data.email_from_address || '',
         email_from_name: data.email_from_name || '',
+        signwell_enabled: !!(data as any).signwell_enabled,
+        signwell_api_key: (data as any).signwell_api_key || '',
       };
     },
     enabled: !!profile?.company_id,
@@ -88,6 +92,8 @@ export const useCompanyApiConfiguration = () => {
       if ('email_api_key' in updates) dbUpdates.email_api_key = updates.email_api_key;
       if ('email_from_address' in updates) dbUpdates.email_from_address = updates.email_from_address;
       if ('email_from_name' in updates) dbUpdates.email_from_name = updates.email_from_name;
+      if ('signwell_enabled' in updates) dbUpdates.signwell_enabled = updates.signwell_enabled;
+      if ('signwell_api_key' in updates) dbUpdates.signwell_api_key = updates.signwell_api_key;
 
       const { data, error } = await supabase
         .from('company_settings')
@@ -130,4 +136,6 @@ const getDefaultConfiguration = (): CompanyApiConfig => ({
   email_api_key: '',
   email_from_address: '',
   email_from_name: '',
+  signwell_enabled: false,
+  signwell_api_key: '',
 });
