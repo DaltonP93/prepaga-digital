@@ -577,6 +577,8 @@ export type Database = {
           email_from_name: string | null
           id: string
           menu_config: Json | null
+          signwell_api_key: string | null
+          signwell_enabled: boolean | null
           sms_api_key: string | null
           sms_sender_id: string | null
           updated_at: string | null
@@ -591,6 +593,8 @@ export type Database = {
           email_from_name?: string | null
           id?: string
           menu_config?: Json | null
+          signwell_api_key?: string | null
+          signwell_enabled?: boolean | null
           sms_api_key?: string | null
           sms_sender_id?: string | null
           updated_at?: string | null
@@ -605,6 +609,8 @@ export type Database = {
           email_from_name?: string | null
           id?: string
           menu_config?: Json | null
+          signwell_api_key?: string | null
+          signwell_enabled?: boolean | null
           sms_api_key?: string | null
           sms_sender_id?: string | null
           updated_at?: string | null
@@ -1744,6 +1750,8 @@ export type Database = {
           recipient_phone: string | null
           recipient_type: string
           sale_id: string
+          signwell_document_id: string | null
+          signwell_signing_url: string | null
           status: string | null
           token: string
           updated_at: string | null
@@ -1763,6 +1771,8 @@ export type Database = {
           recipient_phone?: string | null
           recipient_type: string
           sale_id: string
+          signwell_document_id?: string | null
+          signwell_signing_url?: string | null
           status?: string | null
           token: string
           updated_at?: string | null
@@ -1782,6 +1792,8 @@ export type Database = {
           recipient_phone?: string | null
           recipient_type?: string
           sale_id?: string
+          signwell_document_id?: string | null
+          signwell_signing_url?: string | null
           status?: string | null
           token?: string
           updated_at?: string | null

@@ -158,6 +158,16 @@ export const LiveTemplatePreview: React.FC<LiveTemplatePreviewProps> = ({
       });
   }, [templateId]);
 
+  const loadSignedUrl = async (annex: TemplateAttachment) => {
+    if (signedUrls[annex.id]) return;
+    const { data } = await supabase.storage
+      .from("documents")
+      .createSignedUrl(annex.file_url, 3600);
+    if (data?.signedUrl) {
+      setSignedUrls(prev => ({ ...prev, [annex.id]: data.signedUrl }));
+    }
+  };
+
   const openAnnex = async (annex: TemplateAttachment) => {
     if (signedUrls[annex.id]) {
       window.open(signedUrls[annex.id], '_blank');
@@ -171,6 +181,17 @@ export const LiveTemplatePreview: React.FC<LiveTemplatePreviewProps> = ({
       window.open(data.signedUrl, '_blank');
     }
   };
+
+  // Auto-load signed URLs for PDF annexes
+  useEffect(() => {
+    if (annexes.length === 0) return;
+    annexes.forEach(annex => {
+      const isPDF = annex.file_type === 'application/pdf' || annex.file_name?.endsWith('.pdf');
+      if (isPDF && !signedUrls[annex.id]) {
+        loadSignedUrl(annex);
+      }
+    });
+  }, [annexes]);
 
   // Create context and interpolate content
   const { processedContent, context } = useMemo(() => {
@@ -284,7 +305,7 @@ export const LiveTemplatePreview: React.FC<LiveTemplatePreviewProps> = ({
                     }}
                   />
                 ) : annexes.length > 0 ? (
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <div className="flex items-center gap-2 mb-2">
                       <Paperclip className="h-4 w-4 text-primary" />
                       <p className="text-sm font-medium">Anexos adjuntos ({annexes.length})</p>
@@ -292,24 +313,43 @@ export const LiveTemplatePreview: React.FC<LiveTemplatePreviewProps> = ({
                     <p className="text-xs text-muted-foreground">
                       Este template no tiene contenido del diseñador. Los siguientes anexos se enviarán directamente al cliente.
                     </p>
-                    <div className="space-y-2">
-                      {annexes.map((annex) => (
-                        <div key={annex.id} className="flex items-center justify-between border rounded-lg p-3">
-                          <div className="flex items-center gap-3">
-                            <FileText className="h-5 w-5 text-primary flex-shrink-0" />
-                            <div>
-                              <p className="text-sm font-medium">{annex.file_name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {annex.file_type || 'archivo'}{annex.file_size ? ` • ${(annex.file_size / 1024).toFixed(1)} KB` : ''}
-                              </p>
+                    <div className="space-y-4">
+                      {annexes.map((annex) => {
+                        const isPDF = annex.file_type === 'application/pdf' || annex.file_name?.endsWith('.pdf');
+                        const url = signedUrls[annex.id];
+                        return (
+                          <div key={annex.id} className="border rounded-lg overflow-hidden">
+                            <div className="flex items-center justify-between bg-muted/50 px-3 py-2 border-b">
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-primary flex-shrink-0" />
+                                <span className="text-sm font-medium">{annex.file_name}</span>
+                              </div>
+                              <Button variant="outline" size="sm" onClick={() => openAnnex(annex)}>
+                                <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                                Abrir
+                              </Button>
                             </div>
+                            {isPDF && url ? (
+                              <iframe
+                                src={`${url}#toolbar=1&navpanes=0`}
+                                className="w-full h-[500px] bg-muted/30"
+                                title={annex.file_name}
+                              />
+                            ) : isPDF && !url ? (
+                              <div className="flex flex-col items-center justify-center py-8 gap-2">
+                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                <Button variant="ghost" size="sm" onClick={() => loadSignedUrl(annex)}>
+                                  Cargar vista previa del PDF
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="p-4 text-center text-sm text-muted-foreground">
+                                <p>Archivo: {annex.file_type || 'desconocido'}{annex.file_size ? ` • ${(annex.file_size / 1024).toFixed(1)} KB` : ''}</p>
+                              </div>
+                            )}
                           </div>
-                          <Button variant="outline" size="sm" onClick={() => openAnnex(annex)}>
-                            <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                            Ver
-                          </Button>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 ) : annexesLoading ? (
