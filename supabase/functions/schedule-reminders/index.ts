@@ -133,8 +133,8 @@ serve(async (req) => {
         } else {
           errors.push(`Link ${link.id}: ${result.error}`)
         }
-      } catch (err) {
-        errors.push(`Link ${link.id}: ${err.message}`)
+      } catch (err: any) {
+        errors.push(`Link ${link.id}: ${err?.message || "Unknown error"}`)
       }
     }
 

@@ -53,9 +53,9 @@ serve(async (req) => {
         throw new Error("Invalid action parameter");
     }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("File manager error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: error?.message || "Unknown error" }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
@@ -176,7 +176,7 @@ async function handleFileList(supabase: any, req: Request, userId: string) {
 
   // Get signed URLs for each file
   const filesWithUrls = await Promise.all(
-    files.map(async (file) => {
+    files.map(async (file: any) => {
       const { data: urlData, error: urlError } = await supabase.storage
         .from(file.bucket_name)
         .createSignedUrl(file.file_path, 3600); // 1 hour expiry

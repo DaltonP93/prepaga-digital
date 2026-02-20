@@ -29,8 +29,8 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } }
     });
     const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims?.sub) {
+    const { data: userData, error: userError } = await anonClient.auth.getUser(token);
+    if (userError || !userData?.user) {
       return new Response(JSON.stringify({ error: "Invalid token" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -80,11 +80,11 @@ serve(async (req) => {
             campaign_id: campaignId,
             content: message,
             status: 'failed',
-            error_message: error.message,
+            error_message: (error as any)?.message,
             company_id: companyId
           });
 
-        results.push({ phone: recipient.phone, status: 'failed', error: error.message });
+        results.push({ phone: recipient.phone, status: 'failed', error: (error as any)?.message });
       }
     }
 

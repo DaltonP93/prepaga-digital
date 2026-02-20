@@ -287,11 +287,11 @@ async function sendViaMetaAPI(
       success: true,
       messageId: result.messages?.[0]?.id
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error calling Meta WhatsApp API:', error)
     return {
       success: false,
-      error: error.message || 'Network error sending WhatsApp message'
+      error: error?.message || 'Network error sending WhatsApp message'
     }
   }
 }
@@ -340,11 +340,11 @@ async function sendViaTwilio(
       success: true,
       messageId: result.sid,
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error calling Twilio API:', error)
     return {
       success: false,
-      error: error.message || 'Network error sending via Twilio'
+      error: error?.message || 'Network error sending via Twilio'
     }
   }
 }

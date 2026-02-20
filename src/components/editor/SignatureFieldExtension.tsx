@@ -277,7 +277,9 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
 
   const { onMouseDown } = useResizable(width, height, handleResize, containerRef as React.RefObject<HTMLDivElement>);
 
-  const handleSave = () => {
+  const handleSave = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     updateAttributes({ label, signatureType, signerRole, required, showSignerInfo, showDate, showToken, width, height, float: floatDir });
     setIsEditing(false);
   };
@@ -443,7 +445,7 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
               </div>
             </div>
 
-            <Button onClick={handleSave} size="sm" className="w-full">Guardar Configuración</Button>
+            <Button onClick={(e) => handleSave(e)} size="sm" className="w-full">Guardar Configuración</Button>
           </div>
         ) : (
           <div className="space-y-2 overflow-auto" style={{ maxHeight: `${height - 60}px` }}>
