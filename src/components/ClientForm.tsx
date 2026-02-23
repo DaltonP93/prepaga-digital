@@ -27,6 +27,7 @@ interface ClientFormData {
   dni?: string;
   birth_date?: string;
   address?: string;
+  barrio?: string;
   city?: string;
   province?: string;
   latitude?: string;
@@ -97,12 +98,14 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
 
       const detectedCity = data.address.city || data.address.town || data.address.village || "";
       const detectedProvince = data.address.state || "";
-      const detectedAddress = [data.address.road, data.address.house_number, data.address.suburb]
+      const detectedBarrio = data.address.suburb || "";
+      const detectedAddress = [data.address.road, data.address.house_number]
         .filter(Boolean)
         .join(" ");
 
       if (detectedCity) setValue("city", detectedCity, { shouldDirty: true });
       if (detectedProvince) setValue("province", detectedProvince, { shouldDirty: true });
+      if (detectedBarrio) setValue("barrio", detectedBarrio, { shouldDirty: true });
       if (detectedAddress) setValue("address", detectedAddress, { shouldDirty: true });
 
       setLocationLabel(data.display_name || "");
@@ -132,12 +135,14 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
 
     const detectedCity = result.address?.city || result.address?.town || result.address?.village || "";
     const detectedProvince = result.address?.state || "";
-    const detectedAddress = [result.address?.road, result.address?.house_number, result.address?.suburb]
+    const detectedBarrio = result.address?.suburb || "";
+    const detectedAddress = [result.address?.road, result.address?.house_number]
       .filter(Boolean)
       .join(" ");
 
     if (detectedCity) setValue("city", detectedCity, { shouldDirty: true });
     if (detectedProvince) setValue("province", detectedProvince, { shouldDirty: true });
+    if (detectedBarrio) setValue("barrio", detectedBarrio, { shouldDirty: true });
     if (detectedAddress) setValue("address", detectedAddress, { shouldDirty: true });
 
     setSearchResults([]);
@@ -217,6 +222,7 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
         dni: client.dni || "",
         birth_date: client.birth_date || "",
         address: client.address || "",
+        barrio: (client as any).barrio || "",
         city: client.city || "",
         province: client.province || "",
         latitude: "",
@@ -233,6 +239,7 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
       dni: "",
       birth_date: "",
       address: "",
+      barrio: "",
       city: "",
       province: "",
       latitude: "",
@@ -249,7 +256,7 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
         throw new Error("Debes cargar latitud y longitud juntas");
       }
 
-      // Remove latitude/longitude from payload as clients table doesn't have those columns
+      // Remove latitude/longitude from payload; keep barrio (cast as any for untyped column)
       const { latitude: _lat, longitude: _lng, ...cleanData } = data;
 
       if (isEditing && client) {
@@ -322,14 +329,20 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
                   <Input id="city" {...register("city")} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="province">Provincia</Label>
+                  <Label htmlFor="province">Departamento</Label>
                   <Input id="province" {...register("province")} />
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="address">Direccion</Label>
-                <Input id="address" placeholder="Ej: Boqueron 123" {...register("address")} />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="address">Direccion</Label>
+                  <Input id="address" placeholder="Ej: Boqueron 123" {...register("address")} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="barrio">Barrio</Label>
+                  <Input id="barrio" placeholder="Ej: Villa Morra" {...register("barrio")} />
+                </div>
               </div>
 
               <div className="rounded-md border p-3 space-y-2">

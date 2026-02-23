@@ -254,11 +254,11 @@ export const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
               />
             </div>
             <div>
-              <Label htmlFor="province">Provincia/Departamento</Label>
+              <Label htmlFor="province">Departamento</Label>
               <Input
                 id="province"
                 {...register('province')}
-                placeholder="Provincia"
+                placeholder="Departamento"
               />
             </div>
             <div>

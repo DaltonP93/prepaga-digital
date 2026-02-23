@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useCompanyConfiguration } from '@/hooks/useCompanyConfiguration';
 import { useCompanyApiConfiguration, WhatsAppProvider } from '@/hooks/useCompanyApiConfiguration';
 import { getWhatsAppWebhookUrl } from '@/lib/appUrls';
@@ -17,66 +17,115 @@ export const AdminConfigPanel: React.FC = () => {
   const { configuration: uiConfig, isLoading: uiLoading, updateConfiguration: updateUiConfig, isUpdating: uiUpdating } = useCompanyConfiguration();
   const { configuration: apiConfig, isLoading: apiLoading, updateConfiguration: updateApiConfig, isUpdating: apiUpdating } = useCompanyApiConfiguration();
 
-  const [uiFormData, setUiFormData] = useState({
-    login_title: uiConfig?.login_title || 'Sistema de Gestión',
-    login_subtitle: uiConfig?.login_subtitle || 'Acceso al sistema',
-    primary_color: uiConfig?.primary_color || '#1e3a5f',
-    secondary_color: uiConfig?.secondary_color || '#334155',
-    login_background_url: uiConfig?.login_background_url || '',
-    login_logo_url: uiConfig?.login_logo_url || '',
-  });
+  const defaultUiFormData = {
+    login_title: 'Sistema de Gestión',
+    login_subtitle: 'Acceso al sistema',
+    primary_color: '#1e3a5f',
+    secondary_color: '#334155',
+    login_background_url: '',
+    login_logo_url: '',
+  };
 
-  const [apiFormData, setApiFormData] = useState({
-    whatsapp_provider: apiConfig?.whatsapp_provider || 'wame_fallback' as WhatsAppProvider,
-    whatsapp_api_token: apiConfig?.whatsapp_api_token || '',
-    whatsapp_phone_number: apiConfig?.whatsapp_phone_number || '',
-    twilio_account_sid: apiConfig?.twilio_account_sid || '',
-    twilio_auth_token: apiConfig?.twilio_auth_token || '',
-    twilio_whatsapp_number: apiConfig?.twilio_whatsapp_number || '',
-    sms_api_enabled: apiConfig?.sms_api_enabled || false,
-    sms_api_key: apiConfig?.sms_api_key || '',
-    email_api_enabled: apiConfig?.email_api_enabled || false,
-    email_api_key: apiConfig?.email_api_key || '',
-    email_from_address: apiConfig?.email_from_address || '',
-    email_from_name: apiConfig?.email_from_name || '',
-    signwell_enabled: apiConfig?.signwell_enabled || false,
-    signwell_api_key: apiConfig?.signwell_api_key || '',
-  });
+  const defaultApiFormData = {
+    whatsapp_provider: 'wame_fallback' as WhatsAppProvider,
+    whatsapp_api_token: '',
+    whatsapp_phone_number: '',
+    twilio_account_sid: '',
+    twilio_auth_token: '',
+    twilio_whatsapp_number: '',
+    sms_api_enabled: false,
+    sms_api_key: '',
+    email_api_enabled: false,
+    email_api_key: '',
+    email_from_address: '',
+    email_from_name: '',
+    signwell_enabled: false,
+    signwell_api_key: '',
+  };
+
+  const [uiFormData, setUiFormData] = useState(defaultUiFormData);
+  const [apiFormData, setApiFormData] = useState(defaultApiFormData);
   const [signwellTesting, setSignwellTesting] = useState(false);
+  const lastUiSyncKeyRef = useRef<string>('');
+  const lastApiSyncKeyRef = useRef<string>('');
+
+  const hasUiChanges = (
+    current: typeof uiFormData,
+    next: typeof uiFormData,
+  ): boolean => {
+    return (
+      current.login_title !== next.login_title ||
+      current.login_subtitle !== next.login_subtitle ||
+      current.primary_color !== next.primary_color ||
+      current.secondary_color !== next.secondary_color ||
+      current.login_background_url !== next.login_background_url ||
+      current.login_logo_url !== next.login_logo_url
+    );
+  };
+
+  const hasApiChanges = (
+    current: typeof apiFormData,
+    next: typeof apiFormData,
+  ): boolean => {
+    return (
+      current.whatsapp_provider !== next.whatsapp_provider ||
+      current.whatsapp_api_token !== next.whatsapp_api_token ||
+      current.whatsapp_phone_number !== next.whatsapp_phone_number ||
+      current.twilio_account_sid !== next.twilio_account_sid ||
+      current.twilio_auth_token !== next.twilio_auth_token ||
+      current.twilio_whatsapp_number !== next.twilio_whatsapp_number ||
+      current.sms_api_enabled !== next.sms_api_enabled ||
+      current.sms_api_key !== next.sms_api_key ||
+      current.email_api_enabled !== next.email_api_enabled ||
+      current.email_api_key !== next.email_api_key ||
+      current.email_from_address !== next.email_from_address ||
+      current.email_from_name !== next.email_from_name ||
+      current.signwell_enabled !== next.signwell_enabled ||
+      current.signwell_api_key !== next.signwell_api_key
+    );
+  };
+
+  const nextUiFormData = useMemo(() => ({
+    login_title: uiConfig?.login_title || defaultUiFormData.login_title,
+    login_subtitle: uiConfig?.login_subtitle || defaultUiFormData.login_subtitle,
+    primary_color: uiConfig?.primary_color || defaultUiFormData.primary_color,
+    secondary_color: uiConfig?.secondary_color || defaultUiFormData.secondary_color,
+    login_background_url: uiConfig?.login_background_url || defaultUiFormData.login_background_url,
+    login_logo_url: uiConfig?.login_logo_url || defaultUiFormData.login_logo_url,
+  }), [uiConfig]);
+
+  const nextApiFormData = useMemo(() => ({
+    whatsapp_provider: apiConfig?.whatsapp_provider || defaultApiFormData.whatsapp_provider,
+    whatsapp_api_token: apiConfig?.whatsapp_api_token || defaultApiFormData.whatsapp_api_token,
+    whatsapp_phone_number: apiConfig?.whatsapp_phone_number || defaultApiFormData.whatsapp_phone_number,
+    twilio_account_sid: apiConfig?.twilio_account_sid || defaultApiFormData.twilio_account_sid,
+    twilio_auth_token: apiConfig?.twilio_auth_token || defaultApiFormData.twilio_auth_token,
+    twilio_whatsapp_number: apiConfig?.twilio_whatsapp_number || defaultApiFormData.twilio_whatsapp_number,
+    sms_api_enabled: apiConfig?.sms_api_enabled || defaultApiFormData.sms_api_enabled,
+    sms_api_key: apiConfig?.sms_api_key || defaultApiFormData.sms_api_key,
+    email_api_enabled: apiConfig?.email_api_enabled || defaultApiFormData.email_api_enabled,
+    email_api_key: apiConfig?.email_api_key || defaultApiFormData.email_api_key,
+    email_from_address: apiConfig?.email_from_address || defaultApiFormData.email_from_address,
+    email_from_name: apiConfig?.email_from_name || defaultApiFormData.email_from_name,
+    signwell_enabled: apiConfig?.signwell_enabled || defaultApiFormData.signwell_enabled,
+    signwell_api_key: apiConfig?.signwell_api_key || defaultApiFormData.signwell_api_key,
+  }), [apiConfig]);
 
   React.useEffect(() => {
-    if (uiConfig) {
-      setUiFormData({
-        login_title: uiConfig.login_title || 'Sistema de Gestión',
-        login_subtitle: uiConfig.login_subtitle || 'Acceso al sistema',
-        primary_color: uiConfig.primary_color || '#1e3a5f',
-        secondary_color: uiConfig.secondary_color || '#334155',
-        login_background_url: uiConfig.login_background_url || '',
-        login_logo_url: uiConfig.login_logo_url || '',
-      });
-    }
-  }, [uiConfig]);
+    const syncKey = JSON.stringify(nextUiFormData);
+    if (lastUiSyncKeyRef.current === syncKey) return;
+
+    setUiFormData((prev) => (hasUiChanges(prev, nextUiFormData) ? nextUiFormData : prev));
+    lastUiSyncKeyRef.current = syncKey;
+  }, [nextUiFormData]);
 
   React.useEffect(() => {
-    if (apiConfig) {
-      setApiFormData({
-        whatsapp_provider: apiConfig.whatsapp_provider || 'wame_fallback',
-        whatsapp_api_token: apiConfig.whatsapp_api_token || '',
-        whatsapp_phone_number: apiConfig.whatsapp_phone_number || '',
-        twilio_account_sid: apiConfig.twilio_account_sid || '',
-        twilio_auth_token: apiConfig.twilio_auth_token || '',
-        twilio_whatsapp_number: apiConfig.twilio_whatsapp_number || '',
-        sms_api_enabled: apiConfig.sms_api_enabled || false,
-        sms_api_key: apiConfig.sms_api_key || '',
-        email_api_enabled: apiConfig.email_api_enabled || false,
-        email_api_key: apiConfig.email_api_key || '',
-        email_from_address: apiConfig.email_from_address || '',
-        email_from_name: apiConfig.email_from_name || '',
-        signwell_enabled: apiConfig.signwell_enabled || false,
-        signwell_api_key: apiConfig.signwell_api_key || '',
-      });
-    }
-  }, [apiConfig]);
+    const syncKey = JSON.stringify(nextApiFormData);
+    if (lastApiSyncKeyRef.current === syncKey) return;
+
+    setApiFormData((prev) => (hasApiChanges(prev, nextApiFormData) ? nextApiFormData : prev));
+    lastApiSyncKeyRef.current = syncKey;
+  }, [nextApiFormData]);
 
   const handleUiSave = () => {
     updateUiConfig(uiFormData);

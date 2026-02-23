@@ -43,6 +43,23 @@ const getDocStatusBadge = (status: string) => {
   }
 };
 
+const isAnexoPlanName = (value?: string | null) => {
+  const lower = (value || '').toLowerCase();
+  return lower.includes('anexo plan') || (lower.includes('anexo') && lower.includes('plan'));
+};
+
+const normalizeResponsePlaceholder = (value?: string | null): string => {
+  if (!value) return '';
+  let normalized = value.trim();
+  if (normalized.startsWith('{{') && normalized.endsWith('}}')) {
+    normalized = normalized.slice(2, -2).trim();
+  }
+  if (normalized.startsWith('respuestas.')) {
+    normalized = normalized.replace(/^respuestas\./, '');
+  }
+  return normalized;
+};
+
 const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus, disabled }) => {
   const navigate = useNavigate();
   const { templates } = useTemplates();
@@ -121,7 +138,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       if (!saleId) return [];
       const { data, error } = await supabase
         .from('documents')
-        .select('id, name, document_type, status, beneficiary_id, content, created_at')
+        .select('id, name, document_type, status, beneficiary_id, content, file_url, requires_signature, generated_from_template, created_at')
         .eq('sale_id', saleId)
         .neq('document_type', 'firma')
         .order('created_at', { ascending: true });
@@ -201,8 +218,14 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       const responsesMap: Record<string, any> = {};
       (templateResponses || []).forEach((tr: any) => {
         const placeholderName = tr.template_questions?.placeholder_name;
-        if (placeholderName && tr.response_value) {
-          responsesMap[placeholderName] = tr.response_value;
+        const normalizedPlaceholder = normalizeResponsePlaceholder(placeholderName);
+        if (tr.response_value !== null && tr.response_value !== undefined) {
+          if (normalizedPlaceholder) {
+            responsesMap[normalizedPlaceholder] = tr.response_value;
+          }
+          if (tr.question_id) {
+            responsesMap[tr.question_id] = tr.response_value;
+          }
         }
       });
 
@@ -214,20 +237,28 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
 
       // Generate documents for the titular (all templates)
       for (const template of (templateContents || [])) {
-        const renderedContent = interpolateEnhancedTemplate(template.content || '', context);
+        const hasDesignerContent = !!template.content?.trim();
+        const renderedContent = hasDesignerContent
+          ? interpolateEnhancedTemplate(template.content || '', context)
+          : '';
         const lower = template.name.toLowerCase();
         const isDDJJ = lower.includes('ddjj') || lower.includes('declaración') || lower.includes('declaracion');
         const isContrato = lower.includes('contrato');
-        const isAnexo = !isDDJJ && !isContrato;
+        const isAnexoPlan = isAnexoPlanName(template.name);
+        const isAnexo = isAnexoPlan || (!isDDJJ && !isContrato);
+        const normalizedContent = !hasDesignerContent && isAnexo
+          ? `<p>Documento de anexo cargado sin estructura de diseñador. Procesado como template interno.</p>`
+          : renderedContent;
 
         await supabase.from('documents').insert({
           sale_id: saleId,
           name: template.name,
           document_type: isAnexo ? 'anexo' : (isDDJJ ? 'ddjj_salud' : 'contrato'),
-          content: renderedContent,
+          content: normalizedContent,
           status: 'pendiente' as any,
           requires_signature: !isAnexo,
           is_final: isAnexo,
+          generated_from_template: true,
           beneficiary_id: null,
         });
       }
@@ -273,16 +304,24 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         .in('template_id', templateIds);
 
       if (templateAttachments && templateAttachments.length > 0) {
+        const templateNameById = new Map(
+          (templateContents || []).map((t: any) => [t.id, t.name])
+        );
+
         for (const att of templateAttachments) {
+          const parentTemplateName = templateNameById.get((att as any).template_id);
+          const isAnexoPlanAttachment = isAnexoPlanName(parentTemplateName) || isAnexoPlanName((att as any).file_name);
+
           await supabase.from('documents').insert({
             sale_id: saleId,
-            name: `Anexo - ${(att as any).file_name}`,
+            name: `${isAnexoPlanAttachment ? 'Anexo Plan' : 'Anexo'} - ${(att as any).file_name}`,
             document_type: 'anexo',
             file_url: (att as any).file_url,
             content: null,
             status: 'pendiente' as any,
             requires_signature: false,
             is_final: true,
+            generated_from_template: true,
             beneficiary_id: null,
           });
         }

@@ -50,6 +50,18 @@ const createEmptyData = (): BeneficiaryHealthData => ({
   saved: false,
 });
 
+const normalizeDDJJPlaceholder = (value?: string | null): string => {
+  if (!value) return '';
+  let normalized = value.trim();
+  if (normalized.startsWith('{{') && normalized.endsWith('}}')) {
+    normalized = normalized.slice(2, -2).trim();
+  }
+  if (normalized.startsWith('respuestas.')) {
+    normalized = normalized.replace(/^respuestas\./, '');
+  }
+  return normalized;
+};
+
 const parseExistingData = (detail: string | null, hasPreexisting: boolean | null): BeneficiaryHealthData => {
   const data = createEmptyData();
   if (!detail && !hasPreexisting) return data;
@@ -319,37 +331,51 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
       // Sync DDJJ answers to template_responses for template engine interpolation
       try {
         if (saleId) {
+          const { data: saleTemplateRows } = await supabase
+            .from('sale_templates')
+            .select('template_id, templates:template_id(name)')
+            .eq('sale_id', saleId);
+
+          const ddjjTemplateIds = (saleTemplateRows || [])
+            .filter((row: any) => {
+              const name = (row.templates?.name || '').toLowerCase();
+              return name.includes('ddjj') || name.includes('declaración') || name.includes('declaracion');
+            })
+            .map((row: any) => row.template_id)
+            .filter(Boolean);
+
           const { data: ddjiQuestions } = await supabase
             .from('template_questions')
-            .select('id, placeholder_name, sort_order')
-            .eq('template_id', '784e7d0e-8001-48a6-a44d-945722293fc4')
+            .select('id, template_id, placeholder_name, sort_order')
+            .in('template_id', ddjjTemplateIds.length > 0 ? ddjjTemplateIds : ['784e7d0e-8001-48a6-a44d-945722293fc4'])
             .order('sort_order');
 
           if (ddjiQuestions && ddjiQuestions.length > 0) {
             for (const q of ddjiQuestions) {
+              const placeholderName = normalizeDDJJPlaceholder(q.placeholder_name);
               let responseValue = '';
-              if (q.placeholder_name?.startsWith('ddjj_pregunta_')) {
-                const idx = parseInt(q.placeholder_name.replace('ddjj_pregunta_', '')) - 1;
+              if (placeholderName.startsWith('ddjj_pregunta_')) {
+                const idx = parseInt(placeholderName.replace('ddjj_pregunta_', '')) - 1;
                 responseValue = d.answers[idx] === 'si'
                   ? `Sí${d.details[idx] ? ': ' + d.details[idx] : ''}`
                   : d.answers[idx] === 'no' ? 'No' : '';
-              } else if (q.placeholder_name === 'ddjj_peso') {
+              } else if (placeholderName === 'ddjj_peso') {
                 responseValue = d.peso || '';
-              } else if (q.placeholder_name === 'ddjj_altura') {
+              } else if (placeholderName === 'ddjj_altura') {
                 responseValue = d.altura || '';
-              } else if (q.placeholder_name === 'ddjj_fuma') {
+              } else if (placeholderName === 'ddjj_fuma') {
                 responseValue = d.habits[0] ? 'Sí' : 'No';
-              } else if (q.placeholder_name === 'ddjj_vapea') {
+              } else if (placeholderName === 'ddjj_vapea') {
                 responseValue = d.habits[1] ? 'Sí' : 'No';
-              } else if (q.placeholder_name === 'ddjj_alcohol') {
+              } else if (placeholderName === 'ddjj_alcohol') {
                 responseValue = d.habits[2] ? 'Sí' : 'No';
-              } else if (q.placeholder_name === 'ddjj_menstruacion') {
+              } else if (placeholderName === 'ddjj_menstruacion') {
                 responseValue = d.lastMenstruation || 'N/A';
               }
 
               await supabase.from('template_responses').upsert({
                 sale_id: saleId,
-                template_id: '784e7d0e-8001-48a6-a44d-945722293fc4',
+                template_id: (q as any).template_id,
                 question_id: q.id,
                 response_value: responseValue,
               }, { onConflict: 'sale_id,template_id,question_id', ignoreDuplicates: false });

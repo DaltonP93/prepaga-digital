@@ -23,6 +23,24 @@ export interface CompanyApiConfig {
   signwell_api_key: string;
 }
 
+const DEFAULT_CONFIGURATION: CompanyApiConfig = {
+  whatsapp_provider: 'wame_fallback',
+  whatsapp_api_enabled: false,
+  whatsapp_api_token: '',
+  whatsapp_phone_number: '',
+  twilio_account_sid: '',
+  twilio_auth_token: '',
+  twilio_whatsapp_number: '',
+  sms_api_enabled: false,
+  sms_api_key: '',
+  email_api_enabled: false,
+  email_api_key: '',
+  email_from_address: '',
+  email_from_name: '',
+  signwell_enabled: false,
+  signwell_api_key: '',
+};
+
 export const useCompanyApiConfiguration = () => {
   const queryClient = useQueryClient();
   const { profile } = useSimpleAuthContext();
@@ -115,27 +133,11 @@ export const useCompanyApiConfiguration = () => {
   });
 
   return {
-    configuration: configuration || getDefaultConfiguration(),
+    configuration: configuration || DEFAULT_CONFIGURATION,
     isLoading,
     updateConfiguration: updateMutation.mutate,
     isUpdating: updateMutation.isPending,
   };
 };
 
-const getDefaultConfiguration = (): CompanyApiConfig => ({
-  whatsapp_provider: 'wame_fallback',
-  whatsapp_api_enabled: false,
-  whatsapp_api_token: '',
-  whatsapp_phone_number: '',
-  twilio_account_sid: '',
-  twilio_auth_token: '',
-  twilio_whatsapp_number: '',
-  sms_api_enabled: false,
-  sms_api_key: '',
-  email_api_enabled: false,
-  email_api_key: '',
-  email_from_address: '',
-  email_from_name: '',
-  signwell_enabled: false,
-  signwell_api_key: '',
-});
+const getDefaultConfiguration = (): CompanyApiConfig => DEFAULT_CONFIGURATION;

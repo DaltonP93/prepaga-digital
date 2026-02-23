@@ -16,6 +16,8 @@ export interface BeneficiaryContext {
   direccion: string;
   ciudad: string;
   provincia: string;
+  departamento: string;
+  barrio: string;
   codigoPostal: string;
   genero: string;
   estadoCivil: string;
@@ -39,6 +41,8 @@ export interface EnhancedTemplateContext {
     direccion: string;
     ciudad: string;
     provincia: string;
+    departamento: string;
+    barrio: string;
     codigoPostal: string;
     fechaNacimiento: string;
     edad: number;
@@ -160,6 +164,8 @@ function createBeneficiaryContext(beneficiary: any): BeneficiaryContext {
     direccion: beneficiary.address || '',
     ciudad: beneficiary.city || '',
     provincia: beneficiary.province || '',
+    departamento: beneficiary.province || '',
+    barrio: beneficiary.barrio || '',
     codigoPostal: beneficiary.postal_code || '',
     genero: beneficiary.gender || '',
     estadoCivil: beneficiary.marital_status || '',
@@ -202,6 +208,8 @@ export function createEnhancedTemplateContext(
       direccion: client?.address || '',
       ciudad: client?.city || '',
       provincia: client?.province || '',
+      departamento: client?.province || '',
+      barrio: (client as any)?.barrio || '',
       codigoPostal: client?.postal_code || '',
       fechaNacimiento: formatDate(client?.birth_date),
       edad: calculateAge(client?.birth_date),
@@ -311,6 +319,8 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     '{{titular_direccion}}': context.cliente.direccion,
     '{{titular_ciudad}}': context.cliente.ciudad,
     '{{titular_provincia}}': context.cliente.provincia,
+    '{{titular_departamento}}': context.cliente.departamento,
+    '{{titular_barrio}}': context.cliente.barrio,
     '{{titular_fecha_nacimiento}}': context.cliente.fechaNacimiento,
     '{{titular_edad}}': String(context.cliente.edad),
     '{{monto_total}}': context.venta.totalFormateado,
@@ -364,6 +374,7 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
         '{{phone}}': beneficiary.telefono,
         '{{address}}': beneficiary.direccion,
         '{{city}}': beneficiary.ciudad,
+        '{{barrio}}': beneficiary.barrio,
         '{{occupation}}': beneficiary.ocupacion,
         '{{marital_status}}': beneficiary.estadoCivil,
         '{{document_number}}': beneficiary.dni,
@@ -405,7 +416,9 @@ export function getEnhancedTemplateVariables(): { category: string; variables: {
         { key: '{{cliente.dni}}', description: 'DNI/Documento del cliente' },
         { key: '{{cliente.direccion}}', description: 'Dirección del cliente' },
         { key: '{{cliente.ciudad}}', description: 'Ciudad del cliente' },
-        { key: '{{cliente.provincia}}', description: 'Provincia del cliente' },
+        { key: '{{cliente.provincia}}', description: 'Provincia/Departamento del cliente' },
+        { key: '{{cliente.departamento}}', description: 'Departamento del cliente (alias de provincia)' },
+        { key: '{{cliente.barrio}}', description: 'Barrio del cliente' },
         { key: '{{cliente.fechaNacimiento}}', description: 'Fecha de nacimiento' },
         { key: '{{cliente.edad}}', description: 'Edad del cliente' },
       ],
