@@ -22,6 +22,7 @@ interface TemplateDesignerProps {
   templateId?: string;
   onSave?: (templateData: any) => void;
   onCancel?: () => void;
+  onAttachmentClick?: () => void;
 }
 
 export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
@@ -34,6 +35,7 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
   templateId,
   onSave,
   onCancel,
+  onAttachmentClick,
 }) => {
   const { toast } = useToast();
   const [templateData, setTemplateData] = useState({
@@ -205,6 +207,7 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
                     onDynamicFieldsChange={onDynamicFieldsChange}
                     templateQuestions={templateQuestions}
                     templateId={templateId}
+                    onAttachmentClick={onAttachmentClick}
                   />
                 </CardContent>
               </Card>
