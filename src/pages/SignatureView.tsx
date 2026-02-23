@@ -7,12 +7,13 @@ import { Separator } from "@/components/ui/separator";
 import PublicLayout from "@/layouts/PublicLayout";
 import { EnhancedSignatureCanvas } from "@/components/signature/EnhancedSignatureCanvas";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { 
+import {
   FileText, User, Calendar, Building, CheckCircle, Clock, AlertCircle,
-  Shield, Loader2, Download, Users, PenTool
+  Shield, Loader2, Download, Users, PenTool, Paperclip, Eye
 } from "lucide-react";
 import DOMPurify from 'dompurify';
 import { formatCurrency } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 const SignatureView = () => {
   const { token } = useParams<{ token: string }>();
@@ -188,37 +189,64 @@ const SignatureView = () => {
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <Download className="h-4 w-4" />
-                  Documentos Firmados
+                  Documentos
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {documents.map((doc: any) => (
-                  <div key={doc.id} className="border rounded-lg p-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-primary" />
-                      <div>
-                        <p className="font-medium text-sm">{doc.name}</p>
-                        <p className="text-xs text-muted-foreground">{doc.document_type || 'Documento'}</p>
+                {documents.map((doc: any) => {
+                  const isAnexo = doc.requires_signature === false || doc.document_type === 'anexo';
+                  return (
+                    <div key={doc.id} className="border rounded-lg p-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {isAnexo ? (
+                          <Paperclip className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <FileText className="h-4 w-4 text-primary" />
+                        )}
+                        <div>
+                          <p className="font-medium text-sm">{doc.name}</p>
+                          <div className="flex items-center gap-1">
+                            <p className="text-xs text-muted-foreground">
+                              {doc.document_type === 'anexo' ? 'Anexo' : (doc.document_type || 'Documento')}
+                            </p>
+                            {isAnexo && <Badge variant="secondary" className="text-[10px] ml-1">Anexo</Badge>}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {doc.file_url && (
-                        <Button size="sm" variant="outline" asChild>
-                          <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
+                      <div className="flex items-center gap-2">
+                        {doc.file_url && !doc.content && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              const { data } = await supabase.storage
+                                .from('documents')
+                                .createSignedUrl(doc.file_url, 3600);
+                              if (data?.signedUrl) {
+                                window.open(data.signedUrl, '_blank');
+                              }
+                            }}
+                          >
                             <Download className="h-3 w-3 mr-1" />
                             Descargar
-                          </a>
-                        </Button>
-                      )}
-                      {!doc.file_url && doc.content && (
-                        <Button size="sm" variant="outline" onClick={() => handleDownloadSignedContent(doc)}>
-                          <Download className="h-3 w-3 mr-1" />
-                          Descargar PDF
-                        </Button>
-                      )}
+                          </Button>
+                        )}
+                        {!doc.file_url && doc.content && (
+                          <Button size="sm" variant="outline" onClick={() => handleDownloadSignedContent(doc)}>
+                            <Download className="h-3 w-3 mr-1" />
+                            Descargar PDF
+                          </Button>
+                        )}
+                        {doc.file_url && doc.content && (
+                          <Button size="sm" variant="outline" onClick={() => handleDownloadSignedContent(doc)}>
+                            <Download className="h-3 w-3 mr-1" />
+                            Descargar PDF
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </CardContent>
             </Card>
           )}
@@ -347,57 +375,124 @@ const SignatureView = () => {
           )}
         </div>
 
-        {/* Documents List - Redesigned as clean list items */}
-        {documents && documents.length > 0 && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">
-                {isTitular 
-                  ? `Documentos a Firmar (${documents.length})`
-                  : 'Documentos'
-                }
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {documents.map((doc: any) => (
-                <div key={doc.id} className="flex items-center justify-between border rounded-lg p-4">
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-5 w-5 text-primary flex-shrink-0" />
-                    <div>
-                      <p className="font-medium text-sm">
-                        {doc.name}{recipientName ? ` - ${recipientName}` : ''}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{doc.document_type || 'Documento'}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!showSignaturePanel && (
-                      <Button size="sm" onClick={handleOpenSignaturePanel}>
-                        <PenTool className="h-3 w-3 mr-1" />
-                        Firmar
-                      </Button>
-                    )}
-                    {showSignaturePanel && (
-                      <Badge variant="outline">Pendiente de firma</Badge>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+        {/* Documents List - Separated into signature-required and annexes */}
+        {(() => {
+          const docsToSign = documents?.filter((d: any) => d.requires_signature !== false) || [];
+          const annexDocs = documents?.filter((d: any) => d.requires_signature === false) || [];
+          const hasAnyDocs = docsToSign.length > 0 || annexDocs.length > 0;
 
-        {documents && documents.length === 0 && (
-          <Card>
-            <CardContent className="text-center py-8">
-              <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No hay documentos disponibles para firmar aún.</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Los documentos serán generados por el vendedor. Vuelva a intentar más tarde.
-              </p>
-            </CardContent>
-          </Card>
-        )}
+          if (!hasAnyDocs) {
+            return (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No hay documentos disponibles para firmar aún.</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Los documentos serán generados por el vendedor. Vuelva a intentar más tarde.
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          }
+
+          return (
+            <>
+              {/* Documents requiring signature */}
+              {docsToSign.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">
+                      {isTitular
+                        ? `Documentos a Firmar (${docsToSign.length})`
+                        : 'Documentos'
+                      }
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {docsToSign.map((doc: any) => (
+                      <div key={doc.id} className="flex items-center justify-between border rounded-lg p-4">
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 text-primary flex-shrink-0" />
+                          <div>
+                            <p className="font-medium text-sm">
+                              {doc.name}{recipientName ? ` - ${recipientName}` : ''}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{doc.document_type || 'Documento'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {!showSignaturePanel && (
+                            <Button size="sm" onClick={handleOpenSignaturePanel}>
+                              <PenTool className="h-3 w-3 mr-1" />
+                              Firmar
+                            </Button>
+                          )}
+                          {showSignaturePanel && (
+                            <Badge variant="outline">Pendiente de firma</Badge>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Informational annexes (read-only) */}
+              {annexDocs.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Paperclip className="h-4 w-4" />
+                      Anexos ({annexDocs.length})
+                    </CardTitle>
+                    <CardDescription>Documentos informativos adjuntos. No requieren firma.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {annexDocs.map((doc: any) => (
+                      <div key={doc.id} className="flex items-center justify-between border rounded-lg p-4 bg-muted/20">
+                        <div className="flex items-center gap-3">
+                          <Paperclip className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                          <div>
+                            <p className="font-medium text-sm">{doc.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {doc.document_type === 'anexo' ? 'Anexo' : (doc.document_type || 'Documento')}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="text-xs">Solo lectura</Badge>
+                          {doc.file_url && !doc.content && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                const { data } = await supabase.storage
+                                  .from('documents')
+                                  .createSignedUrl(doc.file_url, 3600);
+                                if (data?.signedUrl) {
+                                  window.open(data.signedUrl, '_blank');
+                                }
+                              }}
+                            >
+                              <Eye className="h-3 w-3 mr-1" />
+                              Ver
+                            </Button>
+                          )}
+                          {doc.content && (
+                            <Button size="sm" variant="outline" onClick={() => handleDownloadSignedContent(doc)}>
+                              <Eye className="h-3 w-3 mr-1" />
+                              Ver
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          );
+        })()}
 
         {/* Signature Section - only visible after clicking Firmar */}
         {showSignaturePanel && (

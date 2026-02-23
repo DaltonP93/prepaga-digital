@@ -215,14 +215,19 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       // Generate documents for the titular (all templates)
       for (const template of (templateContents || [])) {
         const renderedContent = interpolateEnhancedTemplate(template.content || '', context);
+        const lower = template.name.toLowerCase();
+        const isDDJJ = lower.includes('ddjj') || lower.includes('declaración') || lower.includes('declaracion');
+        const isContrato = lower.includes('contrato');
+        const isAnexo = !isDDJJ && !isContrato;
 
         await supabase.from('documents').insert({
           sale_id: saleId,
           name: template.name,
-          document_type: template.name.toLowerCase().includes('ddjj') || template.name.toLowerCase().includes('declaración') ? 'ddjj_salud' : 'contrato',
+          document_type: isAnexo ? 'anexo' : (isDDJJ ? 'ddjj_salud' : 'contrato'),
           content: renderedContent,
           status: 'pendiente' as any,
-          requires_signature: true,
+          requires_signature: !isAnexo,
+          is_final: isAnexo,
           beneficiary_id: null,
         });
       }
@@ -258,6 +263,28 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
               });
             }
           }
+        }
+      }
+
+      // Include template attachments (annexes) as documents
+      const { data: templateAttachments } = await supabase
+        .from('template_attachments' as any)
+        .select('*')
+        .in('template_id', templateIds);
+
+      if (templateAttachments && templateAttachments.length > 0) {
+        for (const att of templateAttachments) {
+          await supabase.from('documents').insert({
+            sale_id: saleId,
+            name: `Anexo - ${(att as any).file_name}`,
+            document_type: 'anexo',
+            file_url: (att as any).file_url,
+            content: null,
+            status: 'pendiente' as any,
+            requires_signature: false,
+            is_final: true,
+            beneficiary_id: null,
+          });
         }
       }
 
