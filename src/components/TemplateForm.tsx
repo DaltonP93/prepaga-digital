@@ -40,7 +40,7 @@ interface TemplateFormData {
   is_global: boolean;
 }
 
-const TAB_ORDER = ["setup", "content", "variables", "questions", "annexes", "preview"] as const;
+const TAB_ORDER = ["setup", "content", "variables", "questions", "preview"] as const;
 type TabKey = (typeof TAB_ORDER)[number];
 
 const QUICK_START_TEMPLATES = [
@@ -103,6 +103,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
   const [showCopyDialog, setShowCopyDialog] = useState(false);
   const [dynamicFields, setDynamicFields] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<TabKey>("setup");
+  const [showAnnexes, setShowAnnexes] = useState(false);
 
   const { questions } = useTemplateQuestions(template?.id);
   const { downloadDocument, isGenerating } = useEnhancedPDFGeneration();
@@ -215,7 +216,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
       </div>
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)} className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="setup" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             <span className="hidden sm:inline">Configuración</span>
@@ -231,10 +232,6 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
           <TabsTrigger value="questions" className="flex items-center gap-2">
             <HelpCircle className="h-4 w-4" />
             <span className="hidden sm:inline">Preguntas</span>
-          </TabsTrigger>
-          <TabsTrigger value="annexes" className="flex items-center gap-2">
-            <Paperclip className="h-4 w-4" />
-            <span className="hidden sm:inline">Anexos</span>
           </TabsTrigger>
           <TabsTrigger value="preview" className="flex items-center gap-2">
             <Eye className="h-4 w-4" />
@@ -301,10 +298,18 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
                   <CardTitle>Diseñador Visual</CardTitle>
                   <CardDescription>Construye el documento principal con formato profesional.</CardDescription>
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("variables")}>
-                  <Wand2 className="h-4 w-4 mr-2" />
-                  Insertar variables
-                </Button>
+                <div className="flex items-center gap-2">
+                  {isEditing && template && (
+                    <Button type="button" variant="outline" size="sm" onClick={() => setShowAnnexes(!showAnnexes)}>
+                      <Paperclip className="h-4 w-4 mr-2" />
+                      Anexos
+                    </Button>
+                  )}
+                  <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("variables")}>
+                    <Wand2 className="h-4 w-4 mr-2" />
+                    Insertar variables
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0 h-[540px]">
@@ -316,9 +321,13 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
                 onDynamicFieldsChange={handleDynamicFieldsChange}
                 templateQuestions={questions || []}
                 templateId={template?.id}
+                onAttachmentClick={isEditing && template ? () => setShowAnnexes(true) : undefined}
               />
             </CardContent>
           </Card>
+          {showAnnexes && isEditing && template && (
+            <TemplateAnnexesManager templateId={template.id} />
+          )}
         </TabsContent>
 
         <TabsContent value="variables" className="space-y-4">
@@ -358,17 +367,6 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
           </Card>
         </TabsContent>
 
-        <TabsContent value="annexes" className="space-y-4">
-          {isEditing && template ? (
-            <TemplateAnnexesManager templateId={template.id} />
-          ) : (
-            <Card>
-              <CardContent className="text-center py-8">
-                <p className="text-muted-foreground">Guarde el template primero para poder adjuntar anexos.</p>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
 
         <TabsContent value="preview" className="space-y-4">
           <LiveTemplatePreview

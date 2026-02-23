@@ -42,6 +42,7 @@ export interface TipTapEditorProps {
   showToolbar?: boolean;
   showSidebar?: boolean;
   onReady?: (api: TipTapEditorAPI) => void;
+  onAttachmentClick?: () => void;
 }
 
 export interface TipTapEditorAPI {
@@ -386,6 +387,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
                     onImageClick={() => setShowImageManager(true)}
                     onSignatureClick={() => insertSignature('normal')}
                     onQuestionClick={() => insertDynamicQuestion('text', 'Nueva pregunta')}
+                    onAttachmentClick={props.onAttachmentClick}
                   />
                   
                   <div className="flex items-center gap-1 p-2 border-b bg-gray-50/50">

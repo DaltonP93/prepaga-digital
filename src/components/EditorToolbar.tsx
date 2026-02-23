@@ -21,7 +21,8 @@ import {
   Heading1,
   Heading2,
   Heading3,
-  MessageSquare
+  MessageSquare,
+  Paperclip,
 } from 'lucide-react';
 import { Editor } from '@tiptap/react';
 import {
@@ -36,6 +37,7 @@ interface EditorToolbarProps {
   onImageClick: () => void;
   onSignatureClick: () => void;
   onQuestionClick?: () => void;
+  onAttachmentClick?: () => void;
 }
 
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({
@@ -43,6 +45,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onImageClick,
   onSignatureClick,
   onQuestionClick,
+  onAttachmentClick,
 }) => {
   if (!editor) {
     return null;
@@ -216,6 +219,14 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
               tooltip="Insertar pregunta dinámica"
             >
               <MessageSquare className="w-4 h-4" />
+            </ToolbarButton>
+          )}
+          {onAttachmentClick && (
+            <ToolbarButton
+              onClick={onAttachmentClick}
+              tooltip="Adjuntar documento (anexo)"
+            >
+              <Paperclip className="w-4 h-4" />
             </ToolbarButton>
           )}
         </div>
