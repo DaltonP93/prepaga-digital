@@ -16,7 +16,7 @@ import { QuestionCopyDialog } from "@/components/QuestionCopyDialog";
 import { EnhancedPlaceholdersPanel } from "@/components/templates/EnhancedPlaceholdersPanel";
 import { LiveTemplatePreview } from "@/components/templates/LiveTemplatePreview";
 import { TemplateAnnexesManager } from "@/components/templates/TemplateAnnexesManager";
-import { FileText, Settings, Eye, HelpCircle, Copy, Code, Sparkles, ChevronLeft, ChevronRight, Wand2, Paperclip } from "lucide-react";
+import { FileText, Settings, Eye, HelpCircle, Copy, Code, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCreateTemplate, useUpdateTemplate } from "@/hooks/useTemplates";
 import { useTemplateQuestions } from "@/hooks/useTemplateQuestions";
 import { useEnhancedPDFGeneration } from "@/hooks/useEnhancedPDFGeneration";
@@ -291,40 +291,16 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
         </TabsContent>
 
         <TabsContent value="content" className="space-y-4">
-          <Card className="h-[620px]">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <CardTitle>Diseñador Visual</CardTitle>
-                  <CardDescription>Construye el documento principal con formato profesional.</CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  {isEditing && template && (
-                    <Button type="button" variant="outline" size="sm" onClick={() => setShowAnnexes(!showAnnexes)}>
-                      <Paperclip className="h-4 w-4 mr-2" />
-                      Anexos
-                    </Button>
-                  )}
-                  <Button type="button" variant="outline" size="sm" onClick={() => setActiveTab("variables")}>
-                    <Wand2 className="h-4 w-4 mr-2" />
-                    Insertar variables
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0 h-[540px]">
-              <TemplateDesigner
-                template={template}
-                content={watch("content")}
-                onContentChange={handleContentChange}
-                dynamicFields={dynamicFields}
-                onDynamicFieldsChange={handleDynamicFieldsChange}
-                templateQuestions={questions || []}
-                templateId={template?.id}
-                onAttachmentClick={isEditing && template ? () => setShowAnnexes(true) : undefined}
-              />
-            </CardContent>
-          </Card>
+          <TemplateDesigner
+            template={template}
+            content={watch("content")}
+            onContentChange={handleContentChange}
+            dynamicFields={dynamicFields}
+            onDynamicFieldsChange={handleDynamicFieldsChange}
+            templateQuestions={questions || []}
+            templateId={template?.id}
+            onAttachmentClick={isEditing && template ? () => setShowAnnexes(true) : undefined}
+          />
           {showAnnexes && isEditing && template && (
             <TemplateAnnexesManager templateId={template.id} />
           )}
