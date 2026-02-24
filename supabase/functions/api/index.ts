@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { checkRateLimit, rateLimitResponse, getClientIdentifier } from "../_shared/rate-limiter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,27 +9,56 @@ const corsHeaders = {
 };
 
 /**
- * Validate API key against database-stored keys
- * SECURITY: API keys should be stored in a secure table with hashing
- * This implementation validates against the company_settings table
+ * Hash an API key using SHA-256 for secure comparison.
+ * Uses Web Crypto API available in Deno.
+ */
+async function hashApiKey(apiKey: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(apiKey);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Validate API key against database-stored keys using SHA-256 hash comparison.
+ * Falls back to plaintext comparison for backward compatibility during migration.
  */
 const validateApiKey = async (supabase: any, apiKey: string): Promise<{ valid: boolean; companyId?: string }> => {
   if (!apiKey || apiKey.length < 32) {
     return { valid: false };
   }
 
-  // Check if API key exists in company settings
-  // In production, you should hash the API key and compare hashes
+  const hashedInput = await hashApiKey(apiKey);
+
+  // First try hashed comparison (preferred)
+  const { data: hashedData, error: hashedError } = await supabase
+    .from('company_settings')
+    .select('company_id')
+    .eq('email_api_key', hashedInput)
+    .single();
+
+  if (!hashedError && hashedData) {
+    return { valid: true, companyId: hashedData.company_id };
+  }
+
+  // Fallback: plaintext comparison for backward compatibility
+  // TODO: Remove this fallback after migrating all API keys to hashed values
   const { data, error } = await supabase
     .from('company_settings')
-    .select('company_id, email_api_key')
+    .select('company_id')
     .eq('email_api_key', apiKey)
     .single();
 
   if (error || !data) {
-    console.log('API key validation failed:', error?.message || 'Key not found');
     return { valid: false };
   }
+
+  // Auto-migrate: hash the key in-place for future requests
+  await supabase
+    .from('company_settings')
+    .update({ email_api_key: hashedInput })
+    .eq('company_id', data.company_id);
 
   return { valid: true, companyId: data.company_id };
 };
@@ -39,6 +69,13 @@ serve(async (req) => {
   }
 
   try {
+    // Rate limiting
+    const clientIp = getClientIdentifier(req);
+    const rateCheck = checkRateLimit(`api:${clientIp}`, { windowMs: 15 * 60 * 1000, maxRequests: 200 });
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(corsHeaders, rateCheck.retryAfterMs);
+    }
+
     // Initialize Supabase client with service role for API key validation
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",

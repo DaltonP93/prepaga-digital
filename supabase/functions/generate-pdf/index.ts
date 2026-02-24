@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { sanitizeHtml, detectThreats, escapeHtml } from "../_shared/html-sanitizer.ts"
+import { checkRateLimit, rateLimitResponse, getClientIdentifier } from "../_shared/rate-limiter.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,6 +24,13 @@ serve(async (req) => {
   }
 
   try {
+    // Rate limiting
+    const clientIp = getClientIdentifier(req)
+    const rateCheck = checkRateLimit(`pdf:${clientIp}`, { windowMs: 5 * 60 * 1000, maxRequests: 30 })
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(corsHeaders, rateCheck.retryAfterMs)
+    }
+
     // Authenticate the request
     const authHeader = req.headers.get('Authorization')
     if (!authHeader?.startsWith('Bearer ')) {
@@ -63,6 +72,13 @@ serve(async (req) => {
 
     let processedContent = htmlContent || ''
     let templateData: any = null
+
+    // Server-side HTML sanitization - defense in depth
+    const threats = detectThreats(processedContent)
+    if (threats.length > 0) {
+      console.warn('HTML threats detected in PDF content, sanitizing:', threats)
+      processedContent = sanitizeHtml(processedContent)
+    }
 
     if (templateId) {
       const { data: template, error: templateError } = await supabase
@@ -188,7 +204,7 @@ function interpolateTemplateVariables(template: string, data: any): string {
       const placeholder = `{{${prefix}.${key}}}`
       const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
       if (value !== null && value !== undefined && typeof value !== 'object') {
-        result = result.replace(regex, String(value))
+        result = result.replace(regex, escapeHtml(String(value)))
       }
     })
   }
