@@ -248,7 +248,13 @@ export const useResendSignatureLink = () => {
         })
         .eq('id', oldLink.id);
 
-      // 2. Create new link with same recipient data
+      // 2. Delete existing documents for this sale (signed/pending) so new ones are generated fresh
+      await supabase
+        .from('documents')
+        .delete()
+        .eq('sale_id', oldLink.sale_id);
+
+      // 3. Create new link with same recipient data
       const token = crypto.randomUUID();
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 1);
@@ -273,9 +279,11 @@ export const useResendSignatureLink = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['signature-links', data.sale_id] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      queryClient.invalidateQueries({ queryKey: ['sale-documents', data.sale_id] });
       toast({
         title: 'Enlace reenviado',
-        description: 'Se ha generado un nuevo enlace de firma.',
+        description: 'Se ha generado un nuevo enlace de firma. Los documentos anteriores fueron eliminados.',
       });
     },
     onError: (error: any) => {
