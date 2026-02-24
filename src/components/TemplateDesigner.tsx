@@ -1,14 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TipTapEditor from "@/components/TipTapEditor";
-import { TemplateVariables } from "@/components/TemplateVariables";
 import { DraggablePlaceholdersSidebar } from "@/components/DraggablePlaceholdersSidebar";
-import { Save, Eye, FileText } from "lucide-react";
+import { Eye, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import DOMPurify from 'dompurify';
 
@@ -99,75 +94,7 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold">
-            {template ? "Editar Template" : "Nuevo Template"}
-          </h2>
-          <p className="text-muted-foreground">
-            Diseña y personaliza tu template de documento
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {onCancel && (
-            <Button variant="outline" onClick={onCancel}>
-              Cancelar
-            </Button>
-          )}
-          <Button onClick={handleSave} className="flex items-center gap-2">
-            <Save className="h-4 w-4" />
-            Guardar
-          </Button>
-        </div>
-      </div>
-
-      {/* Template Basic Info */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Información Básica</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="template-name">Nombre del Template</Label>
-              <Input
-                id="template-name"
-                value={templateData.name}
-                onChange={(e) =>
-                  setTemplateData(prev => ({ ...prev, name: e.target.value }))
-                }
-                placeholder="Nombre del template"
-              />
-            </div>
-            <div>
-              <Label htmlFor="template-type">Tipo de Template</Label>
-              <Input
-                id="template-type"
-                value={templateData.template_type}
-                onChange={(e) =>
-                  setTemplateData(prev => ({ ...prev, template_type: e.target.value }))
-                }
-                placeholder="Tipo de template"
-              />
-            </div>
-          </div>
-          <div>
-            <Label htmlFor="template-description">Descripción</Label>
-            <Textarea
-              id="template-description"
-              value={templateData.description}
-              onChange={(e) =>
-                setTemplateData(prev => ({ ...prev, description: e.target.value }))
-              }
-              placeholder="Descripción del template"
-              rows={3}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
+    <div className="space-y-4">
       {/* Design Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList>
@@ -181,9 +108,9 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="editor" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Sidebar with placeholders */}
+        <TabsContent value="editor" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+            {/* Sidebar with placeholders - LEFT only */}
             <div className="lg:col-span-1">
               <DraggablePlaceholdersSidebar 
                 onPlaceholderInsert={handlePlaceholderInsert}
@@ -195,40 +122,27 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
 
             {/* Main editor */}
             <div className="lg:col-span-3">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Contenido del Template</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <TipTapEditor
-                    content={templateData.content}
-                    onChange={handleContentChange}
-                    dynamicFields={dynamicFields}
-                    onDynamicFieldsChange={onDynamicFieldsChange}
-                    templateQuestions={templateQuestions}
-                    templateId={templateId}
-                    onAttachmentClick={onAttachmentClick}
-                  />
-                </CardContent>
-              </Card>
+              <TipTapEditor
+                content={templateData.content}
+                onChange={handleContentChange}
+                dynamicFields={dynamicFields}
+                onDynamicFieldsChange={onDynamicFieldsChange}
+                templateQuestions={templateQuestions}
+                templateId={templateId}
+                onAttachmentClick={onAttachmentClick}
+              />
             </div>
           </div>
-
-          {/* Template Variables */}
-          <TemplateVariables 
-            onVariableSelect={handleVariableSelect}
-          />
         </TabsContent>
 
-        <TabsContent value="preview" className="space-y-6">
+        <TabsContent value="preview" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Vista Previa del Template</CardTitle>
             </CardHeader>
             <CardContent>
-              {/* SECURITY: Content is sanitized with DOMPurify to prevent XSS attacks */}
               <div 
-                className="prose max-w-none p-6 border rounded-lg bg-white"
+                className="prose max-w-none p-6 border rounded-lg bg-background"
                 dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(templateData.content) }}
               />
             </CardContent>
