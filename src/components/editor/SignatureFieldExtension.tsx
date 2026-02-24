@@ -307,7 +307,10 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
       marginRight: floatDir === 'left' ? '16px' : undefined,
       marginLeft: floatDir === 'right' ? '16px' : undefined,
       width: `${width}%`,
-    }}>
+    }}
+      onMouseDown={(e: React.MouseEvent) => { if (isEditing) e.stopPropagation(); }}
+      onClick={(e: React.MouseEvent) => { if (isEditing) e.stopPropagation(); }}
+    >
       <div
         ref={containerRef}
         style={{ width: '100%', height: `${height}px` }}
@@ -395,7 +398,12 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
         </div>
 
         {isEditing ? (
-          <div className="space-y-4 bg-background rounded-lg p-3 border" onPointerDown={(e) => e.stopPropagation()}>
+          <div className="space-y-4 bg-background rounded-lg p-3 border"
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
             <div>
               <Label className="text-xs font-medium">Etiqueta</Label>
               <Input value={label} onChange={(e) => setLabel(e.target.value)} className="text-sm mt-1" placeholder="Ej: Firma del Cliente" />
@@ -405,11 +413,14 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
               <Label className="text-xs font-medium">Tipo de Firma</Label>
               <Select value={signatureType} onValueChange={setSignatureType}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="both">Ambas (Digital + Electrónica)</SelectItem>
-                  <SelectItem value="digital">Solo Digital (manuscrita)</SelectItem>
-                  <SelectItem value="electronic">Solo Electrónica (token)</SelectItem>
-                </SelectContent>
+                 <SelectContent
+                   onPointerDownOutside={(e) => e.preventDefault()}
+                   onEscapeKeyDown={(e) => e.preventDefault()}
+                 >
+                   <SelectItem value="both">Ambas (Digital + Electrónica)</SelectItem>
+                   <SelectItem value="digital">Solo Digital (manuscrita)</SelectItem>
+                   <SelectItem value="electronic">Solo Electrónica (token)</SelectItem>
+                 </SelectContent>
               </Select>
             </div>
 
@@ -417,11 +428,14 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
               <Label className="text-xs font-medium">Rol del Firmante</Label>
               <Select value={signerRole} onValueChange={setSignerRole}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cliente">Cliente / Titular</SelectItem>
-                  <SelectItem value="empresa">Representante de Empresa</SelectItem>
-                  <SelectItem value="testigo">Testigo</SelectItem>
-                </SelectContent>
+                 <SelectContent
+                   onPointerDownOutside={(e) => e.preventDefault()}
+                   onEscapeKeyDown={(e) => e.preventDefault()}
+                 >
+                   <SelectItem value="cliente">Cliente / Titular</SelectItem>
+                   <SelectItem value="empresa">Representante de Empresa</SelectItem>
+                   <SelectItem value="testigo">Testigo</SelectItem>
+                 </SelectContent>
               </Select>
             </div>
 
