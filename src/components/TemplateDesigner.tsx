@@ -129,6 +129,7 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
                 onDynamicFieldsChange={onDynamicFieldsChange}
                 templateQuestions={templateQuestions}
                 templateId={templateId}
+                showSidebar={false}
                 onAttachmentClick={onAttachmentClick}
               />
             </div>

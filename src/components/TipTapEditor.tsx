@@ -29,6 +29,7 @@ import { useBranding } from './CompanyBrandingProvider';
 import { useToast } from '@/hooks/use-toast';
 import { SignatureFieldExtension } from './editor/SignatureFieldExtension';
 import { DynamicPlaceholderExtension } from './editor/DynamicPlaceholderExtension';
+import { TemplateAnnexesManager } from './templates/TemplateAnnexesManager';
 
 export interface TipTapEditorProps {
   initialContent?: string;
@@ -79,6 +80,8 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
     showSidebar = true,
     onReady
   } = props;
+  
+  const [showAnnexesManager, setShowAnnexesManager] = useState(false);
   
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -387,10 +390,10 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
                     onImageClick={() => setShowImageManager(true)}
                     onSignatureClick={() => insertSignature('normal')}
                     onQuestionClick={() => insertDynamicQuestion('text', 'Nueva pregunta')}
-                    onAttachmentClick={props.onAttachmentClick}
+                    onAttachmentClick={templateId ? () => setShowAnnexesManager(true) : undefined}
                   />
                   
-                  <div className="flex items-center gap-1 p-2 border-b bg-gray-50/50">
+                  <div className="flex items-center gap-1 p-2 border-b bg-muted/30">
                     <Button
                       variant="outline"
                       size="sm"
@@ -491,7 +494,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
 
       {showImageManager && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+          <div className="bg-background rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Administrador de Imágenes</h3>
               <Button
@@ -503,6 +506,24 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
               </Button>
             </div>
             <ImageManager onImageSelect={addImage} />
+          </div>
+        </div>
+      )}
+
+      {showAnnexesManager && templateId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Anexos del Template</h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAnnexesManager(false)}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <TemplateAnnexesManager templateId={templateId} />
           </div>
         </div>
       )}

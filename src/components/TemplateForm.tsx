@@ -15,7 +15,6 @@ import { QuestionBuilder } from "@/components/QuestionBuilder";
 import { QuestionCopyDialog } from "@/components/QuestionCopyDialog";
 import { EnhancedPlaceholdersPanel } from "@/components/templates/EnhancedPlaceholdersPanel";
 import { LiveTemplatePreview } from "@/components/templates/LiveTemplatePreview";
-import { TemplateAnnexesManager } from "@/components/templates/TemplateAnnexesManager";
 import { FileText, Settings, Eye, HelpCircle, Copy, Code, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCreateTemplate, useUpdateTemplate } from "@/hooks/useTemplates";
 import { useTemplateQuestions } from "@/hooks/useTemplateQuestions";
@@ -103,7 +102,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
   const [showCopyDialog, setShowCopyDialog] = useState(false);
   const [dynamicFields, setDynamicFields] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<TabKey>("setup");
-  const [showAnnexes, setShowAnnexes] = useState(false);
+  
 
   const { questions } = useTemplateQuestions(template?.id);
   const { downloadDocument, isGenerating } = useEnhancedPDFGeneration();
@@ -299,11 +298,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
             onDynamicFieldsChange={handleDynamicFieldsChange}
             templateQuestions={questions || []}
             templateId={template?.id}
-            onAttachmentClick={isEditing && template ? () => setShowAnnexes(true) : undefined}
           />
-          {showAnnexes && isEditing && template && (
-            <TemplateAnnexesManager templateId={template.id} />
-          )}
         </TabsContent>
 
         <TabsContent value="variables" className="space-y-4">
