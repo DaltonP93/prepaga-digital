@@ -13,18 +13,81 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/utils';
 import RequireAuth from '@/components/RequireAuth';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStateTransition } from '@/hooks/useStateTransition';
 import { ALL_SALE_STATUSES, SALE_STATUS_LABELS, type SaleStatus } from '@/types/workflow';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 const Sales = () => {
   const { data: sales, isLoading } = useSales();
+  const queryClient = useQueryClient();
   const deleteSale = useDeleteSale();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
   const { canViewState, canEditState } = useStateTransition();
   const { profile } = useSimpleAuthContext();
+
+  // Fetch signature links counts per sale for progress
+  const saleIds = (sales || []).map(s => s.id);
+  const { data: signatureLinksData } = useQuery({
+    queryKey: ['sales-signature-progress', saleIds],
+    queryFn: async () => {
+      if (saleIds.length === 0) return {};
+      const { data } = await supabase
+        .from('signature_links')
+        .select('sale_id, status')
+        .in('sale_id', saleIds);
+      const map: Record<string, { total: number; completed: number }> = {};
+      (data || []).forEach(link => {
+        if (!map[link.sale_id]) map[link.sale_id] = { total: 0, completed: 0 };
+        map[link.sale_id].total++;
+        if (link.status === 'completado') map[link.sale_id].completed++;
+      });
+      return map;
+    },
+    enabled: saleIds.length > 0,
+  });
+
+  // Fetch document counts per sale
+  const { data: documentCountsData } = useQuery({
+    queryKey: ['sales-document-counts', saleIds],
+    queryFn: async () => {
+      if (saleIds.length === 0) return {};
+      const { data } = await supabase
+        .from('documents')
+        .select('sale_id')
+        .in('sale_id', saleIds)
+        .neq('document_type', 'firma');
+      const map: Record<string, number> = {};
+      (data || []).forEach(doc => {
+        map[doc.sale_id] = (map[doc.sale_id] || 0) + 1;
+      });
+      return map;
+    },
+    enabled: saleIds.length > 0,
+  });
+
+  // Real-time subscription for sales changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('sales-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['sales'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'signature_links' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['sales-signature-progress'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['sales-document-counts'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const visibleSales = (sales || []).filter((sale) =>
     canViewState((sale.status || 'borrador') as SaleStatus)
@@ -194,23 +257,31 @@ const Sales = () => {
                           </TableCell>
                           
                           <TableCell>
-                            <div className="space-y-2">
-                              <div className="flex justify-between text-sm">
-                                <span>0%</span>
-                              </div>
-                              <div className="w-full bg-muted rounded-full h-2">
-                                <div 
-                                  className="bg-primary h-2 rounded-full transition-all" 
-                                  style={{ width: '0%' }}
-                                />
-                              </div>
-                            </div>
+                            {(() => {
+                              const progress = signatureLinksData?.[sale.id];
+                              const pct = progress && progress.total > 0
+                                ? Math.round((progress.completed / progress.total) * 100)
+                                : (sale.status === 'completado' || sale.status === 'firmado' ? 100 : 0);
+                              return (
+                                <div className="space-y-2">
+                                  <div className="flex justify-between text-sm">
+                                    <span>{pct}%</span>
+                                  </div>
+                                  <div className="w-full bg-muted rounded-full h-2">
+                                    <div 
+                                      className={`h-2 rounded-full transition-all ${pct === 100 ? 'bg-green-500' : 'bg-primary'}`}
+                                      style={{ width: `${pct}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </TableCell>
                           
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <FileText className="h-4 w-4 text-muted-foreground" />
-                              <span className="font-medium">0</span>
+                              <span className="font-medium">{documentCountsData?.[sale.id] || 0}</span>
                             </div>
                           </TableCell>
                           

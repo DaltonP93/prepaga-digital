@@ -437,7 +437,12 @@ export const useSignatureLinkDocuments = (
         .order('created_at', { ascending: true });
 
       if (recipientType === 'adherente' && recipientId) {
+        // Adherente only sees their own documents
         query = query.eq('beneficiary_id', recipientId);
+      } else if (recipientType === 'titular') {
+        // Titular sees only documents without a beneficiary_id (their own docs)
+        // Adherent-specific DDJJ docs have beneficiary_id set and should NOT appear here
+        query = query.is('beneficiary_id', null);
       }
 
       const { data, error } = await query;
