@@ -67,13 +67,25 @@ serve(async (req) => {
         )
       }
 
-      const email = requestBody.email || 'admin@samap.local';
-      const password = requestBody.password || 'admin123';
-      const firstName = requestBody.firstName || requestBody.first_name || 'Super';
-      const lastName = requestBody.lastName || requestBody.last_name || 'Admin';
+      // Require a bootstrap secret for production safety
+      const bootstrapSecret = Deno.env.get('BOOTSTRAP_SECRET')
+      if (bootstrapSecret) {
+        const providedSecret = requestBody.bootstrap_secret
+        if (!providedSecret || providedSecret !== bootstrapSecret) {
+          return new Response(
+            JSON.stringify({ error: 'Invalid or missing bootstrap secret' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+      }
+
+      const email = requestBody.email;
+      const password = requestBody.password;
+      const firstName = requestBody.firstName || requestBody.first_name;
+      const lastName = requestBody.lastName || requestBody.last_name;
       const phone = requestBody.phone || null;
 
-      if (!email || !firstName || !lastName) {
+      if (!email || !password || !firstName || !lastName) {
         return new Response(
           JSON.stringify({ error: 'Faltan campos obligatorios para bootstrap inicial' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
