@@ -355,9 +355,11 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
 
   const handleAnnexContentExtracted = useCallback((htmlContent: string) => {
     if (!editor) return;
-    editor.commands.setContent(htmlContent);
-    onChange?.(htmlContent);
-    onContentChange?.(htmlContent);
+    // Append the document content at the end instead of replacing
+    editor.chain().focus('end').insertContent(htmlContent).run();
+    const newContent = editor.getHTML();
+    onChange?.(newContent);
+    onContentChange?.(newContent);
     setShowAnnexesManager(false);
     toast({
       title: "Documento importado",

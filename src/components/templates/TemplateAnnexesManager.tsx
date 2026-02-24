@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { Upload, FileText, Trash2, Loader2, FileInput } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import * as pdfjsLib from "pdfjs-dist";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
 interface TemplateAttachment {
   id: string;
@@ -104,12 +106,34 @@ export function TemplateAnnexesManager({ templateId, onContentExtracted }: Templ
     }
   };
 
+  const renderPdfToImages = async (data: ArrayBuffer): Promise<string> => {
+    const pdf = await pdfjsLib.getDocument({ data }).promise;
+    const totalPages = pdf.numPages;
+    const imagesHtml: string[] = [];
+
+    for (let i = 1; i <= totalPages; i++) {
+      const page = await pdf.getPage(i);
+      const scale = 2; // high-res
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement("canvas");
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext("2d")!;
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      const dataUrl = canvas.toDataURL("image/png");
+      imagesHtml.push(
+        `<div style="margin-bottom:8px;"><img src="${dataUrl}" alt="Página ${i}" style="max-width:100%;height:auto;border:1px solid #e5e7eb;border-radius:4px;" /></div>`
+      );
+    }
+
+    return imagesHtml.join("\n");
+  };
+
   const extractAndInsertContent = async (file: File) => {
     if (!onContentExtracted) return;
 
     try {
       if (file.type.startsWith('image/')) {
-        // For images, insert as an image tag
         const reader = new FileReader();
         reader.onload = (ev) => {
           const base64 = ev.target?.result as string;
@@ -120,23 +144,9 @@ export function TemplateAnnexesManager({ templateId, onContentExtracted }: Templ
         return;
       }
 
-      // For PDFs, extract text using pdf-lib or convert pages to images
       if (file.type === 'application/pdf') {
         const arrayBuffer = await file.arrayBuffer();
-        const base64 = arrayBufferToBase64(arrayBuffer);
-        
-        // Create an HTML representation with embedded PDF pages as images via canvas
-        const html = `
-          <div style="text-align: center; padding: 20px;">
-            <h2>${file.name}</h2>
-            <p><em>Documento PDF adjunto - ${formatFileSize(file.size)}</em></p>
-            <div style="border: 1px solid #ccc; padding: 10px; margin: 10px 0;">
-              <object data="data:application/pdf;base64,${base64}" type="application/pdf" width="100%" height="600px">
-                <p>Vista previa del PDF no disponible. El documento se incluirá como anexo en el paquete de firma.</p>
-              </object>
-            </div>
-          </div>
-        `;
+        const html = await renderPdfToImages(arrayBuffer);
         onContentExtracted(html);
       }
     } catch (err) {
@@ -159,14 +169,14 @@ export function TemplateAnnexesManager({ templateId, onContentExtracted }: Templ
         return;
       }
 
-      const isPdf = attachment.file_type?.includes('pdf');
       const isImage = attachment.file_type?.startsWith('image') || 
                       ['jpg', 'jpeg', 'png', 'webp'].some(ext => attachment.file_name.toLowerCase().endsWith(ext));
+      const isPdf = attachment.file_type?.includes('pdf') || attachment.file_name.toLowerCase().endsWith('.pdf');
+
+      const response = await fetch(signedUrlData.signedUrl);
+      const blob = await response.blob();
 
       if (isImage) {
-        // Fetch image and convert to base64 for embedding
-        const response = await fetch(signedUrlData.signedUrl);
-        const blob = await response.blob();
         const reader = new FileReader();
         reader.onload = (ev) => {
           const base64 = ev.target?.result as string;
@@ -175,19 +185,8 @@ export function TemplateAnnexesManager({ templateId, onContentExtracted }: Templ
         };
         reader.readAsDataURL(blob);
       } else if (isPdf) {
-        // For PDF, fetch and embed
-        const response = await fetch(signedUrlData.signedUrl);
-        const arrayBuffer = await response.arrayBuffer();
-        const base64 = arrayBufferToBase64(arrayBuffer);
-        
-        const html = `
-          <div style="text-align: center; padding: 10px;">
-            <h3>${attachment.file_name}</h3>
-            <object data="data:application/pdf;base64,${base64}" type="application/pdf" width="100%" height="600px">
-              <p>Documento PDF adjunto: ${attachment.file_name}</p>
-            </object>
-          </div>
-        `;
+        const arrayBuffer = await blob.arrayBuffer();
+        const html = await renderPdfToImages(arrayBuffer);
         onContentExtracted(html);
       } else {
         toast.info("Este tipo de archivo no puede ser insertado directamente en el editor.");
@@ -315,12 +314,3 @@ export function TemplateAnnexesManager({ templateId, onContentExtracted }: Templ
   );
 }
 
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  let binary = '';
-  const bytes = new Uint8Array(buffer);
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
