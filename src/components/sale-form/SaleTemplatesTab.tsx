@@ -281,6 +281,13 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       );
 
       // Generate documents for the titular (all templates)
+      // Preload attachment info to detect annexo-only templates
+      const { data: allAttachments } = await supabase
+        .from('template_attachments' as any)
+        .select('template_id')
+        .in('template_id', templateIds);
+      const templatesWithAttachments = new Set((allAttachments || []).map((a: any) => a.template_id));
+
       for (const template of (templateContents || [])) {
         const hasDesignerContent = !!template.content?.trim();
         const renderedContent = hasDesignerContent
@@ -291,6 +298,13 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         const isContrato = lower.includes('contrato');
         const isAnexoPlan = isAnexoPlanName(template.name);
         const isAnexo = isAnexoPlan || (!isDDJJ && !isContrato);
+
+        // Skip annexo templates without designer content that have file attachments
+        // (the attachments will be inserted separately below)
+        if (isAnexo && !hasDesignerContent && templatesWithAttachments.has(template.id)) {
+          continue;
+        }
+
         const normalizedContent = !hasDesignerContent && isAnexo
           ? `<p>Documento de anexo cargado sin estructura de diseñador. Procesado como template interno.</p>`
           : renderedContent;
@@ -448,7 +462,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
   }
 
   const availableTemplates = templates?.filter(
-    t => !saleTemplates?.some(st => (st as any).templates?.id === t.id)
+    t => t.is_active !== false && !saleTemplates?.some(st => (st as any).templates?.id === t.id)
   ) || [];
 
   // Group generated docs

@@ -172,7 +172,10 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
         await createTemplate.mutateAsync(templateData);
       }
 
-      onOpenChange(false);
+      // Only close/navigate if in dialog mode; inline mode stays open
+      if (!isInlineMode) {
+        onOpenChange(false);
+      }
     } catch (error) {
       console.error("Error saving template:", error);
     }
