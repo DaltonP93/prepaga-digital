@@ -248,11 +248,47 @@ export const useResendSignatureLink = () => {
         })
         .eq('id', oldLink.id);
 
-      // 2. Delete existing documents for this sale (signed/pending) so new ones are generated fresh
-      await supabase
-        .from('documents')
-        .delete()
-        .eq('sale_id', oldLink.sale_id);
+      // 2. Delete ONLY signed/final copies of documents for this recipient
+      // Keep original "pendiente" documents so the new link can use them
+      if (oldLink.recipient_type === 'adherente' && oldLink.recipient_id) {
+        // For adherente: delete signed copies tied to this beneficiary
+        await supabase
+          .from('documents')
+          .delete()
+          .eq('sale_id', oldLink.sale_id)
+          .eq('beneficiary_id', oldLink.recipient_id)
+          .eq('status', 'firmado' as any);
+
+        // Reset original documents back to pendiente
+        await supabase
+          .from('documents')
+          .update({ status: 'pendiente' as any, signed_at: null, signature_data: null } as any)
+          .eq('sale_id', oldLink.sale_id)
+          .eq('beneficiary_id', oldLink.recipient_id);
+      } else {
+        // For titular: delete signed copies without beneficiary_id + signature image docs
+        await supabase
+          .from('documents')
+          .delete()
+          .eq('sale_id', oldLink.sale_id)
+          .is('beneficiary_id', null)
+          .eq('status', 'firmado' as any);
+
+        // Delete standalone firma documents
+        await supabase
+          .from('documents')
+          .delete()
+          .eq('sale_id', oldLink.sale_id)
+          .eq('document_type', 'firma');
+
+        // Reset original titular documents back to pendiente
+        await supabase
+          .from('documents')
+          .update({ status: 'pendiente' as any, signed_at: null, signature_data: null } as any)
+          .eq('sale_id', oldLink.sale_id)
+          .is('beneficiary_id', null)
+          .neq('document_type', 'firma');
+      }
 
       // 3. Create new link with same recipient data
       const token = crypto.randomUUID();
