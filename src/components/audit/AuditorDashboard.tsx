@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -80,6 +80,24 @@ export const AuditorDashboard: React.FC = () => {
       return (data || []).map((s: any) => ({ ...s, profiles: profilesMap[s.salesperson_id] || null }));
     },
   });
+
+  // Realtime: auto-refresh when any sale's status or audit_status changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('audit-sales-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'sales' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['audit-sales'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   // Approve sale - changes status to 'aprobado_para_templates' (approved, ready for next steps)
   const approveSale = useMutation({

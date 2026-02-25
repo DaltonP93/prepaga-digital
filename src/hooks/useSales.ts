@@ -65,7 +65,9 @@ export const useSales = () => {
           clients:client_id(first_name, last_name, email, phone, dni),
           plans:plan_id(name, price, description, coverage_details),
           companies:company_id(name),
-          templates:template_id(name, description)
+          templates:template_id(name, description),
+          documents(id),
+          sale_documents(id)
         `)
         .order('created_at', { ascending: false });
 

@@ -19,18 +19,14 @@ interface SignatureLinkData {
   id: string;
   sale_id: string;
   package_id: string | null;
-  token: string;
   recipient_type: string;
   recipient_id: string | null;
-  recipient_email: string | null;
-  recipient_phone: string | null;
   expires_at: string;
   accessed_at: string | null;
   access_count: number;
-  ip_addresses: any;
   status: string;
   completed_at: string | null;
-  created_by: string | null;
+  signwell_signing_url?: string | null;
   created_at: string;
   updated_at: string | null;
   sale?: {
@@ -75,7 +71,7 @@ export const useSignatureLinkByToken = (token: string) => {
 
       const { data: linkData, error: linkError } = await signatureClient
         .from('signature_links')
-        .select('*')
+        .select('id,sale_id,package_id,recipient_type,recipient_id,expires_at,accessed_at,access_count,status,completed_at,created_at,updated_at,signwell_signing_url')
         .eq('token', token)
         .gt('expires_at', new Date().toISOString())
         .single();
@@ -178,7 +174,7 @@ export const useSubmitSignatureLink = () => {
           completed_at: new Date().toISOString(),
         })
         .eq('id', linkId)
-        .select()
+        .select('id,sale_id,recipient_type,recipient_id,status,completed_at')
         .single();
 
       if (error) {
@@ -466,7 +462,7 @@ export const useAllSignatureLinksPublic = (saleId: string | undefined, token?: s
         : createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
       const { data, error } = await client
         .from('signature_links')
-        .select('*')
+        .select('id,sale_id,recipient_type,recipient_id,status,completed_at,created_at')
         .eq('sale_id', saleId)
         .order('created_at', { ascending: true });
       if (error) throw error;

@@ -53,6 +53,7 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
       marital_status: data.marital_status || null,
       occupation: data.occupation || null,
       address: data.address || null,
+      barrio: data.barrio || null,
       city: data.city || null,
       province: data.province || null,
       postal_code: data.postal_code || null,
@@ -240,8 +241,12 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
                           <p className="font-medium">{beneficiary.occupation || '-'}</p>
                         </div>
                         <div>
-                          <span className="text-muted-foreground">Dirección:</span>
+                          <span className="text-muted-foreground">Domicilio:</span>
                           <p className="font-medium">{beneficiary.address || '-'}</p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Barrio:</span>
+                          <p className="font-medium">{(beneficiary as any).barrio || '-'}</p>
                         </div>
                         <div>
                           <span className="text-muted-foreground">Ciudad:</span>

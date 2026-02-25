@@ -31,6 +31,7 @@ import { CurrencyConfigurationPanel } from '@/components/CurrencyConfigurationPa
 import { ProfileCompanyAssignmentPanel } from '@/components/ProfileCompanyAssignmentPanel';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { WorkflowConfigPanel } from '@/components/workflow/WorkflowConfigPanel';
+import { SaleProgressConfigPanel } from '@/components/workflow/SaleProgressConfigPanel';
 import { AdminConfigPanel } from '@/components/AdminConfigPanel';
 import { MenuConfigPanel } from '@/components/MenuConfigPanel';
 import { useRolePermissions } from '@/hooks/useRolePermissions';
@@ -252,6 +253,9 @@ export default function Settings() {
               )}
             </CardContent>
           </Card>
+          {canManageWorkflow && profile?.company_id && (
+            <SaleProgressConfigPanel />
+          )}
         </TabsContent>
 
         <TabsContent value="sistema" className="space-y-4">

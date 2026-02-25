@@ -17,6 +17,7 @@ import { useState } from 'react';
 import { useStateTransition } from '@/hooks/useStateTransition';
 import { ALL_SALE_STATUSES, SALE_STATUS_LABELS, type SaleStatus } from '@/types/workflow';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
+import { useSaleProgressConfig } from '@/hooks/useSaleProgressConfig';
 
 const Sales = () => {
   const { data: sales, isLoading } = useSales();
@@ -25,6 +26,7 @@ const Sales = () => {
   const [statusFilter, setStatusFilter] = useState('todos');
   const { canViewState, canEditState } = useStateTransition();
   const { profile } = useSimpleAuthContext();
+  const { getProgress } = useSaleProgressConfig();
 
   const visibleSales = (sales || []).filter((sale) =>
     canViewState((sale.status || 'borrador') as SaleStatus)
@@ -69,6 +71,13 @@ const Sales = () => {
       aprobado_para_templates: 'Aprobado',
     };
     return map[status] || status;
+  };
+
+  const getProgressColor = (progress: number): string => {
+    if (progress >= 95) return 'bg-green-500';
+    if (progress >= 60) return 'bg-blue-500';
+    if (progress >= 30) return 'bg-yellow-500';
+    return 'bg-muted-foreground/50';
   };
 
   const formatDate = (dateString: string) => {
@@ -194,23 +203,30 @@ const Sales = () => {
                           </TableCell>
                           
                           <TableCell>
-                            <div className="space-y-2">
-                              <div className="flex justify-between text-sm">
-                                <span>0%</span>
-                              </div>
-                              <div className="w-full bg-muted rounded-full h-2">
-                                <div 
-                                  className="bg-primary h-2 rounded-full transition-all" 
-                                  style={{ width: '0%' }}
-                                />
-                              </div>
-                            </div>
+                            {(() => {
+                              const progress = getProgress(sale.status || 'borrador');
+                              return (
+                                <div className="space-y-2">
+                                  <div className="flex justify-between text-sm">
+                                    <span>{progress}%</span>
+                                  </div>
+                                  <div className="w-full bg-muted rounded-full h-2">
+                                    <div
+                                      className={`${getProgressColor(progress)} h-2 rounded-full transition-all`}
+                                      style={{ width: `${progress}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </TableCell>
-                          
+
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <FileText className="h-4 w-4 text-muted-foreground" />
-                              <span className="font-medium">0</span>
+                              <span className="font-medium">
+                                {((sale as any).documents?.length || 0) + ((sale as any).sale_documents?.length || 0)}
+                              </span>
                             </div>
                           </TableCell>
                           

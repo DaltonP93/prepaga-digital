@@ -25,6 +25,7 @@ const beneficiarySchema = z.object({
   marital_status: z.string().optional(),
   occupation: z.string().optional(),
   address: z.string().optional(),
+  barrio: z.string().optional(),
   city: z.string().optional(),
   province: z.string().optional(),
   postal_code: z.string().optional(),
@@ -235,13 +236,23 @@ export const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="address">Dirección</Label>
-            <Input
-              id="address"
-              {...register('address')}
-              placeholder="Dirección completa"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="address">Domicilio</Label>
+              <Input
+                id="address"
+                {...register('address')}
+                placeholder="Ej: Boquerón 123"
+              />
+            </div>
+            <div>
+              <Label htmlFor="barrio">Barrio</Label>
+              <Input
+                id="barrio"
+                {...register('barrio')}
+                placeholder="Ej: Villa Morra"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

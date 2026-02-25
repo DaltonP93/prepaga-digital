@@ -30,6 +30,9 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
     birth_date: '',
     phone: '',
     email: '',
+    address: '',
+    barrio: '',
+    city: '',
     amount: 0,
   });
 
@@ -55,7 +58,7 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
         ...newBeneficiary,
         sale_id: saleId,
       });
-      setNewBeneficiary({ first_name: '', last_name: '', dni: '', relationship: '', birth_date: '', phone: '', email: '', amount: 0 });
+      setNewBeneficiary({ first_name: '', last_name: '', dni: '', relationship: '', birth_date: '', phone: '', email: '', address: '', barrio: '', city: '', amount: 0 });
       setShowForm(false);
     } catch (error) {
       console.error('Error adding beneficiary:', error);
@@ -148,6 +151,30 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
                   value={newBeneficiary.amount}
                   onChange={(e) => setNewBeneficiary(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
                   placeholder="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Domicilio</Label>
+                <Input
+                  value={newBeneficiary.address}
+                  onChange={(e) => setNewBeneficiary(prev => ({ ...prev, address: e.target.value }))}
+                  placeholder="Ej: Boquerón 123"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Barrio</Label>
+                <Input
+                  value={newBeneficiary.barrio}
+                  onChange={(e) => setNewBeneficiary(prev => ({ ...prev, barrio: e.target.value }))}
+                  placeholder="Ej: Villa Morra"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Ciudad</Label>
+                <Input
+                  value={newBeneficiary.city}
+                  onChange={(e) => setNewBeneficiary(prev => ({ ...prev, city: e.target.value }))}
+                  placeholder="Ciudad"
                 />
               </div>
             </div>
