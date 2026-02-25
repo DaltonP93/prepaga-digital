@@ -14,9 +14,133 @@ import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { formatCurrency } from '@/lib/utils';
 import { 
   CheckCircle, XCircle, Clock, AlertCircle, Eye, Search, 
-  FileText, User, DollarSign, Calendar, Filter, Download
+  FileText, User, DollarSign, Calendar, Filter, Download,
+  HeartPulse
 } from 'lucide-react';
 import { ImageLightbox } from '@/components/ui/image-lightbox';
+
+const HEALTH_QUESTIONS = [
+  '1. ¿Padece alguna enfermedad crónica (diabetes, hipertensión, asma, EPOC, reumatológicas, tiroideas, insuficiencia renal u otras)?',
+  '2. ¿Padece o ha padecido alguna enfermedad o trastorno mental o neurológico (ansiedad, depresión, convulsiones u otros)?',
+  '3. ¿Padece o ha padecido enfermedad cardiovascular o coronaria, o se ha sometido a procedimientos (marcapasos, bypass, cateterismo, etc.)?',
+  '4. ¿Posee o ha poseído quistes, tumores o enfermedades oncológicas que hayan requerido cirugía, quimioterapia o radioterapia?',
+  '5. ¿Ha sido internado/a o sometido/a a alguna cirugía?',
+  '6. ¿Consume medicamentos, sustancias o se somete a tratamientos, de origen médico, natural o experimental?',
+  '7. Otras enfermedades o condiciones no mencionadas',
+];
+
+const HABITS_LABELS = ['Fuma', 'Vapea', 'Consume bebidas alcohólicas'];
+
+interface ParsedHealthData {
+  peso: string;
+  altura: string;
+  answers: ('si' | 'no' | '')[];
+  details: string[];
+  habits: boolean[];
+  lastMenstruation: string;
+}
+
+const parseHealthDetail = (detail: string | null, hasPreexisting: boolean | null): ParsedHealthData => {
+  const data: ParsedHealthData = {
+    peso: '', altura: '',
+    answers: new Array(HEALTH_QUESTIONS.length).fill(''),
+    details: new Array(HEALTH_QUESTIONS.length).fill(''),
+    habits: [false, false, false],
+    lastMenstruation: '',
+  };
+  if (!detail && !hasPreexisting) return data;
+  if (detail) {
+    const parts = detail.split('; ');
+    for (const part of parts) {
+      const qMatch = HEALTH_QUESTIONS.findIndex(q => part.startsWith(q));
+      if (qMatch >= 0) {
+        data.answers[qMatch] = 'si';
+        const colonIdx = part.indexOf(': ', HEALTH_QUESTIONS[qMatch].length - 5);
+        if (colonIdx >= 0) data.details[qMatch] = part.substring(colonIdx + 2);
+        continue;
+      }
+      if (part.startsWith('Hábitos: ')) {
+        const habitList = part.replace('Hábitos: ', '').split(', ');
+        HABITS_LABELS.forEach((h, i) => { if (habitList.includes(h)) data.habits[i] = true; });
+        continue;
+      }
+      if (part.startsWith('Última menstruación/embarazo: ')) {
+        data.lastMenstruation = part.replace('Última menstruación/embarazo: ', '');
+        continue;
+      }
+      if (part.startsWith('Peso: ')) { data.peso = part.replace('Peso: ', '').replace(' kg', ''); continue; }
+      if (part.startsWith('Estatura: ')) { data.altura = part.replace('Estatura: ', '').replace(' cm', ''); continue; }
+    }
+  }
+  return data;
+};
+
+const BeneficiaryHealthView: React.FC<{ beneficiary: any }> = ({ beneficiary }) => {
+  const health = parseHealthDetail(beneficiary.preexisting_conditions_detail, beneficiary.has_preexisting_conditions);
+  const hasData = beneficiary.preexisting_conditions_detail || beneficiary.has_preexisting_conditions !== null;
+
+  if (!hasData) {
+    return (
+      <div className="text-sm text-muted-foreground italic py-2">
+        Sin declaración jurada completada
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Biometría */}
+      <div className="flex flex-wrap gap-4">
+        {health.peso && (
+          <div className="text-sm"><span className="font-medium">Peso:</span> {health.peso} kg</div>
+        )}
+        {health.altura && (
+          <div className="text-sm"><span className="font-medium">Estatura:</span> {health.altura} cm</div>
+        )}
+        {health.lastMenstruation && (
+          <div className="text-sm"><span className="font-medium">Últ. menstruación:</span> {health.lastMenstruation}</div>
+        )}
+      </div>
+
+      {/* Hábitos */}
+      {health.habits.some(h => h) && (
+        <div className="flex flex-wrap gap-2">
+          {HABITS_LABELS.map((label, i) => (
+            health.habits[i] && (
+              <Badge key={i} variant="outline" className="text-orange-600 border-orange-300">
+                {label}
+              </Badge>
+            )
+          ))}
+        </div>
+      )}
+
+      {/* Preguntas */}
+      <div className="space-y-1.5">
+        {HEALTH_QUESTIONS.map((q, i) => {
+          const shortQ = q.replace(/^\d+\.\s*/, '').substring(0, 80) + (q.length > 83 ? '...' : '');
+          const answer = health.answers[i];
+          if (!answer) return null;
+          return (
+            <div key={i} className="flex items-start gap-2 text-sm">
+              {answer === 'si' ? (
+                <Badge variant="destructive" className="text-[10px] px-1.5 py-0 shrink-0 mt-0.5">Sí</Badge>
+              ) : (
+                <Badge variant="outline" className="text-green-600 border-green-300 text-[10px] px-1.5 py-0 shrink-0 mt-0.5">No</Badge>
+              )}
+              <div>
+                <span className="text-muted-foreground">{shortQ}</span>
+                {health.details[i] && (
+                  <span className="ml-1 font-medium text-foreground">— {health.details[i]}</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 export const AuditorDashboard: React.FC = () => {
   const { toast } = useToast();
@@ -506,6 +630,34 @@ export const AuditorDashboard: React.FC = () => {
                           ))}
                         </div>
                       )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Declaración Jurada de Salud */}
+          {selectedSale.beneficiaries?.length > 0 && (
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <HeartPulse className="h-5 w-5" />
+                  Declaración Jurada de Salud
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {selectedSale.beneficiaries.map((ben: any) => (
+                    <div key={ben.id} className="p-3 border rounded-lg space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{ben.first_name} {ben.last_name}</span>
+                        {ben.is_primary && <Badge variant="outline" className="text-xs">Titular</Badge>}
+                        {!ben.is_primary && ben.relationship && (
+                          <Badge variant="outline" className="text-xs">{ben.relationship}</Badge>
+                        )}
+                      </div>
+                      <BeneficiaryHealthView beneficiary={ben} />
                     </div>
                   ))}
                 </div>
