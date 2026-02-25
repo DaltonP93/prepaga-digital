@@ -73,6 +73,8 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
     billing_ruc: (sale as any)?.billing_ruc || '',
     billing_email: (sale as any)?.billing_email || '',
     billing_phone: (sale as any)?.billing_phone || '',
+    immediate_coverage: (sale as any)?.immediate_coverage || false,
+    sale_type: (sale as any)?.sale_type || 'venta_nueva',
   });
 
   const handleChange = (field: string, value: any) => {
@@ -130,6 +132,8 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           billing_ruc: formData.billing_ruc || null,
           billing_email: formData.billing_email || null,
           billing_phone: formData.billing_phone || null,
+          immediate_coverage: formData.immediate_coverage,
+          sale_type: formData.sale_type,
         } as any);
         toast.success('Venta actualizada');
       } else {
@@ -150,6 +154,8 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           billing_ruc: formData.billing_ruc || null,
           billing_email: formData.billing_email || null,
           billing_phone: formData.billing_phone || null,
+          immediate_coverage: formData.immediate_coverage,
+          sale_type: formData.sale_type,
         } as any);
         toast.success('Venta creada exitosamente');
         navigate(`/sales/${result.id}/edit`);

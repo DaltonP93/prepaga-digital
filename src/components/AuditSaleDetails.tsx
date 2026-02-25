@@ -114,7 +114,7 @@ export const AuditSaleDetails: React.FC<AuditSaleDetailsProps> = ({
               <p className="text-sm">{sale.clients?.phone || 'No especificado'}</p>
             </div>
             <div>
-              <Label className="text-sm font-medium text-muted-foreground">DNI</Label>
+              <Label className="text-sm font-medium text-muted-foreground">C.I.</Label>
               <p className="text-sm">{sale.clients?.dni || 'No especificado'}</p>
             </div>
           </CardContent>

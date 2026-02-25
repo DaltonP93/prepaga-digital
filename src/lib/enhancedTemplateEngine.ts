@@ -3,6 +3,54 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatCurrency as formatPygCurrency } from '@/lib/utils';
 
+/**
+ * Convert a number to words in Spanish (Guaranies)
+ */
+function numberToWordsES(n: number): string {
+  if (n === 0) return 'CERO';
+  
+  const units = ['', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE'];
+  const teens = ['DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISÉIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE'];
+  const tens = ['', 'DIEZ', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'];
+  const hundreds = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'];
+
+  const convert = (num: number): string => {
+    if (num === 0) return '';
+    if (num === 100) return 'CIEN';
+    if (num < 10) return units[num];
+    if (num < 20) return teens[num - 10];
+    if (num < 30) {
+      if (num === 20) return 'VEINTE';
+      return 'VEINTI' + units[num - 20];
+    }
+    if (num < 100) {
+      const t = Math.floor(num / 10);
+      const u = num % 10;
+      return u === 0 ? tens[t] : `${tens[t]} Y ${units[u]}`;
+    }
+    if (num < 1000) {
+      const h = Math.floor(num / 100);
+      const rest = num % 100;
+      return rest === 0 ? (num === 100 ? 'CIEN' : hundreds[h]) : `${hundreds[h]} ${convert(rest)}`;
+    }
+    if (num < 1000000) {
+      const thousands = Math.floor(num / 1000);
+      const rest = num % 1000;
+      const prefix = thousands === 1 ? 'MIL' : `${convert(thousands)} MIL`;
+      return rest === 0 ? prefix : `${prefix} ${convert(rest)}`;
+    }
+    if (num < 1000000000) {
+      const millions = Math.floor(num / 1000000);
+      const rest = num % 1000000;
+      const prefix = millions === 1 ? 'UN MILLÓN' : `${convert(millions)} MILLONES`;
+      return rest === 0 ? prefix : `${prefix} ${convert(rest)}`;
+    }
+    return String(num);
+  };
+
+  return convert(Math.abs(Math.floor(n)));
+}
+
 export interface BeneficiaryContext {
   nombre: string;
   apellido: string;
@@ -37,6 +85,7 @@ export interface EnhancedTemplateContext {
     nombreCompleto: string;
     email: string;
     telefono: string;
+    ci: string;
     dni: string;
     direccion: string;
     ciudad: string;
@@ -69,6 +118,7 @@ export interface EnhancedTemplateContext {
     fechaFormateada: string;
     total: number;
     totalFormateado: string;
+    totalLetras: string;
     vendedor: string;
     vendedorEmail: string;
     notas: string;
@@ -78,6 +128,8 @@ export interface EnhancedTemplateContext {
     cantidadAdherentes: number;
     fechaInicioContrato: string;
     fechaInicioContratoFormateada: string;
+    vigenciaInmediata: string;
+    tipoVenta: string;
   };
   facturacion: {
     razonSocial: string;
@@ -204,6 +256,7 @@ export function createEnhancedTemplateContext(
       nombreCompleto: `${client?.first_name || ''} ${client?.last_name || ''}`.trim(),
       email: client?.email || '',
       telefono: client?.phone || '',
+      ci: client?.dni || '',
       dni: client?.dni || '',
       direccion: client?.address || '',
       ciudad: client?.city || '',
@@ -238,6 +291,7 @@ export function createEnhancedTemplateContext(
       fechaFormateada: formatDate(sale?.sale_date || now, "d 'de' MMMM 'de' yyyy"),
       total: sale?.total_amount || 0,
       totalFormateado: formatCurrency(sale?.total_amount || 0),
+      totalLetras: numberToWordsES(sale?.total_amount || 0) + ' GUARANÍES',
       vendedor: sale?.salesperson ? `${sale.salesperson.first_name || ''} ${sale.salesperson.last_name || ''}`.trim() : '',
       vendedorEmail: sale?.salesperson?.email || '',
       notas: sale?.notes || '',
@@ -247,6 +301,8 @@ export function createEnhancedTemplateContext(
       cantidadAdherentes: sale?.adherents_count || beneficiaries.length,
       fechaInicioContrato: sale?.contract_start_date ? formatDate(sale.contract_start_date, 'dd/MM/yyyy') : '',
       fechaInicioContratoFormateada: sale?.contract_start_date ? formatDate(sale.contract_start_date, "d 'de' MMMM 'de' yyyy") : '',
+      vigenciaInmediata: sale?.immediate_coverage ? 'Sí' : 'No',
+      tipoVenta: sale?.sale_type === 'reingreso' ? 'Reingreso' : 'Venta Nueva',
     },
     facturacion: {
       razonSocial: sale?.billing_razon_social || '',
@@ -261,8 +317,15 @@ export function createEnhancedTemplateContext(
       estado: signatureLink?.status || 'pendiente',
     },
     fecha: {
-      actual: formatDate(now, 'yyyy-MM-dd'),
-      actualFormateada: formatDate(now, "d 'de' MMMM 'de' yyyy"),
+      actual: (() => {
+        // fecha_actual = first day of current month
+        const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        return formatDate(firstOfMonth, 'yyyy-MM-dd');
+      })(),
+      actualFormateada: (() => {
+        const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        return formatDate(firstOfMonth, "d 'de' MMMM 'de' yyyy");
+      })(),
       horaActual: formatDate(now, 'HH:mm'),
       anio: formatDate(now, 'yyyy'),
       mes: formatDate(now, 'MMMM'),
@@ -315,7 +378,8 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     '{{titular_nombre}}': context.cliente.nombreCompleto,
     '{{titular_email}}': context.cliente.email,
     '{{titular_telefono}}': context.cliente.telefono,
-    '{{titular_dni}}': context.cliente.dni,
+    '{{titular_ci}}': context.cliente.ci,
+    '{{titular_dni}}': context.cliente.ci,
     '{{titular_direccion}}': context.cliente.direccion,
     '{{titular_ciudad}}': context.cliente.ciudad,
     '{{titular_provincia}}': context.cliente.provincia,
@@ -324,6 +388,7 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     '{{titular_fecha_nacimiento}}': context.cliente.fechaNacimiento,
     '{{titular_edad}}': String(context.cliente.edad),
     '{{monto_total}}': context.venta.totalFormateado,
+    '{{monto_total_letras}}': context.venta.totalLetras,
     '{{razon_social}}': context.facturacion.razonSocial,
     '{{ruc}}': context.facturacion.ruc,
     '{{billing_email}}': context.facturacion.email,
@@ -331,6 +396,8 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     '{{fecha_actual}}': context.fecha.actualFormateada,
     '{{numero_contrato}}': context.venta.numeroContrato,
     '{{vendedor_nombre}}': context.venta.vendedor,
+    '{{vigencia_inmediata}}': context.venta.vigenciaInmediata,
+    '{{tipo_venta}}': context.venta.tipoVenta,
   };
   Object.entries(legacyAliases).forEach(([placeholder, value]) => {
     const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
@@ -413,7 +480,8 @@ export function getEnhancedTemplateVariables(): { category: string; variables: {
         { key: '{{cliente.nombreCompleto}}', description: 'Nombre completo del cliente' },
         { key: '{{cliente.email}}', description: 'Email del cliente' },
         { key: '{{cliente.telefono}}', description: 'Teléfono del cliente' },
-        { key: '{{cliente.dni}}', description: 'DNI/Documento del cliente' },
+        { key: '{{cliente.ci}}', description: 'C.I. del cliente' },
+        { key: '{{cliente.dni}}', description: 'C.I. del cliente (alias)' },
         { key: '{{cliente.direccion}}', description: 'Dirección del cliente' },
         { key: '{{cliente.ciudad}}', description: 'Ciudad del cliente' },
         { key: '{{cliente.provincia}}', description: 'Provincia/Departamento del cliente' },
@@ -449,6 +517,7 @@ export function getEnhancedTemplateVariables(): { category: string; variables: {
         { key: '{{venta.fechaFormateada}}', description: 'Fecha formateada (ej: 5 de febrero de 2026)' },
         { key: '{{venta.total}}', description: 'Total de la venta (número)' },
         { key: '{{venta.totalFormateado}}', description: 'Total formateado en Gs.' },
+        { key: '{{venta.totalLetras}}', description: 'Total en letras (ej: CINCUENTA MIL GUARANÍES)' },
         { key: '{{venta.vendedor}}', description: 'Nombre del vendedor' },
         { key: '{{venta.numeroContrato}}', description: 'Número de contrato' },
         { key: '{{venta.numeroSolicitud}}', description: 'Número de solicitud' },
@@ -456,6 +525,8 @@ export function getEnhancedTemplateVariables(): { category: string; variables: {
         { key: '{{venta.cantidadAdherentes}}', description: 'Cantidad de adherentes' },
         { key: '{{venta.fechaInicioContrato}}', description: 'Fecha inicio contrato (dd/MM/yyyy) - 1er día del mes de aprobación' },
         { key: '{{venta.fechaInicioContratoFormateada}}', description: 'Fecha inicio contrato formateada' },
+        { key: '{{venta.vigenciaInmediata}}', description: 'Vigencia inmediata (Sí/No)' },
+        { key: '{{venta.tipoVenta}}', description: 'Tipo de venta (Venta Nueva/Reingreso)' },
       ],
     },
     {
@@ -480,8 +551,8 @@ export function getEnhancedTemplateVariables(): { category: string; variables: {
     {
       category: 'Fecha y Hora',
       variables: [
-        { key: '{{fecha.actual}}', description: 'Fecha actual (yyyy-MM-dd)' },
-        { key: '{{fecha.actualFormateada}}', description: 'Fecha actual formateada' },
+        { key: '{{fecha.actual}}', description: 'Fecha 1er día del mes actual (yyyy-MM-dd)' },
+        { key: '{{fecha.actualFormateada}}', description: 'Fecha 1er día del mes actual formateada' },
         { key: '{{fecha.horaActual}}', description: 'Hora actual (HH:mm)' },
         { key: '{{fecha.anio}}', description: 'Año actual' },
         { key: '{{fecha.mes}}', description: 'Mes actual (nombre)' },
@@ -494,7 +565,8 @@ export function getEnhancedTemplateVariables(): { category: string; variables: {
         { key: '{{titular.nombre}}', description: 'Nombre del titular' },
         { key: '{{titular.apellido}}', description: 'Apellido del titular' },
         { key: '{{titular.nombreCompleto}}', description: 'Nombre completo del titular' },
-        { key: '{{titular.dni}}', description: 'DNI del titular' },
+        { key: '{{titular.ci}}', description: 'C.I. del titular' },
+        { key: '{{titular.dni}}', description: 'C.I. del titular (alias)' },
         { key: '{{titular.edad}}', description: 'Edad del titular' },
         { key: '{{titular.montoFormateado}}', description: 'Monto de cobertura del titular' },
       ],
@@ -513,7 +585,7 @@ export function getEnhancedTemplateVariables(): { category: string; variables: {
         { key: '{{edad}}', description: 'Edad (dentro del loop)' },
         { key: '{{monto}}', description: 'Monto numérico (dentro del loop)' },
         { key: '{{montoFormateado}}', description: 'Monto de cobertura formateado (dentro del loop)' },
-        { key: '{{dni}}', description: 'DNI/Documento (dentro del loop)' },
+        { key: '{{dni}}', description: 'C.I./Documento (dentro del loop)' },
         { key: '{{first_name}}', description: 'Nombre - alias inglés (dentro del loop)' },
         { key: '{{last_name}}', description: 'Apellido - alias inglés (dentro del loop)' },
         { key: '{{birth_date}}', description: 'Fecha nac. - alias inglés (dentro del loop)' },

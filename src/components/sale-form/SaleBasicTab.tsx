@@ -27,6 +27,8 @@ interface SaleBasicTabProps {
     billing_ruc: string;
     billing_email: string;
     billing_phone: string;
+    immediate_coverage: boolean;
+    sale_type: string;
   };
   onChange: (field: string, value: any) => void;
   companyId?: string;
@@ -98,7 +100,7 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
                 </div>
                 {filteredClients.map((client) => (
                   <SelectItem key={client.id} value={client.id}>
-                    {client.first_name} {client.last_name} {client.dni ? `- DNI: ${client.dni}` : ''}
+                    {client.first_name} {client.last_name} {client.dni ? `- C.I.: ${client.dni}` : ''}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -152,6 +154,34 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
           className="h-4 w-4"
         />
         <Label htmlFor="requires_adherents">¿Requiere adherentes/grupo familiar?</Label>
+      </div>
+
+      {/* Vigencia Inmediata & Tipo de Venta */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Vigencia Inmediata (V.I.)</Label>
+          <Select value={formData.immediate_coverage ? 'si' : 'no'} onValueChange={(v) => onChange('immediate_coverage', v === 'si')}>
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="si">Sí</SelectItem>
+              <SelectItem value="no">No</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Tipo de Venta</Label>
+          <Select value={formData.sale_type || 'venta_nueva'} onValueChange={(v) => onChange('sale_type', v)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="venta_nueva">Venta Nueva</SelectItem>
+              <SelectItem value="reingreso">Reingreso</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Total Amount - READONLY, auto-calculated */}

@@ -181,7 +181,7 @@ export const CombinedRequestForm = ({ onComplete }: { onComplete?: () => void })
                 />
               </div>
               <div>
-                <Label htmlFor="dni">DNI *</Label>
+                <Label htmlFor="dni">C.I. *</Label>
                 <Input
                   id="dni"
                   value={formData.personal.dni}

@@ -163,7 +163,7 @@ export const useSignatureFlow = () => {
           <p><strong>Nombre:</strong> ${data.client?.first_name} ${data.client?.last_name}</p>
           <p><strong>Email:</strong> ${data.client?.email}</p>
           <p><strong>Teléfono:</strong> ${data.client?.phone || 'N/A'}</p>
-          <p><strong>DNI:</strong> ${data.client?.dni || 'N/A'}</p>
+          <p><strong>C.I.:</strong> ${data.client?.dni || 'N/A'}</p>
         </div>
 
         <div class="plan-info">
