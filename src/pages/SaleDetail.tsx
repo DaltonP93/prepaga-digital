@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useSale } from '@/hooks/useSale';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { SaleDetails } from '@/components/SaleDetails';
 import { ClientDetails } from '@/components/ClientDetails';
@@ -13,13 +14,14 @@ import { SignatureLinkGenerator } from '@/components/signature/SignatureLinkGene
 import { DocumentPackageSelector } from '@/components/documents/DocumentPackageSelector';
 import { AuditCommentsPanel } from '@/components/audit/AuditCommentsPanel';
 import { SaleWorkflowSteps } from '@/components/SaleWorkflowSteps';
-import { Loader2, FileText, User, Users, MessageSquare, PenTool, Package, ClipboardCheck, LayoutDashboard, ListOrdered } from 'lucide-react';
+import { Loader2, FileText, User, Users, MessageSquare, PenTool, Package, ClipboardCheck, LayoutDashboard, ListOrdered, ArrowLeft } from 'lucide-react';
 import { useStateTransition } from '@/hooks/useStateTransition';
 import { useRolePermissions } from '@/hooks/useRolePermissions';
 import type { SaleStatus } from '@/types/workflow';
 
 export default function SaleDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { data: sale, isLoading } = useSale(id!);
   const { canViewState } = useStateTransition();
   const { role } = useRolePermissions();
@@ -61,11 +63,17 @@ export default function SaleDetail() {
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Detalle de Venta</h1>
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="sm" onClick={() => navigate('/sales')} className="gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Volver
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold">Detalle de Venta</h1>
           <p className="text-muted-foreground">
             {sale.contract_number ? `Contrato: ${sale.contract_number}` : `ID: ${id?.slice(0, 8)}`}
-          </p>
+            </p>
+          </div>
         </div>
 
         {/* Mode toggle */}

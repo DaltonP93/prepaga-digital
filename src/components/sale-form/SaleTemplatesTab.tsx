@@ -617,8 +617,8 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="py-4">
             <p className="text-sm text-muted-foreground">
-              <strong>Documentos a enviar:</strong> Se generarán enlaces de firma individuales para el titular
-              {beneficiaries && beneficiaries.length > 0 ? ` y ${beneficiaries.length} adherente(s)` : ''}.
+               <strong>Documentos a enviar:</strong> Se generarán enlaces de firma individuales para el titular
+              {beneficiaries && beneficiaries.filter(b => !b.is_primary).length > 0 ? ` y ${beneficiaries.filter(b => !b.is_primary).length} adherente(s)` : ''}.
               Cada uno recibirá las declaraciones juradas correspondientes junto con el contrato y anexos seleccionados.
             </p>
           </CardContent>

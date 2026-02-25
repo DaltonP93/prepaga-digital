@@ -75,7 +75,7 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Users className="h-5 w-5" />
-          <h3 className="text-lg font-semibold">Adherentes ({beneficiaries?.length || 0})</h3>
+          <h3 className="text-lg font-semibold">Adherentes ({beneficiaries?.filter(b => !b.is_primary).length || 0})</h3>
         </div>
         {!disabled && (
           <Button type="button" size="sm" onClick={() => setShowForm(!showForm)}>
@@ -163,9 +163,9 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
 
       {isLoading ? (
         <div className="text-center py-8 text-muted-foreground">Cargando adherentes...</div>
-      ) : beneficiaries && beneficiaries.length > 0 ? (
+      ) : beneficiaries && beneficiaries.filter(b => !b.is_primary).length > 0 ? (
         <div className="space-y-2">
-          {beneficiaries.map((b) => (
+          {beneficiaries.filter(b => !b.is_primary).map((b) => (
             <Card key={b.id}>
               <CardContent className="flex items-center justify-between py-3 px-4">
                 <div>
