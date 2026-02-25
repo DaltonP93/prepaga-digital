@@ -1,41 +1,29 @@
 
 
-## Diagnóstico del problema
+## Diagnóstico
 
-**Causa raíz identificada**: El `SelectTrigger` de Radix UI renderiza un elemento `<button>` HTML. Dentro del `<form>` del `TemplateForm`, los botones sin atributo `type="button"` actúan como `type="submit"` por defecto. Al hacer clic en el selector de "Tipo de Firma" o "Rol del Firmante", se **envía el formulario completo**, lo que guarda el template y provoca que el editor se re-renderice, cerrando la configuración del campo de firma.
+El campo `barrio` se envía en el INSERT a la tabla `beneficiaries`, pero esa columna **no existe** en la tabla. PostgREST rechaza la petición con un error de columna desconocida, lo que impide guardar el adherente. Como no se guarda, tampoco aparece en la lista ni se puede expandir la sección de documentos.
 
-Esto también aplica a los botones de alineación (float), el botón de Settings, y el botón "Guardar Configuración" dentro del componente de firma.
-
----
+La tabla `clients` sí tiene `barrio`, pero `beneficiaries` no.
 
 ## Plan de cambios
 
-### 1. Agregar `type="button"` a todos los botones en `SignatureFieldExtension.tsx`
+### 1. Migración SQL: agregar columna `barrio` a `beneficiaries`
 
-Los siguientes elementos necesitan `type="button"` explícito:
+```sql
+ALTER TABLE public.beneficiaries
+  ADD COLUMN IF NOT EXISTS barrio character varying DEFAULT NULL;
+```
 
-- **Botones de float/alineación** (líneas 367, 376, 386) — ya usan `<Button>` pero sin `type`
-- **Botón Settings** (línea 394) — abre/cierra configuración
-- **Botón "Limpiar"** del MiniSignatureCanvas (línea 189)
-- **Botón "Guardar Configuración"** (línea 466)
-- **SelectTrigger** de "Tipo de Firma" (línea 415) y "Rol del Firmante" (línea 432) — necesitan `type="button"`
+Esto es todo lo que se necesita a nivel de base de datos. No se requieren cambios de RLS ni nuevas políticas.
 
-### 2. Agregar botón "Eliminar campo de firma"
+### 2. Sin cambios de código
 
-- Destructurar `deleteNode` de las props del componente (ya disponible via `ReactNodeViewRenderer`)
-- Agregar un botón con ícono de papelera (Trash2) en la barra de herramientas del campo, junto al botón de Settings
-- Eliminación directa sin confirmación (es más rápido para el flujo de diseño)
-
-### 3. Agregar `type="button"` en `EditorToolbar.tsx`
-
-- El componente `ToolbarButton` interno (línea 66) renderiza `<Button>` sin `type`. Agregar `type="button"` para prevenir envíos accidentales del formulario padre.
-
----
+El componente `SaleAdherentsTab.tsx` y el hook `useCreateBeneficiary` ya envían `barrio` correctamente. Una vez que la columna exista en la tabla, el INSERT funcionará y los adherentes aparecerán en la lista con su botón "Documentos" expandible.
 
 ## Archivos a modificar
 
-| Archivo | Cambio |
+| Recurso | Cambio |
 |---|---|
-| `src/components/editor/SignatureFieldExtension.tsx` | `type="button"` en todos los botones + destructurar `deleteNode` + botón eliminar |
-| `src/components/EditorToolbar.tsx` | `type="button"` en ToolbarButton |
+| Migración SQL | `ALTER TABLE beneficiaries ADD COLUMN barrio` |
 
