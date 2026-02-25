@@ -387,7 +387,7 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     '{{titular_barrio}}': context.cliente.barrio,
     '{{titular_fecha_nacimiento}}': context.cliente.fechaNacimiento,
     '{{titular_edad}}': String(context.cliente.edad),
-    '{{monto_total}}': context.venta.totalFormateado,
+    '{{monto_total}}': `${context.venta.totalFormateado} (${context.venta.totalLetras})`,
     '{{monto_total_letras}}': context.venta.totalLetras,
     '{{razon_social}}': context.facturacion.razonSocial,
     '{{ruc}}': context.facturacion.ruc,
@@ -435,7 +435,7 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
         '{{full_name}}': beneficiary.nombreCompleto,
         '{{birth_date}}': beneficiary.fechaNacimiento,
         '{{gender}}': beneficiary.genero,
-        '{{amount}}': String(beneficiary.monto),
+        '{{amount}}': beneficiary.montoFormateado,
         '{{relationship}}': beneficiary.parentesco,
         '{{email}}': beneficiary.email,
         '{{phone}}': beneficiary.telefono,
@@ -447,7 +447,10 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
         '{{document_number}}': beneficiary.dni,
         '{{dni}}': beneficiary.dni,
         '{{age}}': String(beneficiary.edad),
+        '{{titular.edad}}': String(beneficiary.edad),
         '{{formatted_amount}}': beneficiary.montoFormateado,
+        '{{vigencia_inmediata}}': context.venta.vigenciaInmediata,
+        '{{tipo_venta}}': context.venta.tipoVenta,
       };
       Object.entries(englishAliases).forEach(([placeholder, value]) => {
         const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
@@ -464,10 +467,10 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
 
   // FALLBACK: If there are still unresolved beneficiary-style placeholders in table rows
   // (template doesn't use {{#beneficiarios}} loop), auto-expand rows
-  const hasBeneficiaryPlaceholders = /\{\{(first_name|last_name|_index|birth_date|dni|gender|amount|relationship)\}\}/gi.test(result);
+  const hasBeneficiaryPlaceholders = /\{\{(first_name|last_name|_index|birth_date|dni|gender|amount|relationship|titular\.edad)\}\}/gi.test(result);
   if (hasBeneficiaryPlaceholders && context.beneficiarios.length > 0) {
     // Find <tr> elements containing beneficiary placeholders and replicate them
-    const trRegex = /<tr[^>]*>([\s\S]*?\{\{(?:first_name|last_name|_index|birth_date|dni|gender|amount|relationship)\}\}[\s\S]*?)<\/tr>/gi;
+    const trRegex = /<tr[^>]*>([\s\S]*?\{\{(?:first_name|last_name|_index|birth_date|dni|gender|amount|relationship|titular\.edad)\}\}[\s\S]*?)<\/tr>/gi;
     result = result.replace(trRegex, (fullMatch, rowContent) => {
       return context.beneficiarios.map((beneficiary, index) => {
         let row = fullMatch;
@@ -481,12 +484,16 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
           '{{dni}}': beneficiary.dni,
           '{{document_number}}': beneficiary.dni,
           '{{age}}': String(beneficiary.edad),
+          '{{titular.edad}}': String(beneficiary.edad),
+          '{{edad}}': String(beneficiary.edad),
           '{{_index}}': String(index + 1),
           '{{index}}': String(index + 1),
           '{{indice}}': String(index + 1),
           '{{email}}': beneficiary.email,
           '{{phone}}': beneficiary.telefono,
           '{{formatted_amount}}': beneficiary.montoFormateado,
+          '{{vigencia_inmediata}}': context.venta.vigenciaInmediata,
+          '{{tipo_venta}}': context.venta.tipoVenta,
         };
         Object.entries(aliases).forEach(([placeholder, value]) => {
           const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
@@ -616,6 +623,7 @@ export function getEnhancedTemplateVariables(): { category: string; variables: {
         { key: '{{genero}}', description: 'Género (dentro del loop)' },
         { key: '{{parentesco}}', description: 'Parentesco (dentro del loop)' },
         { key: '{{edad}}', description: 'Edad (dentro del loop)' },
+        { key: '{{titular.edad}}', description: 'Edad del beneficiario (alias legacy dentro del loop)' },
         { key: '{{monto}}', description: 'Monto numérico (dentro del loop)' },
         { key: '{{montoFormateado}}', description: 'Monto de cobertura formateado (dentro del loop)' },
         { key: '{{dni}}', description: 'C.I./Documento (dentro del loop)' },
@@ -624,7 +632,9 @@ export function getEnhancedTemplateVariables(): { category: string; variables: {
         { key: '{{birth_date}}', description: 'Fecha nac. - alias inglés (dentro del loop)' },
         { key: '{{gender}}', description: 'Género - alias inglés (dentro del loop)' },
         { key: '{{relationship}}', description: 'Parentesco - alias inglés (dentro del loop)' },
-        { key: '{{amount}}', description: 'Monto - alias inglés (dentro del loop)' },
+        { key: '{{amount}}', description: 'Monto formateado - alias inglés (dentro del loop)' },
+        { key: '{{vigencia_inmediata}}', description: 'Vigencia inmediata de la venta (dentro del loop)' },
+        { key: '{{tipo_venta}}', description: 'Tipo de venta (dentro del loop)' },
       ],
     },
     {
