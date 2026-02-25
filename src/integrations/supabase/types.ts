@@ -180,6 +180,7 @@ export type Database = {
         Row: {
           address: string | null
           amount: number | null
+          barrio: string | null
           birth_date: string | null
           city: string | null
           created_at: string | null
@@ -207,6 +208,7 @@ export type Database = {
         Insert: {
           address?: string | null
           amount?: number | null
+          barrio?: string | null
           birth_date?: string | null
           city?: string | null
           created_at?: string | null
@@ -234,6 +236,7 @@ export type Database = {
         Update: {
           address?: string | null
           amount?: number | null
+          barrio?: string | null
           birth_date?: string | null
           city?: string | null
           created_at?: string | null
@@ -1613,11 +1616,13 @@ export type Database = {
           contract_start_date: string | null
           created_at: string | null
           id: string
+          immediate_coverage: boolean | null
           notes: string | null
           plan_id: string | null
           request_number: string | null
           requires_adherents: boolean | null
           sale_date: string | null
+          sale_type: string | null
           salesperson_id: string | null
           signature_completed_at: string | null
           signature_expires_at: string | null
@@ -1651,11 +1656,13 @@ export type Database = {
           contract_start_date?: string | null
           created_at?: string | null
           id?: string
+          immediate_coverage?: boolean | null
           notes?: string | null
           plan_id?: string | null
           request_number?: string | null
           requires_adherents?: boolean | null
           sale_date?: string | null
+          sale_type?: string | null
           salesperson_id?: string | null
           signature_completed_at?: string | null
           signature_expires_at?: string | null
@@ -1689,11 +1696,13 @@ export type Database = {
           contract_start_date?: string | null
           created_at?: string | null
           id?: string
+          immediate_coverage?: boolean | null
           notes?: string | null
           plan_id?: string | null
           request_number?: string | null
           requires_adherents?: boolean | null
           sale_date?: string | null
+          sale_type?: string | null
           salesperson_id?: string | null
           signature_completed_at?: string | null
           signature_expires_at?: string | null

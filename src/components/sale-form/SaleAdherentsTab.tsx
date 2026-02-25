@@ -123,7 +123,7 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
                 />
               </div>
               <div className="space-y-2">
-                <Label>DNI</Label>
+                <Label>C.I.</Label>
                 <Input
                   value={newBeneficiary.dni}
                   onChange={(e) => setNewBeneficiary(prev => ({ ...prev, dni: e.target.value }))}
@@ -210,7 +210,7 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
                   <div>
                     <div className="font-medium">{b.first_name} {b.last_name}</div>
                     <div className="text-sm text-muted-foreground">
-                      {b.dni && `DNI: ${b.dni}`} {b.relationship && `• ${b.relationship}`}
+                      {b.dni && `C.I.: ${b.dni}`} {b.relationship && `• ${b.relationship}`}
                       {b.amount ? ` • ${formatCurrency(Number(b.amount) || 0)}` : ''}
                     </div>
                   </div>

@@ -311,7 +311,7 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
                   <Input id="phone" {...register("phone")} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="dni">DNI/CI</Label>
+                  <Label htmlFor="dni">C.I.</Label>
                   <Input id="dni" {...register("dni")} />
                 </div>
               </div>

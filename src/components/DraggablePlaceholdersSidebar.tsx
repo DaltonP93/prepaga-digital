@@ -32,7 +32,7 @@ const databaseVariables = [
       { name: '{{cliente.apellido}}', label: 'Apellido del cliente', type: 'text' },
       { name: '{{cliente.email}}', label: 'Email', type: 'text' },
       { name: '{{cliente.telefono}}', label: 'Teléfono', type: 'text' },
-      { name: '{{cliente.dni}}', label: 'DNI/Documento', type: 'text' },
+      { name: '{{cliente.ci}}', label: 'C.I.', type: 'text' },
       { name: '{{cliente.direccion}}', label: 'Dirección', type: 'text' },
       { name: '{{cliente.fecha_nacimiento}}', label: 'Fecha de nacimiento', type: 'date' },
     ]

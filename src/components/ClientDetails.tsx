@@ -45,7 +45,7 @@ export const ClientDetails: React.FC<ClientDetailsProps> = ({ clientId }) => {
             <p className="text-sm">{client.first_name} {client.last_name}</p>
           </div>
           <div>
-            <label className="text-sm font-medium text-muted-foreground">DNI</label>
+            <label className="text-sm font-medium text-muted-foreground">C.I.</label>
             <p className="text-sm">{client.dni || 'No proporcionado'}</p>
           </div>
           <div>

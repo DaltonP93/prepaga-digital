@@ -68,7 +68,7 @@ export const generateSimplePDF = async (data: PDFData): Promise<Uint8Array> => {
   
   const clientInfo = [
     `Nombre: ${data.personal.first_name} ${data.personal.last_name}`,
-    `DNI: ${data.personal.dni}`,
+    `C.I.: ${data.personal.dni}`,
     `Email: ${data.personal.email}`,
     `Teléfono: ${data.personal.phone || 'No especificado'}`,
   ];

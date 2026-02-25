@@ -343,7 +343,7 @@ const SignatureView = () => {
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <p className="font-medium">{client.first_name} {client.last_name}</p>
-                {client.dni && <p className="text-muted-foreground">DNI: {client.dni}</p>}
+                {client.dni && <p className="text-muted-foreground">C.I.: {client.dni}</p>}
                 {isTitular && client.email && <p className="text-muted-foreground">{client.email}</p>}
               </CardContent>
             </Card>

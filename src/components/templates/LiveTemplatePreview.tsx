@@ -58,7 +58,7 @@ const defaultSampleData = {
     last_name: 'Pérez García',
     email: 'juan.perez@email.com',
     phone: '+54 11 1234-5678',
-    dni: '30.123.456',
+    dni: '4.567.890',
     address: 'Av. Corrientes 1234, Piso 5',
     city: 'Buenos Aires',
     province: 'Buenos Aires',
@@ -88,6 +88,8 @@ const defaultSampleData = {
     request_number: 'SOL-2026-0001',
     adherents_count: 3,
     notes: 'Cliente VIP',
+    immediate_coverage: true,
+    sale_type: 'venta_nueva',
   },
   beneficiaries: [
     {
@@ -376,7 +378,7 @@ export const LiveTemplatePreview: React.FC<LiveTemplatePreviewProps> = ({
                   </h4>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div><span className="text-muted-foreground">Nombre:</span> {context.cliente.nombreCompleto}</div>
-                    <div><span className="text-muted-foreground">DNI:</span> {context.cliente.dni}</div>
+                    <div><span className="text-muted-foreground">C.I.:</span> {context.cliente.ci || context.cliente.dni}</div>
                     <div><span className="text-muted-foreground">Email:</span> {context.cliente.email}</div>
                     <div><span className="text-muted-foreground">Teléfono:</span> {context.cliente.telefono}</div>
                   </div>
