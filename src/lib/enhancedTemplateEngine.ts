@@ -445,6 +445,7 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
         '{{occupation}}': beneficiary.ocupacion,
         '{{marital_status}}': beneficiary.estadoCivil,
         '{{document_number}}': beneficiary.dni,
+        '{{dni}}': beneficiary.dni,
         '{{age}}': String(beneficiary.edad),
         '{{formatted_amount}}': beneficiary.montoFormateado,
       };
@@ -461,8 +462,40 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     }).join('');
   });
 
-  // Clean up any remaining unmatched placeholders (optional - can remove or make configurable)
-  // result = result.replace(/\{\{[^}]+\}\}/g, '');
+  // FALLBACK: If there are still unresolved beneficiary-style placeholders in table rows
+  // (template doesn't use {{#beneficiarios}} loop), auto-expand rows
+  const hasBeneficiaryPlaceholders = /\{\{(first_name|last_name|_index|birth_date|dni|gender|amount|relationship)\}\}/gi.test(result);
+  if (hasBeneficiaryPlaceholders && context.beneficiarios.length > 0) {
+    // Find <tr> elements containing beneficiary placeholders and replicate them
+    const trRegex = /<tr[^>]*>([\s\S]*?\{\{(?:first_name|last_name|_index|birth_date|dni|gender|amount|relationship)\}\}[\s\S]*?)<\/tr>/gi;
+    result = result.replace(trRegex, (fullMatch, rowContent) => {
+      return context.beneficiarios.map((beneficiary, index) => {
+        let row = fullMatch;
+        const aliases: Record<string, string> = {
+          '{{first_name}}': beneficiary.nombre,
+          '{{last_name}}': beneficiary.apellido,
+          '{{birth_date}}': beneficiary.fechaNacimiento,
+          '{{gender}}': beneficiary.genero,
+          '{{amount}}': beneficiary.montoFormateado,
+          '{{relationship}}': beneficiary.parentesco,
+          '{{dni}}': beneficiary.dni,
+          '{{document_number}}': beneficiary.dni,
+          '{{age}}': String(beneficiary.edad),
+          '{{_index}}': String(index + 1),
+          '{{index}}': String(index + 1),
+          '{{indice}}': String(index + 1),
+          '{{email}}': beneficiary.email,
+          '{{phone}}': beneficiary.telefono,
+          '{{formatted_amount}}': beneficiary.montoFormateado,
+        };
+        Object.entries(aliases).forEach(([placeholder, value]) => {
+          const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+          row = row.replace(regex, value || '');
+        });
+        return row;
+      }).join('\n');
+    });
+  }
 
   return result;
 }

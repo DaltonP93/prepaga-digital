@@ -210,6 +210,18 @@ export const useSubmitSignatureLink = () => {
           },
         });
 
+      // Update IP address on signature link
+      try {
+        await signatureClient
+          .from('signature_links')
+          .update({
+            ip_addresses: [clientIp],
+          } as any)
+          .eq('id', linkId);
+      } catch (ipErr) {
+        console.warn('Could not update IP on signature link:', ipErr);
+      }
+
       // For SignWell completions, skip canvas-specific document embedding
       // SignWell handles the signed PDF on their platform
       if (isSignWellCompletion) {
@@ -235,7 +247,14 @@ export const useSubmitSignatureLink = () => {
         return data;
       }
 
-      // Store signature in documents table for the sale (canvas flow)
+      // Detect if this is an electronic signature (JSON string) vs canvas (base64 image)
+      let isElectronicSignature = false;
+      try {
+        const parsed = JSON.parse(signatureData);
+        if (parsed.type === 'electronica') isElectronicSignature = true;
+      } catch { /* not JSON, so it's canvas data */ }
+
+      // Store signature in documents table for the sale
       try {
         await signatureClient
           .from('documents')
@@ -305,20 +324,55 @@ export const useSubmitSignatureLink = () => {
                   </div>
                 `;
 
-            // Inline signature image to replace placeholder in template
-            const signatureImg = `<img src="${signatureData}" alt="Firma digital" style="max-width:280px;max-height:120px;display:block;" />`;
-            const signatureImgWithDate = `
-              <div style="text-align:center;">
-                ${signatureImg}
-                <p style="margin:4px 0 0 0;font-size:10px;color:#6b7280;">Firmado el: ${safeSignedAt}</p>
-              </div>
-            `;
+            // Build signature block depending on type (canvas vs electronic)
+            let signatureBlock: string;
+            let signatureImgWithDate: string;
+
+            if (isElectronicSignature) {
+              const electronicBlock = `
+                <div style="text-align:center;padding:16px;border:1px solid #d1d5db;border-radius:8px;background:#f9fafb;">
+                  <p style="margin:0 0 4px 0;font-size:14px;font-weight:bold;">✓ Firma Electrónica</p>
+                  <p style="margin:0 0 4px 0;font-size:11px;color:#4b5563;">
+                    Firmado electrónicamente el: ${safeSignedAt}
+                  </p>
+                  <p style="margin:0;font-size:10px;color:#6b7280;">
+                    IP: ${clientIp} | Dispositivo: ${navigator.userAgent.substring(0, 60)}
+                  </p>
+                </div>
+              `;
+              signatureImgWithDate = electronicBlock;
+              signatureBlock = `
+                <hr style="margin:24px 0;border:none;border-top:1px solid #d1d5db;" />
+                ${electronicBlock}
+              `;
+            } else {
+              const signatureImg = `<img src="${signatureData}" alt="Firma digital" style="max-width:280px;max-height:120px;display:block;" />`;
+              signatureImgWithDate = `
+                <div style="text-align:center;">
+                  ${signatureImg}
+                  <p style="margin:4px 0 0 0;font-size:10px;color:#6b7280;">Firmado el: ${safeSignedAt}</p>
+                </div>
+              `;
+              signatureBlock = `
+                <hr style="margin:24px 0;border:none;border-top:1px solid #d1d5db;" />
+                <section style="padding:16px;border:1px solid #e5e7eb;border-radius:8px;background:#fafafa;">
+                  <h4 style="margin:0 0 8px 0;font-size:14px;">Firma Digital Incrustada</h4>
+                  <p style="margin:0 0 8px 0;font-size:12px;color:#4b5563;">
+                    Firmado el: ${safeSignedAt}
+                  </p>
+                  ${signatureImg}
+                </section>
+              `;
+            }
 
             // Try to replace signature placeholders in the document content
-            // Supports: {{firma_contratante}}, {{firma_titular}}, {{firma_adherente}}
+            // Supports: {{firma_contratante}}, {{firma_titular}}, {{firma_adherente}}, Firma del Cliente
             const placeholderPatterns = recipientType === 'adherente'
               ? [/\{\{firma_adherente\}\}/gi, /\{\{firma_contratante\}\}/gi, /\{\{firma_titular\}\}/gi]
               : [/\{\{firma_contratante\}\}/gi, /\{\{firma_titular\}\}/gi];
+
+            // Also look for "Firma del Cliente" text marker
+            const textMarkerPatterns = [/Firma del Cliente/gi];
 
             let finalContent = originalContent;
             let placeholderFound = false;
@@ -331,18 +385,19 @@ export const useSubmitSignatureLink = () => {
               }
             }
 
-            // Fallback: if no placeholder found, append signature block at the end
+            // Try text marker replacement if no placeholder found
             if (!placeholderFound) {
-              const signatureBlock = `
-                <hr style="margin:24px 0;border:none;border-top:1px solid #d1d5db;" />
-                <section style="padding:16px;border:1px solid #e5e7eb;border-radius:8px;background:#fafafa;">
-                  <h4 style="margin:0 0 8px 0;font-size:14px;">Firma Digital Incrustada</h4>
-                  <p style="margin:0 0 8px 0;font-size:12px;color:#4b5563;">
-                    Firmado el: ${safeSignedAt}
-                  </p>
-                  ${signatureImg}
-                </section>
-              `;
+              for (const pattern of textMarkerPatterns) {
+                if (pattern.test(finalContent)) {
+                  finalContent = finalContent.replace(pattern, signatureImgWithDate);
+                  placeholderFound = true;
+                  break;
+                }
+              }
+            }
+
+            // Fallback: append signature block at the end
+            if (!placeholderFound) {
               finalContent = `${finalContent}${signatureBlock}`;
             }
 

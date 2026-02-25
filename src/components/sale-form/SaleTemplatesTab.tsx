@@ -357,6 +357,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       }
 
       // Include template attachments (annexes) as documents
+      // Only for templates that did NOT already generate a designer-content document
       const { data: templateAttachments } = await supabase
         .from('template_attachments' as any)
         .select('*')
@@ -366,9 +367,20 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         const templateNameById = new Map(
           (templateContents || []).map((t: any) => [t.id, t.name])
         );
+        // Track which templates already had an HTML document generated
+        const templatesWithContent = new Set(
+          (templateContents || []).filter((t: any) => !!t.content?.trim()).map((t: any) => t.id)
+        );
 
         for (const att of templateAttachments) {
-          const parentTemplateName = templateNameById.get((att as any).template_id);
+          const parentTemplateId = (att as any).template_id;
+          // Skip attachment if the parent template already generated an HTML document
+          // (avoids duplicate: one HTML doc + one PDF attachment for same annexo)
+          if (templatesWithContent.has(parentTemplateId)) {
+            continue;
+          }
+
+          const parentTemplateName = templateNameById.get(parentTemplateId);
           const isAnexoPlanAttachment = isAnexoPlanName(parentTemplateName) || isAnexoPlanName((att as any).file_name);
 
           await supabase.from('documents').insert({
