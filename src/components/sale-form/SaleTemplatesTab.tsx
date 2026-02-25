@@ -330,6 +330,38 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       if (beneficiaries && beneficiaries.length > 0 && ddjiTemplates.length > 0) {
         for (const b of beneficiaries) {
           if (b.signature_required !== false && !b.is_primary) {
+            // Build per-beneficiary DDJJ responses from their own health data
+            const benResponsesMap: Record<string, any> = { ...responsesMap };
+            const benDetail = b.preexisting_conditions_detail || '';
+            const benLines = benDetail.split('; ');
+            for (const line of benLines) {
+              if (line.startsWith('Peso:')) {
+                benResponsesMap['ddjj_peso'] = line.replace('Peso:', '').replace('kg', '').trim();
+              } else if (line.startsWith('Estatura:')) {
+                benResponsesMap['ddjj_altura'] = line.replace('Estatura:', '').replace('cm', '').trim();
+              } else if (line.startsWith('Hábitos:')) {
+                const habits = line.replace('Hábitos:', '').trim();
+                benResponsesMap['ddjj_fuma'] = habits.includes('Fuma') ? 'Sí' : 'No';
+                benResponsesMap['ddjj_vapea'] = habits.includes('Vapea') ? 'Sí' : 'No';
+                benResponsesMap['ddjj_alcohol'] = habits.includes('alcohólicas') ? 'Sí' : 'No';
+              }
+            }
+            // Parse per-beneficiary health questions
+            for (let i = 1; i <= 7; i++) {
+              const questionPrefix = `${i}.`;
+              const matchingLine = benLines.find(l => l.trim().startsWith(questionPrefix));
+              if (matchingLine) {
+                benResponsesMap[`ddjj_pregunta_${i}`] = matchingLine.includes(':')
+                  ? 'Sí: ' + matchingLine.split(':').slice(1).join(':').trim()
+                  : 'Sí';
+              } else if (!benResponsesMap[`ddjj_pregunta_${i}`]) {
+                benResponsesMap[`ddjj_pregunta_${i}`] = b.has_preexisting_conditions ? '' : 'No';
+              }
+            }
+            if (!benResponsesMap['ddjj_fuma']) benResponsesMap['ddjj_fuma'] = 'No';
+            if (!benResponsesMap['ddjj_vapea']) benResponsesMap['ddjj_vapea'] = 'No';
+            if (!benResponsesMap['ddjj_alcohol']) benResponsesMap['ddjj_alcohol'] = 'No';
+
             for (const ddjiTemplate of ddjiTemplates) {
               const beneficiaryContext = createEnhancedTemplateContext(
                 {
@@ -338,7 +370,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
                   address: b.address, birth_date: b.birth_date,
                   city: (b as any).city, province: (b as any).province,
                 },
-                plan, company, sale, beneficiaries || [], undefined, responsesMap
+                plan, company, sale, beneficiaries || [], undefined, benResponsesMap
               );
               const renderedContent = interpolateEnhancedTemplate(ddjiTemplate.content || '', beneficiaryContext);
 
