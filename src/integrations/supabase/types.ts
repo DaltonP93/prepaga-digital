@@ -636,6 +636,7 @@ export type Database = {
           created_at: string | null
           dashboard_layout: Json | null
           id: string
+          sale_progress_config: Json | null
           sidebar_collapsed: boolean | null
           theme: string | null
           updated_at: string | null
@@ -645,6 +646,7 @@ export type Database = {
           created_at?: string | null
           dashboard_layout?: Json | null
           id?: string
+          sale_progress_config?: Json | null
           sidebar_collapsed?: boolean | null
           theme?: string | null
           updated_at?: string | null
@@ -654,6 +656,7 @@ export type Database = {
           created_at?: string | null
           dashboard_layout?: Json | null
           id?: string
+          sale_progress_config?: Json | null
           sidebar_collapsed?: boolean | null
           theme?: string | null
           updated_at?: string | null
