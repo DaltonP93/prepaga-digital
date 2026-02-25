@@ -369,8 +369,10 @@ const SignatureView = () => {
 
         {/* Documents List - Separated into signature-required and annexes */}
         {(() => {
-          const docsToSign = documents?.filter((d: any) => d.requires_signature !== false) || [];
-          const annexDocs = documents?.filter((d: any) => d.requires_signature === false) || [];
+          // Annexes are documents that don't require signature OR have annex-related document_type
+          const isAnnex = (d: any) => d.requires_signature === false || d.document_type === 'anexo' || d.document_type?.includes('anexo');
+          const annexDocs = documents?.filter((d: any) => isAnnex(d)) || [];
+          const docsToSign = documents?.filter((d: any) => !isAnnex(d)) || [];
           const hasAnyDocs = docsToSign.length > 0 || annexDocs.length > 0;
 
           if (!hasAnyDocs) {

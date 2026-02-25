@@ -5,8 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Users, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Users, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useBeneficiaries, useCreateBeneficiary, useDeleteBeneficiary, useUpdateBeneficiary } from '@/hooks/useBeneficiaries';
+import { BeneficiaryDocuments } from '@/components/beneficiaries/BeneficiaryDocuments';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 
@@ -22,6 +23,7 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
   const updateBeneficiary = useUpdateBeneficiary();
 
   const [showForm, setShowForm] = useState(false);
+  const [expandedDocIds, setExpandedDocIds] = useState<Set<string>>(new Set());
   const [newBeneficiary, setNewBeneficiary] = useState({
     first_name: '',
     last_name: '',
@@ -68,6 +70,15 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
     } catch (error) {
       console.error('Error deleting beneficiary:', error);
     }
+  };
+
+  const toggleDocs = (id: string) => {
+    setExpandedDocIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   return (
@@ -166,22 +177,41 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
       ) : beneficiaries && beneficiaries.filter(b => !b.is_primary).length > 0 ? (
         <div className="space-y-2">
           {beneficiaries.filter(b => !b.is_primary).map((b) => (
-            <Card key={b.id}>
-              <CardContent className="flex items-center justify-between py-3 px-4">
-                <div>
-                  <div className="font-medium">{b.first_name} {b.last_name}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {b.dni && `DNI: ${b.dni}`} {b.relationship && `• ${b.relationship}`}
-                    {b.amount ? ` • ${formatCurrency(Number(b.amount) || 0)}` : ''}
+            <div key={b.id} className="space-y-2">
+              <Card>
+                <CardContent className="flex items-center justify-between py-3 px-4">
+                  <div>
+                    <div className="font-medium">{b.first_name} {b.last_name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {b.dni && `DNI: ${b.dni}`} {b.relationship && `• ${b.relationship}`}
+                      {b.amount ? ` • ${formatCurrency(Number(b.amount) || 0)}` : ''}
+                    </div>
                   </div>
-                </div>
-                {!disabled && (
-                  <Button type="button" variant="ghost" size="sm" onClick={() => handleDelete(b.id)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleDocs(b.id)}
+                    >
+                      {expandedDocIds.has(b.id) ? <ChevronUp className="h-4 w-4 mr-1" /> : <ChevronDown className="h-4 w-4 mr-1" />}
+                      Documentos
+                    </Button>
+                    {!disabled && (
+                      <Button type="button" variant="ghost" size="sm" onClick={() => handleDelete(b.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              {expandedDocIds.has(b.id) && (
+                <BeneficiaryDocuments
+                  beneficiaryId={b.id}
+                  beneficiaryName={`${b.first_name} ${b.last_name}`}
+                />
+              )}
+            </div>
           ))}
         </div>
       ) : (
