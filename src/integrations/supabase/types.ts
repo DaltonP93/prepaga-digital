@@ -334,6 +334,7 @@ export type Database = {
       clients: {
         Row: {
           address: string | null
+          barrio: string | null
           birth_date: string | null
           city: string | null
           company_id: string
@@ -353,6 +354,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          barrio?: string | null
           birth_date?: string | null
           city?: string | null
           company_id: string
@@ -372,6 +374,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          barrio?: string | null
           birth_date?: string | null
           city?: string | null
           company_id?: string
@@ -633,6 +636,7 @@ export type Database = {
           created_at: string | null
           dashboard_layout: Json | null
           id: string
+          sale_progress_config: Json | null
           sidebar_collapsed: boolean | null
           theme: string | null
           updated_at: string | null
@@ -642,6 +646,7 @@ export type Database = {
           created_at?: string | null
           dashboard_layout?: Json | null
           id?: string
+          sale_progress_config?: Json | null
           sidebar_collapsed?: boolean | null
           theme?: string | null
           updated_at?: string | null
@@ -651,6 +656,7 @@ export type Database = {
           created_at?: string | null
           dashboard_layout?: Json | null
           id?: string
+          sale_progress_config?: Json | null
           sidebar_collapsed?: boolean | null
           theme?: string | null
           updated_at?: string | null

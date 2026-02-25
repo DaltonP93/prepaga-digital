@@ -13,20 +13,60 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/utils';
 import RequireAuth from '@/components/RequireAuth';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStateTransition } from '@/hooks/useStateTransition';
 import { ALL_SALE_STATUSES, SALE_STATUS_LABELS, type SaleStatus } from '@/types/workflow';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { useSaleProgressConfig } from '@/hooks/useSaleProgressConfig';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 const Sales = () => {
   const { data: sales, isLoading } = useSales();
+  const queryClient = useQueryClient();
   const deleteSale = useDeleteSale();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
   const { canViewState, canEditState } = useStateTransition();
   const { profile } = useSimpleAuthContext();
   const { getProgress } = useSaleProgressConfig();
+
+  // Fetch document counts per sale
+  const saleIds = (sales || []).map(s => s.id);
+  const { data: documentCountsData } = useQuery({
+    queryKey: ['sales-document-counts', saleIds],
+    queryFn: async () => {
+      if (saleIds.length === 0) return {};
+      const { data } = await supabase
+        .from('documents')
+        .select('sale_id')
+        .in('sale_id', saleIds)
+        .neq('document_type', 'firma');
+      const map: Record<string, number> = {};
+      (data || []).forEach(doc => {
+        map[doc.sale_id] = (map[doc.sale_id] || 0) + 1;
+      });
+      return map;
+    },
+    enabled: saleIds.length > 0,
+  });
+
+  // Real-time subscription for sales changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('sales-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['sales'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['sales-document-counts'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const visibleSales = (sales || []).filter((sale) =>
     canViewState((sale.status || 'borrador') as SaleStatus)
@@ -82,10 +122,10 @@ const Sales = () => {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('es-PY', { 
-      day: '2-digit', 
-      month: '2-digit', 
-      year: 'numeric' 
+    return date.toLocaleDateString('es-PY', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
     });
   };
 
@@ -118,7 +158,7 @@ const Sales = () => {
                 />
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-40">
@@ -136,7 +176,7 @@ const Sales = () => {
                     ))}
                 </SelectContent>
               </Select>
-              
+
               <Button asChild className="bg-primary hover:bg-primary/90">
                 <Link to="/sales/new">
                   <Plus className="mr-2 h-4 w-4" />
@@ -177,7 +217,7 @@ const Sales = () => {
                               </div>
                             </div>
                           </TableCell>
-                          
+
                           <TableCell>
                             <div className="space-y-1">
                               <div className="font-medium">
@@ -188,20 +228,20 @@ const Sales = () => {
                               </div>
                             </div>
                           </TableCell>
-                          
+
                           <TableCell>
                             <Badge variant={getStatusBadgeVariant(sale.status || 'borrador')}>
                               {getStatusText(sale.status || 'borrador')}
                             </Badge>
                           </TableCell>
-                          
+
                           <TableCell>
                             <div className="font-semibold">
                               {formatCurrency(sale.total_amount || 0)}
                             </div>
                             <div className="text-sm text-muted-foreground">PYG</div>
                           </TableCell>
-                          
+
                           <TableCell>
                             {(() => {
                               const progress = getProgress(sale.status || 'borrador');
@@ -224,12 +264,10 @@ const Sales = () => {
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <FileText className="h-4 w-4 text-muted-foreground" />
-                              <span className="font-medium">
-                                {((sale as any).documents?.length || 0) + ((sale as any).sale_documents?.length || 0)}
-                              </span>
+                              <span className="font-medium">{documentCountsData?.[sale.id] || 0}</span>
                             </div>
                           </TableCell>
-                          
+
                           <TableCell>
                             <div className="space-y-1">
                               <div className="font-medium">
@@ -240,7 +278,7 @@ const Sales = () => {
                               </div>
                             </div>
                           </TableCell>
-                          
+
                           <TableCell>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -305,8 +343,8 @@ const Sales = () => {
                         <TableCell colSpan={8} className="text-center py-12">
                           <div className="space-y-4">
                             <p className="text-muted-foreground">
-                              {searchTerm || statusFilter !== 'todos' 
-                                ? 'No se encontraron contratos con los filtros aplicados' 
+                              {searchTerm || statusFilter !== 'todos'
+                                ? 'No se encontraron contratos con los filtros aplicados'
                                 : 'No hay contratos registrados'
                               }
                             </p>

@@ -29,7 +29,6 @@ const SignatureView = () => {
   
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const [showSignaturePanel, setShowSignaturePanel] = useState(false);
   const [signwellCompleted, setSignwellCompleted] = useState(false);
   const signatureSectionRef = useRef<HTMLDivElement>(null);
 
@@ -99,13 +98,6 @@ const SignatureView = () => {
       token: token!,
       signatureData,
     });
-  };
-
-  const handleOpenSignaturePanel = () => {
-    setShowSignaturePanel(true);
-    setTimeout(() => {
-      signatureSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
   };
 
   const handleDownloadSignature = () => {
@@ -377,8 +369,10 @@ const SignatureView = () => {
 
         {/* Documents List - Separated into signature-required and annexes */}
         {(() => {
-          const docsToSign = documents?.filter((d: any) => d.requires_signature !== false) || [];
-          const annexDocs = documents?.filter((d: any) => d.requires_signature === false) || [];
+          // Annexes are documents that don't require signature OR have annex-related document_type
+          const isAnnex = (d: any) => d.requires_signature === false || d.document_type === 'anexo' || d.document_type?.includes('anexo');
+          const annexDocs = documents?.filter((d: any) => isAnnex(d)) || [];
+          const docsToSign = documents?.filter((d: any) => !isAnnex(d)) || [];
           const hasAnyDocs = docsToSign.length > 0 || annexDocs.length > 0;
 
           if (!hasAnyDocs) {
@@ -410,29 +404,26 @@ const SignatureView = () => {
                   </CardHeader>
                   <CardContent className="space-y-2">
                     {docsToSign.map((doc: any) => (
-                      <div key={doc.id} className="flex items-center justify-between border rounded-lg p-4">
-                        <div className="flex items-center gap-3">
-                          <FileText className="h-5 w-5 text-primary flex-shrink-0" />
-                          <div>
-                            <p className="font-medium text-sm">
-                              {doc.name}{recipientName ? ` - ${recipientName}` : ''}
-                            </p>
-                            <p className="text-xs text-muted-foreground">{doc.document_type || 'Documento'}</p>
+                        <div key={doc.id} className="flex items-center justify-between border rounded-lg p-4">
+                          <div className="flex items-center gap-3">
+                            <FileText className="h-5 w-5 text-primary flex-shrink-0" />
+                            <div>
+                              <p className="font-medium text-sm">
+                                {doc.name}{recipientName ? ` - ${recipientName}` : ''}
+                              </p>
+                              <p className="text-xs text-muted-foreground">{doc.document_type || 'Documento'}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {doc.content && (
+                              <Button size="sm" variant="outline" onClick={() => handleDownloadSignedContent(doc)}>
+                                <Eye className="h-3 w-3 mr-1" />
+                                Ver
+                              </Button>
+                            )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {!showSignaturePanel && (
-                            <Button size="sm" onClick={handleOpenSignaturePanel}>
-                              <PenTool className="h-3 w-3 mr-1" />
-                              Firmar
-                            </Button>
-                          )}
-                          {showSignaturePanel && (
-                            <Badge variant="outline">Pendiente de firma</Badge>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                      ))}
                   </CardContent>
                 </Card>
               )}
@@ -494,8 +485,8 @@ const SignatureView = () => {
           );
         })()}
 
-        {/* Signature Section - only visible after clicking Firmar */}
-        {showSignaturePanel && (
+        {/* Signature Section - always visible when there are documents */}
+        {documents && documents.filter((d: any) => d.requires_signature !== false).length > 0 && (
           <div ref={signatureSectionRef}>
             {signwellSigningUrl && !signwellCompleted ? (
               /* SignWell Embedded Signing via iframe */
@@ -574,7 +565,7 @@ const SignatureView = () => {
                     ) : (
                       <>
                         <CheckCircle className="h-4 w-4 mr-2" />
-                        Firmar {isTitular ? 'Todos los Documentos' : 'Declaración Jurada'}
+                        Firmar Todos los Documentos
                       </>
                     )}
                   </Button>

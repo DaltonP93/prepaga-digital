@@ -229,6 +229,51 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         }
       });
 
+      // Fallback: If DDJJ responses are not populated from template_responses,
+      // build them directly from beneficiary health data (primary beneficiary / titular)
+      const primaryBen = (beneficiaries || []).find((b: any) => b.is_primary);
+      if (primaryBen && !responsesMap['ddjj_peso']) {
+        const healthDetail = primaryBen.preexisting_conditions_detail || '';
+        const detailLines = healthDetail.split('; ');
+        
+        // Extract structured data from preexisting_conditions_detail
+        for (const line of detailLines) {
+          if (line.startsWith('Peso:')) {
+            responsesMap['ddjj_peso'] = line.replace('Peso:', '').replace('kg', '').trim();
+          } else if (line.startsWith('Estatura:')) {
+            responsesMap['ddjj_altura'] = line.replace('Estatura:', '').replace('cm', '').trim();
+          } else if (line.startsWith('Hábitos:')) {
+            const habits = line.replace('Hábitos:', '').trim();
+            responsesMap['ddjj_fuma'] = habits.includes('Fuma') ? 'Sí' : 'No';
+            responsesMap['ddjj_vapea'] = habits.includes('Vapea') ? 'Sí' : 'No';
+            responsesMap['ddjj_alcohol'] = habits.includes('alcohólicas') ? 'Sí' : 'No';
+          } else if (line.startsWith('Última menstruación')) {
+            responsesMap['ddjj_menstruacion'] = line.split(':').slice(1).join(':').trim();
+          }
+        }
+
+        // Parse health questions from detail
+        for (let i = 1; i <= 7; i++) {
+          if (!responsesMap[`ddjj_pregunta_${i}`]) {
+            const questionPrefix = `${i}.`;
+            const matchingLine = detailLines.find(l => l.trim().startsWith(questionPrefix));
+            if (matchingLine) {
+              responsesMap[`ddjj_pregunta_${i}`] = matchingLine.includes(':') 
+                ? 'Sí: ' + matchingLine.split(':').slice(1).join(':').trim()
+                : 'Sí';
+            } else {
+              responsesMap[`ddjj_pregunta_${i}`] = primaryBen.has_preexisting_conditions ? '' : 'No';
+            }
+          }
+        }
+        
+        // Set default No for habits if not found
+        if (!responsesMap['ddjj_fuma']) responsesMap['ddjj_fuma'] = 'No';
+        if (!responsesMap['ddjj_vapea']) responsesMap['ddjj_vapea'] = 'No';
+        if (!responsesMap['ddjj_alcohol']) responsesMap['ddjj_alcohol'] = 'No';
+        if (!responsesMap['ddjj_menstruacion']) responsesMap['ddjj_menstruacion'] = 'N/A';
+      }
+
       // *** ENHANCED TEMPLATE ENGINE — 50+ variables, beneficiary loops, formatted dates/currency ***
       const { createEnhancedTemplateContext, interpolateEnhancedTemplate } = await import('@/lib/enhancedTemplateEngine');
       const context = createEnhancedTemplateContext(
@@ -236,6 +281,13 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       );
 
       // Generate documents for the titular (all templates)
+      // Preload attachment info to detect annexo-only templates
+      const { data: allAttachments } = await supabase
+        .from('template_attachments' as any)
+        .select('template_id')
+        .in('template_id', templateIds);
+      const templatesWithAttachments = new Set((allAttachments || []).map((a: any) => a.template_id));
+
       for (const template of (templateContents || [])) {
         const hasDesignerContent = !!template.content?.trim();
         const renderedContent = hasDesignerContent
@@ -246,6 +298,13 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         const isContrato = lower.includes('contrato');
         const isAnexoPlan = isAnexoPlanName(template.name);
         const isAnexo = isAnexoPlan || (!isDDJJ && !isContrato);
+
+        // Skip annexo templates without designer content that have file attachments
+        // (the attachments will be inserted separately below)
+        if (isAnexo && !hasDesignerContent && templatesWithAttachments.has(template.id)) {
+          continue;
+        }
+
         const normalizedContent = !hasDesignerContent && isAnexo
           ? `<p>Documento de anexo cargado sin estructura de diseñador. Procesado como template interno.</p>`
           : renderedContent;
@@ -403,7 +462,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
   }
 
   const availableTemplates = templates?.filter(
-    t => !saleTemplates?.some(st => (st as any).templates?.id === t.id)
+    t => t.is_active !== false && !saleTemplates?.some(st => (st as any).templates?.id === t.id)
   ) || [];
 
   // Group generated docs
@@ -558,8 +617,8 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="py-4">
             <p className="text-sm text-muted-foreground">
-              <strong>Documentos a enviar:</strong> Se generarán enlaces de firma individuales para el titular
-              {beneficiaries && beneficiaries.length > 0 ? ` y ${beneficiaries.length} adherente(s)` : ''}.
+               <strong>Documentos a enviar:</strong> Se generarán enlaces de firma individuales para el titular
+              {beneficiaries && beneficiaries.filter(b => !b.is_primary).length > 0 ? ` y ${beneficiaries.filter(b => !b.is_primary).length} adherente(s)` : ''}.
               Cada uno recibirá las declaraciones juradas correspondientes junto con el contrato y anexos seleccionados.
             </p>
           </CardContent>

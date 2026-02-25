@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
+import { checkRateLimit, rateLimitResponse, getClientIdentifier } from "../_shared/rate-limiter.ts";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -15,6 +16,12 @@ serve(async (req) => {
   }
 
   try {
+    // Rate limiting for email campaigns
+    const clientIp = getClientIdentifier(req);
+    const rateCheck = checkRateLimit(`email:${clientIp}`, { windowMs: 15 * 60 * 1000, maxRequests: 10 });
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(corsHeaders, rateCheck.retryAfterMs);
+    }
     // Authenticate the request
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {

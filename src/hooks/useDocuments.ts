@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
@@ -15,22 +14,21 @@ export const useDocuments = () => {
   const { data: documents, isLoading, error } = useQuery({
     queryKey: ["documents"],
     queryFn: async () => {
-      console.log("Fetching documents...");
-      
       const { data, error } = await supabase
         .from("documents")
         .select(`
           *,
-          sales:sale_id(id, status)
+          sales:sale_id(
+            id, 
+            status, 
+            contract_number,
+            clients:client_id(first_name, last_name),
+            plans:plan_id(name)
+          )
         `)
         .order("created_at", { ascending: false });
 
-      if (error) {
-        console.error("Error fetching documents:", error);
-        throw error;
-      }
-
-      console.log("Documents fetched:", data?.length || 0);
+      if (error) throw error;
       return data;
     },
     retry: 2,
@@ -39,18 +37,13 @@ export const useDocuments = () => {
 
   const createDocumentMutation = useMutation({
     mutationFn: async (document: DocumentInsert) => {
-      console.log("Creating document:", document);
       const { data, error } = await supabase
         .from("documents")
         .insert([document])
         .select()
         .single();
 
-      if (error) {
-        console.error("Error creating document:", error);
-        throw error;
-      }
-
+      if (error) throw error;
       return data;
     },
     onSuccess: () => {
@@ -61,7 +54,6 @@ export const useDocuments = () => {
       });
     },
     onError: (error) => {
-      console.error("Error creating document:", error);
       toast({
         title: "Error",
         description: "No se pudo crear el documento.",
@@ -72,7 +64,6 @@ export const useDocuments = () => {
 
   const updateDocumentMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: DocumentUpdate }) => {
-      console.log("Updating document:", id, updates);
       const { data, error } = await supabase
         .from("documents")
         .update(updates)
@@ -80,11 +71,7 @@ export const useDocuments = () => {
         .select()
         .single();
 
-      if (error) {
-        console.error("Error updating document:", error);
-        throw error;
-      }
-
+      if (error) throw error;
       return data;
     },
     onSuccess: () => {
@@ -95,7 +82,6 @@ export const useDocuments = () => {
       });
     },
     onError: (error) => {
-      console.error("Error updating document:", error);
       toast({
         title: "Error",
         description: "No se pudo actualizar el documento.",
@@ -106,16 +92,12 @@ export const useDocuments = () => {
 
   const deleteDocumentMutation = useMutation({
     mutationFn: async (id: string) => {
-      console.log("Deleting document:", id);
       const { error } = await supabase
         .from("documents")
         .delete()
         .eq("id", id);
 
-      if (error) {
-        console.error("Error deleting document:", error);
-        throw error;
-      }
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["documents"] });
@@ -125,7 +107,6 @@ export const useDocuments = () => {
       });
     },
     onError: (error) => {
-      console.error("Error deleting document:", error);
       toast({
         title: "Error",
         description: "No se pudo eliminar el documento.",

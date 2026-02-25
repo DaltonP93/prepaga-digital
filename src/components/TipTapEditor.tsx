@@ -29,6 +29,7 @@ import { useBranding } from './CompanyBrandingProvider';
 import { useToast } from '@/hooks/use-toast';
 import { SignatureFieldExtension } from './editor/SignatureFieldExtension';
 import { DynamicPlaceholderExtension } from './editor/DynamicPlaceholderExtension';
+import { TemplateAnnexesManager } from './templates/TemplateAnnexesManager';
 
 export interface TipTapEditorProps {
   initialContent?: string;
@@ -42,6 +43,7 @@ export interface TipTapEditorProps {
   showToolbar?: boolean;
   showSidebar?: boolean;
   onReady?: (api: TipTapEditorAPI) => void;
+  onAttachmentClick?: () => void;
 }
 
 export interface TipTapEditorAPI {
@@ -78,6 +80,8 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
     showSidebar = true,
     onReady
   } = props;
+  
+  const [showAnnexesManager, setShowAnnexesManager] = useState(false);
   
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -349,19 +353,33 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
     }
   }, [editor, onReady, insertSignature, insertPlaceholder, insertDropdown, insertCheckbox, insertRadioButton, insertQRCode, insertBarcode, insertDynamicQuestion, insertText, addImage, updateSelectedNodeAttrs, setContent, getContent]);
 
+  const handleAnnexContentExtracted = useCallback((htmlContent: string) => {
+    if (!editor) return;
+    // Append the document content at the end instead of replacing
+    editor.chain().focus('end').insertContent(htmlContent).run();
+    const newContent = editor.getHTML();
+    onChange?.(newContent);
+    onContentChange?.(newContent);
+    setShowAnnexesManager(false);
+    toast({
+      title: "Documento importado",
+      description: "El contenido del documento se ha cargado en el editor.",
+    });
+  }, [editor, onChange, onContentChange, toast]);
+
   return (
-    <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-white' : 'grid grid-cols-1 lg:grid-cols-4'} gap-6`}>
-      <div className={`${isFullscreen ? 'flex-1 flex flex-col' : 'lg:col-span-3'} space-y-4`}>
+    <div className={isFullscreen ? 'fixed inset-0 z-50 bg-background' : ''}>
+      <div className="space-y-2">
         <Card className="flex-1">
           {showToolbar && (
-            <CardHeader className="pb-2">
+            <CardHeader className="py-2 px-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <FileText className="w-4 h-4" />
                   Editor de Plantillas
                 </CardTitle>
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="gap-1">
+                  <Badge variant="outline" className="gap-1 text-xs">
                     <Activity className="w-3 h-3" />
                     {editor?.isActive ? 'Activo' : 'Inactivo'}
                   </Badge>
@@ -377,66 +395,33 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
             </CardHeader>
           )}
 
-          <CardContent className="space-y-4">
+          <CardContent className="p-2">
             <div className="border rounded-lg">
               {showToolbar && (
-                <div ref={toolbarRef} className={stickyToolbar ? 'sticky top-0 z-10 bg-white border-b' : ''}>
+                <div ref={toolbarRef} className={stickyToolbar ? 'sticky top-0 z-10 bg-background border-b' : ''}>
                   <EditorToolbar 
                     editor={editor} 
                     onImageClick={() => setShowImageManager(true)}
                     onSignatureClick={() => insertSignature('normal')}
                     onQuestionClick={() => insertDynamicQuestion('text', 'Nueva pregunta')}
+                    onAttachmentClick={templateId ? () => setShowAnnexesManager(true) : undefined}
                   />
                   
-                  <div className="flex items-center gap-1 p-2 border-b bg-gray-50/50">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => insertDynamicQuestion('text', 'Pregunta de texto')}
-                      className="gap-2"
-                    >
-                      <Type className="w-4 h-4" />
-                      Texto
+                  <div className="flex items-center gap-1 p-1.5 border-b bg-muted/30">
+                    <Button variant="outline" size="sm" onClick={() => insertDynamicQuestion('text', 'Pregunta de texto')} className="gap-1 h-7 text-xs">
+                      <Type className="w-3 h-3" /> Texto
                     </Button>
-                    
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => insertDynamicQuestion('textarea', 'Pregunta de texto largo')}
-                      className="gap-2"
-                    >
-                      <AlignLeft className="w-4 h-4" />
-                      Área de texto
+                    <Button variant="outline" size="sm" onClick={() => insertDynamicQuestion('textarea', 'Pregunta de texto largo')} className="gap-1 h-7 text-xs">
+                      <AlignLeft className="w-3 h-3" /> Área de texto
                     </Button>
-                    
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => insertDynamicQuestion('select', 'Pregunta de selección')}
-                      className="gap-2"
-                    >
-                      <ChevronDown className="w-4 h-4" />
-                      Lista
+                    <Button variant="outline" size="sm" onClick={() => insertDynamicQuestion('select', 'Pregunta de selección')} className="gap-1 h-7 text-xs">
+                      <ChevronDown className="w-3 h-3" /> Lista
                     </Button>
-                    
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => insertDynamicQuestion('radio', 'Pregunta de opción múltiple')}
-                      className="gap-2"
-                    >
-                      <Circle className="w-4 h-4" />
-                      Radio
+                    <Button variant="outline" size="sm" onClick={() => insertDynamicQuestion('radio', 'Pregunta de opción múltiple')} className="gap-1 h-7 text-xs">
+                      <Circle className="w-3 h-3" /> Radio
                     </Button>
-                    
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => insertDynamicQuestion('checkbox', 'Pregunta de casillas')}
-                      className="gap-2"
-                    >
-                      <Square className="w-4 h-4" />
-                      Checkbox
+                    <Button variant="outline" size="sm" onClick={() => insertDynamicQuestion('checkbox', 'Pregunta de casillas')} className="gap-1 h-7 text-xs">
+                      <Square className="w-3 h-3" /> Checkbox
                     </Button>
                   </div>
                 </div>
@@ -453,24 +438,20 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
         </Card>
 
         {showToolbar && (
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex gap-6 text-sm text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <Type className="w-4 h-4" />
-                  <span>{editor?.storage.characterCount?.characters() || 0} caracteres</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <FileText className="w-4 h-4" />
-                  <span>{editor?.storage.characterCount?.words() || 0} palabras</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Hash className="w-4 h-4" />
-                  <span>Línea {editor?.state.selection.$head.pos || 1}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="flex gap-4 text-xs text-muted-foreground px-2">
+            <span className="flex items-center gap-1">
+              <Type className="w-3 h-3" />
+              {editor?.storage.characterCount?.characters() || 0} caracteres
+            </span>
+            <span className="flex items-center gap-1">
+              <FileText className="w-3 h-3" />
+              {editor?.storage.characterCount?.words() || 0} palabras
+            </span>
+            <span className="flex items-center gap-1">
+              <Hash className="w-3 h-3" />
+              Línea {editor?.state.selection.$head.pos || 1}
+            </span>
+          </div>
         )}
       </div>
 
@@ -489,18 +470,31 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
 
       {showImageManager && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+          <div className="bg-background rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Administrador de Imágenes</h3>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowImageManager(false)}
-              >
+              <Button variant="outline" size="sm" onClick={() => setShowImageManager(false)}>
                 <X className="w-4 h-4" />
               </Button>
             </div>
             <ImageManager onImageSelect={addImage} />
+          </div>
+        </div>
+      )}
+
+      {showAnnexesManager && templateId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Adjuntar Documento al Editor</h3>
+              <Button variant="outline" size="sm" onClick={() => setShowAnnexesManager(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <TemplateAnnexesManager 
+              templateId={templateId} 
+              onContentExtracted={handleAnnexContentExtracted}
+            />
           </div>
         </div>
       )}
