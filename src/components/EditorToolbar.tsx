@@ -67,6 +67,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
+          type="button"
           variant={isActive ? 'default' : 'outline'}
           size="sm"
           onClick={onClick}

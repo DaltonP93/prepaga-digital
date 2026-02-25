@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
-import { Settings, PenTool, ShieldCheck, RotateCcw, User, Calendar, Hash, GripVertical, AlignLeft, AlignRight, AlignCenter } from 'lucide-react';
+import { Settings, PenTool, ShieldCheck, RotateCcw, User, Calendar, Hash, GripVertical, AlignLeft, AlignRight, AlignCenter, Trash2 } from 'lucide-react';
 
 // ── TipTap Node Extension ──────────────────────────────────────────────
 
@@ -186,7 +186,7 @@ const MiniSignatureCanvas: React.FC<{
         onTouchEnd={stop}
       />
       {hasContent && (
-        <Button variant="outline" size="sm" onClick={clear} className="gap-1">
+        <Button type="button" variant="outline" size="sm" onClick={clear} className="gap-1">
           <RotateCcw className="h-3 w-3" />
           Limpiar
         </Button>
@@ -253,7 +253,7 @@ const useResizable = (
 
 // ── Main Component ─────────────────────────────────────────────────────
 
-const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
+const SignatureFieldComponent = ({ node, updateAttributes, selected, deleteNode }: any) => {
   const [isEditing, setIsEditing] = useState(false);
   const [label, setLabel] = useState(node.attrs.label);
   const [signatureType, setSignatureType] = useState(node.attrs.signatureType);
@@ -364,6 +364,7 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
           </div>
           <div className="flex items-center gap-0.5">
             <Button
+              type="button"
               variant={floatDir === 'left' ? 'secondary' : 'ghost'}
               size="sm"
               onClick={() => toggleFloat('left')}
@@ -373,6 +374,7 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
               <AlignLeft className="h-3 w-3" />
             </Button>
             <Button
+              type="button"
               variant={floatDir === 'none' ? 'secondary' : 'ghost'}
               size="sm"
               onClick={() => { setFloatDir('none'); updateAttributes({ float: 'none' }); }}
@@ -382,6 +384,7 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
               <AlignCenter className="h-3 w-3" />
             </Button>
             <Button
+              type="button"
               variant={floatDir === 'right' ? 'secondary' : 'ghost'}
               size="sm"
               onClick={() => toggleFloat('right')}
@@ -391,8 +394,11 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
               <AlignRight className="h-3 w-3" />
             </Button>
             <span className="text-[10px] text-muted-foreground mx-1">{width}%</span>
-            <Button variant="ghost" size="sm" onClick={() => setIsEditing(!isEditing)} className="h-7 w-7 p-0">
+            <Button type="button" variant="ghost" size="sm" onClick={() => setIsEditing(!isEditing)} className="h-7 w-7 p-0">
               <Settings className="h-4 w-4" />
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => deleteNode()} className="h-7 w-7 p-0 text-destructive hover:text-destructive" title="Eliminar campo de firma">
+              <Trash2 className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -412,7 +418,7 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
             <div>
               <Label className="text-xs font-medium">Tipo de Firma</Label>
               <Select value={signatureType} onValueChange={(val) => { setSignatureType(val); }}>
-                <SelectTrigger className="mt-1" onPointerDown={(e) => e.stopPropagation()}><SelectValue /></SelectTrigger>
+                <SelectTrigger type="button" className="mt-1" onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}><SelectValue /></SelectTrigger>
                  <SelectContent
                    className="z-[9999]"
                    onPointerDownOutside={(e) => e.preventDefault()}
@@ -429,7 +435,7 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
             <div>
               <Label className="text-xs font-medium">Rol del Firmante</Label>
               <Select value={signerRole} onValueChange={(val) => { setSignerRole(val); }}>
-                <SelectTrigger className="mt-1" onPointerDown={(e) => e.stopPropagation()}><SelectValue /></SelectTrigger>
+                <SelectTrigger type="button" className="mt-1" onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}><SelectValue /></SelectTrigger>
                  <SelectContent
                    className="z-[9999]"
                    onPointerDownOutside={(e) => e.preventDefault()}
@@ -463,7 +469,7 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
               </div>
             </div>
 
-            <Button onClick={(e) => handleSave(e)} size="sm" className="w-full">Guardar Configuración</Button>
+            <Button type="button" onClick={(e) => handleSave(e)} size="sm" className="w-full">Guardar Configuración</Button>
           </div>
         ) : (
           <div className="space-y-2 overflow-auto" style={{ maxHeight: `${height - 60}px` }}>
