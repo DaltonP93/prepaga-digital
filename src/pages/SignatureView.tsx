@@ -514,68 +514,148 @@ const SignatureView = () => {
                   </p>
                 </CardContent>
               </Card>
-            ) : (
-              /* Canvas-based signature (default / fallback) */
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="h-5 w-5" />
-                    Firma Digital
-                  </CardTitle>
-                  <CardDescription>
-                    Dibuje su firma en el área a continuación. Esta firma tendrá validez legal.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <EnhancedSignatureCanvas
-                    onSignatureChange={setSignatureData}
-                    width={600}
-                    height={200}
-                  />
+            ) : (() => {
+              // Detect signature type from document content
+              const hasElectronicSignature = documents?.some((doc: any) => {
+                const content = doc.content || '';
+                return content.includes('signature-type="electronica"') || 
+                       content.includes('data-signature-type="electronica"') ||
+                       content.includes('firma electrónica') ||
+                       content.includes('firma electronica');
+              });
 
-                  <Separator />
+              if (hasElectronicSignature) {
+                // Electronic signature: just checkbox + button, no canvas
+                return (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Shield className="h-5 w-5" />
+                        Firma Electrónica
+                      </CardTitle>
+                      <CardDescription>
+                        Al aceptar, se registrará su firma electrónica con validez legal.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="space-y-3">
+                        <label className="flex items-start gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={termsAccepted}
+                            onChange={(e) => setTermsAccepted(e.target.checked)}
+                            className="mt-1 h-4 w-4 rounded border-border"
+                          />
+                          <span className="text-sm text-muted-foreground">
+                            He leído y acepto los términos y condiciones. Confirmo que la información
+                            proporcionada es correcta y completa. Autorizo el procesamiento de mis datos
+                            personales según la política de privacidad.
+                          </span>
+                        </label>
+                      </div>
 
-                  <div className="space-y-3">
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={termsAccepted}
-                        onChange={(e) => setTermsAccepted(e.target.checked)}
-                        className="mt-1 h-4 w-4 rounded border-border"
-                      />
-                      <span className="text-sm text-muted-foreground">
-                        He leído y acepto los términos y condiciones. Confirmo que la información
-                        proporcionada es correcta y completa. Autorizo el procesamiento de mis datos
-                        personales según la política de privacidad.
-                      </span>
-                    </label>
-                  </div>
+                      <Button
+                        onClick={() => {
+                          if (!termsAccepted || !linkData || !token) return;
+                          const electronicSignatureData = JSON.stringify({
+                            type: 'electronica',
+                            accepted_at: new Date().toISOString(),
+                            user_agent: navigator.userAgent,
+                          });
+                          submitSignature.mutate({
+                            linkId: linkData.id,
+                            token: token,
+                            signatureData: electronicSignatureData,
+                          });
+                        }}
+                        disabled={!termsAccepted || submitSignature.isPending}
+                        className="w-full"
+                        size="lg"
+                      >
+                        {submitSignature.isPending ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Procesando firma...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Firmar Todos los Documentos
+                          </>
+                        )}
+                      </Button>
 
-                  <Button
-                    onClick={handleSignatureComplete}
-                    disabled={!signatureData || !termsAccepted || submitSignature.isPending}
-                    className="w-full"
-                    size="lg"
-                  >
-                    {submitSignature.isPending ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Procesando firma...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Firmar Todos los Documentos
-                      </>
-                    )}
-                  </Button>
+                      <p className="text-xs text-center text-muted-foreground">
+                        Al firmar, se registrará su IP y hora de firma por seguridad.
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              }
 
-                  <p className="text-xs text-center text-muted-foreground">
-                    Al firmar, se registrará su IP y hora de firma por seguridad.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+              // Default: canvas-based digital signature
+              return (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Shield className="h-5 w-5" />
+                      Firma Digital
+                    </CardTitle>
+                    <CardDescription>
+                      Dibuje su firma en el área a continuación. Esta firma tendrá validez legal.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <EnhancedSignatureCanvas
+                      onSignatureChange={setSignatureData}
+                      width={600}
+                      height={200}
+                    />
+
+                    <Separator />
+
+                    <div className="space-y-3">
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={termsAccepted}
+                          onChange={(e) => setTermsAccepted(e.target.checked)}
+                          className="mt-1 h-4 w-4 rounded border-border"
+                        />
+                        <span className="text-sm text-muted-foreground">
+                          He leído y acepto los términos y condiciones. Confirmo que la información
+                          proporcionada es correcta y completa. Autorizo el procesamiento de mis datos
+                          personales según la política de privacidad.
+                        </span>
+                      </label>
+                    </div>
+
+                    <Button
+                      onClick={handleSignatureComplete}
+                      disabled={!signatureData || !termsAccepted || submitSignature.isPending}
+                      className="w-full"
+                      size="lg"
+                    >
+                      {submitSignature.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Procesando firma...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Firmar Todos los Documentos
+                        </>
+                      )}
+                    </Button>
+
+                    <p className="text-xs text-center text-muted-foreground">
+                      Al firmar, se registrará su IP y hora de firma por seguridad.
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            })()}
           </div>
         )}
       </div>
