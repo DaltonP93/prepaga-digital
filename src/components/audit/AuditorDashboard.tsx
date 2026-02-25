@@ -539,7 +539,7 @@ export const AuditorDashboard: React.FC = () => {
                 {selectedSale.clients?.phone || 'No especificado'}
               </div>
               <div>
-                <span className="font-medium">DNI: </span>
+                <span className="font-medium">C.I.: </span>
                 {selectedSale.clients?.dni || 'No especificado'}
               </div>
             </CardContent>
@@ -572,70 +572,73 @@ export const AuditorDashboard: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Beneficiaries */}
-          {selectedSale.beneficiaries?.length > 0 && (
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle>Beneficiarios ({selectedSale.beneficiaries.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {selectedSale.beneficiaries.map((ben: any) => (
-                    <div key={ben.id} className="p-3 border rounded-lg space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-medium">
-                            {ben.first_name} {ben.last_name}
-                            {ben.is_primary && <Badge variant="outline" className="ml-2 text-xs">Titular</Badge>}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {ben.relationship} • {ben.dni || 'Sin DNI'}
-                          </div>
-                        </div>
-                      </div>
-                      {/* Beneficiary Documents */}
-                      {ben.beneficiary_documents && ben.beneficiary_documents.length > 0 && (
-                        <div className="border-t pt-2 space-y-1">
-                          <p className="text-xs font-medium text-muted-foreground">Documentos adjuntos ({ben.beneficiary_documents.length})</p>
-                          {ben.beneficiary_documents.map((doc: any) => (
-                            <div key={doc.id} className="flex items-center justify-between p-2 bg-muted/30 rounded text-sm">
-                              <div className="flex items-center gap-2">
-                                <FileText className="h-3 w-3" />
-                                <span>{doc.file_name}</span>
-                                {doc.is_verified && (
-                                  <Badge variant="outline" className="text-green-600 border-green-600 text-[10px]">
-                                    <CheckCircle className="h-2 w-2 mr-1" />Verificado
-                                  </Badge>
-                                )}
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={async () => {
-                                  const { data } = await supabase.storage
-                                    .from('beneficiary-documents')
-                                    .createSignedUrl(doc.file_url, 3600);
-                                  if (data?.signedUrl) {
-                                    setLightboxUrl(data.signedUrl);
-                                    setLightboxName(doc.file_name);
-                                    setLightboxType(doc.file_type || '');
-                                    setLightboxOpen(true);
-                                  }
-                                }}
-                              >
-                                <Eye className="h-3 w-3 mr-1" />
-                                Ver
-                              </Button>
+          {/* Adherentes (excluye titular) */}
+          {(() => {
+            const adherentes = (selectedSale.beneficiaries || []).filter((b: any) => !b.is_primary);
+            if (adherentes.length === 0) return null;
+            return (
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle>Adherentes ({adherentes.length})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {adherentes.map((ben: any) => (
+                      <div key={ben.id} className="p-3 border rounded-lg space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">
+                              {ben.first_name} {ben.last_name}
                             </div>
-                          ))}
+                            <div className="text-sm text-muted-foreground">
+                              {ben.relationship} • C.I.: {ben.dni || 'No especificado'}
+                            </div>
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                        {/* Beneficiary Documents */}
+                        {ben.beneficiary_documents && ben.beneficiary_documents.length > 0 && (
+                          <div className="border-t pt-2 space-y-1">
+                            <p className="text-xs font-medium text-muted-foreground">Documentos adjuntos ({ben.beneficiary_documents.length})</p>
+                            {ben.beneficiary_documents.map((doc: any) => (
+                              <div key={doc.id} className="flex items-center justify-between p-2 bg-muted/30 rounded text-sm">
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-3 w-3" />
+                                  <span>{doc.file_name}</span>
+                                  {doc.is_verified && (
+                                    <Badge variant="outline" className="text-green-600 border-green-600 text-[10px]">
+                                      <CheckCircle className="h-2 w-2 mr-1" />Verificado
+                                    </Badge>
+                                  )}
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={async () => {
+                                    const { data } = await supabase.storage
+                                      .from('beneficiary-documents')
+                                      .createSignedUrl(doc.file_url, 3600);
+                                    if (data?.signedUrl) {
+                                      setLightboxUrl(data.signedUrl);
+                                      setLightboxName(doc.file_name);
+                                      setLightboxType(doc.file_type || '');
+                                      setLightboxOpen(true);
+                                    }
+                                  }}
+                                >
+                                  <Eye className="h-3 w-3 mr-1" />
+                                  Ver
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
 
           {/* Declaración Jurada de Salud */}
           {selectedSale.beneficiaries?.length > 0 && (
