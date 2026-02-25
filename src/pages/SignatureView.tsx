@@ -29,8 +29,6 @@ const SignatureView = () => {
   
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const [activeSigningDocId, setActiveSigningDocId] = useState<string | null>(null);
-  const [signedDocIds, setSignedDocIds] = useState<Set<string>>(new Set());
   const [signwellCompleted, setSignwellCompleted] = useState(false);
   const signatureSectionRef = useRef<HTMLDivElement>(null);
 
@@ -94,25 +92,12 @@ const SignatureView = () => {
   };
 
   const handleSignatureComplete = async () => {
-    if (!signatureData || !linkData || !termsAccepted || !activeSigningDocId) return;
+    if (!signatureData || !linkData || !termsAccepted) return;
     await submitSignature.mutateAsync({
       linkId: linkData.id,
       token: token!,
       signatureData,
     });
-    setSignedDocIds(prev => new Set(prev).add(activeSigningDocId));
-    setActiveSigningDocId(null);
-    setSignatureData(null);
-    setTermsAccepted(false);
-  };
-
-  const handleOpenSignaturePanel = (docId: string) => {
-    setActiveSigningDocId(docId);
-    setSignatureData(null);
-    setTermsAccepted(false);
-    setTimeout(() => {
-      signatureSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
   };
 
   const handleDownloadSignature = () => {
@@ -416,17 +401,10 @@ const SignatureView = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    {docsToSign.map((doc: any) => {
-                      const isSigned = signedDocIds.has(doc.id);
-                      const isActive = activeSigningDocId === doc.id;
-                      return (
-                        <div key={doc.id} className={`flex items-center justify-between border rounded-lg p-4 ${isSigned ? 'bg-green-50 border-green-200' : isActive ? 'bg-primary/5 border-primary' : ''}`}>
+                    {docsToSign.map((doc: any) => (
+                        <div key={doc.id} className="flex items-center justify-between border rounded-lg p-4">
                           <div className="flex items-center gap-3">
-                            {isSigned ? (
-                              <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
-                            ) : (
-                              <FileText className="h-5 w-5 text-primary flex-shrink-0" />
-                            )}
+                            <FileText className="h-5 w-5 text-primary flex-shrink-0" />
                             <div>
                               <p className="font-medium text-sm">
                                 {doc.name}{recipientName ? ` - ${recipientName}` : ''}
@@ -435,20 +413,15 @@ const SignatureView = () => {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            {isSigned ? (
-                              <Badge className="bg-green-600 text-[10px]">✓ Firmado</Badge>
-                            ) : isActive ? (
-                              <Badge variant="outline" className="text-primary">Firmando...</Badge>
-                            ) : (
-                              <Button size="sm" onClick={() => handleOpenSignaturePanel(doc.id)} disabled={!!activeSigningDocId}>
-                                <PenTool className="h-3 w-3 mr-1" />
-                                Firmar
+                            {doc.content && (
+                              <Button size="sm" variant="outline" onClick={() => handleDownloadSignedContent(doc)}>
+                                <Eye className="h-3 w-3 mr-1" />
+                                Ver
                               </Button>
                             )}
                           </div>
                         </div>
-                      );
-                    })}
+                      ))}
                   </CardContent>
                 </Card>
               )}
@@ -510,8 +483,8 @@ const SignatureView = () => {
           );
         })()}
 
-        {/* Signature Section - only visible after clicking Firmar */}
-        {activeSigningDocId && (
+        {/* Signature Section - always visible when there are documents */}
+        {documents && documents.filter((d: any) => d.requires_signature !== false).length > 0 && (
           <div ref={signatureSectionRef}>
             {signwellSigningUrl && !signwellCompleted ? (
               /* SignWell Embedded Signing via iframe */
@@ -590,7 +563,7 @@ const SignatureView = () => {
                     ) : (
                       <>
                         <CheckCircle className="h-4 w-4 mr-2" />
-                        Firmar Documento
+                        Firmar Todos los Documentos
                       </>
                     )}
                   </Button>
