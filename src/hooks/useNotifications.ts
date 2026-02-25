@@ -62,8 +62,12 @@ export const useNotifications = () => {
 
   useEffect(() => {
     const channel = supabase
-      .channel('notifications-changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, () => {
+      .channel('notifications-user-changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'notifications',
+      }, () => {
         queryClient.invalidateQueries({ queryKey: ['notifications'] });
       })
       .subscribe();

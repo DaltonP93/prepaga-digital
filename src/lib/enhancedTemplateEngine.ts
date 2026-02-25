@@ -414,8 +414,10 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
   }
 
   // Handle beneficiaries loop {{#beneficiarios}}...{{/beneficiarios}}
+  let beneficiaryLoopMatched = false;
   const beneficiariesLoopRegex = /\{\{#beneficiarios\}\}([\s\S]*?)\{\{\/beneficiarios\}\}/gi;
   result = result.replace(beneficiariesLoopRegex, (_, content) => {
+    beneficiaryLoopMatched = true;
     return context.beneficiarios.map((beneficiary, index) => {
       let itemResult = content;
       // Replace beneficiary-specific placeholders (Spanish names from BeneficiaryContext)
@@ -465,43 +467,44 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     }).join('');
   });
 
-  // FALLBACK: If there are still unresolved beneficiary-style placeholders in table rows
-  // (template doesn't use {{#beneficiarios}} loop), auto-expand rows
-  const hasBeneficiaryPlaceholders = /\{\{(first_name|last_name|_index|birth_date|dni|gender|amount|relationship|titular\.edad)\}\}/gi.test(result);
-  if (hasBeneficiaryPlaceholders && context.beneficiarios.length > 0) {
-    // Find <tr> elements containing beneficiary placeholders and replicate them
-    const trRegex = /<tr[^>]*>([\s\S]*?\{\{(?:first_name|last_name|_index|birth_date|dni|gender|amount|relationship|titular\.edad)\}\}[\s\S]*?)<\/tr>/gi;
-    result = result.replace(trRegex, (fullMatch, rowContent) => {
-      return context.beneficiarios.map((beneficiary, index) => {
-        let row = fullMatch;
-        const aliases: Record<string, string> = {
-          '{{first_name}}': beneficiary.nombre,
-          '{{last_name}}': beneficiary.apellido,
-          '{{birth_date}}': beneficiary.fechaNacimiento,
-          '{{gender}}': beneficiary.genero,
-          '{{amount}}': beneficiary.montoFormateado,
-          '{{relationship}}': beneficiary.parentesco,
-          '{{dni}}': beneficiary.dni,
-          '{{document_number}}': beneficiary.dni,
-          '{{age}}': String(beneficiary.edad),
-          '{{titular.edad}}': String(beneficiary.edad),
-          '{{edad}}': String(beneficiary.edad),
-          '{{_index}}': String(index + 1),
-          '{{index}}': String(index + 1),
-          '{{indice}}': String(index + 1),
-          '{{email}}': beneficiary.email,
-          '{{phone}}': beneficiary.telefono,
-          '{{formatted_amount}}': beneficiary.montoFormateado,
-          '{{vigencia_inmediata}}': context.venta.vigenciaInmediata,
-          '{{tipo_venta}}': context.venta.tipoVenta,
-        };
-        Object.entries(aliases).forEach(([placeholder, value]) => {
-          const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-          row = row.replace(regex, value || '');
-        });
-        return row;
-      }).join('\n');
-    });
+  // FALLBACK: Only run if the explicit {{#beneficiarios}} loop did NOT match
+  // This prevents double beneficiary tables
+  if (!beneficiaryLoopMatched) {
+    const hasBeneficiaryPlaceholders = /\{\{(first_name|last_name|_index|birth_date|dni|gender|amount|relationship|titular\.edad)\}\}/gi.test(result);
+    if (hasBeneficiaryPlaceholders && context.beneficiarios.length > 0) {
+      const trRegex = /<tr[^>]*>([\s\S]*?\{\{(?:first_name|last_name|_index|birth_date|dni|gender|amount|relationship|titular\.edad)\}\}[\s\S]*?)<\/tr>/gi;
+      result = result.replace(trRegex, (fullMatch, rowContent) => {
+        return context.beneficiarios.map((beneficiary, index) => {
+          let row = fullMatch;
+          const aliases: Record<string, string> = {
+            '{{first_name}}': beneficiary.nombre,
+            '{{last_name}}': beneficiary.apellido,
+            '{{birth_date}}': beneficiary.fechaNacimiento,
+            '{{gender}}': beneficiary.genero,
+            '{{amount}}': beneficiary.montoFormateado,
+            '{{relationship}}': beneficiary.parentesco,
+            '{{dni}}': beneficiary.dni,
+            '{{document_number}}': beneficiary.dni,
+            '{{age}}': String(beneficiary.edad),
+            '{{titular.edad}}': String(beneficiary.edad),
+            '{{edad}}': String(beneficiary.edad),
+            '{{_index}}': String(index + 1),
+            '{{index}}': String(index + 1),
+            '{{indice}}': String(index + 1),
+            '{{email}}': beneficiary.email,
+            '{{phone}}': beneficiary.telefono,
+            '{{formatted_amount}}': beneficiary.montoFormateado,
+            '{{vigencia_inmediata}}': context.venta.vigenciaInmediata,
+            '{{tipo_venta}}': context.venta.tipoVenta,
+          };
+          Object.entries(aliases).forEach(([placeholder, value]) => {
+            const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+            row = row.replace(regex, value || '');
+          });
+          return row;
+        }).join('\n');
+      });
+    }
   }
 
   return result;
