@@ -248,37 +248,47 @@ export const useResendSignatureLink = () => {
         })
         .eq('id', oldLink.id);
 
-      // 2. Delete ONLY signed/final copies of documents for this recipient
+      // 2. Delete ONLY final/signed copies of documents for this recipient
       // Keep original "pendiente" documents so the new link can use them
       if (oldLink.recipient_type === 'adherente' && oldLink.recipient_id) {
-        // For adherente: delete signed copies tied to this beneficiary
+        // For adherente: delete all final copies tied to this beneficiary
         await supabase
           .from('documents')
           .delete()
           .eq('sale_id', oldLink.sale_id)
           .eq('beneficiary_id', oldLink.recipient_id)
-          .eq('status', 'firmado' as any);
+          .eq('is_final', true);
+
+        // Delete firma documents for this adherente
+        await supabase
+          .from('documents')
+          .delete()
+          .eq('sale_id', oldLink.sale_id)
+          .eq('beneficiary_id', oldLink.recipient_id)
+          .eq('document_type', 'firma');
 
         // Reset original documents back to pendiente
         await supabase
           .from('documents')
           .update({ status: 'pendiente' as any, signed_at: null, signature_data: null } as any)
           .eq('sale_id', oldLink.sale_id)
-          .eq('beneficiary_id', oldLink.recipient_id);
+          .eq('beneficiary_id', oldLink.recipient_id)
+          .eq('is_final', false);
       } else {
-        // For titular: delete signed copies without beneficiary_id + signature image docs
+        // For titular: delete all final copies without beneficiary_id
         await supabase
           .from('documents')
           .delete()
           .eq('sale_id', oldLink.sale_id)
           .is('beneficiary_id', null)
-          .eq('status', 'firmado' as any);
+          .eq('is_final', true);
 
-        // Delete standalone firma documents
+        // Delete standalone firma documents for titular
         await supabase
           .from('documents')
           .delete()
           .eq('sale_id', oldLink.sale_id)
+          .is('beneficiary_id', null)
           .eq('document_type', 'firma');
 
         // Reset original titular documents back to pendiente
@@ -287,7 +297,7 @@ export const useResendSignatureLink = () => {
           .update({ status: 'pendiente' as any, signed_at: null, signature_data: null } as any)
           .eq('sale_id', oldLink.sale_id)
           .is('beneficiary_id', null)
-          .neq('document_type', 'firma');
+          .eq('is_final', false);
       }
 
       // 3. Create new link with same recipient data
