@@ -263,6 +263,21 @@ export const useSubmitSignatureLink = () => {
         const recipientType = data.recipient_type;
         const recipientId = data.recipient_id;
 
+        // First, delete any existing final copies for this recipient to avoid duplicates
+        let deleteQuery = signatureClient
+          .from('documents')
+          .delete()
+          .eq('sale_id', data.sale_id)
+          .eq('is_final', true)
+          .neq('document_type', 'firma');
+
+        if (recipientType === 'adherente' && recipientId) {
+          deleteQuery = deleteQuery.eq('beneficiary_id', recipientId);
+        } else if (recipientType === 'titular') {
+          deleteQuery = deleteQuery.is('beneficiary_id', null);
+        }
+        await deleteQuery;
+
         let docsQuery = signatureClient
           .from('documents')
           .select('*')

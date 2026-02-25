@@ -411,11 +411,13 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
 
             <div>
               <Label className="text-xs font-medium">Tipo de Firma</Label>
-              <Select value={signatureType} onValueChange={setSignatureType}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <Select value={signatureType} onValueChange={(val) => { setSignatureType(val); }}>
+                <SelectTrigger className="mt-1" onPointerDown={(e) => e.stopPropagation()}><SelectValue /></SelectTrigger>
                  <SelectContent
+                   className="z-[9999]"
                    onPointerDownOutside={(e) => e.preventDefault()}
                    onEscapeKeyDown={(e) => e.preventDefault()}
+                   onCloseAutoFocus={(e) => e.preventDefault()}
                  >
                    <SelectItem value="both">Ambas (Digital + Electrónica)</SelectItem>
                    <SelectItem value="digital">Solo Digital (manuscrita)</SelectItem>
@@ -426,11 +428,13 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected }: any) => {
 
             <div>
               <Label className="text-xs font-medium">Rol del Firmante</Label>
-              <Select value={signerRole} onValueChange={setSignerRole}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <Select value={signerRole} onValueChange={(val) => { setSignerRole(val); }}>
+                <SelectTrigger className="mt-1" onPointerDown={(e) => e.stopPropagation()}><SelectValue /></SelectTrigger>
                  <SelectContent
+                   className="z-[9999]"
                    onPointerDownOutside={(e) => e.preventDefault()}
                    onEscapeKeyDown={(e) => e.preventDefault()}
+                   onCloseAutoFocus={(e) => e.preventDefault()}
                  >
                    <SelectItem value="cliente">Cliente / Titular</SelectItem>
                    <SelectItem value="empresa">Representante de Empresa</SelectItem>
