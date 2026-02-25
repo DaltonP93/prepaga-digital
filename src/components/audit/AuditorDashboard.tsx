@@ -103,27 +103,24 @@ const BeneficiaryHealthView: React.FC<{ beneficiary: any }> = ({ beneficiary }) 
       </div>
 
       {/* Hábitos */}
-      {health.habits.some(h => h) && (
-        <div className="flex flex-wrap gap-2">
-          {HABITS_LABELS.map((label, i) => (
-            health.habits[i] && (
-              <Badge key={i} variant="outline" className="text-orange-600 border-orange-300">
-                {label}
-              </Badge>
-            )
-          ))}
-        </div>
-      )}
+      <div className="flex flex-wrap gap-2">
+        {HABITS_LABELS.map((label, i) => (
+          <Badge key={i} variant="outline" className={health.habits[i] ? "text-orange-600 border-orange-300" : "text-muted-foreground"}>
+            {health.habits[i] ? '✓' : '✗'} {label}
+          </Badge>
+        ))}
+      </div>
 
-      {/* Preguntas */}
+      {/* Preguntas - show all 7 */}
       <div className="space-y-1.5">
         {HEALTH_QUESTIONS.map((q, i) => {
           const shortQ = q.replace(/^\d+\.\s*/, '').substring(0, 80) + (q.length > 83 ? '...' : '');
           const answer = health.answers[i];
-          if (!answer) return null;
+          // Default to 'no' if not answered
+          const displayAnswer = answer || 'no';
           return (
             <div key={i} className="flex items-start gap-2 text-sm">
-              {answer === 'si' ? (
+              {displayAnswer === 'si' ? (
                 <Badge variant="destructive" className="text-[10px] px-1.5 py-0 shrink-0 mt-0.5">Sí</Badge>
               ) : (
                 <Badge variant="outline" className="text-green-600 border-green-300 text-[10px] px-1.5 py-0 shrink-0 mt-0.5">No</Badge>
@@ -542,6 +539,30 @@ export const AuditorDashboard: React.FC = () => {
                 <span className="font-medium">C.I.: </span>
                 {selectedSale.clients?.dni || 'No especificado'}
               </div>
+              {selectedSale.clients?.birth_date && (
+                <div>
+                  <span className="font-medium">Fecha Nac.: </span>
+                  {new Date(selectedSale.clients.birth_date).toLocaleDateString('es-PY')}
+                </div>
+              )}
+              {selectedSale.clients?.address && (
+                <div>
+                  <span className="font-medium">Dirección: </span>
+                  {selectedSale.clients.address}
+                </div>
+              )}
+              {selectedSale.clients?.barrio && (
+                <div>
+                  <span className="font-medium">Barrio: </span>
+                  {selectedSale.clients.barrio}
+                </div>
+              )}
+              {selectedSale.clients?.city && (
+                <div>
+                  <span className="font-medium">Ciudad: </span>
+                  {selectedSale.clients.city}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -569,8 +590,51 @@ export const AuditorDashboard: React.FC = () => {
                 <span className="font-medium">Contrato #: </span>
                 {selectedSale.contract_number || 'Sin asignar'}
               </div>
+              {selectedSale.profiles && (
+                <div>
+                  <span className="font-medium">Vendedor: </span>
+                  {selectedSale.profiles.first_name} {selectedSale.profiles.last_name}
+                </div>
+              )}
             </CardContent>
           </Card>
+
+          {/* Información Laboral y Contractual */}
+          {(selectedSale.workplace || selectedSale.profession || selectedSale.work_phone || selectedSale.work_address || selectedSale.signature_modality) && (
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>Información Adicional</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {selectedSale.workplace && (
+                    <div><span className="font-medium">Lugar de Trabajo: </span>{selectedSale.workplace}</div>
+                  )}
+                  {selectedSale.profession && (
+                    <div><span className="font-medium">Profesión: </span>{selectedSale.profession}</div>
+                  )}
+                  {selectedSale.work_phone && (
+                    <div><span className="font-medium">Tel. Laboral: </span>{selectedSale.work_phone}</div>
+                  )}
+                  {selectedSale.work_address && (
+                    <div><span className="font-medium">Dir. Laboral: </span>{selectedSale.work_address}</div>
+                  )}
+                  {selectedSale.signature_modality && (
+                    <div><span className="font-medium">Modalidad Firma: </span>{selectedSale.signature_modality}</div>
+                  )}
+                  {selectedSale.immediate_validity !== null && selectedSale.immediate_validity !== undefined && (
+                    <div><span className="font-medium">Vigencia Inmediata: </span>{selectedSale.immediate_validity ? 'Sí' : 'No'}</div>
+                  )}
+                  {selectedSale.maternity_bonus !== null && selectedSale.maternity_bonus !== undefined && (
+                    <div><span className="font-medium">Prima Maternidad: </span>{selectedSale.maternity_bonus ? 'Sí' : 'No'}</div>
+                  )}
+                  {selectedSale.sale_type && (
+                    <div><span className="font-medium">Tipo de Venta: </span>{selectedSale.sale_type}</div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Adherentes (excluye titular) */}
           {(() => {
@@ -592,7 +656,20 @@ export const AuditorDashboard: React.FC = () => {
                             </div>
                             <div className="text-sm text-muted-foreground">
                               {ben.relationship} • C.I.: {ben.dni || 'No especificado'}
+                              {ben.birth_date && ` • Nac: ${new Date(ben.birth_date).toLocaleDateString('es-PY')}`}
+                              {ben.email && ` • ${ben.email}`}
+                              {ben.phone && ` • Tel: ${ben.phone}`}
                             </div>
+                            {(ben.address || ben.barrio || ben.city) && (
+                              <div className="text-sm text-muted-foreground">
+                                {[ben.address, ben.barrio, ben.city].filter(Boolean).join(', ')}
+                              </div>
+                            )}
+                            {ben.amount > 0 && (
+                              <div className="text-sm text-muted-foreground">
+                                Monto: {formatCurrency(Number(ben.amount))}
+                              </div>
+                            )}
                           </div>
                         </div>
                         {/* Beneficiary Documents */}
@@ -615,7 +692,7 @@ export const AuditorDashboard: React.FC = () => {
                                   size="sm"
                                   onClick={async () => {
                                     const { data } = await supabase.storage
-                                      .from('beneficiary-documents')
+                                      .from('documents')
                                       .createSignedUrl(doc.file_url, 3600);
                                     if (data?.signedUrl) {
                                       setLightboxUrl(data.signedUrl);
