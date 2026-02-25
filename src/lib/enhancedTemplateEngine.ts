@@ -387,7 +387,7 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     '{{titular_barrio}}': context.cliente.barrio,
     '{{titular_fecha_nacimiento}}': context.cliente.fechaNacimiento,
     '{{titular_edad}}': String(context.cliente.edad),
-    '{{monto_total}}': `${context.venta.totalFormateado} (${context.venta.totalLetras})`,
+    '{{monto_total}}': context.venta.totalFormateado,
     '{{monto_total_letras}}': context.venta.totalLetras,
     '{{razon_social}}': context.facturacion.razonSocial,
     '{{ruc}}': context.facturacion.ruc,
