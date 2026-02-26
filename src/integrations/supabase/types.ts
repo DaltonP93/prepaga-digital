@@ -1173,6 +1173,41 @@ export type Database = {
           },
         ]
       }
+      hash_anchors: {
+        Row: {
+          anchor_reference: string | null
+          anchor_type: string
+          anchored_at: string | null
+          evidence_bundle_id: string
+          hash_value: string
+          id: string
+        }
+        Insert: {
+          anchor_reference?: string | null
+          anchor_type?: string
+          anchored_at?: string | null
+          evidence_bundle_id: string
+          hash_value: string
+          id?: string
+        }
+        Update: {
+          anchor_reference?: string | null
+          anchor_type?: string
+          anchored_at?: string | null
+          evidence_bundle_id?: string
+          hash_value?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hash_anchors_evidence_bundle_id_fkey"
+            columns: ["evidence_bundle_id"]
+            isOneToOne: false
+            referencedRelation: "signature_evidence_bundles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       information_requests: {
         Row: {
           created_at: string | null
@@ -1903,6 +1938,77 @@ export type Database = {
           },
         ]
       }
+      signature_evidence_bundles: {
+        Row: {
+          bundle_hash: string
+          created_at: string | null
+          document_hash: string
+          document_id: string | null
+          evidence_json: Json
+          id: string
+          pdf_hash: string | null
+          sale_id: string
+          signature_event_id: string | null
+          signature_link_id: string | null
+          storage_url: string | null
+        }
+        Insert: {
+          bundle_hash: string
+          created_at?: string | null
+          document_hash: string
+          document_id?: string | null
+          evidence_json: Json
+          id?: string
+          pdf_hash?: string | null
+          sale_id: string
+          signature_event_id?: string | null
+          signature_link_id?: string | null
+          storage_url?: string | null
+        }
+        Update: {
+          bundle_hash?: string
+          created_at?: string | null
+          document_hash?: string
+          document_id?: string | null
+          evidence_json?: Json
+          id?: string
+          pdf_hash?: string | null
+          sale_id?: string
+          signature_event_id?: string | null
+          signature_link_id?: string | null
+          storage_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signature_evidence_bundles_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_evidence_bundles_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_evidence_bundles_signature_event_id_fkey"
+            columns: ["signature_event_id"]
+            isOneToOne: false
+            referencedRelation: "signature_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_evidence_bundles_signature_link_id_fkey"
+            columns: ["signature_link_id"]
+            isOneToOne: false
+            referencedRelation: "signature_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       signature_identity_verification: {
         Row: {
           attempts: number
@@ -2049,6 +2155,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      signature_policies: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          title: string
+          version: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          title?: string
+          version: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          title?: string
+          version?: string
+        }
+        Relationships: []
       }
       signature_workflow_steps: {
         Row: {
