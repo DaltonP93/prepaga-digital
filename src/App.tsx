@@ -6,10 +6,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SimpleAuthProvider } from "@/components/SimpleAuthProvider";
 import { CompanyBrandingProvider } from "@/components/CompanyBrandingProvider";
-import { SimpleProtectedRoute } from "@/components/SimpleProtectedRoute";
-import { RoleProtectedRoute } from "@/components/RoleProtectedRoute";
-import { SimpleLoginForm } from "@/components/SimpleLoginForm";
-import MainLayout from "@/layouts/MainLayout";
+
+// Lazy-load components not needed for initial login page render
+const SimpleProtectedRoute = lazy(() => import("@/components/SimpleProtectedRoute").then(m => ({ default: m.SimpleProtectedRoute })));
+const RoleProtectedRoute = lazy(() => import("@/components/RoleProtectedRoute").then(m => ({ default: m.RoleProtectedRoute })));
+const SimpleLoginForm = lazy(() => import("@/components/SimpleLoginForm"));
+const MainLayout = lazy(() => import("@/layouts/MainLayout"));
 
 // Lazy-loaded pages for code splitting — reduces initial bundle size
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
