@@ -67,16 +67,20 @@ serve(async (req) => {
         )
       }
 
-      // Require a bootstrap secret for production safety
+      // Require a bootstrap secret - always enforced
       const bootstrapSecret = Deno.env.get('BOOTSTRAP_SECRET')
-      if (bootstrapSecret) {
-        const providedSecret = requestBody.bootstrap_secret
-        if (!providedSecret || providedSecret !== bootstrapSecret) {
-          return new Response(
-            JSON.stringify({ error: 'Invalid or missing bootstrap secret' }),
-            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
-        }
+      if (!bootstrapSecret) {
+        return new Response(
+          JSON.stringify({ error: 'BOOTSTRAP_SECRET not configured. Set it in Supabase secrets before bootstrapping.' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      const providedSecret = requestBody.bootstrap_secret
+      if (!providedSecret || providedSecret !== bootstrapSecret) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid or missing bootstrap secret' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
       }
 
       const email = requestBody.email;
