@@ -9,6 +9,14 @@ interface VerificationState {
   expiresAt: string | null;
   attemptsRemaining: number;
   error: string | null;
+  channelUsed: string | null;
+}
+
+interface OtpPolicy {
+  require_otp: boolean;
+  allowed_channels: string[];
+  default_channel: string;
+  whatsapp_enabled: boolean;
 }
 
 export const useSignatureVerification = () => {
@@ -20,9 +28,32 @@ export const useSignatureVerification = () => {
     expiresAt: null,
     attemptsRemaining: 3,
     error: null,
+    channelUsed: null,
   });
+  const [otpPolicy, setOtpPolicy] = useState<OtpPolicy | null>(null);
 
-  const sendOTP = async (signatureLinkId: string, saleId: string, recipientEmail: string, token: string) => {
+  const fetchPolicy = async (saleId: string, token: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('signature-otp', {
+        body: { action: 'get_policy', sale_id: saleId },
+        headers: { 'x-signature-token': token },
+      });
+      if (!error && data) {
+        setOtpPolicy(data);
+      }
+    } catch (err) {
+      console.error('Error fetching OTP policy:', err);
+    }
+  };
+
+  const sendOTP = async (
+    signatureLinkId: string,
+    saleId: string,
+    recipientEmail: string,
+    token: string,
+    channel?: string,
+    recipientPhone?: string,
+  ) => {
     setState(prev => ({ ...prev, step: 'sending', error: null }));
     try {
       const { data, error } = await supabase.functions.invoke('signature-otp', {
@@ -31,6 +62,8 @@ export const useSignatureVerification = () => {
           signature_link_id: signatureLinkId,
           sale_id: saleId,
           recipient_email: recipientEmail,
+          recipient_phone: recipientPhone,
+          channel: channel || otpPolicy?.default_channel || 'email',
         },
         headers: { 'x-signature-token': token },
       });
@@ -44,11 +77,13 @@ export const useSignatureVerification = () => {
         verificationId: data.verification_id,
         destinationMasked: data.destination_masked,
         expiresAt: data.expires_at,
+        channelUsed: data.channel_used || channel || 'email',
       }));
 
+      const channelLabel = data.channel_used === 'whatsapp' ? 'WhatsApp' : 'correo';
       toast({
         title: 'Código enviado',
-        description: `Se envió un código de verificación a ${data.destination_masked}`,
+        description: `Se envió un código de verificación a ${data.destination_masked} vía ${channelLabel}`,
       });
     } catch (err: any) {
       setState(prev => ({ ...prev, step: 'error', error: err.message }));
@@ -116,11 +151,14 @@ export const useSignatureVerification = () => {
       expiresAt: null,
       attemptsRemaining: 3,
       error: null,
+      channelUsed: null,
     });
   };
 
   return {
     ...state,
+    otpPolicy,
+    fetchPolicy,
     sendOTP,
     verifyOTP,
     reset,

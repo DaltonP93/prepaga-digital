@@ -34,6 +34,7 @@ import { WorkflowConfigPanel } from '@/components/workflow/WorkflowConfigPanel';
 import { SaleProgressConfigPanel } from '@/components/workflow/SaleProgressConfigPanel';
 import { AdminConfigPanel } from '@/components/AdminConfigPanel';
 import { MenuConfigPanel } from '@/components/MenuConfigPanel';
+import { OtpPolicyConfigPanel } from '@/components/OtpPolicyConfigPanel';
 import { useRolePermissions } from '@/hooks/useRolePermissions';
 
 export default function Settings() {
@@ -200,7 +201,10 @@ export default function Settings() {
 
         <TabsContent value="integraciones" className="space-y-4">
           {canManageWorkflow ? (
-            <AdminConfigPanel />
+            <>
+              <AdminConfigPanel />
+              <OtpPolicyConfigPanel />
+            </>
           ) : (
             <Card>
               <CardContent className="p-6">
