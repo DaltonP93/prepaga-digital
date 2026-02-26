@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { useCompanyConfiguration } from '@/hooks/useCompanyConfiguration';
-import { useCompanyApiConfiguration, WhatsAppProvider } from '@/hooks/useCompanyApiConfiguration';
+import { useCompanyApiConfiguration, WhatsAppProvider, EmailProvider } from '@/hooks/useCompanyApiConfiguration';
 import { getWhatsAppWebhookUrl } from '@/lib/appUrls';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,11 +30,14 @@ export const AdminConfigPanel: React.FC = () => {
     whatsapp_provider: 'wame_fallback' as WhatsAppProvider,
     whatsapp_api_token: '',
     whatsapp_phone_number: '',
+    whatsapp_gateway_url: '',
+    whatsapp_linked_phone: '',
     twilio_account_sid: '',
     twilio_auth_token: '',
     twilio_whatsapp_number: '',
     sms_api_enabled: false,
     sms_api_key: '',
+    email_provider: 'resend' as EmailProvider,
     email_api_enabled: false,
     email_api_key: '',
     email_from_address: '',
@@ -71,11 +74,14 @@ export const AdminConfigPanel: React.FC = () => {
       current.whatsapp_provider !== next.whatsapp_provider ||
       current.whatsapp_api_token !== next.whatsapp_api_token ||
       current.whatsapp_phone_number !== next.whatsapp_phone_number ||
+      current.whatsapp_gateway_url !== next.whatsapp_gateway_url ||
+      current.whatsapp_linked_phone !== next.whatsapp_linked_phone ||
       current.twilio_account_sid !== next.twilio_account_sid ||
       current.twilio_auth_token !== next.twilio_auth_token ||
       current.twilio_whatsapp_number !== next.twilio_whatsapp_number ||
       current.sms_api_enabled !== next.sms_api_enabled ||
       current.sms_api_key !== next.sms_api_key ||
+      current.email_provider !== next.email_provider ||
       current.email_api_enabled !== next.email_api_enabled ||
       current.email_api_key !== next.email_api_key ||
       current.email_from_address !== next.email_from_address ||
@@ -98,11 +104,14 @@ export const AdminConfigPanel: React.FC = () => {
     whatsapp_provider: apiConfig?.whatsapp_provider || defaultApiFormData.whatsapp_provider,
     whatsapp_api_token: apiConfig?.whatsapp_api_token || defaultApiFormData.whatsapp_api_token,
     whatsapp_phone_number: apiConfig?.whatsapp_phone_number || defaultApiFormData.whatsapp_phone_number,
+    whatsapp_gateway_url: apiConfig?.whatsapp_gateway_url || defaultApiFormData.whatsapp_gateway_url,
+    whatsapp_linked_phone: apiConfig?.whatsapp_linked_phone || defaultApiFormData.whatsapp_linked_phone,
     twilio_account_sid: apiConfig?.twilio_account_sid || defaultApiFormData.twilio_account_sid,
     twilio_auth_token: apiConfig?.twilio_auth_token || defaultApiFormData.twilio_auth_token,
     twilio_whatsapp_number: apiConfig?.twilio_whatsapp_number || defaultApiFormData.twilio_whatsapp_number,
     sms_api_enabled: apiConfig?.sms_api_enabled || defaultApiFormData.sms_api_enabled,
     sms_api_key: apiConfig?.sms_api_key || defaultApiFormData.sms_api_key,
+    email_provider: apiConfig?.email_provider || defaultApiFormData.email_provider,
     email_api_enabled: apiConfig?.email_api_enabled || defaultApiFormData.email_api_enabled,
     email_api_key: apiConfig?.email_api_key || defaultApiFormData.email_api_key,
     email_from_address: apiConfig?.email_from_address || defaultApiFormData.email_from_address,
@@ -155,6 +164,12 @@ export const AdminConfigPanel: React.FC = () => {
       return {
         connected: !!apiFormData.twilio_account_sid && !!apiFormData.twilio_auth_token && !!apiFormData.twilio_whatsapp_number,
         label: 'Twilio',
+      };
+    }
+    if (provider === 'qr_session') {
+      return {
+        connected: !!apiFormData.whatsapp_gateway_url && !!apiFormData.whatsapp_linked_phone,
+        label: 'Sesión QR',
       };
     }
     return { connected: true, label: 'wa.me (Manual)' };
@@ -298,7 +313,7 @@ export const AdminConfigPanel: React.FC = () => {
               {/* Provider Selector */}
               <div className="space-y-3">
                 <Label className="text-base font-medium">Proveedor de WhatsApp</Label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                   {/* Meta Business API */}
                   <div
                     className={`relative cursor-pointer rounded-lg border-2 p-4 transition-all ${apiFormData.whatsapp_provider === 'meta' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
@@ -306,7 +321,7 @@ export const AdminConfigPanel: React.FC = () => {
                   >
                     <div className="font-medium">Meta Business API</div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Envío automático via API oficial de WhatsApp (Facebook). Requiere cuenta Business verificada.
+                      API oficial de WhatsApp. Requiere cuenta Business verificada.
                     </p>
                     {apiFormData.whatsapp_provider === 'meta' && (
                       <div className="absolute top-2 right-2">
@@ -322,9 +337,28 @@ export const AdminConfigPanel: React.FC = () => {
                   >
                     <div className="font-medium">Twilio</div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Envío via Twilio WhatsApp Sandbox o número verificado. Fácil de configurar.
+                      Sandbox o número verificado. Fácil de configurar.
                     </p>
                     {apiFormData.whatsapp_provider === 'twilio' && (
+                      <div className="absolute top-2 right-2">
+                        <CheckCircle className="h-5 w-5 text-primary" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* QR Session Gateway */}
+                  <div
+                    className={`relative cursor-pointer rounded-lg border-2 p-4 transition-all ${apiFormData.whatsapp_provider === 'qr_session' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                    onClick={() => handleApiInputChange('whatsapp_provider', 'qr_session')}
+                  >
+                    <div className="font-medium flex items-center gap-1">
+                      Sesión QR
+                      <Badge variant="secondary" className="text-[10px]">Gateway</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Vincula tu número escaneando QR. Usa whatsapp-web.js o Baileys como gateway.
+                    </p>
+                    {apiFormData.whatsapp_provider === 'qr_session' && (
                       <div className="absolute top-2 right-2">
                         <CheckCircle className="h-5 w-5 text-primary" />
                       </div>
@@ -341,7 +375,7 @@ export const AdminConfigPanel: React.FC = () => {
                       <Badge variant="secondary" className="text-[10px]">Sin API</Badge>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Abre WhatsApp Web con el mensaje pre-cargado. No requiere API ni cuenta Business.
+                      Abre WhatsApp Web con mensaje pre-cargado. No requiere API.
                     </p>
                     {apiFormData.whatsapp_provider === 'wame_fallback' && (
                       <div className="absolute top-2 right-2">
@@ -418,6 +452,53 @@ export const AdminConfigPanel: React.FC = () => {
                     <p className="text-xs text-muted-foreground mt-1">
                       Formato: +[código país][número]. Para sandbox: +14155238886
                     </p>
+                  </div>
+                </div>
+              )}
+
+              {/* QR Session Gateway Fields */}
+              {apiFormData.whatsapp_provider === 'qr_session' && (
+                <div className="space-y-4 p-4 rounded-lg border bg-muted/30">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <Smartphone className="h-4 w-4" />
+                    Gateway WhatsApp con Sesión QR
+                  </h4>
+                  <p className="text-sm text-muted-foreground">
+                    Conecta un servidor gateway (whatsapp-web.js, Baileys, WPPConnect) que expone una API HTTP.
+                    El admin escanea el QR desde el gateway y el número queda vinculado para envío automático.
+                  </p>
+                  <div>
+                    <Label htmlFor="gateway_url">URL del Gateway</Label>
+                    <Input
+                      id="gateway_url"
+                      value={apiFormData.whatsapp_gateway_url}
+                      onChange={(e) => handleApiInputChange('whatsapp_gateway_url', e.target.value)}
+                      placeholder="https://mi-gateway.example.com"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Endpoint base del servidor gateway. Ej: POST /send-otp
+                    </p>
+                  </div>
+                  <div>
+                    <Label htmlFor="linked_phone">Número Vinculado (QR)</Label>
+                    <Input
+                      id="linked_phone"
+                      value={apiFormData.whatsapp_linked_phone}
+                      onChange={(e) => handleApiInputChange('whatsapp_linked_phone', e.target.value)}
+                      placeholder="+5959XXXXXXX"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Número que escaneó el QR y queda como remitente de los mensajes OTP.
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm space-y-1">
+                    <p className="font-medium">Flujo de vinculación:</p>
+                    <ol className="list-decimal list-inside text-muted-foreground space-y-0.5">
+                      <li>Despliega el gateway en tu servidor (whatsapp-web.js / Baileys)</li>
+                      <li>Accede a la interfaz del gateway y escanea el QR con tu WhatsApp</li>
+                      <li>Copia la URL del gateway y el número vinculado aquí</li>
+                      <li>El sistema enviará OTP automáticamente por este número</li>
+                    </ol>
                   </div>
                 </div>
               )}
@@ -509,15 +590,80 @@ export const AdminConfigPanel: React.FC = () => {
                 <Label htmlFor="email_enabled">Habilitar envío de emails</Label>
               </div>
               {apiFormData.email_api_enabled && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="email_key">API Key</Label>
-                    <Input id="email_key" type="password" value={apiFormData.email_api_key} onChange={(e) => handleApiInputChange('email_api_key', e.target.value)} placeholder="Tu API Key de email" />
+                <div className="space-y-4">
+                  {/* Email Provider Selector */}
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Proveedor de Email</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div
+                        className={`relative cursor-pointer rounded-lg border-2 p-4 transition-all ${apiFormData.email_provider === 'resend' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                        onClick={() => handleApiInputChange('email_provider', 'resend')}
+                      >
+                        <div className="font-medium flex items-center gap-1">
+                          Resend API
+                          <Badge variant="secondary" className="text-[10px]">Recomendado</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Servicio cloud de email transaccional. Solo necesitas API Key.
+                        </p>
+                        {apiFormData.email_provider === 'resend' && (
+                          <div className="absolute top-2 right-2">
+                            <CheckCircle className="h-5 w-5 text-primary" />
+                          </div>
+                        )}
+                      </div>
+                      <div
+                        className={`relative cursor-pointer rounded-lg border-2 p-4 transition-all ${apiFormData.email_provider === 'smtp' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                        onClick={() => handleApiInputChange('email_provider', 'smtp')}
+                      >
+                        <div className="font-medium flex items-center gap-1">
+                          SMTP Propio
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Office 365, iRedMail u otro servidor SMTP con credenciales propias.
+                        </p>
+                        {apiFormData.email_provider === 'smtp' && (
+                          <div className="absolute top-2 right-2">
+                            <CheckCircle className="h-5 w-5 text-primary" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <Label htmlFor="email_from">Email Remitente</Label>
-                    <Input id="email_from" value={apiFormData.email_from_address} onChange={(e) => handleApiInputChange('email_from_address', e.target.value)} placeholder="noreply@tuempresa.com" />
-                  </div>
+
+                  {/* Resend Fields */}
+                  {apiFormData.email_provider === 'resend' && (
+                    <div className="grid grid-cols-2 gap-4 p-4 rounded-lg border bg-muted/30">
+                      <div>
+                        <Label htmlFor="email_key">API Key (Resend)</Label>
+                        <Input id="email_key" type="password" value={apiFormData.email_api_key} onChange={(e) => handleApiInputChange('email_api_key', e.target.value)} placeholder="re_xxxxxxxx..." />
+                      </div>
+                      <div>
+                        <Label htmlFor="email_from">Email Remitente</Label>
+                        <Input id="email_from" value={apiFormData.email_from_address} onChange={(e) => handleApiInputChange('email_from_address', e.target.value)} placeholder="noreply@tuempresa.com" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SMTP Fields */}
+                  {apiFormData.email_provider === 'smtp' && (
+                    <div className="p-4 rounded-lg border bg-muted/30 space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        La configuración SMTP detallada (host, puerto, TLS, credenciales) se administra desde el panel de <strong>Política OTP para Firma</strong> más abajo, en la sección "SMTP Propio".
+                        Activa el canal SMTP en la política OTP para configurar los datos del servidor.
+                      </p>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="email_from_smtp">Email Remitente</Label>
+                          <Input id="email_from_smtp" value={apiFormData.email_from_address} onChange={(e) => handleApiInputChange('email_from_address', e.target.value)} placeholder="noreply@tuempresa.com" />
+                        </div>
+                        <div>
+                          <Label htmlFor="email_name_smtp">Nombre Remitente</Label>
+                          <Input id="email_name_smtp" value={apiFormData.email_from_name} onChange={(e) => handleApiInputChange('email_from_name', e.target.value)} placeholder="Mi Empresa" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

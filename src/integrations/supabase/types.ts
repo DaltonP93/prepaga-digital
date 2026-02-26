@@ -652,6 +652,7 @@ export type Database = {
           email_api_key: string | null
           email_from_address: string | null
           email_from_name: string | null
+          email_provider: string | null
           id: string
           menu_config: Json | null
           signwell_api_key: string | null
@@ -660,6 +661,8 @@ export type Database = {
           sms_sender_id: string | null
           updated_at: string | null
           whatsapp_api_key: string | null
+          whatsapp_gateway_url: string | null
+          whatsapp_linked_phone: string | null
           whatsapp_phone_id: string | null
         }
         Insert: {
@@ -668,6 +671,7 @@ export type Database = {
           email_api_key?: string | null
           email_from_address?: string | null
           email_from_name?: string | null
+          email_provider?: string | null
           id?: string
           menu_config?: Json | null
           signwell_api_key?: string | null
@@ -676,6 +680,8 @@ export type Database = {
           sms_sender_id?: string | null
           updated_at?: string | null
           whatsapp_api_key?: string | null
+          whatsapp_gateway_url?: string | null
+          whatsapp_linked_phone?: string | null
           whatsapp_phone_id?: string | null
         }
         Update: {
@@ -684,6 +690,7 @@ export type Database = {
           email_api_key?: string | null
           email_from_address?: string | null
           email_from_name?: string | null
+          email_provider?: string | null
           id?: string
           menu_config?: Json | null
           signwell_api_key?: string | null
@@ -692,6 +699,8 @@ export type Database = {
           sms_sender_id?: string | null
           updated_at?: string | null
           whatsapp_api_key?: string | null
+          whatsapp_gateway_url?: string | null
+          whatsapp_linked_phone?: string | null
           whatsapp_phone_id?: string | null
         }
         Relationships: [

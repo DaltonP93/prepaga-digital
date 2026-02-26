@@ -3,18 +3,22 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 
-export type WhatsAppProvider = 'meta' | 'twilio' | 'wame_fallback';
+export type WhatsAppProvider = 'meta' | 'twilio' | 'wame_fallback' | 'qr_session';
+export type EmailProvider = 'resend' | 'smtp';
 
 export interface CompanyApiConfig {
   whatsapp_provider: WhatsAppProvider;
   whatsapp_api_enabled: boolean;
   whatsapp_api_token: string;
   whatsapp_phone_number: string;
+  whatsapp_gateway_url: string;
+  whatsapp_linked_phone: string;
   twilio_account_sid: string;
   twilio_auth_token: string;
   twilio_whatsapp_number: string;
   sms_api_enabled: boolean;
   sms_api_key: string;
+  email_provider: EmailProvider;
   email_api_enabled: boolean;
   email_api_key: string;
   email_from_address: string;
@@ -28,11 +32,14 @@ const DEFAULT_CONFIGURATION: CompanyApiConfig = {
   whatsapp_api_enabled: false,
   whatsapp_api_token: '',
   whatsapp_phone_number: '',
+  whatsapp_gateway_url: '',
+  whatsapp_linked_phone: '',
   twilio_account_sid: '',
   twilio_auth_token: '',
   twilio_whatsapp_number: '',
   sms_api_enabled: false,
   sms_api_key: '',
+  email_provider: 'resend',
   email_api_enabled: false,
   email_api_key: '',
   email_from_address: '',
@@ -72,11 +79,14 @@ export const useCompanyApiConfiguration = () => {
         whatsapp_api_enabled: !!data.whatsapp_api_key,
         whatsapp_api_token: data.whatsapp_api_key || '',
         whatsapp_phone_number: data.whatsapp_phone_id || '',
+        whatsapp_gateway_url: (data as any).whatsapp_gateway_url || '',
+        whatsapp_linked_phone: (data as any).whatsapp_linked_phone || '',
         twilio_account_sid: (data as any).twilio_account_sid || '',
         twilio_auth_token: (data as any).twilio_auth_token || '',
         twilio_whatsapp_number: (data as any).twilio_whatsapp_number || '',
         sms_api_enabled: !!data.sms_api_key,
         sms_api_key: data.sms_api_key || '',
+        email_provider: (data as any).email_provider || 'resend',
         email_api_enabled: !!data.email_api_key,
         email_api_key: data.email_api_key || '',
         email_from_address: data.email_from_address || '',
@@ -103,10 +113,13 @@ export const useCompanyApiConfiguration = () => {
       if ('whatsapp_provider' in updates) dbUpdates.whatsapp_provider = updates.whatsapp_provider;
       if ('whatsapp_api_token' in updates) dbUpdates.whatsapp_api_key = updates.whatsapp_api_token;
       if ('whatsapp_phone_number' in updates) dbUpdates.whatsapp_phone_id = updates.whatsapp_phone_number;
+      if ('whatsapp_gateway_url' in updates) dbUpdates.whatsapp_gateway_url = updates.whatsapp_gateway_url;
+      if ('whatsapp_linked_phone' in updates) dbUpdates.whatsapp_linked_phone = updates.whatsapp_linked_phone;
       if ('twilio_account_sid' in updates) dbUpdates.twilio_account_sid = updates.twilio_account_sid;
       if ('twilio_auth_token' in updates) dbUpdates.twilio_auth_token = updates.twilio_auth_token;
       if ('twilio_whatsapp_number' in updates) dbUpdates.twilio_whatsapp_number = updates.twilio_whatsapp_number;
       if ('sms_api_key' in updates) dbUpdates.sms_api_key = updates.sms_api_key;
+      if ('email_provider' in updates) dbUpdates.email_provider = updates.email_provider;
       if ('email_api_key' in updates) dbUpdates.email_api_key = updates.email_api_key;
       if ('email_from_address' in updates) dbUpdates.email_from_address = updates.email_from_address;
       if ('email_from_name' in updates) dbUpdates.email_from_name = updates.email_from_name;
