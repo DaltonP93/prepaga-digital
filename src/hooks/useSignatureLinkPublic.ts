@@ -20,6 +20,7 @@ interface SignatureLinkData {
   sale_id: string;
   package_id: string | null;
   recipient_type: string;
+  recipient_email?: string;
   recipient_id: string | null;
   expires_at: string;
   accessed_at: string | null;

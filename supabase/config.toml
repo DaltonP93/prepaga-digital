@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.api]
 verify_jwt = false
+
+[functions.signature-otp]
+verify_jwt = false

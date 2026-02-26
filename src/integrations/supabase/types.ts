@@ -1749,6 +1749,226 @@ export type Database = {
           },
         ]
       }
+      signature_consent_records: {
+        Row: {
+          checkbox_state: boolean
+          consent_text: string
+          consent_text_version: string
+          created_at: string
+          document_id: string | null
+          id: string
+          ip_address: string | null
+          sale_id: string
+          signature_link_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          checkbox_state?: boolean
+          consent_text: string
+          consent_text_version?: string
+          created_at?: string
+          document_id?: string | null
+          id?: string
+          ip_address?: string | null
+          sale_id: string
+          signature_link_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          checkbox_state?: boolean
+          consent_text?: string
+          consent_text_version?: string
+          created_at?: string
+          document_id?: string | null
+          id?: string
+          ip_address?: string | null
+          sale_id?: string
+          signature_link_id?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signature_consent_records_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_consent_records_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_consent_records_signature_link_id_fkey"
+            columns: ["signature_link_id"]
+            isOneToOne: false
+            referencedRelation: "signature_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signature_events: {
+        Row: {
+          consent_record_id: string | null
+          created_at: string
+          document_hash: string | null
+          document_id: string | null
+          document_version: string | null
+          evidence_bundle_hash: string | null
+          evidence_bundle_url: string | null
+          id: string
+          identity_verification_id: string | null
+          identity_verified: boolean
+          ip_address: string | null
+          sale_id: string
+          signature_link_id: string
+          signature_method: string
+          timestamp: string
+          user_agent: string | null
+        }
+        Insert: {
+          consent_record_id?: string | null
+          created_at?: string
+          document_hash?: string | null
+          document_id?: string | null
+          document_version?: string | null
+          evidence_bundle_hash?: string | null
+          evidence_bundle_url?: string | null
+          id?: string
+          identity_verification_id?: string | null
+          identity_verified?: boolean
+          ip_address?: string | null
+          sale_id: string
+          signature_link_id: string
+          signature_method?: string
+          timestamp?: string
+          user_agent?: string | null
+        }
+        Update: {
+          consent_record_id?: string | null
+          created_at?: string
+          document_hash?: string | null
+          document_id?: string | null
+          document_version?: string | null
+          evidence_bundle_hash?: string | null
+          evidence_bundle_url?: string | null
+          id?: string
+          identity_verification_id?: string | null
+          identity_verified?: boolean
+          ip_address?: string | null
+          sale_id?: string
+          signature_link_id?: string
+          signature_method?: string
+          timestamp?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signature_events_consent_record_id_fkey"
+            columns: ["consent_record_id"]
+            isOneToOne: false
+            referencedRelation: "signature_consent_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_events_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_events_identity_verification_id_fkey"
+            columns: ["identity_verification_id"]
+            isOneToOne: false
+            referencedRelation: "signature_identity_verification"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_events_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_events_signature_link_id_fkey"
+            columns: ["signature_link_id"]
+            isOneToOne: false
+            referencedRelation: "signature_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signature_identity_verification: {
+        Row: {
+          attempts: number
+          auth_method: string
+          created_at: string
+          destination_masked: string | null
+          expires_at: string
+          id: string
+          ip_address: string | null
+          max_attempts: number
+          otp_code_hash: string
+          result: string
+          sale_id: string
+          signature_link_id: string
+          user_agent: string | null
+          verified_at: string | null
+        }
+        Insert: {
+          attempts?: number
+          auth_method?: string
+          created_at?: string
+          destination_masked?: string | null
+          expires_at: string
+          id?: string
+          ip_address?: string | null
+          max_attempts?: number
+          otp_code_hash: string
+          result?: string
+          sale_id: string
+          signature_link_id: string
+          user_agent?: string | null
+          verified_at?: string | null
+        }
+        Update: {
+          attempts?: number
+          auth_method?: string
+          created_at?: string
+          destination_masked?: string | null
+          expires_at?: string
+          id?: string
+          ip_address?: string | null
+          max_attempts?: number
+          otp_code_hash?: string
+          result?: string
+          sale_id?: string
+          signature_link_id?: string
+          user_agent?: string | null
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signature_identity_verification_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_identity_verification_signature_link_id_fkey"
+            columns: ["signature_link_id"]
+            isOneToOne: false
+            referencedRelation: "signature_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       signature_links: {
         Row: {
           access_count: number | null
