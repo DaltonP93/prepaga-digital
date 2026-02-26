@@ -1,4 +1,5 @@
 
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -9,27 +10,35 @@ import { SimpleProtectedRoute } from "@/components/SimpleProtectedRoute";
 import { RoleProtectedRoute } from "@/components/RoleProtectedRoute";
 import { SimpleLoginForm } from "@/components/SimpleLoginForm";
 import MainLayout from "@/layouts/MainLayout";
-import Dashboard from "@/pages/Dashboard";
-import Sales from "@/pages/Sales";
-import NewSale from "@/pages/NewSale";
-import SaleDetail from "@/pages/SaleDetail";
-import SaleEdit from "@/pages/SaleEdit";
-import Clients from "@/pages/Clients";
-import Plans from "@/pages/Plans";
-import Documents from "@/pages/Documents";
-import Templates from "@/pages/Templates";
-import TemplateDetail from "@/pages/TemplateDetail";
-import TemplateEdit from "@/pages/TemplateEdit";
-import SignatureWorkflow from "@/pages/SignatureWorkflow";
-import Analytics from "@/pages/Analytics";
-import Profile from "@/pages/Profile";
-import Users from "@/pages/Users";
-import Companies from "@/pages/Companies";
-import AuditDashboard from "@/pages/AuditDashboard";
-import Experience from "@/pages/Experience";
-import Settings from "@/pages/Settings";
-import SignatureView from "@/pages/SignatureView";
-import NotFound from "@/pages/NotFound";
+
+// Lazy-loaded pages for code splitting — reduces initial bundle size
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const Sales = lazy(() => import("@/pages/Sales"));
+const NewSale = lazy(() => import("@/pages/NewSale"));
+const SaleDetail = lazy(() => import("@/pages/SaleDetail"));
+const SaleEdit = lazy(() => import("@/pages/SaleEdit"));
+const Clients = lazy(() => import("@/pages/Clients"));
+const Plans = lazy(() => import("@/pages/Plans"));
+const Documents = lazy(() => import("@/pages/Documents"));
+const Templates = lazy(() => import("@/pages/Templates"));
+const TemplateDetail = lazy(() => import("@/pages/TemplateDetail"));
+const TemplateEdit = lazy(() => import("@/pages/TemplateEdit"));
+const SignatureWorkflow = lazy(() => import("@/pages/SignatureWorkflow"));
+const Analytics = lazy(() => import("@/pages/Analytics"));
+const Profile = lazy(() => import("@/pages/Profile"));
+const Users = lazy(() => import("@/pages/Users"));
+const Companies = lazy(() => import("@/pages/Companies"));
+const AuditDashboard = lazy(() => import("@/pages/AuditDashboard"));
+const Experience = lazy(() => import("@/pages/Experience"));
+const Settings = lazy(() => import("@/pages/Settings"));
+const SignatureView = lazy(() => import("@/pages/SignatureView"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
+
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-[60vh]">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+  </div>
+);
 
 // Crear cliente de React Query con configuración optimizada
 const queryClient = new QueryClient({
@@ -50,6 +59,7 @@ const App = () => {
           <CompanyBrandingProvider>
             <Toaster />
             <BrowserRouter>
+              <Suspense fallback={<PageLoader />}>
               <Routes>
                 {/* Public routes */}
                 <Route path="/login" element={<SimpleLoginForm />} />
@@ -109,6 +119,7 @@ const App = () => {
                 </Route>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
               </Routes>
+              </Suspense>
             </BrowserRouter>
           </CompanyBrandingProvider>
         </SimpleAuthProvider>
