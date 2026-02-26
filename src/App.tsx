@@ -1,5 +1,5 @@
 
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -7,34 +7,51 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SimpleAuthProvider } from "@/components/SimpleAuthProvider";
 import { CompanyBrandingProvider } from "@/components/CompanyBrandingProvider";
 
+// Helper: retry dynamic imports once then force-reload on chunk errors
+function lazyRetry(importFn: () => Promise<any>) {
+  return lazy(() =>
+    importFn().catch((error) => {
+      // If chunk failed to load, reload the page once
+      const hasReloaded = sessionStorage.getItem('chunk_reload');
+      if (!hasReloaded) {
+        sessionStorage.setItem('chunk_reload', '1');
+        window.location.reload();
+        return new Promise(() => {}); // never resolves, page will reload
+      }
+      sessionStorage.removeItem('chunk_reload');
+      throw error;
+    })
+  );
+}
+
 // Lazy-load components not needed for initial login page render
-const SimpleProtectedRoute = lazy(() => import("@/components/SimpleProtectedRoute").then(m => ({ default: m.SimpleProtectedRoute })));
-const RoleProtectedRoute = lazy(() => import("@/components/RoleProtectedRoute").then(m => ({ default: m.RoleProtectedRoute })));
-const SimpleLoginForm = lazy(() => import("@/components/SimpleLoginForm"));
-const MainLayout = lazy(() => import("@/layouts/MainLayout"));
+const SimpleProtectedRoute = lazyRetry(() => import("@/components/SimpleProtectedRoute").then(m => ({ default: m.SimpleProtectedRoute })));
+const RoleProtectedRoute = lazyRetry(() => import("@/components/RoleProtectedRoute").then(m => ({ default: m.RoleProtectedRoute })));
+const SimpleLoginForm = lazyRetry(() => import("@/components/SimpleLoginForm"));
+const MainLayout = lazyRetry(() => import("@/layouts/MainLayout"));
 
 // Lazy-loaded pages for code splitting — reduces initial bundle size
-const Dashboard = lazy(() => import("@/pages/Dashboard"));
-const Sales = lazy(() => import("@/pages/Sales"));
-const NewSale = lazy(() => import("@/pages/NewSale"));
-const SaleDetail = lazy(() => import("@/pages/SaleDetail"));
-const SaleEdit = lazy(() => import("@/pages/SaleEdit"));
-const Clients = lazy(() => import("@/pages/Clients"));
-const Plans = lazy(() => import("@/pages/Plans"));
-const Documents = lazy(() => import("@/pages/Documents"));
-const Templates = lazy(() => import("@/pages/Templates"));
-const TemplateDetail = lazy(() => import("@/pages/TemplateDetail"));
-const TemplateEdit = lazy(() => import("@/pages/TemplateEdit"));
-const SignatureWorkflow = lazy(() => import("@/pages/SignatureWorkflow"));
-const Analytics = lazy(() => import("@/pages/Analytics"));
-const Profile = lazy(() => import("@/pages/Profile"));
-const Users = lazy(() => import("@/pages/Users"));
-const Companies = lazy(() => import("@/pages/Companies"));
-const AuditDashboard = lazy(() => import("@/pages/AuditDashboard"));
-const Experience = lazy(() => import("@/pages/Experience"));
-const Settings = lazy(() => import("@/pages/Settings"));
-const SignatureView = lazy(() => import("@/pages/SignatureView"));
-const NotFound = lazy(() => import("@/pages/NotFound"));
+const Dashboard = lazyRetry(() => import("@/pages/Dashboard"));
+const Sales = lazyRetry(() => import("@/pages/Sales"));
+const NewSale = lazyRetry(() => import("@/pages/NewSale"));
+const SaleDetail = lazyRetry(() => import("@/pages/SaleDetail"));
+const SaleEdit = lazyRetry(() => import("@/pages/SaleEdit"));
+const Clients = lazyRetry(() => import("@/pages/Clients"));
+const Plans = lazyRetry(() => import("@/pages/Plans"));
+const Documents = lazyRetry(() => import("@/pages/Documents"));
+const Templates = lazyRetry(() => import("@/pages/Templates"));
+const TemplateDetail = lazyRetry(() => import("@/pages/TemplateDetail"));
+const TemplateEdit = lazyRetry(() => import("@/pages/TemplateEdit"));
+const SignatureWorkflow = lazyRetry(() => import("@/pages/SignatureWorkflow"));
+const Analytics = lazyRetry(() => import("@/pages/Analytics"));
+const Profile = lazyRetry(() => import("@/pages/Profile"));
+const Users = lazyRetry(() => import("@/pages/Users"));
+const Companies = lazyRetry(() => import("@/pages/Companies"));
+const AuditDashboard = lazyRetry(() => import("@/pages/AuditDashboard"));
+const Experience = lazyRetry(() => import("@/pages/Experience"));
+const Settings = lazyRetry(() => import("@/pages/Settings"));
+const SignatureView = lazyRetry(() => import("@/pages/SignatureView"));
+const NotFound = lazyRetry(() => import("@/pages/NotFound"));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
