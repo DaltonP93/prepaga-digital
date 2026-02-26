@@ -126,7 +126,7 @@ const SignatureView = () => {
       const ip = 'client-side'; // Will be captured server-side
       const ua = navigator.userAgent;
 
-      // Create signature events for each document
+      // Create signature events + evidence bundles for each document
       for (const doc of docsToSign) {
         const docHash = doc.content ? await generateDocumentHash(doc.content) : '';
         
@@ -141,7 +141,7 @@ const SignatureView = () => {
         });
 
         // Insert signature event
-        await supabase.from('signature_events' as any).insert({
+        const { data: eventData } = await supabase.from('signature_events' as any).insert({
           signature_link_id: linkData.id,
           sale_id: linkData.sale_id,
           document_id: doc.id,
@@ -154,7 +154,28 @@ const SignatureView = () => {
           signature_method: isElectronic ? 'electronic' : 'digital',
           evidence_bundle_hash: evidenceResult.hash,
           timestamp,
-        });
+        }).select().single();
+
+        // Insert evidence bundle (immutable chain of custody)
+        const { data: bundleData } = await supabase.from('signature_evidence_bundles' as any).insert({
+          signature_link_id: linkData.id,
+          signature_event_id: (eventData as any)?.id || null,
+          sale_id: linkData.sale_id,
+          document_id: doc.id,
+          document_hash: docHash,
+          evidence_json: evidenceResult.bundle,
+          bundle_hash: evidenceResult.hash,
+        }).select().single();
+
+        // Insert hash anchor (internal integrity proof)
+        if (bundleData) {
+          await supabase.from('hash_anchors' as any).insert({
+            evidence_bundle_id: (bundleData as any).id,
+            hash_value: evidenceResult.hash,
+            anchor_type: 'internal',
+            anchor_reference: `sha256:${evidenceResult.hash}`,
+          });
+        }
       }
 
       // Submit the actual signature
