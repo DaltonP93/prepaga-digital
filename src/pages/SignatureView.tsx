@@ -36,6 +36,7 @@ const SignatureView = () => {
   const [signwellCompleted, setSignwellCompleted] = useState(false);
   const signatureSectionRef = useRef<HTMLDivElement>(null);
   const [otpCode, setOtpCode] = useState('');
+  const [selectedChannel, setSelectedChannel] = useState<string>('email');
   const [consentRecordId, setConsentRecordId] = useState<string | null>(null);
   const verification = useSignatureVerification();
 
@@ -64,6 +65,13 @@ const SignatureView = () => {
       return () => window.removeEventListener('message', handleSignWellMessage);
     }
   }, [signwellSigningUrl, handleSignWellMessage]);
+
+  // Fetch OTP policy when link data is available
+  useEffect(() => {
+    if (linkData?.sale_id && token) {
+      verification.fetchPolicy(linkData.sale_id, token);
+    }
+  }, [linkData?.sale_id, token]);
 
   const handleDownloadSignedContent = (doc: any) => {
     if (!doc?.content) return;
@@ -635,9 +643,36 @@ const SignatureView = () => {
                         {verification.step === 'idle' || verification.step === 'error' || verification.step === 'sending' ? (
                           <div className="space-y-3">
                             <p className="text-sm text-muted-foreground">
-                              Se enviará un código de verificación de 6 dígitos a su correo electrónico.
+                              Se enviará un código de verificación de 6 dígitos.
                               El código será válido por 5 minutos.
                             </p>
+
+                            {/* Channel selector if policy allows multiple */}
+                            {verification.otpPolicy && verification.otpPolicy.allowed_channels.length > 1 && (
+                              <div className="flex gap-2">
+                                {verification.otpPolicy.allowed_channels.includes('email') && (
+                                  <Button
+                                    variant={selectedChannel === 'email' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setSelectedChannel('email')}
+                                  >
+                                    <Mail className="h-3 w-3 mr-1" />
+                                    Email
+                                  </Button>
+                                )}
+                                {verification.otpPolicy.allowed_channels.includes('whatsapp') && (
+                                  <Button
+                                    variant={selectedChannel === 'whatsapp' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setSelectedChannel('whatsapp')}
+                                  >
+                                    <Shield className="h-3 w-3 mr-1" />
+                                    WhatsApp
+                                  </Button>
+                                )}
+                              </div>
+                            )}
+
                             {verification.error && (
                               <Alert variant="destructive">
                                 <AlertCircle className="h-4 w-4" />
@@ -648,7 +683,9 @@ const SignatureView = () => {
                               onClick={() => {
                                 const email = linkData.recipient_email || 
                                   (isTitular ? client?.email : '') || '';
-                                verification.sendOTP(linkData.id, linkData.sale_id, email, token!);
+                                const phone = isTitular ? (client as any)?.phone : 
+                                  (sale?.beneficiaries?.find((b: any) => b.id === linkData.recipient_id) as any)?.phone || '';
+                                verification.sendOTP(linkData.id, linkData.sale_id, email, token!, selectedChannel, phone || undefined);
                               }}
                               disabled={verification.step === 'sending' as string}
                               className="w-full"

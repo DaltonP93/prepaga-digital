@@ -574,6 +574,77 @@ export type Database = {
           },
         ]
       }
+      company_otp_policy: {
+        Row: {
+          allowed_channels: Json
+          company_id: string
+          created_at: string | null
+          default_channel: string
+          id: string
+          max_attempts: number
+          otp_expiration_seconds: number
+          otp_length: number
+          require_otp_for_signature: boolean
+          smtp_from_address: string | null
+          smtp_from_name: string | null
+          smtp_host: string | null
+          smtp_password_encrypted: string | null
+          smtp_port: number | null
+          smtp_tls: boolean | null
+          smtp_user: string | null
+          updated_at: string | null
+          whatsapp_otp_enabled: boolean
+        }
+        Insert: {
+          allowed_channels?: Json
+          company_id: string
+          created_at?: string | null
+          default_channel?: string
+          id?: string
+          max_attempts?: number
+          otp_expiration_seconds?: number
+          otp_length?: number
+          require_otp_for_signature?: boolean
+          smtp_from_address?: string | null
+          smtp_from_name?: string | null
+          smtp_host?: string | null
+          smtp_password_encrypted?: string | null
+          smtp_port?: number | null
+          smtp_tls?: boolean | null
+          smtp_user?: string | null
+          updated_at?: string | null
+          whatsapp_otp_enabled?: boolean
+        }
+        Update: {
+          allowed_channels?: Json
+          company_id?: string
+          created_at?: string | null
+          default_channel?: string
+          id?: string
+          max_attempts?: number
+          otp_expiration_seconds?: number
+          otp_length?: number
+          require_otp_for_signature?: boolean
+          smtp_from_address?: string | null
+          smtp_from_name?: string | null
+          smtp_host?: string | null
+          smtp_password_encrypted?: string | null
+          smtp_port?: number | null
+          smtp_tls?: boolean | null
+          smtp_user?: string | null
+          updated_at?: string | null
+          whatsapp_otp_enabled?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_otp_policy_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_settings: {
         Row: {
           company_id: string
@@ -2013,6 +2084,7 @@ export type Database = {
         Row: {
           attempts: number
           auth_method: string
+          channel: string | null
           created_at: string
           destination_masked: string | null
           expires_at: string
@@ -2029,6 +2101,7 @@ export type Database = {
         Insert: {
           attempts?: number
           auth_method?: string
+          channel?: string | null
           created_at?: string
           destination_masked?: string | null
           expires_at: string
@@ -2045,6 +2118,7 @@ export type Database = {
         Update: {
           attempts?: number
           auth_method?: string
+          channel?: string | null
           created_at?: string
           destination_masked?: string | null
           expires_at?: string
