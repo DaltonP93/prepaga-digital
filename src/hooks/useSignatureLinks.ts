@@ -327,6 +327,9 @@ export const useResendSignatureLink = () => {
       queryClient.invalidateQueries({ queryKey: ['signature-links', data.sale_id] });
       queryClient.invalidateQueries({ queryKey: ['documents'] });
       queryClient.invalidateQueries({ queryKey: ['sale-documents', data.sale_id] });
+      queryClient.invalidateQueries({ queryKey: ['signed-documents', data.sale_id] });
+      queryClient.invalidateQueries({ queryKey: ['sale-generated-documents', data.sale_id] });
+      queryClient.invalidateQueries({ queryKey: ['signature-link-documents'] });
       toast({
         title: 'Enlace reenviado',
         description: 'Se ha generado un nuevo enlace de firma. Los documentos anteriores fueron eliminados.',
