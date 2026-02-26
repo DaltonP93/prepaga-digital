@@ -212,7 +212,7 @@ function createBeneficiaryContext(beneficiary: any): BeneficiaryContext {
     telefono: beneficiary.phone || '',
     fechaNacimiento: formatDate(beneficiary.birth_date),
     edad: calculateAge(beneficiary.birth_date),
-    parentesco: beneficiary.relationship || 'Titular',
+    parentesco: beneficiary.relationship || (beneficiary.is_primary ? 'Titular' : 'Adherente'),
     direccion: beneficiary.address || '',
     ciudad: beneficiary.city || '',
     provincia: beneficiary.province || '',
@@ -245,9 +245,47 @@ export function createEnhancedTemplateContext(
 ): EnhancedTemplateContext {
   const now = new Date();
   
-  // Create beneficiary contexts
-  const beneficiaryContexts = beneficiaries.map(b => createBeneficiaryContext(b));
-  const primaryBeneficiary = beneficiaryContexts.find(b => b.parentesco === 'Titular') || beneficiaryContexts[0] || null;
+  // Create beneficiary contexts (always include titular first for contract tables)
+  const normalizedBeneficiaries = Array.isArray(beneficiaries) ? beneficiaries : [];
+  const hasPrimaryBeneficiary = normalizedBeneficiaries.some((b: any) => b?.is_primary === true);
+
+  const titularFallback = !hasPrimaryBeneficiary && client
+    ? {
+        first_name: client?.first_name || '',
+        last_name: client?.last_name || '',
+        document_number: client?.dni || '',
+        dni: client?.dni || '',
+        email: client?.email || '',
+        phone: client?.phone || '',
+        birth_date: client?.birth_date || null,
+        address: client?.address || '',
+        city: client?.city || '',
+        province: client?.province || '',
+        barrio: (client as any)?.barrio || '',
+        postal_code: client?.postal_code || '',
+        gender: '',
+        relationship: 'Titular',
+        is_primary: true,
+        amount: sale?.total_amount || plan?.price || 0,
+        signature_required: true,
+      }
+    : null;
+
+  const mergedBeneficiaries = titularFallback
+    ? [titularFallback, ...normalizedBeneficiaries]
+    : normalizedBeneficiaries;
+
+  const beneficiaryContexts = mergedBeneficiaries.map((b) => createBeneficiaryContext(b));
+  const sortedBeneficiaryContexts = [...beneficiaryContexts].sort((a, b) => {
+    const aIsPrimary = (a.parentesco || '').toLowerCase() === 'titular';
+    const bIsPrimary = (b.parentesco || '').toLowerCase() === 'titular';
+    if (aIsPrimary === bIsPrimary) return 0;
+    return aIsPrimary ? -1 : 1;
+  });
+
+  const primaryBeneficiary = sortedBeneficiaryContexts.find((b) => (b.parentesco || '').toLowerCase() === 'titular')
+    || sortedBeneficiaryContexts[0]
+    || null;
 
   return {
     cliente: {
@@ -331,7 +369,7 @@ export function createEnhancedTemplateContext(
       mes: formatDate(now, 'MMMM'),
       dia: formatDate(now, 'd'),
     },
-    beneficiarios: beneficiaryContexts,
+    beneficiarios: sortedBeneficiaryContexts,
     beneficiarioPrincipal: primaryBeneficiary,
     respuestas: responses || {},
   };
@@ -448,6 +486,7 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
         '{{marital_status}}': beneficiary.estadoCivil,
         '{{document_number}}': beneficiary.dni,
         '{{dni}}': beneficiary.dni,
+        '{{ci}}': beneficiary.dni,
         '{{age}}': String(beneficiary.edad),
         '{{titular.edad}}': String(beneficiary.edad),
         '{{formatted_amount}}': beneficiary.montoFormateado,
@@ -470,9 +509,9 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
   // FALLBACK: Only run if the explicit {{#beneficiarios}} loop did NOT match
   // This prevents double beneficiary tables
   if (!beneficiaryLoopMatched) {
-    const hasBeneficiaryPlaceholders = /\{\{(first_name|last_name|_index|birth_date|dni|gender|amount|relationship|titular\.edad)\}\}/gi.test(result);
+    const hasBeneficiaryPlaceholders = /\{\{(first_name|last_name|_index|birth_date|dni|ci|gender|amount|relationship|titular\.edad)\}\}/gi.test(result);
     if (hasBeneficiaryPlaceholders && context.beneficiarios.length > 0) {
-      const trRegex = /<tr[^>]*>([\s\S]*?\{\{(?:first_name|last_name|_index|birth_date|dni|gender|amount|relationship|titular\.edad)\}\}[\s\S]*?)<\/tr>/gi;
+      const trRegex = /<tr[^>]*>([\s\S]*?\{\{(?:first_name|last_name|_index|birth_date|dni|ci|gender|amount|relationship|titular\.edad)\}\}[\s\S]*?)<\/tr>/gi;
       result = result.replace(trRegex, (fullMatch, rowContent) => {
         return context.beneficiarios.map((beneficiary, index) => {
           let row = fullMatch;
@@ -484,6 +523,7 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
             '{{amount}}': beneficiary.montoFormateado,
             '{{relationship}}': beneficiary.parentesco,
             '{{dni}}': beneficiary.dni,
+            '{{ci}}': beneficiary.dni,
             '{{document_number}}': beneficiary.dni,
             '{{age}}': String(beneficiary.edad),
             '{{titular.edad}}': String(beneficiary.edad),

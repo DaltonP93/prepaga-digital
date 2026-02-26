@@ -201,6 +201,17 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
 
       // Fetch template contents for all associated templates
       const templateIds = saleTemplates.map((st: any) => st.templates?.id || st.template_id).filter(Boolean);
+
+      // Always fetch fresh beneficiaries at send-time to avoid stale placeholder rendering
+      const { data: beneficiariesFromDb, error: beneficiariesError } = await supabase
+        .from('beneficiaries')
+        .select('*')
+        .eq('sale_id', saleId)
+        .order('created_at', { ascending: true });
+
+      if (beneficiariesError) throw beneficiariesError;
+      const effectiveBeneficiaries = beneficiariesFromDb || beneficiaries || [];
+
       const { data: templateContents, error: templateError } = await supabase
         .from('templates')
         .select('*')
@@ -231,7 +242,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
 
       // Fallback: If DDJJ responses are not populated from template_responses,
       // build them directly from beneficiary health data (primary beneficiary / titular)
-      const primaryBen = (beneficiaries || []).find((b: any) => b.is_primary);
+      const primaryBen = (effectiveBeneficiaries || []).find((b: any) => b.is_primary);
       if (primaryBen && !responsesMap['ddjj_peso']) {
         const healthDetail = primaryBen.preexisting_conditions_detail || '';
         const detailLines = healthDetail.split('; ');
@@ -277,7 +288,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       // *** ENHANCED TEMPLATE ENGINE — 50+ variables, beneficiary loops, formatted dates/currency ***
       const { createEnhancedTemplateContext, interpolateEnhancedTemplate } = await import('@/lib/enhancedTemplateEngine');
       const context = createEnhancedTemplateContext(
-        client, plan, company, sale, beneficiaries || [], undefined, responsesMap
+        client, plan, company, sale, effectiveBeneficiaries || [], undefined, responsesMap
       );
 
       // Generate documents for the titular (all templates)
@@ -327,8 +338,8 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         t.name.toLowerCase().includes('ddjj') || t.name.toLowerCase().includes('declaración')
       );
 
-      if (beneficiaries && beneficiaries.length > 0 && ddjiTemplates.length > 0) {
-        for (const b of beneficiaries) {
+      if (effectiveBeneficiaries && effectiveBeneficiaries.length > 0 && ddjiTemplates.length > 0) {
+        for (const b of effectiveBeneficiaries) {
           if (b.signature_required !== false && !b.is_primary) {
             // Build per-beneficiary DDJJ responses from their own health data
             const benResponsesMap: Record<string, any> = { ...responsesMap };
@@ -370,7 +381,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
                   address: b.address, birth_date: b.birth_date,
                   city: (b as any).city, province: (b as any).province,
                 },
-                plan, company, sale, beneficiaries || [], undefined, benResponsesMap
+                plan, company, sale, effectiveBeneficiaries || [], undefined, benResponsesMap
               );
               const renderedContent = interpolateEnhancedTemplate(ddjiTemplate.content || '', beneficiaryContext);
 
@@ -439,8 +450,8 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       });
 
       // Create separate signature links for each adherente
-      if (beneficiaries && beneficiaries.length > 0) {
-        for (const b of beneficiaries) {
+      if (effectiveBeneficiaries && effectiveBeneficiaries.length > 0) {
+        for (const b of effectiveBeneficiaries) {
           if (b.signature_required !== false && !b.is_primary) {
             await createSignatureLink.mutateAsync({
               saleId,
