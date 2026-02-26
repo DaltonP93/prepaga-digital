@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import DOMPurify from 'dompurify';
 import {
   Dialog,
   DialogContent,
@@ -142,7 +143,7 @@ export const DocumentPreviewDialog: React.FC<DocumentPreviewDialogProps> = ({
           {hasContent ? (
             <div
               className="prose prose-sm max-w-none p-4 bg-white rounded border"
-              dangerouslySetInnerHTML={{ __html: document.content || '' }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(document.content || '') }}
             />
           ) : hasFileUrl ? (
             <div className="p-4">
