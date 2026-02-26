@@ -474,20 +474,59 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
 
   // Fallback: Auto-expand <tr> rows with beneficiary placeholders
   if (!beneficiaryLoopMatched) {
+    // TipTap/rich editors often split placeholders across HTML tags like:
+    // <span>{{</span><span>first_name}}</span> or <strong>{{first_name}}</strong>
+    // First, normalize the HTML to merge split placeholders
+    const normalizePlaceholders = (html: string): string => {
+      // Remove HTML tags from INSIDE placeholder braces: {{<span>name</span>}} -> {{name}}
+      return html.replace(/\{\{([^}]*)\}\}/g, (match) => {
+        const stripped = match.replace(/<[^>]*>/g, '');
+        return stripped;
+      }).replace(/\{(<[^>]*>)*\{/g, '{{').replace(/\}(<[^>]*>)*\}/g, '}}');
+    };
+
+    // More aggressive normalization: find {{ ... }} patterns that may span HTML tags
+    const deepNormalize = (html: string): string => {
+      // Pattern: {{ potentially with HTML tags inside until }}
+      return html.replace(/\{\{(?:<[^>]*>|\s)*([a-zA-Z_][a-zA-Z0-9_.]*?)(?:<[^>]*>|\s)*\}\}/g, '{{$1}}');
+    };
+
+    result = deepNormalize(normalizePlaceholders(result));
+
     const hasBeneficiaryPlaceholders = new RegExp(`\\{\\{(?:${beneficiaryPlaceholderNames})\\}\\}`, 'gi').test(result);
     
     if (hasBeneficiaryPlaceholders && context.beneficiarios.length > 0) {
       // Strategy 1: Expand <tr> rows containing beneficiary placeholders
-      const trPatternStr = `<tr[^>]*>[\\s\\S]*?\\{\\{(?:${beneficiaryPlaceholderNames})\\}\\}[\\s\\S]*?<\\/tr\\s*>`;
-      const trRegex = new RegExp(trPatternStr, 'gi');
-      
+      // Use a more robust approach: find all <tr>...</tr> blocks, check if they contain ben placeholders
+      const trBlocks: { start: number; end: number; content: string }[] = [];
+      const trOpenRegex = /<tr[^>]*>/gi;
+      let trMatch;
+      while ((trMatch = trOpenRegex.exec(result)) !== null) {
+        const startIdx = trMatch.index;
+        // Find the matching </tr> (handle nested content but not nested <tr>)
+        const closeIdx = result.indexOf('</tr>', startIdx + trMatch[0].length);
+        if (closeIdx !== -1) {
+          const endIdx = closeIdx + 5; // '</tr>'.length
+          trBlocks.push({ start: startIdx, end: endIdx, content: result.substring(startIdx, endIdx) });
+        }
+      }
+
+      // Find which <tr> blocks contain beneficiary placeholders
+      const benPlaceholderCheck = new RegExp(`\\{\\{(?:${beneficiaryPlaceholderNames})\\}\\}`, 'gi');
       let trMatched = false;
-      result = result.replace(trRegex, (fullMatch) => {
-        trMatched = true;
-        return context.beneficiarios.map((beneficiary, index) => {
-          return applyBenAliases(fullMatch, buildBenAliases(beneficiary, index));
-        }).join('\n');
-      });
+      // Process in reverse order to preserve indices
+      for (let i = trBlocks.length - 1; i >= 0; i--) {
+        const block = trBlocks[i];
+        if (benPlaceholderCheck.test(block.content)) {
+          benPlaceholderCheck.lastIndex = 0; // reset regex
+          trMatched = true;
+          const expanded = context.beneficiarios.map((beneficiary, index) => {
+            return applyBenAliases(block.content, buildBenAliases(beneficiary, index));
+          }).join('\n');
+          result = result.substring(0, block.start) + expanded + result.substring(block.end);
+        }
+        benPlaceholderCheck.lastIndex = 0;
+      }
 
       // Strategy 2: If no <tr> matched, replace standalone placeholders with first beneficiary
       if (!trMatched) {
