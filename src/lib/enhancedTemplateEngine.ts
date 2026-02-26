@@ -396,7 +396,111 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     });
   };
 
-  // Replace main context variables
+  // ===== STEP 0: BENEFICIARY LOOPS/EXPANSION FIRST =====
+  // Must run BEFORE other replacements so {{titular.edad}}, {{vigencia_inmediata}}, etc.
+  // get replaced PER-BENEFICIARY inside each expanded row, not globally beforehand.
+
+  const beneficiaryPlaceholderNames = 'first_name|last_name|_index|index|indice|birth_date|dni|ci|gender|amount|relationship|edad|titular\\.edad|age|formatted_amount|email|phone|document_number|vigencia_inmediata|tipo_venta|nombre|apellido|nombreCompleto|fechaNacimiento|genero|parentesco|montoFormateado|monto|ocupacion|estadoCivil|barrio';
+
+  const buildBenAliases = (beneficiary: BeneficiaryContext, index: number): Record<string, string> => ({
+    '{{first_name}}': beneficiary.nombre,
+    '{{last_name}}': beneficiary.apellido,
+    '{{nombre}}': beneficiary.nombre,
+    '{{apellido}}': beneficiary.apellido,
+    '{{nombreCompleto}}': beneficiary.nombreCompleto,
+    '{{full_name}}': beneficiary.nombreCompleto,
+    '{{birth_date}}': beneficiary.fechaNacimiento,
+    '{{fechaNacimiento}}': beneficiary.fechaNacimiento,
+    '{{gender}}': beneficiary.genero,
+    '{{genero}}': beneficiary.genero,
+    '{{amount}}': beneficiary.montoFormateado,
+    '{{monto}}': String(beneficiary.monto),
+    '{{montoFormateado}}': beneficiary.montoFormateado,
+    '{{formatted_amount}}': beneficiary.montoFormateado,
+    '{{relationship}}': beneficiary.parentesco,
+    '{{parentesco}}': beneficiary.parentesco,
+    '{{dni}}': beneficiary.dni,
+    '{{ci}}': beneficiary.dni,
+    '{{document_number}}': beneficiary.dni,
+    '{{age}}': String(beneficiary.edad),
+    '{{titular.edad}}': String(beneficiary.edad),
+    '{{edad}}': String(beneficiary.edad),
+    '{{_index}}': String(index + 1),
+    '{{index}}': String(index + 1),
+    '{{indice}}': String(index + 1),
+    '{{email}}': beneficiary.email,
+    '{{phone}}': beneficiary.telefono,
+    '{{address}}': beneficiary.direccion,
+    '{{city}}': beneficiary.ciudad,
+    '{{ocupacion}}': beneficiary.ocupacion,
+    '{{estadoCivil}}': beneficiary.estadoCivil,
+    '{{barrio}}': beneficiary.barrio,
+    '{{occupation}}': beneficiary.ocupacion,
+    '{{marital_status}}': beneficiary.estadoCivil,
+    '{{vigencia_inmediata}}': context.venta.vigenciaInmediata,
+    '{{tipo_venta}}': context.venta.tipoVenta,
+  });
+
+  const applyBenAliases = (text: string, aliases: Record<string, string>): string => {
+    let out = text;
+    Object.entries(aliases).forEach(([placeholder, value]) => {
+      const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      out = out.replace(regex, value || '');
+    });
+    return out;
+  };
+
+  // Handle explicit {{#beneficiarios}}...{{/beneficiarios}} loop
+  let beneficiaryLoopMatched = false;
+  const beneficiariesLoopRegex = /\{\{#beneficiarios\}\}([\s\S]*?)\{\{\/beneficiarios\}\}/gi;
+  result = result.replace(beneficiariesLoopRegex, (_, content) => {
+    beneficiaryLoopMatched = true;
+    return context.beneficiarios.map((beneficiary, index) => {
+      let itemResult = content;
+      // Replace beneficiary-specific placeholders (Spanish names from BeneficiaryContext)
+      Object.keys(beneficiary).forEach(key => {
+        const value = (beneficiary as any)[key];
+        const placeholder = `{{${key}}}`;
+        const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+        if (value !== null && value !== undefined && typeof value !== 'object') {
+          itemResult = itemResult.replace(regex, String(value));
+        }
+      });
+      // English aliases
+      itemResult = applyBenAliases(itemResult, buildBenAliases(beneficiary, index));
+      return itemResult;
+    }).join('');
+  });
+
+  // Fallback: Auto-expand <tr> rows with beneficiary placeholders
+  if (!beneficiaryLoopMatched) {
+    const hasBeneficiaryPlaceholders = new RegExp(`\\{\\{(?:${beneficiaryPlaceholderNames})\\}\\}`, 'gi').test(result);
+    
+    if (hasBeneficiaryPlaceholders && context.beneficiarios.length > 0) {
+      // Strategy 1: Expand <tr> rows containing beneficiary placeholders
+      const trPatternStr = `<tr[^>]*>[\\s\\S]*?\\{\\{(?:${beneficiaryPlaceholderNames})\\}\\}[\\s\\S]*?<\\/tr\\s*>`;
+      const trRegex = new RegExp(trPatternStr, 'gi');
+      
+      let trMatched = false;
+      result = result.replace(trRegex, (fullMatch) => {
+        trMatched = true;
+        return context.beneficiarios.map((beneficiary, index) => {
+          return applyBenAliases(fullMatch, buildBenAliases(beneficiary, index));
+        }).join('\n');
+      });
+
+      // Strategy 2: If no <tr> matched, replace standalone placeholders with first beneficiary
+      if (!trMatched) {
+        console.warn('Template engine: No <tr> rows matched for beneficiary expansion. Applying first-beneficiary fallback.');
+        const firstBen = context.beneficiarios[0];
+        if (firstBen) {
+          result = applyBenAliases(result, buildBenAliases(firstBen, 0));
+        }
+      }
+    }
+  }
+
+  // ===== STEP 1: Replace main context variables =====
   replaceNestedVariables(context.cliente, 'cliente');
   replaceNestedVariables(context.plan, 'plan');
   replaceNestedVariables(context.empresa, 'empresa');
@@ -411,7 +515,7 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     replaceNestedVariables(context.beneficiarioPrincipal, 'titular');
   }
 
-  // Legacy aliases for backward compatibility with existing templates
+  // ===== STEP 2: Legacy aliases =====
   const legacyAliases: Record<string, string> = {
     '{{titular_nombre}}': context.cliente.nombreCompleto,
     '{{titular_email}}': context.cliente.email,
@@ -442,109 +546,13 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     result = result.replace(regex, String(value || ''));
   });
 
-  // Replace responses
+  // ===== STEP 3: Replace responses =====
   if (context.respuestas) {
     Object.entries(context.respuestas).forEach(([key, value]) => {
       const placeholder = `{{respuestas.${key}}}`;
       const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
       result = result.replace(regex, String(value || ''));
     });
-  }
-
-  // Handle beneficiaries loop {{#beneficiarios}}...{{/beneficiarios}}
-  let beneficiaryLoopMatched = false;
-  const beneficiariesLoopRegex = /\{\{#beneficiarios\}\}([\s\S]*?)\{\{\/beneficiarios\}\}/gi;
-  result = result.replace(beneficiariesLoopRegex, (_, content) => {
-    beneficiaryLoopMatched = true;
-    return context.beneficiarios.map((beneficiary, index) => {
-      let itemResult = content;
-      // Replace beneficiary-specific placeholders (Spanish names from BeneficiaryContext)
-      Object.keys(beneficiary).forEach(key => {
-        const value = (beneficiary as any)[key];
-        const placeholder = `{{${key}}}`;
-        const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-        if (value !== null && value !== undefined && typeof value !== 'object') {
-          itemResult = itemResult.replace(regex, String(value));
-        }
-      });
-
-      // English aliases for templates that use DB column names directly
-      const englishAliases: Record<string, string> = {
-        '{{first_name}}': beneficiary.nombre,
-        '{{last_name}}': beneficiary.apellido,
-        '{{full_name}}': beneficiary.nombreCompleto,
-        '{{birth_date}}': beneficiary.fechaNacimiento,
-        '{{gender}}': beneficiary.genero,
-        '{{amount}}': beneficiary.montoFormateado,
-        '{{relationship}}': beneficiary.parentesco,
-        '{{email}}': beneficiary.email,
-        '{{phone}}': beneficiary.telefono,
-        '{{address}}': beneficiary.direccion,
-        '{{city}}': beneficiary.ciudad,
-        '{{barrio}}': beneficiary.barrio,
-        '{{occupation}}': beneficiary.ocupacion,
-        '{{marital_status}}': beneficiary.estadoCivil,
-        '{{document_number}}': beneficiary.dni,
-        '{{dni}}': beneficiary.dni,
-        '{{ci}}': beneficiary.dni,
-        '{{age}}': String(beneficiary.edad),
-        '{{titular.edad}}': String(beneficiary.edad),
-        '{{formatted_amount}}': beneficiary.montoFormateado,
-        '{{vigencia_inmediata}}': context.venta.vigenciaInmediata,
-        '{{tipo_venta}}': context.venta.tipoVenta,
-      };
-      Object.entries(englishAliases).forEach(([placeholder, value]) => {
-        const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-        itemResult = itemResult.replace(regex, value || '');
-      });
-
-      // Replace index (both Spanish and English)
-      itemResult = itemResult.replace(/\{\{indice\}\}/gi, String(index + 1));
-      itemResult = itemResult.replace(/\{\{_index\}\}/gi, String(index + 1));
-      itemResult = itemResult.replace(/\{\{index\}\}/gi, String(index + 1));
-      return itemResult;
-    }).join('');
-  });
-
-  // FALLBACK: Only run if the explicit {{#beneficiarios}} loop did NOT match
-  // This prevents double beneficiary tables
-  if (!beneficiaryLoopMatched) {
-    const hasBeneficiaryPlaceholders = /\{\{(first_name|last_name|_index|birth_date|dni|ci|gender|amount|relationship|titular\.edad)\}\}/gi.test(result);
-    if (hasBeneficiaryPlaceholders && context.beneficiarios.length > 0) {
-      const trRegex = /<tr[^>]*>([\s\S]*?\{\{(?:first_name|last_name|_index|birth_date|dni|ci|gender|amount|relationship|titular\.edad)\}\}[\s\S]*?)<\/tr>/gi;
-      result = result.replace(trRegex, (fullMatch, rowContent) => {
-        return context.beneficiarios.map((beneficiary, index) => {
-          let row = fullMatch;
-          const aliases: Record<string, string> = {
-            '{{first_name}}': beneficiary.nombre,
-            '{{last_name}}': beneficiary.apellido,
-            '{{birth_date}}': beneficiary.fechaNacimiento,
-            '{{gender}}': beneficiary.genero,
-            '{{amount}}': beneficiary.montoFormateado,
-            '{{relationship}}': beneficiary.parentesco,
-            '{{dni}}': beneficiary.dni,
-            '{{ci}}': beneficiary.dni,
-            '{{document_number}}': beneficiary.dni,
-            '{{age}}': String(beneficiary.edad),
-            '{{titular.edad}}': String(beneficiary.edad),
-            '{{edad}}': String(beneficiary.edad),
-            '{{_index}}': String(index + 1),
-            '{{index}}': String(index + 1),
-            '{{indice}}': String(index + 1),
-            '{{email}}': beneficiary.email,
-            '{{phone}}': beneficiary.telefono,
-            '{{formatted_amount}}': beneficiary.montoFormateado,
-            '{{vigencia_inmediata}}': context.venta.vigenciaInmediata,
-            '{{tipo_venta}}': context.venta.tipoVenta,
-          };
-          Object.entries(aliases).forEach(([placeholder, value]) => {
-            const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-            row = row.replace(regex, value || '');
-          });
-          return row;
-        }).join('\n');
-      });
-    }
   }
 
   return result;
