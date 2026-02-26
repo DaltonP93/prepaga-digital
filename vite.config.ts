@@ -18,5 +18,36 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    dedupe: ['react', 'react-dom'],
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-ui': [
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-popover',
+            '@radix-ui/react-select',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-tooltip',
+            '@radix-ui/react-accordion',
+            '@radix-ui/react-checkbox',
+            '@radix-ui/react-switch',
+            '@radix-ui/react-toast',
+          ],
+          'vendor-query': ['@tanstack/react-query'],
+          'vendor-supabase': ['@supabase/supabase-js'],
+          'vendor-editor': [
+            '@tiptap/react',
+            '@tiptap/starter-kit',
+            '@tiptap/extensions',
+          ],
+          'vendor-charts': ['recharts'],
+          'vendor-pdf': ['pdf-lib'],
+        },
+      },
+    },
   },
 }));
