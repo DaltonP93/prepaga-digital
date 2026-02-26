@@ -517,8 +517,12 @@ const SignatureView = () => {
             ) : (() => {
               // Detect signature type from document content
               const hasElectronicSignature = documents?.some((doc: any) => {
-                const content = doc.content || '';
-                return content.includes('signature-type="electronica"') || 
+                const content = (doc.content || '').toLowerCase();
+                return content.includes('signature-type="electronic"') ||
+                       content.includes("signature-type='electronic'") ||
+                       content.includes('data-signature-type="electronic"') ||
+                       content.includes("data-signature-type='electronic'") ||
+                       content.includes('signature-type="electronica"') ||
                        content.includes('data-signature-type="electronica"') ||
                        content.includes('firma electrónica') ||
                        content.includes('firma electronica');

@@ -511,8 +511,10 @@ export const useSubmitSignatureLink = () => {
 
       return data;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['signature-link-public', variables.token] });
+      queryClient.invalidateQueries({ queryKey: ['signature-link-documents', data.sale_id] });
+      queryClient.invalidateQueries({ queryKey: ['all-signature-links-public', data.sale_id] });
       toast({
         title: "¡Firma completada!",
         description: "Su firma ha sido registrada exitosamente.",
@@ -573,7 +575,17 @@ export const useSignatureLinkDocuments = (
         throw error;
       }
 
-      return data || [];
+      const docs = data || [];
+
+      // If final signed documents exist, prioritize them to avoid showing stale pre-signature versions
+      const hasFinalSignedDocs = docs.some((d: any) => d.is_final === true && d.requires_signature !== false);
+      if (hasFinalSignedDocs) {
+        return docs
+          .filter((d: any) => d.is_final === true || d.requires_signature === false)
+          .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      }
+
+      return docs;
     },
     enabled: !!saleId,
   });
