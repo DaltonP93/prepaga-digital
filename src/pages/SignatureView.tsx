@@ -1,19 +1,23 @@
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { useSignatureLinkByToken, useSubmitSignatureLink, useSignatureLinkDocuments, useAllSignatureLinksPublic } from "@/hooks/useSignatureLinkPublic";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import PublicLayout from "@/layouts/PublicLayout";
 import { EnhancedSignatureCanvas } from "@/components/signature/EnhancedSignatureCanvas";
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
   FileText, User, Calendar, Building, CheckCircle, Clock, AlertCircle,
-  Shield, Loader2, Download, Users, PenTool, Paperclip, Eye
+  Shield, Loader2, Download, Users, PenTool, Paperclip, Eye, Mail,
+  KeyRound, Scale, Info, ExternalLink
 } from "lucide-react";
 import DOMPurify from 'dompurify';
 import { formatCurrency } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { useSignatureVerification, generateDocumentHash, buildEvidenceBundle } from "@/hooks/useSignatureVerification";
 
 const SignatureView = () => {
   const { token } = useParams<{ token: string }>();
@@ -31,6 +35,9 @@ const SignatureView = () => {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [signwellCompleted, setSignwellCompleted] = useState(false);
   const signatureSectionRef = useRef<HTMLDivElement>(null);
+  const [otpCode, setOtpCode] = useState('');
+  const [consentRecordId, setConsentRecordId] = useState<string | null>(null);
+  const verification = useSignatureVerification();
 
   // Check if this link has a SignWell signing URL
   const signwellSigningUrl = (linkData as any)?.signwell_signing_url;
@@ -92,12 +99,97 @@ const SignatureView = () => {
   };
 
   const handleSignatureComplete = async () => {
-    if (!signatureData || !linkData || !termsAccepted) return;
-    await submitSignature.mutateAsync({
-      linkId: linkData.id,
-      token: token!,
-      signatureData,
+    if (!linkData || !termsAccepted) return;
+    
+    // For digital signature (canvas), require signatureData
+    const isElectronic = documents?.some((doc: any) => {
+      const content = (doc.content || '').toLowerCase();
+      return content.includes('firma electrónica') || content.includes('firma electronica') ||
+             content.includes('signature-type="electronic"') || content.includes('signature-type="electronica"') ||
+             content.includes('data-signature-type="electronic"') || content.includes('data-signature-type="electronica"');
     });
+
+    if (!isElectronic && !signatureData) return;
+
+    const finalSignatureData = isElectronic
+      ? JSON.stringify({
+          type: 'electronica',
+          accepted_at: new Date().toISOString(),
+          user_agent: navigator.userAgent,
+        })
+      : signatureData!;
+
+    try {
+      // Generate document hashes for all docs to sign
+      const docsToSign = documents?.filter((d: any) => d.requires_signature !== false) || [];
+      const timestamp = new Date().toISOString();
+      const ip = 'client-side'; // Will be captured server-side
+      const ua = navigator.userAgent;
+
+      // Create signature events for each document
+      for (const doc of docsToSign) {
+        const docHash = doc.content ? await generateDocumentHash(doc.content) : '';
+        
+        const evidenceResult = await buildEvidenceBundle({
+          documentHash: docHash,
+          identityVerificationId: verification.verificationId,
+          consentRecordId: consentRecordId || '',
+          signatureMethod: isElectronic ? 'electronic' : 'digital',
+          ip,
+          userAgent: ua,
+          timestamp,
+        });
+
+        // Insert signature event
+        await supabase.from('signature_events' as any).insert({
+          signature_link_id: linkData.id,
+          sale_id: linkData.sale_id,
+          document_id: doc.id,
+          document_hash: docHash,
+          ip_address: ip,
+          user_agent: ua,
+          identity_verified: verification.isVerified,
+          identity_verification_id: verification.verificationId,
+          consent_record_id: consentRecordId,
+          signature_method: isElectronic ? 'electronic' : 'digital',
+          evidence_bundle_hash: evidenceResult.hash,
+          timestamp,
+        });
+      }
+
+      // Submit the actual signature
+      await submitSignature.mutateAsync({
+        linkId: linkData.id,
+        token: token!,
+        signatureData: finalSignatureData,
+      });
+    } catch (error) {
+      console.error('Error in enhanced signature flow:', error);
+    }
+  };
+
+  const handleSaveConsent = async () => {
+    if (!linkData || !termsAccepted) return;
+    
+    const consentText = `Declaro que: (1) he leído el/los documento(s) completo(s); (2) acepto firmarlos electrónicamente; (3) comprendo que tienen validez jurídica conforme a la Ley N° 4017/2010; (4) confirmo mi identidad; (5) acepto el registro de evidencias técnicas (IP, dispositivo, marca de tiempo, hash).`;
+    
+    try {
+      const { data, error } = await supabase.from('signature_consent_records' as any).insert({
+        signature_link_id: linkData.id,
+        sale_id: linkData.sale_id,
+        consent_text_version: 'v1.0',
+        consent_text: consentText,
+        checkbox_state: true,
+        ip_address: 'client-side',
+        user_agent: navigator.userAgent,
+      }).select().single();
+      
+      if (error) throw error;
+      setConsentRecordId((data as any).id);
+      return (data as any).id;
+    } catch (err) {
+      console.error('Error saving consent:', err);
+    }
   };
 
   const handleDownloadSignature = () => {
@@ -485,140 +577,140 @@ const SignatureView = () => {
           );
         })()}
 
-        {/* Signature Section - always visible when there are documents */}
+        {/* Enhanced Signature Flow */}
         {documents && documents.filter((d: any) => d.requires_signature !== false).length > 0 && (
-          <div ref={signatureSectionRef}>
+          <div ref={signatureSectionRef} className="space-y-4">
             {signwellSigningUrl && !signwellCompleted ? (
-              /* SignWell Embedded Signing via iframe */
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Shield className="h-5 w-5" />
                     Firma Electrónica
                   </CardTitle>
-                  <CardDescription>
-                    Firme el documento a través de la plataforma segura SignWell.
-                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="w-full border rounded-lg overflow-hidden" style={{ height: '700px' }}>
-                    <iframe
-                      src={signwellSigningUrl}
-                      title="SignWell Firma"
-                      className="w-full h-full border-0"
-                      allow="camera; microphone"
-                    />
+                    <iframe src={signwellSigningUrl} title="SignWell Firma" className="w-full h-full border-0" allow="camera; microphone" />
                   </div>
-                  <p className="text-xs text-center text-muted-foreground mt-4">
-                    Complete la firma en el formulario de arriba. La página se actualizará automáticamente.
-                  </p>
                 </CardContent>
               </Card>
-            ) : (() => {
-              // Detect signature type from document content
-              const hasElectronicSignature = documents?.some((doc: any) => {
-                const content = (doc.content || '').toLowerCase();
-                return content.includes('signature-type="electronic"') ||
-                       content.includes("signature-type='electronic'") ||
-                       content.includes('data-signature-type="electronic"') ||
-                       content.includes("data-signature-type='electronic'") ||
-                       content.includes('signature-type="electronica"') ||
-                       content.includes('data-signature-type="electronica"') ||
-                       content.includes('firma electrónica') ||
-                       content.includes('firma electronica');
-              });
-
-              if (hasElectronicSignature) {
-                // Electronic signature: just checkbox + button, no canvas
-                return (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Shield className="h-5 w-5" />
-                        Firma Electrónica
-                      </CardTitle>
-                      <CardDescription>
-                        Al aceptar, se registrará su firma electrónica con validez legal.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      <div className="space-y-3">
-                        <label className="flex items-start gap-3 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={termsAccepted}
-                            onChange={(e) => setTermsAccepted(e.target.checked)}
-                            className="mt-1 h-4 w-4 rounded border-border"
-                          />
-                          <span className="text-sm text-muted-foreground">
-                            He leído y acepto los términos y condiciones. Confirmo que la información
-                            proporcionada es correcta y completa. Autorizo el procesamiento de mis datos
-                            personales según la política de privacidad.
-                          </span>
-                        </label>
-                      </div>
-
-                      <Button
-                        onClick={() => {
-                          if (!termsAccepted || !linkData || !token) return;
-                          const electronicSignatureData = JSON.stringify({
-                            type: 'electronica',
-                            accepted_at: new Date().toISOString(),
-                            user_agent: navigator.userAgent,
-                          });
-                          submitSignature.mutate({
-                            linkId: linkData.id,
-                            token: token,
-                            signatureData: electronicSignatureData,
-                          });
-                        }}
-                        disabled={!termsAccepted || submitSignature.isPending}
-                        className="w-full"
-                        size="lg"
-                      >
-                        {submitSignature.isPending ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Procesando firma...
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            Firmar Todos los Documentos
-                          </>
-                        )}
-                      </Button>
-
-                      <p className="text-xs text-center text-muted-foreground">
-                        Al firmar, se registrará su IP y hora de firma por seguridad.
-                      </p>
-                    </CardContent>
-                  </Card>
-                );
-              }
-
-              // Default: canvas-based digital signature
-              return (
+            ) : (
+              <>
+                {/* STEP 1: Identity Verification (OTP) */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <Shield className="h-5 w-5" />
-                      Firma Digital
+                      <KeyRound className="h-5 w-5" />
+                      Paso 1 — Verificación de Identidad
+                      {verification.isVerified && <Badge className="bg-green-600 ml-2">✓ Verificado</Badge>}
                     </CardTitle>
                     <CardDescription>
-                      Dibuje su firma en el área a continuación. Esta firma tendrá validez legal.
+                      Para su seguridad, verificaremos su identidad antes de firmar.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-6">
-                    <EnhancedSignatureCanvas
-                      onSignatureChange={setSignatureData}
-                      width={600}
-                      height={200}
-                    />
+                  <CardContent className="space-y-4">
+                    {!verification.isVerified ? (
+                      <>
+                        {verification.step === 'idle' || verification.step === 'error' || verification.step === 'sending' ? (
+                          <div className="space-y-3">
+                            <p className="text-sm text-muted-foreground">
+                              Se enviará un código de verificación de 6 dígitos a su correo electrónico.
+                              El código será válido por 5 minutos.
+                            </p>
+                            {verification.error && (
+                              <Alert variant="destructive">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription>{verification.error}</AlertDescription>
+                              </Alert>
+                            )}
+                            <Button
+                              onClick={() => {
+                                const email = linkData.recipient_email || 
+                                  (isTitular ? client?.email : '') || '';
+                                verification.sendOTP(linkData.id, linkData.sale_id, email, token!);
+                              }}
+                              disabled={verification.step === 'sending' as string}
+                              className="w-full"
+                            >
+                              {(verification.step as string) === 'sending' ? (
+                                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Enviando código...</>
+                              ) : (
+                                <><Mail className="h-4 w-4 mr-2" />Verificar identidad para firmar</>
+                              )}
+                            </Button>
+                          </div>
+                        ) : verification.step === 'awaiting_code' || verification.step === 'verifying' ? (
+                          <div className="space-y-3">
+                            <p className="text-sm text-muted-foreground">
+                              Código enviado a <strong>{verification.destinationMasked}</strong>
+                            </p>
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="Ingrese código de 6 dígitos"
+                                value={otpCode}
+                                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                maxLength={6}
+                                className="text-center text-lg tracking-widest font-mono"
+                              />
+                              <Button
+                                onClick={() => verification.verifyOTP(otpCode, linkData.id, token!)}
+                                disabled={otpCode.length !== 6 || verification.step === 'verifying'}
+                              >
+                                {verification.step === 'verifying' ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : 'Verificar'}
+                              </Button>
+                            </div>
+                            {verification.error && (
+                              <Alert variant="destructive">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription>{verification.error}</AlertDescription>
+                              </Alert>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                verification.reset();
+                                setOtpCode('');
+                              }}
+                            >
+                              Reenviar código
+                            </Button>
+                          </div>
+                        ) : null}
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 rounded-lg p-3">
+                        <CheckCircle className="h-4 w-4" />
+                        Identidad verificada exitosamente
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
-                    <Separator />
+                {/* STEP 2: Legal Consent */}
+                {verification.isVerified && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Scale className="h-5 w-5" />
+                        Paso 2 — Consentimiento Legal
+                        {consentRecordId && <Badge className="bg-green-600 ml-2">✓ Aceptado</Badge>}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="bg-muted/50 border rounded-lg p-4 text-sm space-y-2">
+                        <p className="font-medium">Declaro que:</p>
+                        <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                          <li>He leído el/los documento(s) completo(s) que se me presentan.</li>
+                          <li>Acepto firmarlos electrónicamente de manera libre y voluntaria.</li>
+                          <li>Comprendo que esta firma tiene validez jurídica conforme a la Ley N° 4017/2010 de la República del Paraguay.</li>
+                          <li>Confirmo mi identidad como firmante autorizado.</li>
+                          <li>Acepto que se registren evidencias técnicas (dirección IP, dispositivo, marca de tiempo, hash del documento) como parte del proceso de firma.</li>
+                        </ol>
+                      </div>
 
-                    <div className="space-y-3">
                       <label className="flex items-start gap-3 cursor-pointer">
                         <input
                           type="checkbox"
@@ -626,40 +718,144 @@ const SignatureView = () => {
                           onChange={(e) => setTermsAccepted(e.target.checked)}
                           className="mt-1 h-4 w-4 rounded border-border"
                         />
-                        <span className="text-sm text-muted-foreground">
-                          He leído y acepto los términos y condiciones. Confirmo que la información
-                          proporcionada es correcta y completa. Autorizo el procesamiento de mis datos
-                          personales según la política de privacidad.
+                        <span className="text-sm font-medium">
+                          He leído y acepto las declaraciones anteriores. Entiendo que mi firma electrónica tendrá la misma validez legal que una firma manuscrita.
                         </span>
                       </label>
-                    </div>
 
-                    <Button
-                      onClick={handleSignatureComplete}
-                      disabled={!signatureData || !termsAccepted || submitSignature.isPending}
-                      className="w-full"
-                      size="lg"
-                    >
-                      {submitSignature.isPending ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Procesando firma...
-                        </>
-                      ) : (
-                        <>
+                      <Link to="/politica-firma" target="_blank" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
+                        <ExternalLink className="h-3 w-3" />
+                        Ver Política de Firma Electrónica
+                      </Link>
+
+                      {!consentRecordId && (
+                        <Button
+                          onClick={handleSaveConsent}
+                          disabled={!termsAccepted}
+                          variant="outline"
+                          className="w-full"
+                        >
                           <CheckCircle className="h-4 w-4 mr-2" />
-                          Firmar Todos los Documentos
-                        </>
+                          Confirmar Consentimiento
+                        </Button>
                       )}
-                    </Button>
+                    </CardContent>
+                  </Card>
+                )}
 
-                    <p className="text-xs text-center text-muted-foreground">
-                      Al firmar, se registrará su IP y hora de firma por seguridad.
-                    </p>
-                  </CardContent>
-                </Card>
-              );
-            })()}
+                {/* STEP 3: Evidence Summary + Signature */}
+                {consentRecordId && (
+                  <>
+                    {/* Evidence Summary */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Info className="h-5 w-5" />
+                          Paso 3 — Resumen de Evidencias
+                        </CardTitle>
+                        <CardDescription>
+                          Las siguientes evidencias serán registradas al firmar:
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                          <div className="bg-muted/30 rounded p-3">
+                            <p className="text-muted-foreground text-xs">Dirección IP</p>
+                            <p className="font-mono">Registrada automáticamente</p>
+                          </div>
+                          <div className="bg-muted/30 rounded p-3">
+                            <p className="text-muted-foreground text-xs">Fecha y Hora</p>
+                            <p className="font-mono">{new Date().toLocaleString('es-PY')}</p>
+                          </div>
+                          <div className="bg-muted/30 rounded p-3">
+                            <p className="text-muted-foreground text-xs">Identidad Verificada</p>
+                            <p className="text-green-600 font-medium">✓ OTP verificado</p>
+                          </div>
+                          <div className="bg-muted/30 rounded p-3">
+                            <p className="text-muted-foreground text-xs">Hash del Documento</p>
+                            <p className="font-mono text-xs truncate">SHA-256 (generado al firmar)</p>
+                          </div>
+                          <div className="bg-muted/30 rounded p-3 sm:col-span-2">
+                            <p className="text-muted-foreground text-xs">Marco Legal</p>
+                            <p>Ley N° 4017/2010 · ISO 14533 · ISO 27001</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Signature Input */}
+                    {(() => {
+                      const hasElectronicSignature = documents?.some((doc: any) => {
+                        const content = (doc.content || '').toLowerCase();
+                        return content.includes('signature-type="electronic"') ||
+                               content.includes("signature-type='electronic'") ||
+                               content.includes('data-signature-type="electronic"') ||
+                               content.includes("data-signature-type='electronic'") ||
+                               content.includes('signature-type="electronica"') ||
+                               content.includes('data-signature-type="electronica"') ||
+                               content.includes('firma electrónica') ||
+                               content.includes('firma electronica');
+                      });
+
+                      return (
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                              <Shield className="h-5 w-5" />
+                              {hasElectronicSignature ? 'Firma Electrónica' : 'Firma Digital'}
+                            </CardTitle>
+                            <CardDescription>
+                              {hasElectronicSignature
+                                ? 'Presione el botón para registrar su firma electrónica con validez legal.'
+                                : 'Dibuje su firma en el área a continuación.'}
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-6">
+                            {!hasElectronicSignature && (
+                              <>
+                                <EnhancedSignatureCanvas
+                                  onSignatureChange={setSignatureData}
+                                  width={600}
+                                  height={200}
+                                />
+                                <Separator />
+                              </>
+                            )}
+
+                            <Button
+                              onClick={handleSignatureComplete}
+                              disabled={
+                                (!hasElectronicSignature && !signatureData) ||
+                                submitSignature.isPending
+                              }
+                              className="w-full"
+                              size="lg"
+                            >
+                              {submitSignature.isPending ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Procesando firma...
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                  Firmar Todos los Documentos
+                                </>
+                              )}
+                            </Button>
+
+                            <p className="text-xs text-center text-muted-foreground">
+                              Al firmar, se generará un paquete de evidencia inmutable (Evidence Bundle)
+                              que incluye hash SHA-256, marca de tiempo y registro de verificación de identidad.
+                            </p>
+                          </CardContent>
+                        </Card>
+                      );
+                    })()}
+                  </>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>
