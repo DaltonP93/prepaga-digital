@@ -87,20 +87,42 @@ export const useOtpPolicy = () => {
     mutationFn: async (updates: Partial<OtpPolicyConfig>) => {
       if (!profile?.company_id) throw new Error('No company ID');
 
+      const { id, company_id, ...cleanUpdates } = updates as any;
+
       const dbData = {
         company_id: profile.company_id,
-        ...updates,
+        ...cleanUpdates,
         updated_at: new Date().toISOString(),
       };
 
-      const { data, error } = await supabase
+      // Check if policy already exists
+      const { data: existing } = await supabase
         .from('company_otp_policy' as any)
-        .upsert(dbData as any)
-        .select()
-        .single();
+        .select('id')
+        .eq('company_id', profile.company_id)
+        .maybeSingle();
 
-      if (error) throw error;
-      return data;
+      let result;
+      if (existing) {
+        const { data, error } = await supabase
+          .from('company_otp_policy' as any)
+          .update(dbData as any)
+          .eq('company_id', profile.company_id)
+          .select()
+          .single();
+        if (error) throw error;
+        result = data;
+      } else {
+        const { data, error } = await supabase
+          .from('company_otp_policy' as any)
+          .insert(dbData as any)
+          .select()
+          .single();
+        if (error) throw error;
+        result = data;
+      }
+
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['otp-policy'] });

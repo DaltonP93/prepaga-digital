@@ -7,12 +7,16 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { KeyRound, Mail, MessageSquare, Smartphone, Shield, Server, Save, Loader2 } from 'lucide-react';
+import { KeyRound, Mail, MessageSquare, Smartphone, Shield, Server, Save, Loader2, Wifi, WifiOff } from 'lucide-react';
 import { useOtpPolicy, OtpPolicyConfig } from '@/hooks/useOtpPolicy';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export const OtpPolicyConfigPanel: React.FC = () => {
   const { policy, isLoading, updatePolicy, isUpdating } = useOtpPolicy();
   const [formData, setFormData] = useState<OtpPolicyConfig>(policy);
+  const [testingSmtp, setTestingSmtp] = useState(false);
+  const [testingWhatsApp, setTestingWhatsApp] = useState(false);
 
   useEffect(() => {
     if (policy) setFormData(policy);
@@ -35,6 +39,42 @@ export const OtpPolicyConfigPanel: React.FC = () => {
   const handleSave = () => {
     const { id, company_id, ...updates } = formData;
     updatePolicy(updates);
+  };
+
+  const handleTestSmtp = async () => {
+    if (!formData.smtp_host || !formData.smtp_user || !formData.smtp_from_address) {
+      toast.error('Completa host, usuario y email remitente antes de probar');
+      return;
+    }
+    setTestingSmtp(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('signature-otp', {
+        body: {
+          action: 'test_smtp',
+          smtp_host: formData.smtp_host,
+          smtp_port: formData.smtp_port,
+          smtp_user: formData.smtp_user,
+          smtp_password: formData.smtp_password_encrypted,
+          smtp_from_address: formData.smtp_from_address,
+          smtp_from_name: formData.smtp_from_name || 'Test',
+          smtp_tls: formData.smtp_tls,
+        },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        toast.success('✅ Conexión SMTP exitosa');
+      } else {
+        toast.error(data?.error || 'No se pudo conectar al servidor SMTP');
+      }
+    } catch (err: any) {
+      toast.error(`Error de prueba: ${err.message}`);
+    } finally {
+      setTestingSmtp(false);
+    }
+  };
+
+  const handleTestWhatsApp = async () => {
+    toast.info('La prueba de WhatsApp depende de la configuración en Integraciones. Verifica que el gateway esté activo.');
   };
 
   if (isLoading) {
@@ -326,6 +366,19 @@ export const OtpPolicyConfigPanel: React.FC = () => {
                   onCheckedChange={(v) => handleChange('smtp_tls', v)}
                 />
               </div>
+              <Button
+                variant="outline"
+                onClick={handleTestSmtp}
+                disabled={testingSmtp}
+                className="w-full"
+              >
+                {testingSmtp ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Wifi className="h-4 w-4 mr-2" />
+                )}
+                {testingSmtp ? 'Probando conexión...' : 'Probar conexión SMTP'}
+              </Button>
             </div>
           </>
         )}
