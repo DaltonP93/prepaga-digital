@@ -10,6 +10,11 @@ interface VerificationState {
   attemptsRemaining: number;
   error: string | null;
   channelUsed: string | null;
+  attemptedChannel: string | null;
+  fallbackUsed: boolean;
+  fallbackReason: string | null;
+  providerUsed: string | null;
+  sent: boolean;
 }
 
 interface OtpPolicy {
@@ -29,6 +34,11 @@ export const useSignatureVerification = () => {
     attemptsRemaining: 3,
     error: null,
     channelUsed: null,
+    attemptedChannel: null,
+    fallbackUsed: false,
+    fallbackReason: null,
+    providerUsed: null,
+    sent: false,
   });
   const [otpPolicy, setOtpPolicy] = useState<OtpPolicy | null>(null);
 
@@ -71,19 +81,55 @@ export const useSignatureVerification = () => {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
+      const wasSent = data.sent !== false;
+      const fallbackUsed = !!data.fallback_used;
+      const channelUsed = data.channel_used || channel || 'email';
+      const attemptedChannel = data.attempted_channel || channel || 'email';
+
+      if (!wasSent) {
+        // OTP was NOT sent - show error, don't proceed to awaiting_code
+        setState(prev => ({
+          ...prev,
+          step: 'error',
+          error: data.fallback_reason || 'No se pudo enviar el código de verificación. Verifique la configuración de comunicaciones.',
+          attemptedChannel,
+          channelUsed,
+          fallbackUsed,
+          fallbackReason: data.fallback_reason || null,
+          providerUsed: data.provider_used || null,
+          sent: false,
+        }));
+        toast({
+          title: 'Error al enviar código',
+          description: data.fallback_reason || 'No se pudo enviar el código. Contacte al administrador.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       setState(prev => ({
         ...prev,
         step: 'awaiting_code',
         verificationId: data.verification_id,
         destinationMasked: data.destination_masked,
         expiresAt: data.expires_at,
-        channelUsed: data.channel_used || channel || 'email',
+        channelUsed,
+        attemptedChannel,
+        fallbackUsed,
+        fallbackReason: data.fallback_reason || null,
+        providerUsed: data.provider_used || null,
+        sent: true,
       }));
 
-      const channelLabel = data.channel_used === 'whatsapp' ? 'WhatsApp' : 'correo';
+      const channelLabel = channelUsed === 'whatsapp' ? 'WhatsApp' : 'Email';
+      let description = `Se envió un código de verificación a ${data.destination_masked} vía ${channelLabel}`;
+      if (fallbackUsed) {
+        description += ` (fallback: ${data.fallback_reason})`;
+      }
+
       toast({
         title: 'Código enviado',
-        description: `Se envió un código de verificación a ${data.destination_masked} vía ${channelLabel}`,
+        description,
       });
     } catch (err: any) {
       setState(prev => ({ ...prev, step: 'error', error: err.message }));
@@ -152,6 +198,11 @@ export const useSignatureVerification = () => {
       attemptsRemaining: 3,
       error: null,
       channelUsed: null,
+      attemptedChannel: null,
+      fallbackUsed: false,
+      fallbackReason: null,
+      providerUsed: null,
+      sent: false,
     });
   };
 

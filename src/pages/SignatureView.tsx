@@ -660,7 +660,7 @@ const SignatureView = () => {
                                     Email
                                   </Button>
                                 )}
-                                {verification.otpPolicy.allowed_channels.includes('whatsapp') && (
+                                {(verification.otpPolicy.allowed_channels.includes('whatsapp') || verification.otpPolicy.allowed_channels.includes('smtp')) && (
                                   <Button
                                     variant={selectedChannel === 'whatsapp' ? 'default' : 'outline'}
                                     size="sm"
@@ -679,6 +679,21 @@ const SignatureView = () => {
                                 <AlertDescription>{verification.error}</AlertDescription>
                               </Alert>
                             )}
+
+                            {/* Show fallback info if previous attempt used fallback */}
+                            {verification.fallbackUsed && verification.fallbackReason && (
+                              <Alert>
+                                <Info className="h-4 w-4" />
+                                <AlertDescription>
+                                  <strong>Solicitaste:</strong> {verification.attemptedChannel === 'whatsapp' ? 'WhatsApp' : 'Email'}
+                                  <br />
+                                  <strong>Se envió por:</strong> {verification.channelUsed === 'whatsapp' ? 'WhatsApp' : 'Email (SMTP)'} (fallback)
+                                  <br />
+                                  <strong>Razón:</strong> {verification.fallbackReason}
+                                </AlertDescription>
+                              </Alert>
+                            )}
+
                             <Button
                               onClick={() => {
                                 const email = linkData.recipient_email || 
@@ -699,9 +714,24 @@ const SignatureView = () => {
                           </div>
                         ) : verification.step === 'awaiting_code' || verification.step === 'verifying' ? (
                           <div className="space-y-3">
-                            <p className="text-sm text-muted-foreground">
-                              Código enviado a <strong>{verification.destinationMasked}</strong>
-                            </p>
+                            {/* Show channel info */}
+                            {verification.fallbackUsed ? (
+                              <Alert>
+                                <Info className="h-4 w-4" />
+                                <AlertDescription>
+                                  <strong>Solicitaste:</strong> {verification.attemptedChannel === 'whatsapp' ? 'WhatsApp' : 'Email'}
+                                  <br />
+                                  <strong>Enviado por:</strong> {verification.channelUsed === 'whatsapp' ? 'WhatsApp' : 'Email (SMTP)'} (fallback)
+                                  <br />
+                                  <span className="text-xs">{verification.fallbackReason}</span>
+                                </AlertDescription>
+                              </Alert>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">
+                                Código enviado a <strong>{verification.destinationMasked}</strong>
+                                {verification.channelUsed === 'whatsapp' ? ' vía WhatsApp' : ' vía Email'}
+                              </p>
+                            )}
                             <div className="flex gap-2">
                               <Input
                                 placeholder="Ingrese código de 6 dígitos"

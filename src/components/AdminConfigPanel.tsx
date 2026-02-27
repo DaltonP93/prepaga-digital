@@ -9,7 +9,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Settings, Palette, MessageSquare, Mail, Smartphone, Eye, CheckCircle, XCircle, ExternalLink, Copy, PenTool, Loader2 } from 'lucide-react';
+import { Settings, Palette, MessageSquare, Mail, Smartphone, Eye, CheckCircle, XCircle, ExternalLink, Copy, PenTool, Loader2, TestTube, AlertTriangle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -49,6 +51,9 @@ export const AdminConfigPanel: React.FC = () => {
   const [uiFormData, setUiFormData] = useState(defaultUiFormData);
   const [apiFormData, setApiFormData] = useState(defaultApiFormData);
   const [signwellTesting, setSignwellTesting] = useState(false);
+  const [whatsappTesting, setWhatsappTesting] = useState(false);
+  const [whatsappTestPhone, setWhatsappTestPhone] = useState('');
+  const { profile } = useSimpleAuthContext();
   const lastUiSyncKeyRef = useRef<string>('');
   const lastApiSyncKeyRef = useRef<string>('');
 
@@ -547,6 +552,55 @@ export const AdminConfigPanel: React.FC = () => {
                   </p>
                 </div>
               )}
+
+              {/* WhatsApp Test Button */}
+              {apiFormData.whatsapp_provider !== 'wame_fallback' && (
+                <div className="space-y-3 p-4 rounded-lg border bg-muted/30">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <TestTube className="h-4 w-4" />
+                    Probar WhatsApp
+                  </h4>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="+5959XXXXXXX (número de prueba)"
+                      value={whatsappTestPhone}
+                      onChange={(e) => setWhatsappTestPhone(e.target.value)}
+                    />
+                    <Button
+                      variant="outline"
+                      disabled={whatsappTesting || !whatsappTestPhone}
+                      onClick={async () => {
+                        setWhatsappTesting(true);
+                        try {
+                          // Save config first
+                          handleApiSave();
+                          // Wait a moment for save
+                          await new Promise(r => setTimeout(r, 1000));
+                          const { data, error } = await supabase.functions.invoke('signature-otp', {
+                            body: {
+                              action: 'test_whatsapp',
+                              test_phone: whatsappTestPhone,
+                              company_id: profile?.company_id,
+                            },
+                          });
+                          if (error) throw error;
+                          if (data?.success) {
+                            toast.success(data.message || 'WhatsApp de prueba enviado');
+                          } else {
+                            toast.error(data?.error || data?.message || 'Error al enviar prueba');
+                          }
+                        } catch (err: any) {
+                          toast.error(err.message || 'Error al probar WhatsApp');
+                        } finally {
+                          setWhatsappTesting(false);
+                        }
+                      }}
+                    >
+                      {whatsappTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Enviar prueba'}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -561,6 +615,12 @@ export const AdminConfigPanel: React.FC = () => {
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  SMS no está implementado actualmente. Se requiere un proveedor externo (Twilio SMS, etc.) para habilitar este canal.
+                </AlertDescription>
+              </Alert>
               <div className="flex items-center space-x-2">
                 <Switch id="sms_enabled" checked={apiFormData.sms_api_enabled} onCheckedChange={(checked) => handleApiInputChange('sms_api_enabled', checked)} />
                 <Label htmlFor="sms_enabled">Habilitar envío de SMS</Label>

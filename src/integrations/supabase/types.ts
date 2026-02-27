@@ -590,6 +590,7 @@ export type Database = {
           smtp_host: string | null
           smtp_password_encrypted: string | null
           smtp_port: number | null
+          smtp_relay_url: string | null
           smtp_tls: boolean | null
           smtp_user: string | null
           updated_at: string | null
@@ -610,6 +611,7 @@ export type Database = {
           smtp_host?: string | null
           smtp_password_encrypted?: string | null
           smtp_port?: number | null
+          smtp_relay_url?: string | null
           smtp_tls?: boolean | null
           smtp_user?: string | null
           updated_at?: string | null
@@ -630,6 +632,7 @@ export type Database = {
           smtp_host?: string | null
           smtp_password_encrypted?: string | null
           smtp_port?: number | null
+          smtp_relay_url?: string | null
           smtp_tls?: boolean | null
           smtp_user?: string | null
           updated_at?: string | null
@@ -659,11 +662,15 @@ export type Database = {
           signwell_enabled: boolean | null
           sms_api_key: string | null
           sms_sender_id: string | null
+          twilio_account_sid: string | null
+          twilio_auth_token: string | null
+          twilio_whatsapp_number: string | null
           updated_at: string | null
           whatsapp_api_key: string | null
           whatsapp_gateway_url: string | null
           whatsapp_linked_phone: string | null
           whatsapp_phone_id: string | null
+          whatsapp_provider: string
         }
         Insert: {
           company_id: string
@@ -678,11 +685,15 @@ export type Database = {
           signwell_enabled?: boolean | null
           sms_api_key?: string | null
           sms_sender_id?: string | null
+          twilio_account_sid?: string | null
+          twilio_auth_token?: string | null
+          twilio_whatsapp_number?: string | null
           updated_at?: string | null
           whatsapp_api_key?: string | null
           whatsapp_gateway_url?: string | null
           whatsapp_linked_phone?: string | null
           whatsapp_phone_id?: string | null
+          whatsapp_provider?: string
         }
         Update: {
           company_id?: string
@@ -697,11 +708,15 @@ export type Database = {
           signwell_enabled?: boolean | null
           sms_api_key?: string | null
           sms_sender_id?: string | null
+          twilio_account_sid?: string | null
+          twilio_auth_token?: string | null
+          twilio_whatsapp_number?: string | null
           updated_at?: string | null
           whatsapp_api_key?: string | null
           whatsapp_gateway_url?: string | null
           whatsapp_linked_phone?: string | null
           whatsapp_phone_id?: string | null
+          whatsapp_provider?: string
         }
         Relationships: [
           {
