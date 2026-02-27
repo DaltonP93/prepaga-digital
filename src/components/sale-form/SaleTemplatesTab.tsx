@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, FileSignature, Plus, Trash2, Lock, Send, Loader2, Eye, FileText, User, ChevronDown, ChevronUp, Paperclip, ExternalLink } from 'lucide-react';
+import { AlertCircle, FileSignature, Plus, Trash2, Lock, Send, Loader2, Eye, FileText, User, ChevronDown, ChevronUp, Paperclip, ExternalLink, RefreshCw } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTemplates } from '@/hooks/useTemplates';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -66,6 +66,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
   const queryClient = useQueryClient();
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [sending, setSending] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [showDocuments, setShowDocuments] = useState(true);
   const [previewDoc, setPreviewDoc] = useState<any>(null);
   const createSignatureLink = useCreateSignatureLink();
@@ -491,6 +492,138 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
     }
   };
 
+  // Regenerate documents without creating new signature links (used after resend erased docs)
+  const handleRegenerateDocuments = async () => {
+    if (!saleId || !saleTemplates?.length) return;
+
+    try {
+      setRegenerating(true);
+
+      const { data: sale, error: saleError } = await supabase
+        .from('sales')
+        .select(`*, clients:client_id(*), plans:plan_id(*), companies:company_id(*)`)
+        .eq('id', saleId)
+        .single();
+
+      if (saleError) throw saleError;
+      const client = sale?.clients as any;
+      const plan = sale?.plans as any;
+      const company = sale?.companies as any;
+
+      const tplIds = saleTemplates.map((st: any) => st.templates?.id || st.template_id).filter(Boolean);
+
+      const { data: beneficiariesFromDb } = await supabase
+        .from('beneficiaries').select('*').eq('sale_id', saleId).order('created_at', { ascending: true });
+      const effectiveBeneficiaries = beneficiariesFromDb || beneficiaries || [];
+
+      const { data: templateContents, error: templateError } = await supabase
+        .from('templates').select('*').in('id', tplIds);
+      if (templateError) throw templateError;
+
+      const { data: templateResponses } = await supabase
+        .from('template_responses')
+        .select('*, template_questions:question_id(placeholder_name)')
+        .eq('sale_id', saleId);
+
+      const responsesMap: Record<string, any> = {};
+      (templateResponses || []).forEach((tr: any) => {
+        const ph = normalizeResponsePlaceholder(tr.template_questions?.placeholder_name);
+        if (tr.response_value !== null && tr.response_value !== undefined) {
+          if (ph) responsesMap[ph] = tr.response_value;
+          if (tr.question_id) responsesMap[tr.question_id] = tr.response_value;
+        }
+      });
+
+      const { createEnhancedTemplateContext, interpolateEnhancedTemplate } = await import('@/lib/enhancedTemplateEngine');
+      const context = createEnhancedTemplateContext(client, plan, company, sale, effectiveBeneficiaries, undefined, responsesMap);
+
+      const { data: allAttachments } = await supabase
+        .from('template_attachments' as any).select('template_id').in('template_id', tplIds);
+      const templatesWithAttachments = new Set((allAttachments || []).map((a: any) => a.template_id));
+
+      for (const template of (templateContents || [])) {
+        const hasContent = !!template.content?.trim();
+        const rendered = hasContent ? interpolateEnhancedTemplate(template.content || '', context) : '';
+        const lower = template.name.toLowerCase();
+        const isDDJJ = lower.includes('ddjj') || lower.includes('declaración') || lower.includes('declaracion');
+        const isContrato = lower.includes('contrato');
+        const isAnexo = isAnexoPlanName(template.name) || (!isDDJJ && !isContrato);
+
+        if (isAnexo && !hasContent && templatesWithAttachments.has(template.id)) continue;
+
+        await supabase.from('documents').insert({
+          sale_id: saleId,
+          name: template.name,
+          document_type: isAnexo ? 'anexo' : (isDDJJ ? 'ddjj_salud' : 'contrato'),
+          content: !hasContent && isAnexo ? '<p>Documento de anexo.</p>' : rendered,
+          status: 'pendiente' as any,
+          requires_signature: !isAnexo,
+          is_final: isAnexo,
+          generated_from_template: true,
+          beneficiary_id: null,
+        });
+      }
+
+      // DDJJ per adherente
+      const ddjiTpls = (templateContents || []).filter(t =>
+        t.name.toLowerCase().includes('ddjj') || t.name.toLowerCase().includes('declaración')
+      );
+      if (effectiveBeneficiaries.length > 0 && ddjiTpls.length > 0) {
+        for (const b of effectiveBeneficiaries) {
+          if (b.signature_required !== false && !b.is_primary) {
+            const benCtx = createEnhancedTemplateContext(
+              { first_name: b.first_name, last_name: b.last_name, email: b.email, phone: b.phone, dni: b.document_number || (b as any).dni, address: b.address, birth_date: b.birth_date, city: (b as any).city, province: (b as any).province },
+              plan, company, sale, effectiveBeneficiaries, undefined, { ...responsesMap }
+            );
+            for (const ddji of ddjiTpls) {
+              await supabase.from('documents').insert({
+                sale_id: saleId,
+                name: `${ddji.name} - ${b.first_name} ${b.last_name}`,
+                document_type: 'ddjj_salud',
+                content: interpolateEnhancedTemplate(ddji.content || '', benCtx),
+                status: 'pendiente' as any,
+                requires_signature: true,
+                beneficiary_id: b.id,
+              });
+            }
+          }
+        }
+      }
+
+      // Attachments
+      const { data: tplAttachments } = await supabase
+        .from('template_attachments' as any).select('*').in('template_id', tplIds);
+      if (tplAttachments?.length) {
+        const nameById = new Map((templateContents || []).map((t: any) => [t.id, t.name]));
+        const withContent = new Set((templateContents || []).filter((t: any) => !!t.content?.trim()).map((t: any) => t.id));
+        for (const att of tplAttachments) {
+          if (withContent.has((att as any).template_id)) continue;
+          const pName = nameById.get((att as any).template_id);
+          await supabase.from('documents').insert({
+            sale_id: saleId,
+            name: `${isAnexoPlanName(pName) ? 'Anexo Plan' : 'Anexo'} - ${(att as any).file_name}`,
+            document_type: 'anexo',
+            file_url: (att as any).file_url,
+            content: null,
+            status: 'pendiente' as any,
+            requires_signature: false,
+            is_final: true,
+            generated_from_template: true,
+            beneficiary_id: null,
+          });
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['sale-generated-documents', saleId] });
+      queryClient.invalidateQueries({ queryKey: ['signed-documents', saleId] });
+      toast.success('Documentos regenerados exitosamente');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al regenerar documentos');
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
   if (!saleId) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -533,10 +666,16 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           <h3 className="text-lg font-semibold">Templates de Firma ({saleTemplates?.length || 0})</h3>
         </div>
         {isApproved && saleTemplates && saleTemplates.length > 0 && !generatedDocs?.length && (
-          <Button onClick={handleSendDocuments} disabled={sending} className="gap-2">
-            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            Enviar Documentos para Firma
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleSendDocuments} disabled={sending || regenerating} className="gap-2">
+              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              Enviar Documentos para Firma
+            </Button>
+            <Button onClick={handleRegenerateDocuments} disabled={sending || regenerating} variant="outline" className="gap-2">
+              {regenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Regenerar Documentos
+            </Button>
+          </div>
         )}
       </div>
 

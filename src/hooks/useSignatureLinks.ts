@@ -248,24 +248,25 @@ export const useResendSignatureLink = () => {
         })
         .eq('id', oldLink.id);
 
-      // 2. Delete ALL generated documents for this recipient so they can be regenerated fresh
+      // 2. Reset document statuses for this recipient instead of deleting them
+      // This preserves the generated documents so they don't need to be regenerated
       if (oldLink.recipient_type === 'adherente' && oldLink.recipient_id) {
-        // For adherente: delete ALL documents tied to this beneficiary
+        // For adherente: reset status of documents tied to this beneficiary
         await supabase
           .from('documents')
-          .delete()
+          .update({ status: 'pendiente' as any, signature_data: null, signed_at: null, signed_by: null, is_final: false })
           .eq('sale_id', oldLink.sale_id)
           .eq('beneficiary_id', oldLink.recipient_id);
       } else {
-        // For titular: delete ALL generated documents without beneficiary_id
+        // For titular: reset status of generated documents without beneficiary_id
         await supabase
           .from('documents')
-          .delete()
+          .update({ status: 'pendiente' as any, signature_data: null, signed_at: null, signed_by: null, is_final: false })
           .eq('sale_id', oldLink.sale_id)
           .is('beneficiary_id', null)
           .eq('generated_from_template', true);
 
-        // Also delete standalone firma documents
+        // Also reset standalone firma documents
         await supabase
           .from('documents')
           .delete()
@@ -306,7 +307,7 @@ export const useResendSignatureLink = () => {
       queryClient.invalidateQueries({ queryKey: ['signature-link-documents'] });
       toast({
         title: 'Enlace reenviado',
-        description: 'Se ha generado un nuevo enlace de firma. Los documentos anteriores fueron eliminados.',
+        description: 'Se ha generado un nuevo enlace de firma. Los documentos se mantienen y podrán ser firmados nuevamente.',
       });
     },
     onError: (error: any) => {
