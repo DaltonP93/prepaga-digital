@@ -110,10 +110,14 @@ export const useCompanyApiConfiguration = () => {
         updated_at: new Date().toISOString(),
       };
 
+      if ('whatsapp_provider' in updates) dbUpdates.whatsapp_provider = updates.whatsapp_provider;
       if ('whatsapp_api_token' in updates) dbUpdates.whatsapp_api_key = updates.whatsapp_api_token;
       if ('whatsapp_phone_number' in updates) dbUpdates.whatsapp_phone_id = updates.whatsapp_phone_number;
       if ('whatsapp_gateway_url' in updates) dbUpdates.whatsapp_gateway_url = updates.whatsapp_gateway_url;
       if ('whatsapp_linked_phone' in updates) dbUpdates.whatsapp_linked_phone = updates.whatsapp_linked_phone;
+      if ('twilio_account_sid' in updates) dbUpdates.twilio_account_sid = updates.twilio_account_sid;
+      if ('twilio_auth_token' in updates) dbUpdates.twilio_auth_token = updates.twilio_auth_token;
+      if ('twilio_whatsapp_number' in updates) dbUpdates.twilio_whatsapp_number = updates.twilio_whatsapp_number;
       if ('sms_api_key' in updates) dbUpdates.sms_api_key = updates.sms_api_key;
       if ('email_provider' in updates) dbUpdates.email_provider = updates.email_provider;
       if ('email_api_key' in updates) dbUpdates.email_api_key = updates.email_api_key;

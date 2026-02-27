@@ -31,106 +31,142 @@ function maskPhone(phone: string): string {
   return phone.slice(0, -4).replace(/./g, '*') + phone.slice(-4);
 }
 
-// Send OTP via Resend (email)
-async function sendViaResend(email: string, otp: string, resendApiKey: string, fromName: string): Promise<boolean> {
+// Send OTP via SMTP Relay (HTTP-based, since Edge Functions can't do native SMTP)
+async function sendViaSMTPRelay(
+  email: string,
+  otp: string,
+  smtpRelayUrl: string,
+  fromAddress: string,
+  fromName: string,
+): Promise<boolean> {
   try {
-    const res = await fetch('https://api.resend.com/emails', {
+    const res = await fetch(smtpRelayUrl, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendApiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        from: `${fromName} <noreply@resend.dev>`,
-        to: [email],
+        to: email,
         subject: 'Código de verificación para firma electrónica',
         html: buildOTPEmailHTML(otp),
+        from_address: fromAddress,
+        from_name: fromName,
       }),
     });
     if (!res.ok) {
-      console.error('Resend error:', await res.text());
+      console.error('SMTP relay error:', await res.text());
       return false;
     }
     return true;
   } catch (err) {
-    console.error('Resend send error:', err);
+    console.error('SMTP relay send error:', err);
     return false;
   }
 }
 
-// Send OTP via custom SMTP (Office 365, iRedMail, etc.)
-async function sendViaSMTP(
-  email: string,
-  otp: string,
-  smtpConfig: { host: string; port: number; user: string; password: string; fromAddress: string; fromName: string; tls: boolean }
-): Promise<boolean> {
-  // Deno doesn't have native SMTP support in edge functions,
-  // so we use the Resend fallback or external SMTP relay.
-  // For custom SMTP, we'll use a fetch-based SMTP relay pattern.
-  // In production, this would call an SMTP gateway service.
-  console.warn('Custom SMTP not directly available in Edge Functions. Using Resend fallback.');
-  return false;
-}
-
-// Send OTP via WhatsApp (using company's configured WhatsApp provider)
+// Send OTP via WhatsApp using the configured provider
 async function sendViaWhatsApp(
   phone: string,
   otp: string,
   supabase: any,
-  companyId: string
-): Promise<boolean> {
+  companyId: string,
+): Promise<{ sent: boolean; provider_used: string; reason?: string }> {
   try {
-    // Get company WhatsApp settings
     const { data: settings } = await supabase
       .from('company_settings')
-      .select('whatsapp_api_key, whatsapp_phone_id')
+      .select('whatsapp_provider, whatsapp_api_key, whatsapp_phone_id, whatsapp_gateway_url, whatsapp_linked_phone, twilio_account_sid, twilio_auth_token, twilio_whatsapp_number')
       .eq('company_id', companyId)
       .single();
 
-    if (!settings?.whatsapp_api_key || !settings?.whatsapp_phone_id) {
-      console.warn('WhatsApp API not configured for company:', companyId);
-      return false;
+    const provider = settings?.whatsapp_provider || 'wame_fallback';
+
+    if (provider === 'wame_fallback') {
+      return { sent: false, provider_used: 'wame_fallback', reason: 'wa.me (manual) no puede enviar OTP automático' };
     }
 
-    // Send via Meta WhatsApp Business API
     const message = `🔐 Tu código de verificación para firma electrónica es: *${otp}*\n\nEste código es válido por 5 minutos.\nNo compartas este código con nadie.`;
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
 
-    const res = await fetch(
-      `https://graph.facebook.com/v18.0/${settings.whatsapp_phone_id}/messages`,
-      {
+    if (provider === 'meta') {
+      if (!settings?.whatsapp_api_key || !settings?.whatsapp_phone_id) {
+        return { sent: false, provider_used: 'meta', reason: 'Meta API no configurada (falta token o phone_id)' };
+      }
+      const res = await fetch(
+        `https://graph.facebook.com/v18.0/${settings.whatsapp_phone_id}/messages`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${settings.whatsapp_api_key}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            to: cleanPhone,
+            type: 'text',
+            text: { body: message },
+          }),
+        }
+      );
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error('Meta WhatsApp API error:', errText);
+        return { sent: false, provider_used: 'meta', reason: `Meta API error: ${errText.slice(0, 100)}` };
+      }
+      return { sent: true, provider_used: 'meta' };
+    }
+
+    if (provider === 'twilio') {
+      if (!settings?.twilio_account_sid || !settings?.twilio_auth_token || !settings?.twilio_whatsapp_number) {
+        return { sent: false, provider_used: 'twilio', reason: 'Twilio no configurado (falta SID, token o número)' };
+      }
+      const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${settings.twilio_account_sid}/Messages.json`;
+      const auth = btoa(`${settings.twilio_account_sid}:${settings.twilio_auth_token}`);
+      const formData = new URLSearchParams();
+      formData.append('From', `whatsapp:${settings.twilio_whatsapp_number}`);
+      formData.append('To', `whatsapp:+${cleanPhone}`);
+      formData.append('Body', message);
+
+      const res = await fetch(twilioUrl, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${settings.whatsapp_api_key}`,
-          'Content-Type': 'application/json',
+          'Authorization': `Basic ${auth}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to: phone.replace(/[^0-9]/g, ''),
-          type: 'text',
-          text: { body: message },
-        }),
+        body: formData.toString(),
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error('Twilio error:', errText);
+        return { sent: false, provider_used: 'twilio', reason: `Twilio error: ${errText.slice(0, 100)}` };
       }
-    );
-
-    if (!res.ok) {
-      console.error('WhatsApp API error:', await res.text());
-      return false;
+      return { sent: true, provider_used: 'twilio' };
     }
 
-    // Log the message
-    await supabase.from('whatsapp_messages').insert({
-      company_id: companyId,
-      phone_number: phone,
-      message_type: 'otp_verification',
-      message_body: `Código OTP enviado`,
-      status: 'sent',
-      sent_at: new Date().toISOString(),
-    });
+    if (provider === 'qr_session') {
+      if (!settings?.whatsapp_gateway_url) {
+        return { sent: false, provider_used: 'qr_session', reason: 'Gateway URL no configurada' };
+      }
+      const gatewayUrl = settings.whatsapp_gateway_url.replace(/\/$/, '');
+      const res = await fetch(`${gatewayUrl}/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: cleanPhone,
+          otp,
+          companyId,
+          message,
+        }),
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error('QR Gateway error:', errText);
+        return { sent: false, provider_used: 'qr_session', reason: `Gateway error: ${errText.slice(0, 100)}` };
+      }
+      return { sent: true, provider_used: 'qr_session' };
+    }
 
-    return true;
+    return { sent: false, provider_used: provider, reason: `Proveedor desconocido: ${provider}` };
   } catch (err) {
     console.error('WhatsApp send error:', err);
-    return false;
+    return { sent: false, provider_used: 'unknown', reason: err.message };
   }
 }
 
@@ -160,7 +196,6 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const signatureToken = req.headers.get('x-signature-token');
@@ -188,20 +223,21 @@ Deno.serve(async (req) => {
       const companyId = saleData?.company_id;
 
       // Get OTP policy for this company
-      let otpPolicy = {
+      let otpPolicy: any = {
         otp_length: 6,
         otp_expiration_seconds: 300,
         max_attempts: 3,
         default_channel: 'email',
         allowed_channels: ['email'],
         whatsapp_otp_enabled: false,
-        smtp_host: null as string | null,
+        smtp_host: null,
         smtp_port: 587,
-        smtp_user: null as string | null,
-        smtp_password_encrypted: null as string | null,
-        smtp_from_address: null as string | null,
-        smtp_from_name: null as string | null,
+        smtp_user: null,
+        smtp_password_encrypted: null,
+        smtp_from_address: null,
+        smtp_from_name: null,
         smtp_tls: true,
+        smtp_relay_url: null,
       };
 
       if (companyId) {
@@ -236,42 +272,60 @@ Deno.serve(async (req) => {
 
       let destinationMasked = '';
       let sendSuccess = false;
+      let attemptedChannel = channel;
+      let channelUsed = channel;
+      let fallbackUsed = false;
+      let fallbackReason = '';
+      let providerUsed = '';
 
       // Send via chosen channel
-      if (channel === 'whatsapp' && recipient_phone && companyId) {
-        sendSuccess = await sendViaWhatsApp(recipient_phone, otp, supabase, companyId);
-        destinationMasked = maskPhone(recipient_phone);
-        if (!sendSuccess && recipient_email) {
-          // Fallback to email
-          console.log('WhatsApp failed, falling back to email');
-          if (resendApiKey) {
-            sendSuccess = await sendViaResend(recipient_email, otp, resendApiKey, otpPolicy.smtp_from_name || 'Prepaga Digital');
-          }
-          destinationMasked = maskEmail(recipient_email);
-        }
-      } else if (channel === 'smtp' && recipient_email && otpPolicy.smtp_host) {
-        // Try custom SMTP first, fallback to Resend
-        sendSuccess = await sendViaSMTP(recipient_email, otp, {
-          host: otpPolicy.smtp_host,
-          port: otpPolicy.smtp_port || 587,
-          user: otpPolicy.smtp_user || '',
-          password: otpPolicy.smtp_password_encrypted || '',
-          fromAddress: otpPolicy.smtp_from_address || '',
-          fromName: otpPolicy.smtp_from_name || 'Prepaga Digital',
-          tls: otpPolicy.smtp_tls ?? true,
-        });
-        if (!sendSuccess && resendApiKey) {
-          sendSuccess = await sendViaResend(recipient_email, otp, resendApiKey, otpPolicy.smtp_from_name || 'Prepaga Digital');
-        }
-        destinationMasked = maskEmail(recipient_email);
-      } else if (recipient_email) {
-        // Default: email via Resend
-        if (resendApiKey) {
-          sendSuccess = await sendViaResend(recipient_email, otp, resendApiKey, otpPolicy.smtp_from_name || 'Prepaga Digital');
+      if (channel === 'whatsapp' && companyId) {
+        const phone = recipient_phone || '';
+        if (!phone) {
+          // No phone → fallback to email
+          fallbackUsed = true;
+          fallbackReason = 'No se proporcionó número de teléfono';
+          channelUsed = 'email';
         } else {
-          console.warn('RESEND_API_KEY not configured. OTP:', otp);
-          sendSuccess = true; // Dev mode
+          const waResult = await sendViaWhatsApp(phone, otp, supabase, companyId);
+          providerUsed = waResult.provider_used;
+          if (waResult.sent) {
+            sendSuccess = true;
+            channelUsed = 'whatsapp';
+            destinationMasked = maskPhone(phone);
+          } else {
+            // Fallback to email via SMTP
+            fallbackUsed = true;
+            fallbackReason = waResult.reason || 'WhatsApp no disponible';
+            channelUsed = 'email';
+          }
         }
+
+        // If we fell back to email
+        if (!sendSuccess && channelUsed === 'email' && recipient_email) {
+          const emailResult = await sendEmailOTP(recipient_email, otp, otpPolicy, companyId, supabase);
+          sendSuccess = emailResult.sent;
+          providerUsed = emailResult.provider_used;
+          destinationMasked = maskEmail(recipient_email);
+          if (!emailResult.sent) {
+            fallbackReason += `. Email fallback también falló: ${emailResult.reason}`;
+          }
+        }
+      } else if ((channel === 'email' || channel === 'smtp') && recipient_email) {
+        channelUsed = 'email';
+        const emailResult = await sendEmailOTP(recipient_email, otp, otpPolicy, companyId, supabase);
+        sendSuccess = emailResult.sent;
+        providerUsed = emailResult.provider_used;
+        destinationMasked = maskEmail(recipient_email);
+        if (!emailResult.sent) {
+          fallbackReason = emailResult.reason || 'Email no pudo ser enviado';
+        }
+      } else if (recipient_email) {
+        // Default email
+        channelUsed = 'email';
+        const emailResult = await sendEmailOTP(recipient_email, otp, otpPolicy, companyId, supabase);
+        sendSuccess = emailResult.sent;
+        providerUsed = emailResult.provider_used;
         destinationMasked = maskEmail(recipient_email);
       }
 
@@ -281,15 +335,15 @@ Deno.serve(async (req) => {
         .insert({
           signature_link_id,
           sale_id,
-          auth_method: channel === 'whatsapp' ? 'OTP_WHATSAPP' : channel === 'smtp' ? 'OTP_SMTP' : 'OTP_EMAIL',
-          channel,
+          auth_method: channelUsed === 'whatsapp' ? 'OTP_WHATSAPP' : 'OTP_EMAIL',
+          channel: channelUsed,
           destination_masked: destinationMasked,
           otp_code_hash: otpHash,
           expires_at: expiresAt.toISOString(),
           max_attempts: otpPolicy.max_attempts,
           ip_address: ip,
           user_agent: userAgent,
-          result: 'pending',
+          result: sendSuccess ? 'pending' : 'send_failed',
         })
         .select()
         .single();
@@ -307,8 +361,12 @@ Deno.serve(async (req) => {
         verification_id: verification.id,
         destination_masked: destinationMasked,
         expires_at: expiresAt.toISOString(),
-        channel_used: channel,
+        attempted_channel: attemptedChannel,
+        channel_used: channelUsed,
         sent: sendSuccess,
+        fallback_used: fallbackUsed,
+        fallback_reason: fallbackReason || undefined,
+        provider_used: providerUsed,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -321,7 +379,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Get the latest pending verification for this link
       const { data: verifications, error: fetchError } = await supabase
         .from('signature_identity_verification')
         .select('*')
@@ -339,7 +396,6 @@ Deno.serve(async (req) => {
 
       const verification = verifications[0];
 
-      // Check expiration
       if (new Date(verification.expires_at) < new Date()) {
         await supabase
           .from('signature_identity_verification')
@@ -352,7 +408,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Check max attempts
       const maxAttempts = verification.max_attempts || 3;
       if (verification.attempts >= maxAttempts) {
         await supabase
@@ -366,11 +421,9 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Verify OTP hash
       const inputHash = await hashOTP(otp_code);
       const isValid = inputHash === verification.otp_code_hash;
 
-      // Update attempt count
       await supabase
         .from('signature_identity_verification')
         .update({
@@ -402,7 +455,6 @@ Deno.serve(async (req) => {
       });
 
     } else if (action === 'get_policy') {
-      // Return OTP policy for the sale's company
       if (!sale_id) {
         return new Response(JSON.stringify({ error: 'sale_id required' }), {
           status: 400,
@@ -421,6 +473,7 @@ Deno.serve(async (req) => {
           require_otp: true,
           allowed_channels: ['email'],
           default_channel: 'email',
+          whatsapp_enabled: false,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -440,45 +493,66 @@ Deno.serve(async (req) => {
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+
     } else if (action === 'test_smtp') {
-      // Test SMTP connectivity
-      const { smtp_host, smtp_port, smtp_user, smtp_password, smtp_from_address, smtp_from_name, smtp_tls } = body;
+      const { smtp_host, smtp_port, smtp_user, smtp_from_address, smtp_from_name, smtp_tls, smtp_relay_url, test_email } = body;
       
-      if (!smtp_host || !smtp_user || !smtp_from_address) {
-        return new Response(JSON.stringify({ success: false, error: 'Faltan campos requeridos (host, usuario, email remitente)' }), {
+      if (smtp_relay_url && test_email) {
+        // Actually test the relay by sending a test email
+        try {
+          const sent = await sendViaSMTPRelay(
+            test_email,
+            '000000',
+            smtp_relay_url,
+            smtp_from_address || 'test@test.com',
+            smtp_from_name || 'Test'
+          );
+          return new Response(JSON.stringify({ 
+            success: sent, 
+            message: sent ? `Email de prueba enviado a ${test_email} vía SMTP relay` : 'SMTP relay no pudo enviar el email'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } catch (err: any) {
+          return new Response(JSON.stringify({ success: false, error: err.message }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
+      if (!smtp_host && !smtp_relay_url) {
+        return new Response(JSON.stringify({ success: false, error: 'Falta host SMTP o URL de relay' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      // Since Deno Edge Functions can't do native SMTP, we test by attempting a TCP connection
-      // For now, validate the config and try Resend as proxy test
-      try {
-        // Check if we can resolve the host by attempting a fetch
-        const testUrl = `https://${smtp_host}`;
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
-        
-        try {
-          await fetch(testUrl, { signal: controller.signal, method: 'HEAD' });
-        } catch {
-          // Even connection refused means the host exists
-        } finally {
-          clearTimeout(timeout);
-        }
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: `Configuración SMTP validada. Host: ${smtp_host || 'relay'}:${smtp_port || 587}, TLS: ${smtp_tls !== false ? 'Sí' : 'No'}. La conexión real se realizará al enviar OTP.` 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
 
-        return new Response(JSON.stringify({ 
-          success: true, 
-          message: `Configuración SMTP validada. Host: ${smtp_host}:${smtp_port || 587}, TLS: ${smtp_tls !== false ? 'Sí' : 'No'}. La conexión real se realizará al enviar OTP.` 
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      } catch (err: any) {
-        return new Response(JSON.stringify({ success: false, error: `No se pudo verificar el host: ${err.message}` }), {
-          status: 200,
+    } else if (action === 'test_whatsapp') {
+      // Test WhatsApp sending
+      const { test_phone, company_id: testCompanyId } = body;
+      if (!test_phone || !testCompanyId) {
+        return new Response(JSON.stringify({ success: false, error: 'Falta número de prueba o company_id' }), {
+          status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+
+      const result = await sendViaWhatsApp(test_phone, '123456', supabase, testCompanyId);
+      return new Response(JSON.stringify({
+        success: result.sent,
+        provider_used: result.provider_used,
+        error: result.reason,
+        message: result.sent ? `WhatsApp de prueba enviado vía ${result.provider_used}` : `Error: ${result.reason}`,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     return new Response(JSON.stringify({ error: 'Invalid action' }), {
@@ -494,3 +568,29 @@ Deno.serve(async (req) => {
     });
   }
 });
+
+// Unified email sending: SMTP relay only (no Resend)
+async function sendEmailOTP(
+  email: string,
+  otp: string,
+  otpPolicy: any,
+  companyId: string | null,
+  supabase: any,
+): Promise<{ sent: boolean; provider_used: string; reason?: string }> {
+  // Check for SMTP relay URL in OTP policy
+  const smtpRelayUrl = otpPolicy.smtp_relay_url;
+  const fromAddress = otpPolicy.smtp_from_address || 'noreply@prepagadigital.com';
+  const fromName = otpPolicy.smtp_from_name || 'Prepaga Digital';
+
+  if (smtpRelayUrl) {
+    const sent = await sendViaSMTPRelay(email, otp, smtpRelayUrl, fromAddress, fromName);
+    return { sent, provider_used: 'smtp_relay', reason: sent ? undefined : 'SMTP relay falló al enviar' };
+  }
+
+  // No SMTP relay configured - report clearly
+  return { 
+    sent: false, 
+    provider_used: 'none', 
+    reason: 'SMTP relay no configurado. Configure smtp_relay_url en la Política OTP para habilitar email.' 
+  };
+}

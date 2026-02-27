@@ -499,6 +499,28 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
     try {
       setRegenerating(true);
 
+      // Delete old non-final generated documents first (not signed ones)
+      const { error: deleteError } = await supabase
+        .from('documents')
+        .delete()
+        .eq('sale_id', saleId)
+        .eq('generated_from_template', true)
+        .neq('status', 'firmado' as any)
+        .is('is_final', false);
+
+      if (deleteError) {
+        console.warn('Error deleting old docs (non-final):', deleteError);
+      }
+
+      // Also delete old annexes that are generated_from_template
+      await supabase
+        .from('documents')
+        .delete()
+        .eq('sale_id', saleId)
+        .eq('generated_from_template', true)
+        .eq('document_type', 'anexo')
+        .neq('status', 'firmado' as any);
+
       const { data: sale, error: saleError } = await supabase
         .from('sales')
         .select(`*, clients:client_id(*), plans:plan_id(*), companies:company_id(*)`)
@@ -533,6 +555,44 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           if (tr.question_id) responsesMap[tr.question_id] = tr.response_value;
         }
       });
+
+      // Fallback: Build DDJJ responses from primary beneficiary health data (same as handleSendDocuments)
+      const primaryBen = (effectiveBeneficiaries || []).find((b: any) => b.is_primary);
+      if (primaryBen && !responsesMap['ddjj_peso']) {
+        const healthDetail = primaryBen.preexisting_conditions_detail || '';
+        const detailLines = healthDetail.split('; ');
+        for (const line of detailLines) {
+          if (line.startsWith('Peso:')) {
+            responsesMap['ddjj_peso'] = line.replace('Peso:', '').replace('kg', '').trim();
+          } else if (line.startsWith('Estatura:')) {
+            responsesMap['ddjj_altura'] = line.replace('Estatura:', '').replace('cm', '').trim();
+          } else if (line.startsWith('Hábitos:')) {
+            const habits = line.replace('Hábitos:', '').trim();
+            responsesMap['ddjj_fuma'] = habits.includes('Fuma') ? 'Sí' : 'No';
+            responsesMap['ddjj_vapea'] = habits.includes('Vapea') ? 'Sí' : 'No';
+            responsesMap['ddjj_alcohol'] = habits.includes('alcohólicas') ? 'Sí' : 'No';
+          } else if (line.startsWith('Última menstruación')) {
+            responsesMap['ddjj_menstruacion'] = line.split(':').slice(1).join(':').trim();
+          }
+        }
+        for (let i = 1; i <= 7; i++) {
+          if (!responsesMap[`ddjj_pregunta_${i}`]) {
+            const questionPrefix = `${i}.`;
+            const matchingLine = detailLines.find(l => l.trim().startsWith(questionPrefix));
+            if (matchingLine) {
+              responsesMap[`ddjj_pregunta_${i}`] = matchingLine.includes(':') 
+                ? 'Sí: ' + matchingLine.split(':').slice(1).join(':').trim()
+                : 'Sí';
+            } else {
+              responsesMap[`ddjj_pregunta_${i}`] = primaryBen.has_preexisting_conditions ? '' : 'No';
+            }
+          }
+        }
+        if (!responsesMap['ddjj_fuma']) responsesMap['ddjj_fuma'] = 'No';
+        if (!responsesMap['ddjj_vapea']) responsesMap['ddjj_vapea'] = 'No';
+        if (!responsesMap['ddjj_alcohol']) responsesMap['ddjj_alcohol'] = 'No';
+        if (!responsesMap['ddjj_menstruacion']) responsesMap['ddjj_menstruacion'] = 'N/A';
+      }
 
       const { createEnhancedTemplateContext, interpolateEnhancedTemplate } = await import('@/lib/enhancedTemplateEngine');
       const context = createEnhancedTemplateContext(client, plan, company, sale, effectiveBeneficiaries, undefined, responsesMap);
@@ -571,16 +631,60 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       if (effectiveBeneficiaries.length > 0 && ddjiTpls.length > 0) {
         for (const b of effectiveBeneficiaries) {
           if (b.signature_required !== false && !b.is_primary) {
+            // Build per-beneficiary DDJJ responses from their own health data (same as handleSendDocuments)
+            const benResponsesMap: Record<string, any> = { ...responsesMap };
+            const benDetail = b.preexisting_conditions_detail || '';
+            const benLines = benDetail.split('; ');
+            for (const line of benLines) {
+              if (line.startsWith('Peso:')) {
+                benResponsesMap['ddjj_peso'] = line.replace('Peso:', '').replace('kg', '').trim();
+              } else if (line.startsWith('Estatura:')) {
+                benResponsesMap['ddjj_altura'] = line.replace('Estatura:', '').replace('cm', '').trim();
+              } else if (line.startsWith('Hábitos:')) {
+                const habits = line.replace('Hábitos:', '').trim();
+                benResponsesMap['ddjj_fuma'] = habits.includes('Fuma') ? 'Sí' : 'No';
+                benResponsesMap['ddjj_vapea'] = habits.includes('Vapea') ? 'Sí' : 'No';
+                benResponsesMap['ddjj_alcohol'] = habits.includes('alcohólicas') ? 'Sí' : 'No';
+              }
+            }
+            for (let i = 1; i <= 7; i++) {
+              const questionPrefix = `${i}.`;
+              const matchingLine = benLines.find(l => l.trim().startsWith(questionPrefix));
+              if (matchingLine) {
+                benResponsesMap[`ddjj_pregunta_${i}`] = matchingLine.includes(':')
+                  ? 'Sí: ' + matchingLine.split(':').slice(1).join(':').trim()
+                  : 'Sí';
+              } else if (!benResponsesMap[`ddjj_pregunta_${i}`]) {
+                benResponsesMap[`ddjj_pregunta_${i}`] = b.has_preexisting_conditions ? '' : 'No';
+              }
+            }
+            if (!benResponsesMap['ddjj_fuma']) benResponsesMap['ddjj_fuma'] = 'No';
+            if (!benResponsesMap['ddjj_vapea']) benResponsesMap['ddjj_vapea'] = 'No';
+            if (!benResponsesMap['ddjj_alcohol']) benResponsesMap['ddjj_alcohol'] = 'No';
+
             const benCtx = createEnhancedTemplateContext(
               { first_name: b.first_name, last_name: b.last_name, email: b.email, phone: b.phone, dni: b.document_number || (b as any).dni, address: b.address, birth_date: b.birth_date, city: (b as any).city, province: (b as any).province },
-              plan, company, sale, effectiveBeneficiaries, undefined, { ...responsesMap }
+              plan, company, sale, effectiveBeneficiaries, undefined, benResponsesMap
             );
             for (const ddji of ddjiTpls) {
+              const renderedDDJJ = interpolateEnhancedTemplate(ddji.content || '', benCtx);
+              
+              // Validate: log unresolved placeholders
+              const unresolvedMatches = renderedDDJJ.match(/\{\{[^}]+\}\}/g);
+              if (unresolvedMatches && unresolvedMatches.length > 0) {
+                console.warn(`[Regeneration] Unresolved placeholders in DDJJ for ${b.first_name}:`, unresolvedMatches);
+                await supabase.from('process_traces').insert({
+                  sale_id: saleId,
+                  action: 'regeneration_unresolved_placeholders',
+                  details: { document: ddji.name, beneficiary: `${b.first_name} ${b.last_name}`, placeholders: unresolvedMatches },
+                });
+              }
+
               await supabase.from('documents').insert({
                 sale_id: saleId,
                 name: `${ddji.name} - ${b.first_name} ${b.last_name}`,
                 document_type: 'ddjj_salud',
-                content: interpolateEnhancedTemplate(ddji.content || '', benCtx),
+                content: renderedDDJJ,
                 status: 'pendiente' as any,
                 requires_signature: true,
                 beneficiary_id: b.id,
