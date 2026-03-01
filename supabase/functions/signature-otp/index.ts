@@ -166,7 +166,7 @@ async function sendViaWhatsApp(
     return { sent: false, provider_used: provider, reason: `Proveedor desconocido: ${provider}` };
   } catch (err) {
     console.error('WhatsApp send error:', err);
-    return { sent: false, provider_used: 'unknown', reason: err.message };
+    return { sent: false, provider_used: 'unknown', reason: (err as Error).message };
   }
 }
 
@@ -562,7 +562,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Signature OTP error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: (error as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
