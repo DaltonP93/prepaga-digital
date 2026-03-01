@@ -43,8 +43,8 @@ export const useSaleProgressConfig = () => {
 
   const { data: config, isLoading } = useQuery({
     queryKey: ['sale-progress-config', profile?.company_id],
-    queryFn: async () => {
-      if (!profile?.company_id) return null;
+    queryFn: async (): Promise<Record<string, number>> => {
+      if (!profile?.company_id) return { ...DEFAULT_PROGRESS_CONFIG };
 
       const { data, error } = await supabase
         .from('company_ui_settings')
@@ -54,18 +54,23 @@ export const useSaleProgressConfig = () => {
 
       if (error) {
         console.error('Error fetching sale progress config:', error);
-        return null;
+        return { ...DEFAULT_PROGRESS_CONFIG };
       }
 
-      return (data as any)?.sale_progress_config as Record<string, number> | null;
+      const storedConfig = (data as any)?.sale_progress_config;
+      if (!storedConfig || typeof storedConfig !== 'object') {
+        return { ...DEFAULT_PROGRESS_CONFIG };
+      }
+
+      return {
+        ...DEFAULT_PROGRESS_CONFIG,
+        ...(storedConfig as Record<string, number>),
+      };
     },
     enabled: !!profile?.company_id,
   });
 
-  const progressConfig: Record<string, number> = {
-    ...DEFAULT_PROGRESS_CONFIG,
-    ...(config || {}),
-  };
+  const progressConfig: Record<string, number> = config || { ...DEFAULT_PROGRESS_CONFIG };
 
   const updateConfig = useMutation({
     mutationFn: async (newConfig: Record<string, number>) => {
