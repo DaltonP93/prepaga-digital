@@ -488,7 +488,20 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     // More aggressive normalization: find {{ ... }} patterns that may span HTML tags
     const deepNormalize = (html: string): string => {
       // Pattern: {{ potentially with HTML tags inside until }}
-      return html.replace(/\{\{(?:<[^>]*>|\s)*([a-zA-Z_][a-zA-Z0-9_.]*?)(?:<[^>]*>|\s)*\}\}/g, '{{$1}}');
+      let normalized = html.replace(/\{\{(?:<[^>]*>|\s)*([a-zA-Z_][a-zA-Z0-9_.]*?)(?:<[^>]*>|\s)*\}\}/g, '{{$1}}');
+      
+      // Even more aggressive: find sequences like } <tag> } or { <tag> { and merge them
+      // Handle cases where TipTap splits {{ into { + HTML + {
+      normalized = normalized.replace(/\{(?:<[^>]*>|\s)+\{/g, '{{');
+      normalized = normalized.replace(/\}(?:<[^>]*>|\s)+\}/g, '}}');
+      
+      // After merging braces, re-clean content inside {{ }}
+      normalized = normalized.replace(/\{\{([^}]*)\}\}/g, (match) => {
+        const stripped = match.replace(/<[^>]*>/g, '').replace(/\s+/g, '');
+        return stripped;
+      });
+      
+      return normalized;
     };
 
     result = deepNormalize(normalizePlaceholders(result));

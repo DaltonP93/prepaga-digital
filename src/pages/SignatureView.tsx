@@ -314,33 +314,28 @@ const SignatureView = () => {
             </CardContent>
           </Card>
 
-          {documents && documents.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Download className="h-4 w-4" />
-                  Documentos
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {documents.map((doc: any) => {
-                  const isAnexo = doc.requires_signature === false || doc.document_type === 'anexo';
-                  return (
+          {(() => {
+            // Only show final (signed) documents in success view
+            const signedDocs = (documents || []).filter((doc: any) => doc.is_final === true);
+            if (signedDocs.length === 0) return null;
+            return (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Download className="h-4 w-4" />
+                    Documentos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {signedDocs.map((doc: any) => (
                     <div key={doc.id} className="border rounded-lg p-3 flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        {isAnexo ? (
-                          <Paperclip className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <FileText className="h-4 w-4 text-primary" />
-                        )}
+                        <FileText className="h-4 w-4 text-primary" />
                         <div>
                           <p className="font-medium text-sm">{doc.name}</p>
-                          <div className="flex items-center gap-1">
-                            <p className="text-xs text-muted-foreground">
-                              {doc.document_type === 'anexo' ? 'Anexo' : (doc.document_type || 'Documento')}
-                            </p>
-                            {isAnexo && <Badge variant="secondary" className="text-[10px] ml-1">Anexo</Badge>}
-                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {doc.document_type || 'Documento'}
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -361,13 +356,7 @@ const SignatureView = () => {
                             Descargar
                           </Button>
                         )}
-                        {!doc.file_url && doc.content && (
-                          <Button size="sm" variant="outline" onClick={() => handleDownloadSignedContent(doc)}>
-                            <Download className="h-3 w-3 mr-1" />
-                            Descargar PDF
-                          </Button>
-                        )}
-                        {doc.file_url && doc.content && (
+                        {doc.content && (
                           <Button size="sm" variant="outline" onClick={() => handleDownloadSignedContent(doc)}>
                             <Download className="h-3 w-3 mr-1" />
                             Descargar PDF
@@ -375,11 +364,11 @@ const SignatureView = () => {
                         )}
                       </div>
                     </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          )}
+                  ))}
+                </CardContent>
+              </Card>
+            );
+          })()}
 
           {isTitular && completedAdherenteLinks.length > 0 && (
             <Card>
