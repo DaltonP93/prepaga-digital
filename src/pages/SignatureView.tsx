@@ -205,12 +205,20 @@ const SignatureView = () => {
   };
 
   const handleSaveConsent = async () => {
-    if (!linkData || !termsAccepted) return;
+    if (!linkData || !termsAccepted || !token) return;
     
     const consentText = `Declaro que: (1) he leído el/los documento(s) completo(s); (2) acepto firmarlos electrónicamente; (3) comprendo que tienen validez jurídica conforme a la Ley N° 4017/2010; (4) confirmo mi identidad; (5) acepto el registro de evidencias técnicas (IP, dispositivo, marca de tiempo, hash).`;
     
     try {
-      const { data, error } = await supabase.from('signature_consent_records' as any).insert({
+      // Use a client with the signature token header for RLS
+      const { createClient } = await import('@supabase/supabase-js');
+      const signatureClient = createClient(
+        'https://ykducvvcjzdpoojxlsig.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrZHVjdnZjanpkcG9vanhsc2lnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwNzgwNzQsImV4cCI6MjA4NTY1NDA3NH0.SpX3e1GgENTB3kpQPPedPds0E13vxDeOmnmFYSJhfPM',
+        { global: { headers: { 'x-signature-token': token } } }
+      );
+
+      const { data, error } = await signatureClient.from('signature_consent_records').insert({
         signature_link_id: linkData.id,
         sale_id: linkData.sale_id,
         consent_text_version: 'v1.0',
@@ -221,10 +229,12 @@ const SignatureView = () => {
       }).select().single();
       
       if (error) throw error;
-      setConsentRecordId((data as any).id);
-      return (data as any).id;
-    } catch (err) {
+      setConsentRecordId(data.id);
+      return data.id;
+    } catch (err: any) {
       console.error('Error saving consent:', err);
+      const { toast } = await import('sonner');
+      toast.error(err.message || "No se pudo registrar el consentimiento. Intente nuevamente.");
     }
   };
 
