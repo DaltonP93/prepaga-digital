@@ -128,7 +128,7 @@ export const useCompanyApiConfiguration = () => {
 
       const { data, error } = await supabase
         .from('company_settings')
-        .upsert(dbUpdates as any)
+        .upsert(dbUpdates as any, { onConflict: 'company_id' })
         .select()
         .single();
 
@@ -149,6 +149,7 @@ export const useCompanyApiConfiguration = () => {
     configuration: configuration || DEFAULT_CONFIGURATION,
     isLoading,
     updateConfiguration: updateMutation.mutate,
+    updateConfigurationAsync: updateMutation.mutateAsync,
     isUpdating: updateMutation.isPending,
   };
 };

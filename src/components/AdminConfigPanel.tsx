@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 
 export const AdminConfigPanel: React.FC = () => {
   const { configuration: uiConfig, isLoading: uiLoading, updateConfiguration: updateUiConfig, isUpdating: uiUpdating } = useCompanyConfiguration();
-  const { configuration: apiConfig, isLoading: apiLoading, updateConfiguration: updateApiConfig, isUpdating: apiUpdating } = useCompanyApiConfiguration();
+  const { configuration: apiConfig, isLoading: apiLoading, updateConfiguration: updateApiConfig, updateConfigurationAsync: updateApiConfigAsync, isUpdating: apiUpdating } = useCompanyApiConfiguration();
 
   const defaultUiFormData = {
     login_title: 'Sistema de Gestión',
@@ -572,10 +572,8 @@ export const AdminConfigPanel: React.FC = () => {
                       onClick={async () => {
                         setWhatsappTesting(true);
                         try {
-                          // Save config first
-                          handleApiSave();
-                          // Wait a moment for save
-                          await new Promise(r => setTimeout(r, 1000));
+                          // Save config first and wait for it
+                          await updateApiConfigAsync(apiFormData);
                           const { data, error } = await supabase.functions.invoke('signature-otp', {
                             body: {
                               action: 'test_whatsapp',
