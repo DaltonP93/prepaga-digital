@@ -17,8 +17,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+  AlertDialogTrigger } from
+"@/components/ui/alert-dialog";
 
 type Client = Database['public']['Tables']['clients']['Row'];
 
@@ -52,15 +52,15 @@ export function ClientsList() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-      </div>
-    );
+      </div>);
+
   }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Clientes</h2>
+          
           <p className="text-muted-foreground">
             Gestiona la información de tus clientes
           </p>
@@ -77,11 +77,11 @@ export function ClientsList() {
           <CardDescription>
             {clients.length} cliente{clients.length !== 1 ? 's' : ''} registrado{clients.length !== 1 ? 's' : ''}
           </CardDescription>
-          {clients.length === 0 && user && !profile?.company_id && userRole !== 'super_admin' && (
-            <p className="text-sm text-amber-600">
+          {clients.length === 0 && user && !profile?.company_id && userRole !== 'super_admin' &&
+          <p className="text-sm text-amber-600">
               Tu usuario no tiene `company_id` en `profiles`. Con RLS activo no podrás ver clientes hasta corregirlo.
             </p>
-          )}
+          }
         </CardHeader>
         <CardContent>
           <Table>
@@ -96,8 +96,8 @@ export function ClientsList() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {clients.map((client) => (
-                <TableRow key={client.id}>
+              {clients.map((client) =>
+              <TableRow key={client.id}>
                   <TableCell className="font-medium">
                     {client.first_name} {client.last_name}
                   </TableCell>
@@ -108,24 +108,24 @@ export function ClientsList() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    {client.phone ? (
-                      <div className="flex items-center space-x-2">
+                    {client.phone ?
+                  <div className="flex items-center space-x-2">
                         <Phone className="h-4 w-4 text-muted-foreground" />
                         <span>{client.phone}</span>
-                      </div>
-                    ) : (
-                      '-'
-                    )}
+                      </div> :
+
+                  '-'
+                  }
                   </TableCell>
                   <TableCell>{client.dni || '-'}</TableCell>
                   <TableCell>{formatDate(client.birth_date)}</TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
                       <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditClient(client)}
-                      >
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEditClient(client)}>
+                      
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <AlertDialog>
@@ -144,9 +144,9 @@ export function ClientsList() {
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
                             <AlertDialogAction
-                              onClick={() => handleDeleteClient(client.id)}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
+                            onClick={() => handleDeleteClient(client.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                            
                               Eliminar
                             </AlertDialogAction>
                           </AlertDialogFooter>
@@ -155,27 +155,27 @@ export function ClientsList() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
 
-          {clients.length === 0 && (
-            <div className="text-center py-8">
+          {clients.length === 0 &&
+          <div className="text-center py-8">
               <p className="text-muted-foreground">No hay clientes registrados</p>
               <Button className="mt-4" onClick={() => setShowClientForm(true)}>
                 <UserPlus className="mr-2 h-4 w-4" />
                 Registrar primer cliente
               </Button>
             </div>
-          )}
+          }
         </CardContent>
       </Card>
 
       <ClientForm
         open={showClientForm}
         onOpenChange={handleCloseForm}
-        client={editingClient}
-      />
-    </div>
-  );
+        client={editingClient} />
+      
+    </div>);
+
 }
