@@ -153,7 +153,7 @@ async function sendViaWhatsApp(
         wahaHeaders['X-Api-Key'] = wahaApiKey;
       }
       // Use linked phone as session name if configured, otherwise 'default'
-      const sessionName = settings.whatsapp_linked_phone || 'default';
+      const sessionName = 'default';
       const res = await fetch(`${gatewayUrl}/api/sendText`, {
         method: 'POST',
         headers: wahaHeaders,
