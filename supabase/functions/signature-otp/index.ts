@@ -147,13 +147,20 @@ async function sendViaWhatsApp(
       const gatewayUrl = settings.whatsapp_gateway_url.replace(/\/$/, '');
       // WAHA API format: POST /api/sendText with { chatId, text, session }
       const chatId = cleanPhone.includes('@') ? cleanPhone : `${cleanPhone}@c.us`;
+      const wahaApiKey = Deno.env.get('WAHA_API_KEY');
+      const wahaHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (wahaApiKey) {
+        wahaHeaders['X-Api-Key'] = wahaApiKey;
+      }
+      // Use linked phone as session name if configured, otherwise 'default'
+      const sessionName = settings.whatsapp_linked_phone || 'default';
       const res = await fetch(`${gatewayUrl}/api/sendText`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: wahaHeaders,
         body: JSON.stringify({
           chatId,
           text: message,
-          session: 'default',
+          session: sessionName,
         }),
       });
       if (!res.ok) {
