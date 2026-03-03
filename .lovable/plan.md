@@ -1,38 +1,50 @@
 
 
-## Problema
+## Problem Diagnosis
 
-Hay **dos errores encadenados**:
+The error "Edge Function returned a non-2xx status code" occurs because:
 
-1. **"Error al actualizar la configuración API"** -- El `upsert` en `useCompanyApiConfiguration.ts` falla con `duplicate key value violates unique constraint "company_settings_company_id_key"`. Esto ocurre porque el upsert no especifica `onConflict: 'company_id'`, así que Supabase intenta hacer INSERT (no hay `id` en el payload) y choca con la constraint unique de `company_id`.
+1. **`selectedChannel` defaults to `'email'`** in `SignatureView.tsx` (line 39)
+2. Your OTP policy for this company only allows `['whatsapp']` as a channel
+3. When the policy loads via `fetchPolicy`, the `selectedChannel` state is **never updated** to match `default_channel: 'whatsapp'`
+4. The Edge Function correctly rejects the request: `"Canal email no permitido"` (HTTP 400)
 
-2. **"wa.me (manual) no puede enviar OTP automático"** -- Como el guardado falló en el paso anterior, la DB todavía tiene `whatsapp_provider = 'wame_fallback'`. Cuando el botón "Probar WhatsApp" llama a `signature-otp` con `action: test_whatsapp`, la edge function lee el provider de la DB (que sigue siendo `wame_fallback`) y devuelve ese error.
+The channel selector UI is also hidden when only one channel is allowed (`allowed_channels.length > 1`), so the user can't manually switch.
 
-**Raíz**: todo se origina en que el upsert no funciona. Arreglar eso soluciona ambos errores.
+## Plan
 
----
+### 1. Auto-sync `selectedChannel` with OTP policy default (SignatureView.tsx)
 
-## Plan de cambios
+Add a `useEffect` that updates `selectedChannel` when `verification.otpPolicy` loads:
 
-### 1. Arreglar el upsert en `useCompanyApiConfiguration.ts` (línea ~129-133)
-
-Cambiar de:
 ```ts
-.upsert(dbUpdates as any)
+useEffect(() => {
+  if (verification.otpPolicy?.default_channel) {
+    setSelectedChannel(verification.otpPolicy.default_channel);
+  }
+}, [verification.otpPolicy]);
 ```
-A:
+
+### 2. Fallback in sendOTP call
+
+Update the button's `onClick` to use the policy's default channel as fallback instead of relying solely on `selectedChannel`:
+
 ```ts
-.upsert(dbUpdates as any, { onConflict: 'company_id' })
+const effectiveChannel = verification.otpPolicy?.allowed_channels?.includes(selectedChannel)
+  ? selectedChannel
+  : verification.otpPolicy?.default_channel || selectedChannel;
 ```
 
-Esto le indica a Supabase que cuando ya exista una fila con ese `company_id`, haga UPDATE en lugar de INSERT.
+### 3. Phone normalization for OTP
 
-### 2. Mejorar el botón "Probar WhatsApp" en `AdminConfigPanel.tsx`
+Ensure the phone passed to `sendOTP` has the `+595` prefix prepended when not present, matching the normalization done in `ClientForm`:
 
-Actualmente llama `handleApiSave()` y espera 1 segundo con un `setTimeout`. Si el save falla (como ocurre ahora), el test procede con datos viejos. Mejora:
+```ts
+const normalizedPhone = phone && !phone.startsWith('+') ? `+595${phone}` : phone;
+```
 
-- Esperar la respuesta del save antes de testear (o al menos verificar que no hubo error).
-- En la llamada `test_whatsapp`, no depender solamente de la DB: la edge function ya lee de DB, así que si el save funciona (con el fix del punto 1), todo fluye correctamente.
+This is needed because the client's phone is stored as `992974616` (without prefix), but the WAHA gateway needs the full international number.
 
-Estos son los únicos dos cambios necesarios. El fix principal es una sola línea.
+### Files Changed
+- `src/pages/SignatureView.tsx` — 3 small edits (useEffect + channel logic + phone normalization)
 
