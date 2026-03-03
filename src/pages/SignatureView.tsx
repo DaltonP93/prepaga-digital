@@ -73,6 +73,13 @@ const SignatureView = () => {
     }
   }, [linkData?.sale_id, token]);
 
+  // Auto-sync selectedChannel with OTP policy default
+  useEffect(() => {
+    if (verification.otpPolicy?.default_channel) {
+      setSelectedChannel(verification.otpPolicy.default_channel);
+    }
+  }, [verification.otpPolicy]);
+
   const handleDownloadSignedContent = (doc: any) => {
     if (!doc?.content) return;
     const htmlContent = `
@@ -700,7 +707,11 @@ const SignatureView = () => {
                                   (isTitular ? client?.email : '') || '';
                                 const phone = isTitular ? (client as any)?.phone : 
                                   (sale?.beneficiaries?.find((b: any) => b.id === linkData.recipient_id) as any)?.phone || '';
-                                verification.sendOTP(linkData.id, linkData.sale_id, email, token!, selectedChannel, phone || undefined);
+                                const normalizedPhone = phone && !phone.startsWith('+') ? `+595${phone}` : phone;
+                                const effectiveChannel = verification.otpPolicy?.allowed_channels?.includes(selectedChannel)
+                                  ? selectedChannel
+                                  : verification.otpPolicy?.default_channel || selectedChannel;
+                                verification.sendOTP(linkData.id, linkData.sale_id, email, token!, effectiveChannel, normalizedPhone || undefined);
                               }}
                               disabled={verification.step === 'sending' as string}
                               className="w-full"
