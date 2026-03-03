@@ -247,6 +247,17 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
     });
   }, [client, open, reset]);
 
+  const normalizePhone = (raw: string | undefined): string => {
+    if (!raw) return "";
+    // Strip spaces, dashes
+    let phone = raw.replace(/[\s\-()]/g, "");
+    // Remove leading +595 if user typed it manually
+    if (phone.startsWith("+595")) phone = phone.slice(4);
+    // Remove leading 0
+    if (phone.startsWith("0")) phone = phone.slice(1);
+    return phone;
+  };
+
   const onSubmit = async (data: ClientFormData) => {
     try {
       const latitude = parseCoordinate(data.latitude, -90, 90, "Latitud");
@@ -255,6 +266,9 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
       if ((latitude === null) !== (longitude === null)) {
         throw new Error("Debes cargar latitud y longitud juntas");
       }
+
+      // Normalize phone: strip leading 0 and +595, store only digits after country code
+      data.phone = normalizePhone(data.phone);
 
       // Remove latitude/longitude from payload; keep barrio (cast as any for untyped column)
       const { latitude: _lat, longitude: _lng, ...cleanData } = data;
@@ -308,7 +322,10 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="phone">Telefono</Label>
-                  <Input id="phone" {...register("phone")} />
+                  <div className="flex">
+                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-muted-foreground text-sm">+595</span>
+                    <Input id="phone" className="rounded-l-none" placeholder="992950125" {...register("phone")} />
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="dni">C.I.</Label>
