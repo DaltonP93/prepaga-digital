@@ -115,7 +115,11 @@ export const useSignatureLinkByToken = (token: string) => {
           companies:company_id (
             name,
             logo_url,
-            primary_color
+            primary_color,
+            tax_id,
+            address,
+            phone,
+            email
           ),
           beneficiaries (
             id,
@@ -314,6 +318,17 @@ export const useSubmitSignatureLink = () => {
           const nowIso = new Date().toISOString();
           const safeSignedAt = new Date().toLocaleString('es-PY');
 
+          // Fetch company info for CONTRATADA block
+          let companyInfo: any = null;
+          try {
+            const { data: saleInfo } = await signatureClient
+              .from('sales')
+              .select('companies:company_id(name, tax_id, address, phone, email)')
+              .eq('id', data.sale_id)
+              .single();
+            companyInfo = (saleInfo as any)?.companies || null;
+          } catch { /* ignore */ }
+
           const finalDocs = docsToSign.map((doc) => {
             const originalContent = doc.content?.trim()
               ? doc.content
@@ -340,42 +355,42 @@ export const useSubmitSignatureLink = () => {
                 .toString(16).replace('-', '').toUpperCase().padStart(8, '0');
 
               const electronicBlock = `
-                <div style="border:2px solid #1a1a1a;border-radius:4px;padding:16px 20px;margin:12px 0;background:#fafafa;font-family:Arial,Helvetica,sans-serif;">
+                <div style="border:1px solid #999;border-radius:3px;padding:8px 12px;margin:8px 0;background:#fafafa;font-family:Arial,Helvetica,sans-serif;font-size:9px;max-width:420px;">
                   <table style="width:100%;border-collapse:collapse;">
                     <tr>
-                      <td colspan="2" style="padding:0 0 8px 0;border-bottom:1px solid #d1d5db;">
-                        <strong style="font-size:14px;color:#111;">✓ FIRMA ELECTRÓNICA</strong>
+                      <td colspan="2" style="padding:0 0 4px 0;border-bottom:1px solid #d1d5db;">
+                        <strong style="font-size:10px;color:#111;">✓ FIRMA ELECTRÓNICA</strong>
                         <br/>
-                        <span style="font-size:10px;color:#6b7280;">Conforme Ley N° 4017/2010 de la República del Paraguay</span>
+                        <span style="font-size:8px;color:#6b7280;">Conforme Ley N° 4017/2010 de la República del Paraguay</span>
                       </td>
                     </tr>
                     <tr>
-                      <td style="padding:6px 0 2px 0;font-size:11px;color:#374151;width:140px;"><strong>Firmante:</strong></td>
-                      <td style="padding:6px 0 2px 0;font-size:11px;color:#111;">${data.recipient_type === 'titular' ? 'Titular' : 'Adherente'}</td>
+                      <td style="padding:3px 0 1px 0;font-size:9px;color:#374151;width:110px;"><strong>Firmante:</strong></td>
+                      <td style="padding:3px 0 1px 0;font-size:9px;color:#111;">${data.recipient_type === 'titular' ? 'Titular' : 'Adherente'}</td>
                     </tr>
                     <tr>
-                      <td style="padding:2px 0;font-size:11px;color:#374151;"><strong>Fecha y hora:</strong></td>
-                      <td style="padding:2px 0;font-size:11px;color:#111;">${isoTimestamp}</td>
+                      <td style="padding:1px 0;font-size:9px;color:#374151;"><strong>Fecha y hora:</strong></td>
+                      <td style="padding:1px 0;font-size:9px;color:#111;">${isoTimestamp}</td>
                     </tr>
                     <tr>
-                      <td style="padding:2px 0;font-size:11px;color:#374151;"><strong>Ref. Documento:</strong></td>
-                      <td style="padding:2px 0;font-size:11px;color:#111;font-family:monospace;">${docRef}</td>
+                      <td style="padding:1px 0;font-size:9px;color:#374151;"><strong>Ref. Documento:</strong></td>
+                      <td style="padding:1px 0;font-size:9px;color:#111;font-family:monospace;font-size:8px;">${docRef}</td>
                     </tr>
                     <tr>
-                      <td style="padding:2px 0;font-size:11px;color:#374151;"><strong>IP de origen:</strong></td>
-                      <td style="padding:2px 0;font-size:11px;color:#111;">${clientIp}</td>
+                      <td style="padding:1px 0;font-size:9px;color:#374151;"><strong>IP de origen:</strong></td>
+                      <td style="padding:1px 0;font-size:9px;color:#111;">${clientIp}</td>
                     </tr>
                     <tr>
-                      <td style="padding:2px 0;font-size:11px;color:#374151;"><strong>Dispositivo:</strong></td>
-                      <td style="padding:2px 0;font-size:11px;color:#111;font-size:9px;">${deviceSummary}</td>
+                      <td style="padding:1px 0;font-size:9px;color:#374151;"><strong>Dispositivo:</strong></td>
+                      <td style="padding:1px 0;font-size:8px;color:#111;">${deviceSummary}</td>
                     </tr>
                     <tr>
-                      <td style="padding:2px 0;font-size:11px;color:#374151;"><strong>Hash verificación:</strong></td>
-                      <td style="padding:2px 0;font-size:11px;color:#111;font-family:monospace;">SHA-256:${hashRef}</td>
+                      <td style="padding:1px 0;font-size:9px;color:#374151;"><strong>Hash verificación:</strong></td>
+                      <td style="padding:1px 0;font-size:8px;color:#111;font-family:monospace;">SHA-256:${hashRef}</td>
                     </tr>
                     <tr>
-                      <td colspan="2" style="padding:8px 0 0 0;border-top:1px solid #e5e7eb;">
-                        <span style="font-size:9px;color:#9ca3af;">
+                      <td colspan="2" style="padding:4px 0 0 0;border-top:1px solid #e5e7eb;">
+                        <span style="font-size:7px;color:#9ca3af;">
                           Este documento ha sido firmado electrónicamente. La firma electrónica tiene la misma validez
                           jurídica que la firma manuscrita conforme a la legislación vigente. Ref. RFC 4122 / ISO 8601.
                         </span>
@@ -455,6 +470,19 @@ export const useSubmitSignatureLink = () => {
             // Fallback: append signature block at the end (only if nothing was replaced)
             if (!placeholderFound) {
               finalContent = `${finalContent}${signatureBlock}`;
+            }
+
+            // Append CONTRATADA (company) signature block
+            if (companyInfo) {
+              const contratadaBlock = `
+                <div style="margin-top:24px;">
+                  <p style="margin:0 0 4px 0;font-size:12px;"><strong>CONTRATADA</strong></p>
+                  <p style="margin:0;font-size:12px;">${companyInfo.name || ''}</p>
+                  ${companyInfo.tax_id ? `<p style="margin:0;font-size:12px;">C.I. N°: ${companyInfo.tax_id}</p>` : ''}
+                  ${companyInfo.address ? `<p style="margin:8px 0 0 0;font-size:10px;color:#666;">${companyInfo.address}${companyInfo.phone ? ` | Tel: ${companyInfo.phone}` : ''}${companyInfo.email ? ` | ${companyInfo.email}` : ''}</p>` : ''}
+                </div>
+              `;
+              finalContent = `${finalContent}${contratadaBlock}`;
             }
 
             return {
