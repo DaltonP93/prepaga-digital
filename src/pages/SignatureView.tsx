@@ -772,6 +772,19 @@ const SignatureView = () => {
                               onClick={() => {
                                 verification.reset();
                                 setOtpCode('');
+                                // Re-send OTP automatically
+                                setTimeout(() => {
+                                  const email = isTitular ? (client as any)?.email :
+                                    (sale?.beneficiaries?.find((b: any) => b.id === linkData.recipient_id) as any)?.email ||
+                                    (isTitular ? client?.email : '') || '';
+                                  const phone = isTitular ? (client as any)?.phone :
+                                    (sale?.beneficiaries?.find((b: any) => b.id === linkData.recipient_id) as any)?.phone || '';
+                                  const normalizedPhone = phone && !phone.startsWith('+') ? `+595${phone}` : phone;
+                                  const effectiveChannel = verification.otpPolicy?.allowed_channels?.includes(selectedChannel)
+                                    ? selectedChannel
+                                    : verification.otpPolicy?.default_channel || selectedChannel;
+                                  verification.sendOTP(linkData.id, linkData.sale_id, email, token!, effectiveChannel, normalizedPhone || undefined);
+                                }, 100);
                               }}
                             >
                               Reenviar código
