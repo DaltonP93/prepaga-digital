@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.signature-otp]
 verify_jwt = false
+
+[functions.generate-evidence-pdf]
+verify_jwt = false
