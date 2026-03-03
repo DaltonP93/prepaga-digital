@@ -145,14 +145,15 @@ async function sendViaWhatsApp(
         return { sent: false, provider_used: 'qr_session', reason: 'Gateway URL no configurada' };
       }
       const gatewayUrl = settings.whatsapp_gateway_url.replace(/\/$/, '');
-      const res = await fetch(`${gatewayUrl}/send-otp`, {
+      // WAHA API format: POST /api/sendText with { chatId, text, session }
+      const chatId = cleanPhone.includes('@') ? cleanPhone : `${cleanPhone}@c.us`;
+      const res = await fetch(`${gatewayUrl}/api/sendText`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          to: cleanPhone,
-          otp,
-          companyId,
-          message,
+          chatId,
+          text: message,
+          session: 'default',
         }),
       });
       if (!res.ok) {
