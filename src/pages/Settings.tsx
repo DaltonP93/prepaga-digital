@@ -35,6 +35,7 @@ import { SaleProgressConfigPanel } from '@/components/workflow/SaleProgressConfi
 import { AdminConfigPanel } from '@/components/AdminConfigPanel';
 import { MenuConfigPanel } from '@/components/MenuConfigPanel';
 import { OtpPolicyConfigPanel } from '@/components/OtpPolicyConfigPanel';
+import { ContratadaSignatureConfig } from '@/components/ContratadaSignatureConfig';
 import { useRolePermissions } from '@/hooks/useRolePermissions';
 
 export default function Settings() {
@@ -203,6 +204,7 @@ export default function Settings() {
           {canManageWorkflow ? (
             <>
               <AdminConfigPanel />
+              <ContratadaSignatureConfig />
               <OtpPolicyConfigPanel />
             </>
           ) : (
