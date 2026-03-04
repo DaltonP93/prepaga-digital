@@ -1,50 +1,37 @@
 
 
-## Problem Diagnosis
+## Plan: Fix `border_radius` error + Move "Firma Contratada" into AdminConfigPanel tabs
 
-The error "Edge Function returned a non-2xx status code" occurs because:
+### Problem 1: `border_radius` column missing
+The `useBranding.ts` hook tries to read/write `border_radius`, `dark_mode`, `font_family`, `shadows` columns on the `companies` table, but these columns don't exist in the database. Need to add them via migration.
 
-1. **`selectedChannel` defaults to `'email'`** in `SignatureView.tsx` (line 39)
-2. Your OTP policy for this company only allows `['whatsapp']` as a channel
-3. When the policy loads via `fetchPolicy`, the `selectedChannel` state is **never updated** to match `default_channel: 'whatsapp'`
-4. The Edge Function correctly rejects the request: `"Canal email no permitido"` (HTTP 400)
+### Problem 2: "Firma Contratada" as a tab inside AdminConfigPanel
+Currently `ContratadaSignatureConfig` is a separate Card below `AdminConfigPanel` in Settings. The user wants it as a new tab inside `AdminConfigPanel`, next to "Firma Digital".
 
-The channel selector UI is also hidden when only one channel is allowed (`allowed_channels.length > 1`), so the user can't manually switch.
+---
 
-## Plan
+### Changes
 
-### 1. Auto-sync `selectedChannel` with OTP policy default (SignatureView.tsx)
+**1. Database migration** — Add missing branding columns to `companies` table:
+```sql
+ALTER TABLE public.companies
+  ADD COLUMN IF NOT EXISTS border_radius text,
+  ADD COLUMN IF NOT EXISTS dark_mode boolean DEFAULT false,
+  ADD COLUMN IF NOT EXISTS font_family text,
+  ADD COLUMN IF NOT EXISTS shadows boolean DEFAULT true;
 
-Add a `useEffect` that updates `selectedChannel` when `verification.otpPolicy` loads:
-
-```ts
-useEffect(() => {
-  if (verification.otpPolicy?.default_channel) {
-    setSelectedChannel(verification.otpPolicy.default_channel);
-  }
-}, [verification.otpPolicy]);
+NOTIFY pgrst, 'reload schema';
 ```
 
-### 2. Fallback in sendOTP call
+**2. `src/components/AdminConfigPanel.tsx`**:
+- Change `grid-cols-5` to `grid-cols-6` in the TabsList
+- Add a new `TabsTrigger` for "Firma Contratada" with `PenTool` icon
+- Add a new `TabsContent` that renders `<ContratadaSignatureConfig />` (without the outer Card wrapper, since AdminConfigPanel already provides structure)
+- Import `ContratadaSignatureConfig`
 
-Update the button's `onClick` to use the policy's default channel as fallback instead of relying solely on `selectedChannel`:
+**3. `src/components/ContratadaSignatureConfig.tsx`**:
+- Export an alternative "inner" version (without Card wrapper) or add a prop `embedded` that skips the Card wrapper, so it fits inside the AdminConfigPanel tab cleanly.
 
-```ts
-const effectiveChannel = verification.otpPolicy?.allowed_channels?.includes(selectedChannel)
-  ? selectedChannel
-  : verification.otpPolicy?.default_channel || selectedChannel;
-```
-
-### 3. Phone normalization for OTP
-
-Ensure the phone passed to `sendOTP` has the `+595` prefix prepended when not present, matching the normalization done in `ClientForm`:
-
-```ts
-const normalizedPhone = phone && !phone.startsWith('+') ? `+595${phone}` : phone;
-```
-
-This is needed because the client's phone is stored as `992974616` (without prefix), but the WAHA gateway needs the full international number.
-
-### Files Changed
-- `src/pages/SignatureView.tsx` — 3 small edits (useEffect + channel logic + phone normalization)
+**4. `src/pages/Settings.tsx`**:
+- Remove the standalone `<ContratadaSignatureConfig />` from the Integraciones tab (it will now live inside AdminConfigPanel).
 
