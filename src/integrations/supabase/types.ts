@@ -480,8 +480,11 @@ export type Database = {
         Row: {
           accent_color: string | null
           address: string | null
+          border_radius: string | null
           created_at: string | null
+          dark_mode: boolean | null
           email: string | null
+          font_family: string | null
           id: string
           is_active: boolean | null
           login_background_url: string | null
@@ -491,6 +494,7 @@ export type Database = {
           phone: string | null
           primary_color: string | null
           secondary_color: string | null
+          shadows: boolean | null
           tax_id: string | null
           updated_at: string | null
           website: string | null
@@ -498,8 +502,11 @@ export type Database = {
         Insert: {
           accent_color?: string | null
           address?: string | null
+          border_radius?: string | null
           created_at?: string | null
+          dark_mode?: boolean | null
           email?: string | null
+          font_family?: string | null
           id?: string
           is_active?: boolean | null
           login_background_url?: string | null
@@ -509,6 +516,7 @@ export type Database = {
           phone?: string | null
           primary_color?: string | null
           secondary_color?: string | null
+          shadows?: boolean | null
           tax_id?: string | null
           updated_at?: string | null
           website?: string | null
@@ -516,8 +524,11 @@ export type Database = {
         Update: {
           accent_color?: string | null
           address?: string | null
+          border_radius?: string | null
           created_at?: string | null
+          dark_mode?: boolean | null
           email?: string | null
+          font_family?: string | null
           id?: string
           is_active?: boolean | null
           login_background_url?: string | null
@@ -527,6 +538,7 @@ export type Database = {
           phone?: string | null
           primary_color?: string | null
           secondary_color?: string | null
+          shadows?: boolean | null
           tax_id?: string | null
           updated_at?: string | null
           website?: string | null

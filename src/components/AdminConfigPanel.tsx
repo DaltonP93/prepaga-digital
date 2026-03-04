@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
+import { ContratadaSignatureConfigInner } from '@/components/ContratadaSignatureConfig';
 import { useCompanyConfiguration } from '@/hooks/useCompanyConfiguration';
 import { useCompanyApiConfiguration, WhatsAppProvider, EmailProvider } from '@/hooks/useCompanyApiConfiguration';
 import { getWhatsAppWebhookUrl } from '@/lib/appUrls';
@@ -196,7 +197,7 @@ export const AdminConfigPanel: React.FC = () => {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="whatsapp" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
           <TabsTrigger value="ui" className="flex items-center gap-2">
             <Palette className="h-4 w-4" />
             Interfaz
@@ -216,6 +217,10 @@ export const AdminConfigPanel: React.FC = () => {
           <TabsTrigger value="signwell" className="flex items-center gap-2">
             <PenTool className="h-4 w-4" />
             Firma Digital
+          </TabsTrigger>
+          <TabsTrigger value="contratada" className="flex items-center gap-2">
+            <PenTool className="h-4 w-4" />
+            Firma Contratada
           </TabsTrigger>
         </TabsList>
 
@@ -832,6 +837,24 @@ export const AdminConfigPanel: React.FC = () => {
                   <p><strong>Fallback:</strong> Si falla la creación en SignWell, el sistema vuelve al canvas automáticamente.</p>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Firma Contratada Tab */}
+        <TabsContent value="contratada" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <PenTool className="h-5 w-5" />
+                Firma de la Contratada
+              </CardTitle>
+              <CardDescription>
+                Configura cómo se firma en nombre de la empresa (contratada) en los contratos.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ContratadaSignatureConfigInner />
             </CardContent>
           </Card>
         </TabsContent>
