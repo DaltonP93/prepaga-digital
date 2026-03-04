@@ -1,50 +1,59 @@
 
 
-## Plan: Firma Electrónica v2.0 — Bloque Compacto Profesional
+## Plan: Firmantes por Rol — Filtrado de Documentos y Bloque de Firma del Contrato
 
 ### Problema Actual
-El bloque de firma electrónica actual es muy extenso: incluye UUID, hash SHA-256, IP, dispositivo, y texto legal largo. Ocupa demasiado espacio en el PDF final y no se ve profesional.
+1. **Contratada** ve todos los documentos (no hay filtro para `recipient_type === 'contratada'`). Deberia ver solo el Contrato.
+2. **Contratante (titular)** ve el Contrato + DDJJ + Anexos, pero el bloque de firma del contrato agrega CONTRATADA automáticamente incluso cuando firma el titular, y viceversa.
+3. **Adherente** funciona correctamente (solo ve su DDJJ por `beneficiary_id`).
+4. El bloque de firma del contrato no separa correctamente la firma CONTRATANTE (solo cuando firma el titular) de la firma CONTRATADA (solo cuando firma la contratada). Actualmente se agrega el bloque CONTRATADA al momento que firma el titular.
 
-### Referencia Deseada (firma_electronica_otro.pdf)
-El diseño de referencia muestra un bloque limpio y compacto:
+### Cambios Planificados
+
+**1. `src/hooks/useSignatureLinkPublic.ts` — Filtrado de documentos para contratada**
+
+En `useSignatureLinkDocuments` (~línea 602):
+- Agregar condición `else if (recipientType === 'contratada')` que filtre solo documentos de tipo `contrato` (sin `beneficiary_id`), excluyendo DDJJ y anexos.
+
+En `useSubmitSignatureLink` — query de docs para firmar (~línea 301):
+- Agregar la misma lógica: si `recipientType === 'contratada'`, filtrar `document_type = 'contrato'` y `beneficiary_id IS NULL`.
+
+**2. `src/hooks/useSignatureLinkPublic.ts` — Bloques de firma separados por rol**
+
+Actualmente (línea ~483-497), el bloque CONTRATADA se agrega siempre que firma cualquier persona. Cambiar la lógica:
+
+- **Cuando firma el TITULAR**: insertar solo el bloque CONTRATANTE (sin el bloque CONTRATADA). La CONTRATADA firmará en su propio flujo.
+- **Cuando firma la CONTRATADA**: insertar solo el bloque CONTRATADA en el documento.
+- **Cuando firma un ADHERENTE**: mantener comportamiento actual (solo su firma en su DDJJ, sin bloques de contrato).
+
+El bloque CONTRATADA solo se agrega al documento del contrato cuando `recipientType === 'contratada'`.
+
+**3. Formato profesional del bloque de firma del contrato (según PDF de referencia)**
+
+El PDF subido muestra un formato con:
+- Línea separadora larga `________________________________`
+- Label centrado: `CONTRATANTE` o `CONTRATADA`  
+- Línea: `Aclaración:...................................`
+- Línea: `C.I.Nº:...................................`
+
+Actualizar el bloque v2.0 para incluir el campo "Aclaración" (nombre completo) además del C.I., replicando el formato del PDF de referencia.
+
+**4. Documento final completo**
+
+Cuando **ambas partes** hayan firmado el contrato (titular + contratada), el documento final del contrato contendrá ambos bloques lado a lado. Esto se logra verificando si ya existe un documento final firmado por la otra parte y fusionando los bloques.
+
+### Resumen de Filtrado por Firmante
 
 ```text
-Firmado electrónicamente por: raquel velazquez
-Fecha: 22.01.2026 11:30:18
-________________________________
-        CONTRATANTE
-C.I.Nº: .............................
+┌─────────────┬──────────────────────────────┬──────────────┐
+│ Firmante    │ Ve / Firma                   │ Bloque firma │
+├─────────────┼──────────────────────────────┼──────────────┤
+│ Contratada  │ Solo Contrato                │ CONTRATADA   │
+│ Titular     │ Contrato + DDJJ + Anexos     │ CONTRATANTE  │
+│ Adherente   │ Solo su DDJJ                 │ ADHERENTE    │
+└─────────────┴──────────────────────────────┴──────────────┘
 ```
 
-Lado a lado con el bloque de la CONTRATADA con el mismo formato.
-
-### Cambios
-
-**1. `src/hooks/useSignatureLinkPublic.ts`** — Reemplazar el bloque de firma electrónica (líneas ~357-401):
-
-- **Bloque actual**: Tabla con 7 filas (firmante, fecha, ref documento UUID, IP, dispositivo, hash SHA-256, texto legal).
-- **Bloque nuevo v2.0**: Formato compacto de 3 líneas máximo:
-  - "Firmado electrónicamente por: [nombre completo]"
-  - "Fecha: [DD.MM.YYYY HH:MM:SS]"
-  - Línea separadora + label "CONTRATANTE" + "C.I.Nº: [número]"
-- Los metadatos técnicos (IP, hash, dispositivo, UUID) se seguirán guardando en `process_traces` y `signature_evidence_bundles` para auditoría, pero **no se mostrarán en el documento visible**.
-- Se necesitará pasar los datos del cliente (nombre, CI) al bloque, disponibles en `data` (sale con joins a clients).
-
-**2. Bloque CONTRATADA** (líneas ~477-484):
-- Aplicar el mismo formato visual compacto:
-  - "Firmado electrónicamente por: [representante nombre]"
-  - "Fecha: [DD.MM.YYYY HH:MM:SS]"
-  - Línea separadora + label "CONTRATADA" + "C.I.Nº: [tax_id]"
-- Layout lado a lado (inline-block o flex) para CONTRATANTE y CONTRATADA en la misma línea, como en el PDF de referencia.
-
-**3. `src/components/editor/SignatureFieldExtension.tsx`** — Actualizar la vista previa del editor:
-- Simplificar el preview del bloque electrónico para reflejar el nuevo formato compacto v2.0.
-- Quitar las filas de Token, RFC/ISO/eIDAS del preview visual.
-- Mostrar: "Firmado electrónicamente por: [variable]" + "Fecha: [timestamp]".
-
-### Datos técnicos preservados
-La información de auditoría (IP, hash, UUID, user agent) se mantiene intacta en:
-- Tabla `process_traces` (ya se graba en línea 523-536)
-- Tabla `signature_evidence_bundles` / `hash_anchors`
-- Solo se elimina del **bloque visual** del documento PDF.
+### Archivos a Modificar
+- `src/hooks/useSignatureLinkPublic.ts` — Filtrado de docs por `contratada`, separación de bloques de firma, formato profesional con "Aclaración"
 
