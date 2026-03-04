@@ -162,24 +162,28 @@ serve(async (req) => {
 
     // Default: Meta Business API
     if (!companySettings?.whatsapp_api_key || !companySettings?.whatsapp_phone_id) {
-      console.error('Company WhatsApp settings not found:', settingsError)
+      // Fallback to wa.me link instead of failing
+      console.warn('Meta API not configured, falling back to wa.me link')
+      const formattedPhone = to.replace(/[\s+\-()]/g, '')
+      const wameUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`
 
       await supabase.from('whatsapp_messages').insert({
         sale_id: saleId,
         phone_number: to,
         message_type: messageType,
         message_body: message,
-        status: 'failed',
-        error_message: 'WhatsApp API key not configured for this company',
+        status: 'manual',
         company_id: companyId,
       })
 
       return new Response(JSON.stringify({
-        success: false,
-        error: 'WhatsApp not configured for this company'
+        success: true,
+        fallback: true,
+        provider: 'wame_fallback',
+        wameUrl,
+        message,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
       })
     }
 
