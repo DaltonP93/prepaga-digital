@@ -400,7 +400,7 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
   // Must run BEFORE other replacements so {{titular.edad}}, {{vigencia_inmediata}}, etc.
   // get replaced PER-BENEFICIARY inside each expanded row, not globally beforehand.
 
-  const beneficiaryPlaceholderNames = 'first_name|last_name|_index|index|indice|birth_date|dni|ci|gender|amount|relationship|edad|titular\\.edad|age|formatted_amount|email|phone|document_number|vigencia_inmediata|tipo_venta|nombre|apellido|nombreCompleto|fechaNacimiento|genero|parentesco|montoFormateado|monto|ocupacion|estadoCivil|barrio';
+  const beneficiaryPlaceholderNames = 'first_name|last_name|_index|index|indice|birth_date|dni|ci|gender|amount|relationship|edad|titular\\.edad|age|formatted_amount|email|phone|document_number|vigencia_inmediata|tipo_venta|venta\\.vigenciaInmediata|venta\\.tipoVenta|nombre|apellido|nombreCompleto|fechaNacimiento|genero|parentesco|montoFormateado|monto|ocupacion|estadoCivil|barrio';
 
   const buildBenAliases = (beneficiary: BeneficiaryContext, index: number): Record<string, string> => ({
     '{{first_name}}': beneficiary.nombre,
@@ -439,6 +439,8 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     '{{marital_status}}': beneficiary.estadoCivil,
     '{{vigencia_inmediata}}': context.venta.vigenciaInmediata,
     '{{tipo_venta}}': context.venta.tipoVenta,
+    '{{venta.vigenciaInmediata}}': context.venta.vigenciaInmediata,
+    '{{venta.tipoVenta}}': context.venta.tipoVenta,
   });
 
   const applyBenAliases = (text: string, aliases: Record<string, string>): string => {
@@ -452,9 +454,17 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
 
   // Handle explicit {{#beneficiarios}}...{{/beneficiarios}} loop
   let beneficiaryLoopMatched = false;
+  let beneficiaryLoopHadContent = false;
   const beneficiariesLoopRegex = /\{\{#beneficiarios\}\}([\s\S]*?)\{\{\/beneficiarios\}\}/gi;
   result = result.replace(beneficiariesLoopRegex, (_, content) => {
     beneficiaryLoopMatched = true;
+    // Check if there's actual content (not just whitespace) between the loop markers
+    const trimmedContent = content.replace(/<[^>]*>/g, '').trim();
+    if (!trimmedContent) {
+      // Empty loop markers — remove them and let auto-expansion handle the table below
+      return '';
+    }
+    beneficiaryLoopHadContent = true;
     return context.beneficiarios.map((beneficiary, index) => {
       let itemResult = content;
       // Replace beneficiary-specific placeholders (Spanish names from BeneficiaryContext)
@@ -473,7 +483,7 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
   });
 
   // Fallback: Auto-expand <tr> rows with beneficiary placeholders
-  if (!beneficiaryLoopMatched) {
+  if (!beneficiaryLoopHadContent) {
     // TipTap/rich editors often split placeholders across HTML tags like:
     // <span>{{</span><span>first_name}}</span> or <strong>{{first_name}}</strong>
     // First, normalize the HTML to merge split placeholders
