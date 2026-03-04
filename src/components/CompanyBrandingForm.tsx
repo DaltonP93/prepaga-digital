@@ -12,6 +12,7 @@ import { Upload, Palette, Type, Image as ImageIcon } from "lucide-react";
 import { useBranding } from "@/hooks/useBranding";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 
 interface BrandingFormData {
   primaryColor: string;
@@ -29,6 +30,7 @@ interface BrandingFormData {
 
 export function CompanyBrandingForm() {
   const { branding, updateBranding, resetBranding } = useBranding();
+  const { profile } = useSimpleAuthContext();
   const [uploading, setUploading] = useState<{ logo: boolean; favicon: boolean }>({
     logo: false,
     favicon: false
@@ -49,25 +51,24 @@ export function CompanyBrandingForm() {
     setUploading(prev => ({ ...prev, [type]: true }));
     
     try {
+      const companyId = profile?.company_id;
+      if (!companyId) throw new Error('No hay empresa asignada al perfil');
+
       const fileExt = file.name.split('.').pop();
       const fileName = `${type}-${Date.now()}.${fileExt}`;
-      const filePath = `company/${fileName}`;
+      const filePath = `${companyId}/branding/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(filePath, file);
+        .from('company-assets')
+        .upload(filePath, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
-      // SECURITY: Use signed URLs instead of public URLs for private buckets
-      // For branding assets that need to be displayed, we create longer-lived signed URLs
-      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-        .from('documents')
-        .createSignedUrl(filePath, 604800); // 1 week expiry for branding assets
+      const { data: urlData } = supabase.storage
+        .from('company-assets')
+        .getPublicUrl(filePath);
 
-      if (signedUrlError) throw signedUrlError;
-
-      setValue(type === 'logo' ? 'logoUrl' : 'favicon', signedUrlData.signedUrl);
+      setValue(type === 'logo' ? 'logoUrl' : 'favicon', urlData.publicUrl);
       toast.success(`${type === 'logo' ? 'Logo' : 'Favicon'} subido correctamente`);
     } catch (error: any) {
       toast.error(`Error al subir ${type}: ` + error.message);
