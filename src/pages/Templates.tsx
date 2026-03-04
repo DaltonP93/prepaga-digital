@@ -39,7 +39,7 @@ const Templates = () => {
 
   const handleEditTemplate = (template: Template) => {
     if (openInNewTab) {
-      window.open(`/templates/edit/${template.id}`, "_blank");
+      window.open(`/templates/${template.id}/edit`, "_blank");
       return;
     }
     setEditingTemplate(template);
@@ -216,7 +216,7 @@ const Templates = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => window.open(`/templates/edit/${template.id}`, "_blank")}
+                        onClick={() => window.open(`/templates/${template.id}/edit`, "_blank")}
                         title="Abrir en nueva pestaña"
                       >
                         <ExternalLink className="h-4 w-4" />

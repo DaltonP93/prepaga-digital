@@ -26,7 +26,7 @@ export const useBranding = () => useContext(BrandingContext);
 export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { profile } = useSimpleAuthContext();
   const { configuration, isLoading } = useCompanyConfiguration();
-  const [appliedBranding, setAppliedBranding] = useState(false);
+  const [lastConfigId, setLastConfigId] = useState<string | null>(null);
 
   const brandingData = {
     primaryColor: configuration?.primary_color || '#1e3a5f',
@@ -39,7 +39,18 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
 
   // Aplicar CSS variables globales para el branding
   useEffect(() => {
-    if (!isLoading && configuration && !appliedBranding) {
+    if (!isLoading && configuration) {
+      // Only re-apply when configuration actually changes
+      const configKey = JSON.stringify({
+        pc: configuration.primary_color,
+        sc: configuration.secondary_color,
+        ac: configuration.accent_color,
+        lu: configuration.login_logo_url,
+        lo: configuration.logo_url,
+        n: configuration.name,
+      });
+      if (configKey === lastConfigId) return;
+
       const root = document.documentElement;
       
       // Convertir colores hex a HSL para Tailwind
@@ -76,12 +87,15 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
       document.title = brandingData.companyName;
       
       // Actualizar favicon si existe
-      const faviconUrl = sanitizeMediaUrl(configuration.login_logo_url);
+      const faviconUrl = sanitizeMediaUrl(configuration.login_logo_url) || sanitizeMediaUrl(configuration.logo_url);
       if (faviconUrl) {
-        const favicon = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
-        if (favicon) {
-          favicon.href = faviconUrl;
+        let favicon = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
+        if (!favicon) {
+          favicon = document.createElement('link');
+          favicon.rel = 'icon';
+          document.head.appendChild(favicon);
         }
+        favicon.href = faviconUrl;
       }
 
       // Persist branding to localStorage for login page (pre-auth)
@@ -90,9 +104,9 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
         localStorage.setItem('samap_branding_name', brandingData.companyName || '');
       } catch { /* ignore */ }
 
-      setAppliedBranding(true);
+      setLastConfigId(configKey);
     }
-  }, [configuration, isLoading, appliedBranding, brandingData]);
+  }, [configuration, isLoading, brandingData, lastConfigId]);
 
   return (
     <BrandingContext.Provider value={brandingData}>
