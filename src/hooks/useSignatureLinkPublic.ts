@@ -318,15 +318,19 @@ export const useSubmitSignatureLink = () => {
           const nowIso = new Date().toISOString();
           const safeSignedAt = new Date().toLocaleString('es-PY');
 
-          // Fetch company info for CONTRATADA block
+          // Fetch company info + client/beneficiary data for signature blocks
           let companyInfo: any = null;
+          let saleClientInfo: any = null;
+          let saleBeneficiaries: any[] = [];
           try {
             const { data: saleInfo } = await signatureClient
               .from('sales')
-              .select('companies:company_id(name, tax_id, address, phone, email)')
+              .select('companies:company_id(name, tax_id, address, phone, email), clients:client_id(first_name, last_name, dni), beneficiaries(id, first_name, last_name, dni)')
               .eq('id', data.sale_id)
               .single();
             companyInfo = (saleInfo as any)?.companies || null;
+            saleClientInfo = (saleInfo as any)?.clients || null;
+            saleBeneficiaries = (saleInfo as any)?.beneficiaries || [];
           } catch { /* ignore */ }
 
           const finalDocs = docsToSign.map((doc) => {
@@ -345,58 +349,41 @@ export const useSubmitSignatureLink = () => {
             let signatureImgWithDate: string;
 
             if (isElectronicSignature) {
-              // Professional electronic signature block per international standards
-              const docRef = crypto.randomUUID();
+              // v2.0 — Compact professional electronic signature block
               const isoTimestamp = new Date().toISOString();
+              const signedDate = new Date();
+              const formattedDate = `${String(signedDate.getDate()).padStart(2,'0')}.${String(signedDate.getMonth()+1).padStart(2,'0')}.${signedDate.getFullYear()} ${String(signedDate.getHours()).padStart(2,'0')}:${String(signedDate.getMinutes()).padStart(2,'0')}:${String(signedDate.getSeconds()).padStart(2,'0')}`;
+
+              // Resolve signer name and CI from fetched sale data
+              let signerName = '';
+              let signerCI = '';
+              if (recipientType === 'adherente' && recipientId && saleBeneficiaries.length > 0) {
+                const ben = saleBeneficiaries.find((b: any) => b.id === recipientId);
+                if (ben) {
+                  signerName = `${ben.first_name || ''} ${ben.last_name || ''}`.trim();
+                  signerCI = ben.dni || '';
+                }
+              } else if (saleClientInfo) {
+                signerName = `${saleClientInfo.first_name || ''} ${saleClientInfo.last_name || ''}`.trim();
+                signerCI = saleClientInfo.dni || '';
+              }
+
+              // Keep technical metadata for audit (process_traces) but NOT in visible block
+              // Store hash reference for evidence bundle
               const deviceSummary = navigator.userAgent.replace(/\s+/g, ' ').substring(0, 80);
-              // Simple hash reference from signature data
               const hashRef = Array.from(new TextEncoder().encode(signatureData + isoTimestamp))
                 .reduce((a, b) => ((a << 5) - a + b) | 0, 0)
                 .toString(16).replace('-', '').toUpperCase().padStart(8, '0');
 
+              const roleLabel = recipientType === 'adherente' ? 'ADHERENTE' : 'CONTRATANTE';
+
               const electronicBlock = `
-                <div style="border:1px solid #999;border-radius:3px;padding:8px 12px;margin:8px 0;background:#fafafa;font-family:Arial,Helvetica,sans-serif;font-size:9px;max-width:420px;">
-                  <table style="width:100%;border-collapse:collapse;">
-                    <tr>
-                      <td colspan="2" style="padding:0 0 4px 0;border-bottom:1px solid #d1d5db;">
-                        <strong style="font-size:10px;color:#111;">✓ FIRMA ELECTRÓNICA</strong>
-                        <br/>
-                        <span style="font-size:8px;color:#6b7280;">Conforme Ley N° 4017/2010 de la República del Paraguay</span>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style="padding:3px 0 1px 0;font-size:9px;color:#374151;width:110px;"><strong>Firmante:</strong></td>
-                      <td style="padding:3px 0 1px 0;font-size:9px;color:#111;">${data.recipient_type === 'titular' ? 'Titular' : 'Adherente'}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:1px 0;font-size:9px;color:#374151;"><strong>Fecha y hora:</strong></td>
-                      <td style="padding:1px 0;font-size:9px;color:#111;">${isoTimestamp}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:1px 0;font-size:9px;color:#374151;"><strong>Ref. Documento:</strong></td>
-                      <td style="padding:1px 0;font-size:9px;color:#111;font-family:monospace;font-size:8px;">${docRef}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:1px 0;font-size:9px;color:#374151;"><strong>IP de origen:</strong></td>
-                      <td style="padding:1px 0;font-size:9px;color:#111;">${clientIp}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:1px 0;font-size:9px;color:#374151;"><strong>Dispositivo:</strong></td>
-                      <td style="padding:1px 0;font-size:8px;color:#111;">${deviceSummary}</td>
-                    </tr>
-                    <tr>
-                      <td style="padding:1px 0;font-size:9px;color:#374151;"><strong>Hash verificación:</strong></td>
-                      <td style="padding:1px 0;font-size:8px;color:#111;font-family:monospace;">SHA-256:${hashRef}</td>
-                    </tr>
-                    <tr>
-                      <td colspan="2" style="padding:4px 0 0 0;border-top:1px solid #e5e7eb;">
-                        <span style="font-size:7px;color:#9ca3af;">
-                          Este documento ha sido firmado electrónicamente. La firma electrónica tiene la misma validez
-                          jurídica que la firma manuscrita conforme a la legislación vigente. Ref. RFC 4122 / ISO 8601.
-                        </span>
-                      </td>
-                    </tr>
-                  </table>
+                <div style="display:inline-block;vertical-align:top;width:48%;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111;">
+                  <p style="margin:0 0 2px 0;font-size:11px;">Firmado electrónicamente por: <strong>${signerName.toLowerCase()}</strong></p>
+                  <p style="margin:0 0 8px 0;font-size:11px;">Fecha: ${formattedDate}</p>
+                  <div style="border-top:1px solid #333;width:80%;margin:0 0 4px 0;"></div>
+                  <p style="margin:0;font-size:11px;text-align:center;font-weight:bold;">${roleLabel}</p>
+                  <p style="margin:2px 0 0 0;font-size:11px;">C.I.Nº: ${signerCI || '.............................'}</p>
                 </div>
               `;
               signatureImgWithDate = electronicBlock;
@@ -472,14 +459,17 @@ export const useSubmitSignatureLink = () => {
               finalContent = `${finalContent}${signatureBlock}`;
             }
 
-            // Append CONTRATADA (company) signature block
+            // Append CONTRATADA (company) signature block — v2.0 compact layout side by side
             if (companyInfo) {
+              const contratadaDate = new Date();
+              const contratadaFormattedDate = `${String(contratadaDate.getDate()).padStart(2,'0')}.${String(contratadaDate.getMonth()+1).padStart(2,'0')}.${contratadaDate.getFullYear()} ${String(contratadaDate.getHours()).padStart(2,'0')}:${String(contratadaDate.getMinutes()).padStart(2,'0')}:${String(contratadaDate.getSeconds()).padStart(2,'0')}`;
               const contratadaBlock = `
-                <div style="margin-top:24px;">
-                  <p style="margin:0 0 4px 0;font-size:12px;"><strong>CONTRATADA</strong></p>
-                  <p style="margin:0;font-size:12px;">${companyInfo.name || ''}</p>
-                  ${companyInfo.tax_id ? `<p style="margin:0;font-size:12px;">C.I. N°: ${companyInfo.tax_id}</p>` : ''}
-                  ${companyInfo.address ? `<p style="margin:8px 0 0 0;font-size:10px;color:#666;">${companyInfo.address}${companyInfo.phone ? ` | Tel: ${companyInfo.phone}` : ''}${companyInfo.email ? ` | ${companyInfo.email}` : ''}</p>` : ''}
+                <div style="display:inline-block;vertical-align:top;width:48%;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111;margin-left:4%;">
+                  <p style="margin:0 0 2px 0;font-size:11px;">Firmado electrónicamente por: <strong>${(companyInfo.name || '').toLowerCase()}</strong></p>
+                  <p style="margin:0 0 8px 0;font-size:11px;">Fecha: ${contratadaFormattedDate}</p>
+                  <div style="border-top:1px solid #333;width:80%;margin:0 0 4px 0;"></div>
+                  <p style="margin:0;font-size:11px;text-align:center;font-weight:bold;">CONTRATADA</p>
+                  <p style="margin:2px 0 0 0;font-size:11px;">C.I.Nº: ${companyInfo.tax_id || '.............................'}</p>
                 </div>
               `;
               finalContent = `${finalContent}${contratadaBlock}`;

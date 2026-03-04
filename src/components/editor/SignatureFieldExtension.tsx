@@ -531,24 +531,15 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected, deleteNode 
             {(signatureType === 'electronic' || signatureType === 'both') && (
               <div className="bg-background rounded-lg border p-2 space-y-1">
                 <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                  <ShieldCheck className="h-3 w-3" /> Firma Electrónica
+                  <ShieldCheck className="h-3 w-3" /> Firma Electrónica v2.0
                 </div>
-                {showDate && (
-                  <div className="flex items-center gap-2 text-xs">
-                    <Calendar className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-muted-foreground">Fecha:</span>
-                    <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px]">{previewTimestamp}</span>
+                <div className="text-[10px] space-y-0.5">
+                  <p className="m-0">Firmado electrónicamente por: <strong className="font-mono">{signerRole === 'empresa' ? '{{representante_nombre}}' : signerRole === 'testigo' ? '{{testigo_nombre}}' : '{{titular_nombre}}'}</strong></p>
+                  <p className="m-0">Fecha: DD.MM.YYYY HH:MM:SS</p>
+                  <div className="border-t border-border mt-1 pt-1">
+                    <p className="m-0 text-center font-bold text-[10px]">{signerRole === 'empresa' ? 'CONTRATADA' : signerRole === 'testigo' ? 'TESTIGO' : 'CONTRATANTE'}</p>
+                    <p className="m-0 text-[10px]">C.I.Nº: {signerRole === 'empresa' ? '{{representante_dni}}' : signerRole === 'testigo' ? '{{testigo_dni}}' : '{{titular_dni}}'}</p>
                   </div>
-                )}
-                {showToken && (
-                  <div className="flex items-center gap-2 text-xs">
-                    <Hash className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-muted-foreground">Token:</span>
-                    <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px] truncate">{previewToken}</span>
-                  </div>
-                )}
-                <div className="text-[10px] text-muted-foreground mt-1 border-t pt-1">
-                  <strong>RFC 4122</strong> · <strong>ISO 8601</strong> · <strong>eIDAS</strong>
                 </div>
               </div>
             )}
