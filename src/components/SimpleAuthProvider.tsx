@@ -17,6 +17,7 @@ export interface SimpleAuthContextType {
 const SimpleAuthContext = createContext<SimpleAuthContextType | undefined>(undefined);
 
 const BRANDING_STORAGE_KEYS = [
+  'samap_branding_favicon',
   'samap_branding_logo',
   'samap_branding_name',
   'samap_branding_login_background',

@@ -20,6 +20,7 @@ export const LogoutButton = () => {
       console.error('❌ LogoutButton: Error al cerrar sesión:', error);
       // Forzar limpieza y redirección incluso si hay error
       const brandingKeys = [
+        'samap_branding_favicon',
         'samap_branding_logo',
         'samap_branding_name',
         'samap_branding_login_background',

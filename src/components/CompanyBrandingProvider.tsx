@@ -28,6 +28,21 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
   const { configuration, isLoading } = useCompanyConfiguration();
   const [lastConfigId, setLastConfigId] = useState<string | null>(null);
 
+  const applyFavicon = (url?: string) => {
+    if (!url) return;
+
+    const rels = ['icon', 'shortcut icon', 'apple-touch-icon'];
+    rels.forEach((rel) => {
+      let link = document.querySelector(`link[rel="${rel}"]`) as HTMLLinkElement | null;
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = rel;
+        document.head.appendChild(link);
+      }
+      link.href = url;
+    });
+  };
+
   const brandingData = {
     primaryColor: configuration?.primary_color || '#1e3a5f',
     secondaryColor: configuration?.secondary_color || '#334155',
@@ -45,6 +60,7 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
         pc: configuration.primary_color,
         sc: configuration.secondary_color,
         ac: configuration.accent_color,
+        fv: configuration.favicon,
         lb: configuration.login_background_url,
         lu: configuration.login_logo_url,
         lt: configuration.login_title,
@@ -90,29 +106,34 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
       document.title = brandingData.companyName;
       
       // Actualizar favicon si existe
-      const faviconUrl = sanitizeMediaUrl(configuration.login_logo_url) || sanitizeMediaUrl(configuration.logo_url);
+      const faviconUrl =
+        sanitizeMediaUrl(configuration.favicon) ||
+        sanitizeMediaUrl(configuration.login_logo_url) ||
+        sanitizeMediaUrl(configuration.logo_url);
       if (faviconUrl) {
-        let favicon = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
-        if (!favicon) {
-          favicon = document.createElement('link');
-          favicon.rel = 'icon';
-          document.head.appendChild(favicon);
-        }
-        favicon.href = faviconUrl;
+        applyFavicon(faviconUrl);
       }
 
       // Persist branding to localStorage for login page (pre-auth)
       try {
+        const currentFavicon = localStorage.getItem('samap_branding_favicon') || '';
         const currentLogo = localStorage.getItem('samap_branding_logo') || '';
         const currentBackground = localStorage.getItem('samap_branding_login_background') || '';
         const currentTitle = localStorage.getItem('samap_branding_name') || '';
         const currentSubtitle = localStorage.getItem('samap_branding_login_subtitle') || '';
 
+        const loginFavicon =
+          sanitizeMediaUrl(configuration.favicon) ||
+          sanitizeMediaUrl(configuration.login_logo_url) ||
+          sanitizeMediaUrl(configuration.logo_url) ||
+          currentFavicon ||
+          '';
         const loginLogo = sanitizeMediaUrl(configuration.login_logo_url) || currentLogo || brandingData.logoUrl || '';
         const loginBackground = sanitizeMediaUrl(configuration.login_background_url) || currentBackground || '';
         const loginTitle = (configuration as any).login_title || currentTitle || brandingData.companyName || '';
         const loginSubtitle = (configuration as any).login_subtitle || currentSubtitle || 'Sistema de Firma Digital - Inicia sesión en tu cuenta';
 
+        localStorage.setItem('samap_branding_favicon', loginFavicon);
         localStorage.setItem('samap_branding_logo', loginLogo);
         localStorage.setItem('samap_branding_name', loginTitle);
         localStorage.setItem('samap_branding_login_background', loginBackground);
@@ -122,6 +143,19 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
       setLastConfigId(configKey);
     }
   }, [configuration, isLoading, brandingData, lastConfigId]);
+
+  useEffect(() => {
+    try {
+      const localFavicon =
+        localStorage.getItem('samap_branding_favicon') ||
+        localStorage.getItem('samap_branding_logo') ||
+        '';
+      const safeLocalFavicon = sanitizeMediaUrl(localFavicon);
+      if (safeLocalFavicon) applyFavicon(safeLocalFavicon);
+    } catch {
+      // noop
+    }
+  }, []);
 
   return (
     <BrandingContext.Provider value={brandingData}>
