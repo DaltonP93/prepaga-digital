@@ -349,12 +349,10 @@ export const useSubmitSignatureLink = () => {
             let signatureImgWithDate: string;
 
             if (isElectronicSignature) {
-              // v2.0 — Compact professional electronic signature block
               const isoTimestamp = new Date().toISOString();
               const signedDate = new Date();
               const formattedDate = `${String(signedDate.getDate()).padStart(2,'0')}.${String(signedDate.getMonth()+1).padStart(2,'0')}.${signedDate.getFullYear()} ${String(signedDate.getHours()).padStart(2,'0')}:${String(signedDate.getMinutes()).padStart(2,'0')}:${String(signedDate.getSeconds()).padStart(2,'0')}`;
 
-              // Resolve signer name and CI from fetched sale data
               let signerName = '';
               let signerCI = '';
               if (recipientType === 'adherente' && recipientId && saleBeneficiaries.length > 0) {
@@ -368,8 +366,6 @@ export const useSubmitSignatureLink = () => {
                 signerCI = saleClientInfo.dni || '';
               }
 
-              // Keep technical metadata for audit (process_traces) but NOT in visible block
-              // Store hash reference for evidence bundle
               const deviceSummary = navigator.userAgent.replace(/\s+/g, ' ').substring(0, 80);
               const hashRef = Array.from(new TextEncoder().encode(signatureData + isoTimestamp))
                 .reduce((a, b) => ((a << 5) - a + b) | 0, 0)
@@ -377,15 +373,40 @@ export const useSubmitSignatureLink = () => {
 
               const roleLabel = recipientType === 'adherente' ? 'ADHERENTE' : 'CONTRATANTE';
 
-              const electronicBlock = `
-                <div style="display:inline-block;vertical-align:top;width:48%;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111;">
-                  <p style="margin:0 0 2px 0;font-size:11px;">Firmado electrónicamente por: <strong>${signerName.toLowerCase()}</strong></p>
-                  <p style="margin:0 0 8px 0;font-size:11px;">Fecha: ${formattedDate}</p>
-                  <div style="border-top:1px solid #333;width:80%;margin:0 0 4px 0;"></div>
-                  <p style="margin:0;font-size:11px;text-align:center;font-weight:bold;">${roleLabel}</p>
-                  <p style="margin:2px 0 0 0;font-size:11px;">C.I.Nº: ${signerCI || '.............................'}</p>
-                </div>
-              `;
+              // Detect signature style from document content
+              const useV1 = originalContent.includes('data-signature-style="v1"');
+
+              let electronicBlock: string;
+              if (useV1) {
+                // v1.0 — Detailed block with metadata
+                electronicBlock = `
+                  <div style="display:inline-block;vertical-align:top;width:48%;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#111;border:1px solid #ccc;border-radius:6px;padding:10px;">
+                    <table style="width:100%;border-collapse:collapse;font-size:10px;">
+                      <tr><td style="color:#666;padding:1px 4px;">Firmante:</td><td><strong>${signerName}</strong></td></tr>
+                      <tr><td style="color:#666;padding:1px 4px;">Fecha:</td><td>${formattedDate}</td></tr>
+                      <tr><td style="color:#666;padding:1px 4px;">Ref. Doc.:</td><td style="font-family:monospace;font-size:9px;">${isoTimestamp.substring(0,8)}…</td></tr>
+                      <tr><td style="color:#666;padding:1px 4px;">IP:</td><td style="font-family:monospace;">Registrada</td></tr>
+                      <tr><td style="color:#666;padding:1px 4px;">Dispositivo:</td><td style="font-size:9px;">${deviceSummary.substring(0,40)}…</td></tr>
+                      <tr><td style="color:#666;padding:1px 4px;">Hash:</td><td style="font-family:monospace;font-size:9px;">${hashRef}</td></tr>
+                    </table>
+                    <p style="margin:4px 0 0;font-size:9px;color:#666;font-style:italic;">Firma válida conforme a Ley 4017/2010</p>
+                    <div style="border-top:1px solid #333;width:80%;margin:6px 0 4px 0;"></div>
+                    <p style="margin:0;text-align:center;font-weight:bold;font-size:10px;">${roleLabel}</p>
+                    <p style="margin:2px 0 0 0;font-size:10px;">C.I.Nº: ${signerCI || '.............................'}</p>
+                  </div>
+                `;
+              } else {
+                // v2.0 — Compact professional block
+                electronicBlock = `
+                  <div style="display:inline-block;vertical-align:top;width:48%;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111;">
+                    <p style="margin:0 0 2px 0;font-size:11px;">Firmado electrónicamente por: <strong>${signerName.toLowerCase()}</strong></p>
+                    <p style="margin:0 0 8px 0;font-size:11px;">Fecha: ${formattedDate}</p>
+                    <div style="border-top:1px solid #333;width:80%;margin:0 0 4px 0;"></div>
+                    <p style="margin:0;font-size:11px;text-align:center;font-weight:bold;">${roleLabel}</p>
+                    <p style="margin:2px 0 0 0;font-size:11px;">C.I.Nº: ${signerCI || '.............................'}</p>
+                  </div>
+                `;
+              }
               signatureImgWithDate = electronicBlock;
               signatureBlock = electronicBlock;
             } else {
