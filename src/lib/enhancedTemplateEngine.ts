@@ -592,6 +592,15 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     '{{vendedor_nombre}}': context.venta.vendedor,
     '{{vigencia_inmediata}}': context.venta.vigenciaInmediata,
     '{{tipo_venta}}': context.venta.tipoVenta,
+    // Company aliases for contracts
+    '{{company_name}}': context.empresa.nombre,
+    '{{company_cuit}}': context.facturacion.ruc,
+    '{{company_address}}': context.empresa.direccion,
+    // Signature role aliases (representante = empresa, testigo)
+    '{{representante_nombre}}': context.empresa.nombre,
+    '{{representante_dni}}': context.facturacion.ruc,
+    '{{testigo_nombre}}': context.venta.vendedor,
+    '{{testigo_dni}}': '',
   };
   Object.entries(legacyAliases).forEach(([placeholder, value]) => {
     const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
