@@ -189,23 +189,36 @@ const useAdvancedAnalytics = (period: string) => {
         }))
         .sort((a, b) => b.ingresos - a.ingresos);
 
-      // Tiempo promedio de cierre (simulado)
-      const timeToClose = periods.map(period => ({
-        period: period.name,
-        avgDays: Math.floor(Math.random() * 30) + 5 // Simulated data
-      }));
+      // Tiempo promedio de cierre (calculado desde created_at hasta status completado)
+      const timeToClose = periods.map(period => {
+        const periodCompleted = salesData?.filter(sale => 
+          sale.status === 'completado' &&
+          isWithinInterval(new Date(sale.created_at!), { start: period.start, end: period.end })
+        ) || [];
+        
+        const avgDays = periodCompleted.length > 0 
+          ? Math.round(periodCompleted.reduce((sum, sale) => {
+              const created = new Date(sale.created_at!);
+              const updated = new Date(sale.updated_at || sale.created_at!);
+              return sum + Math.max(1, Math.round((updated.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)));
+            }, 0) / periodCompleted.length)
+          : 0;
+        
+        return { period: period.name, avgDays };
+      });
 
-      // KPIs calculados
+      // KPIs calculados con datos reales
       const totalSales = salesData?.length || 0;
       const completedSales = salesData?.filter(s => s.status === 'completado').length || 0;
+      const canceledSales = salesData?.filter(s => s.status === 'cancelado').length || 0;
       const totalRevenue = salesData?.reduce((sum, sale) => sum + (sale.total_amount || 0), 0) || 0;
 
       const kpis = {
         conversionRate: totalSales > 0 ? Math.round((completedSales / totalSales) * 100) : 0,
         avgTicket: completedSales > 0 ? Math.round(totalRevenue / completedSales) : 0,
-        customerLifetime: Math.round(Math.random() * 500 + 100), // Simulated
-        churnRate: Math.round(Math.random() * 10 + 2), // Simulated
-        monthlyRecurring: Math.round(totalRevenue * 0.3) // Simulated
+        customerLifetime: completedSales > 0 ? Math.round(totalRevenue / Math.max(1, completedSales)) : 0,
+        churnRate: totalSales > 0 ? Math.round((canceledSales / totalSales) * 100) : 0,
+        monthlyRecurring: Math.round(totalRevenue / Math.max(1, periods.length))
       };
 
       return {

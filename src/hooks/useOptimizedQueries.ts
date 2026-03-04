@@ -79,8 +79,8 @@ export const useOptimizedDashboard = () => {
         pendingSales,
         recentSales,
         salesGrowth,
-        clientsGrowth: Math.max(0, Math.round(Math.random() * 15)), // Placeholder
-        documentsGrowth: Math.max(0, Math.round(Math.random() * 10)), // Placeholder
+        clientsGrowth: 0,
+        documentsGrowth: 0,
       };
     },
     staleTime: 5 * 60 * 1000, // 5 minutos de cache
