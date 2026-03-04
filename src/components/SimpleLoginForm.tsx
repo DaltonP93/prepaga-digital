@@ -11,6 +11,7 @@ import { Eye, EyeOff, Monitor, Moon, Shield, Sun } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ThemePreference, getStoredThemePreference, setThemePreference } from '@/lib/theme';
 import { supabase } from '@/integrations/supabase/client';
+import { sanitizeMediaUrl } from '@/lib/mediaUrl';
 
 export const SimpleLoginForm = () => {
   const [email, setEmail] = useState('');
@@ -26,9 +27,20 @@ export const SimpleLoginForm = () => {
   const brandingLogo = (() => {
     try { return localStorage.getItem('samap_branding_logo') || ''; } catch { return ''; }
   })();
+  const brandingBackground = (() => {
+    try { return localStorage.getItem('samap_branding_login_background') || ''; } catch { return ''; }
+  })();
   const brandingName = (() => {
     try { return localStorage.getItem('samap_branding_name') || 'SAMAP Digital'; } catch { return 'SAMAP Digital'; }
   })();
+  const brandingSubtitle = (() => {
+    try { return localStorage.getItem('samap_branding_login_subtitle') || 'Sistema de Firma Digital - Inicia sesión en tu cuenta'; } catch { return 'Sistema de Firma Digital - Inicia sesión en tu cuenta'; }
+  })();
+  const loginBackgroundUrl = sanitizeMediaUrl(brandingBackground);
+  const loginLogoUrl = sanitizeMediaUrl(brandingLogo);
+  const backgroundStyle = loginBackgroundUrl
+    ? { backgroundImage: `url(${loginBackgroundUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+    : undefined;
   const { user, loading, signIn } = useSimpleAuthContext();
   const navigate = useNavigate();
   const location = useLocation();
@@ -165,7 +177,7 @@ export const SimpleLoginForm = () => {
 
   console.log('📋 SimpleLoginForm: Mostrando formulario de login');
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20" style={backgroundStyle}>
       <Card className="w-full max-w-md backdrop-blur-sm bg-background/95 border-border/50 shadow-xl">
         <CardHeader className="text-center space-y-4">
           <div className="flex items-center justify-center gap-1 rounded-xl border border-border/70 bg-muted/60 p-1">
@@ -201,8 +213,8 @@ export const SimpleLoginForm = () => {
             </Button>
           </div>
           <div className="flex justify-center">
-            {brandingLogo ? (
-              <img src={brandingLogo} alt={brandingName} className="h-16 max-w-[200px] object-contain" />
+            {loginLogoUrl ? (
+              <img src={loginLogoUrl} alt={brandingName} className="h-16 max-w-[200px] object-contain" />
             ) : (
               <div className="p-3 rounded-full bg-primary/10">
                 <Shield className="h-8 w-8 text-primary" />
@@ -213,7 +225,7 @@ export const SimpleLoginForm = () => {
             {brandingName}
           </CardTitle>
           <CardDescription className="text-muted-foreground">
-            Sistema de Firma Digital - Inicia sesión en tu cuenta
+            {brandingSubtitle}
           </CardDescription>
         </CardHeader>
         <CardContent>

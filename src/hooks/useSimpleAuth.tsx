@@ -6,6 +6,25 @@ import { Tables } from "@/integrations/supabase/types";
 
 type Profile = Tables<"profiles">;
 
+const BRANDING_STORAGE_KEYS = [
+  'samap_branding_logo',
+  'samap_branding_name',
+  'samap_branding_login_background',
+  'samap_branding_login_subtitle',
+] as const;
+
+const preserveBrandingStorage = () => {
+  try {
+    const preserved = BRANDING_STORAGE_KEYS.map((key) => [key, localStorage.getItem(key)] as const);
+    localStorage.clear();
+    for (const [key, value] of preserved) {
+      if (value) localStorage.setItem(key, value);
+    }
+  } catch {
+    // noop
+  }
+};
+
 export interface SimpleAuthContextType {
   user: User | null;
   profile: Profile | null;
@@ -79,7 +98,7 @@ export const useSimpleAuth = (): SimpleAuthContextType => {
       setLoading(false);
       
       // Limpiar storage
-      localStorage.clear();
+      preserveBrandingStorage();
       sessionStorage.clear();
       
       // Cerrar sesión en Supabase

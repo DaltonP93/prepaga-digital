@@ -143,6 +143,14 @@ export const AdminConfigPanel: React.FC = () => {
   }, [nextApiFormData]);
 
   const handleUiSave = () => {
+    try {
+      localStorage.setItem('samap_branding_logo', uiFormData.login_logo_url || '');
+      localStorage.setItem('samap_branding_name', uiFormData.login_title || 'SAMAP Digital');
+      localStorage.setItem('samap_branding_login_background', uiFormData.login_background_url || '');
+      localStorage.setItem('samap_branding_login_subtitle', uiFormData.login_subtitle || 'Sistema de Firma Digital - Inicia sesión en tu cuenta');
+    } catch {
+      // noop
+    }
     updateUiConfig(uiFormData);
   };
 

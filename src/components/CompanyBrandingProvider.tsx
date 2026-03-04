@@ -45,7 +45,10 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
         pc: configuration.primary_color,
         sc: configuration.secondary_color,
         ac: configuration.accent_color,
+        lb: configuration.login_background_url,
         lu: configuration.login_logo_url,
+        lt: configuration.login_title,
+        ls: configuration.login_subtitle,
         lo: configuration.logo_url,
         n: configuration.name,
       });
@@ -100,8 +103,20 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
 
       // Persist branding to localStorage for login page (pre-auth)
       try {
-        localStorage.setItem('samap_branding_logo', brandingData.logoUrl || '');
-        localStorage.setItem('samap_branding_name', brandingData.companyName || '');
+        const currentLogo = localStorage.getItem('samap_branding_logo') || '';
+        const currentBackground = localStorage.getItem('samap_branding_login_background') || '';
+        const currentTitle = localStorage.getItem('samap_branding_name') || '';
+        const currentSubtitle = localStorage.getItem('samap_branding_login_subtitle') || '';
+
+        const loginLogo = sanitizeMediaUrl(configuration.login_logo_url) || currentLogo || brandingData.logoUrl || '';
+        const loginBackground = sanitizeMediaUrl(configuration.login_background_url) || currentBackground || '';
+        const loginTitle = (configuration as any).login_title || currentTitle || brandingData.companyName || '';
+        const loginSubtitle = (configuration as any).login_subtitle || currentSubtitle || 'Sistema de Firma Digital - Inicia sesión en tu cuenta';
+
+        localStorage.setItem('samap_branding_logo', loginLogo);
+        localStorage.setItem('samap_branding_name', loginTitle);
+        localStorage.setItem('samap_branding_login_background', loginBackground);
+        localStorage.setItem('samap_branding_login_subtitle', loginSubtitle);
       } catch { /* ignore */ }
 
       setLastConfigId(configKey);

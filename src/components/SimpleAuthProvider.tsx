@@ -16,6 +16,25 @@ export interface SimpleAuthContextType {
 
 const SimpleAuthContext = createContext<SimpleAuthContextType | undefined>(undefined);
 
+const BRANDING_STORAGE_KEYS = [
+  'samap_branding_logo',
+  'samap_branding_name',
+  'samap_branding_login_background',
+  'samap_branding_login_subtitle',
+] as const;
+
+const preserveBrandingStorage = () => {
+  try {
+    const preserved = BRANDING_STORAGE_KEYS.map((key) => [key, localStorage.getItem(key)] as const);
+    localStorage.clear();
+    for (const [key, value] of preserved) {
+      if (value) localStorage.setItem(key, value);
+    }
+  } catch {
+    // noop
+  }
+};
+
 const ROLE_PRIORITY: AppRole[] = [
   'super_admin',
   'admin',
@@ -107,7 +126,7 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           setUser(null);
           setProfile(null);
           setUserRole(null);
-          localStorage.clear();
+          preserveBrandingStorage();
           sessionStorage.clear();
         } else if (event === 'TOKEN_REFRESHED' && session?.user) {
           setUser(session.user);
@@ -157,7 +176,7 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const signOut = async () => {
     try {
-      localStorage.clear();
+      preserveBrandingStorage();
       sessionStorage.clear();
       await supabase.auth.signOut();
     } catch (error) {

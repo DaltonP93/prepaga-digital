@@ -20,6 +20,30 @@ interface CompanyConfiguration {
   logo_url?: string | null;
 }
 
+const readLocalBranding = () => {
+  try {
+    return {
+      login_title: localStorage.getItem('samap_branding_name') || undefined,
+      login_subtitle: localStorage.getItem('samap_branding_login_subtitle') || undefined,
+    };
+  } catch {
+    return {};
+  }
+};
+
+const COMPANY_UPDATE_FIELDS = [
+  'name',
+  'email',
+  'phone',
+  'address',
+  'primary_color',
+  'secondary_color',
+  'accent_color',
+  'logo_url',
+  'login_logo_url',
+  'login_background_url',
+] as const;
+
 export const useCompanyConfiguration = () => {
   const queryClient = useQueryClient();
   const { profile } = useSimpleAuthContext();
@@ -42,7 +66,11 @@ export const useCompanyConfiguration = () => {
         return null;
       }
 
-      return data as CompanyConfiguration;
+      const localBranding = readLocalBranding();
+      return {
+        ...(data as CompanyConfiguration),
+        ...localBranding,
+      };
     },
     enabled: !!profile?.company_id,
   });
@@ -53,9 +81,19 @@ export const useCompanyConfiguration = () => {
         throw new Error('No company ID available');
       }
 
+      const sanitizedUpdates = Object.fromEntries(
+        Object.entries(updates).filter(([key, value]) =>
+          (COMPANY_UPDATE_FIELDS as readonly string[]).includes(key) && value !== undefined
+        )
+      );
+
+      if (Object.keys(sanitizedUpdates).length === 0) {
+        return null;
+      }
+
       const { data, error } = await supabase
         .from('companies')
-        .update(updates)
+        .update(sanitizedUpdates)
         .eq('id', profile.company_id)
         .select()
         .single();

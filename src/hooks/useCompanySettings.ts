@@ -29,8 +29,6 @@ export const useCompanyBranding = (companyId?: string) => {
         .select(`
           login_background_url,
           login_logo_url,
-          login_title,
-          login_subtitle,
           primary_color,
           secondary_color,
           accent_color
@@ -43,7 +41,20 @@ export const useCompanyBranding = (companyId?: string) => {
         return null;
       }
 
-      return data as CompanyBranding;
+      let localTitle: string | undefined;
+      let localSubtitle: string | undefined;
+      try {
+        localTitle = localStorage.getItem('samap_branding_name') || undefined;
+        localSubtitle = localStorage.getItem('samap_branding_login_subtitle') || undefined;
+      } catch {
+        // noop
+      }
+
+      return {
+        ...(data as CompanyBranding),
+        login_title: localTitle,
+        login_subtitle: localSubtitle,
+      };
     },
     enabled: !!targetCompanyId,
   });
