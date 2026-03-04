@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface GeneratedLink {
-  type: 'titular' | 'adherente';
+  type: 'titular' | 'adherente' | 'contratada';
   name?: string;
   email: string;
   token: string;
@@ -29,6 +29,13 @@ export const useCreateAllSignatureLinks = () => {
       if (!sale.clients) {
         throw new Error('La venta debe tener un cliente asignado');
       }
+
+      // Fetch company settings for contratada signature config
+      const { data: companySettings } = await supabase
+        .from('company_settings')
+        .select('contratada_signature_mode, contratada_signer_name, contratada_signer_email, contratada_signer_dni')
+        .eq('company_id', sale.company_id)
+        .single();
 
       const results: GeneratedLink[] = [];
       const expiresAt = new Date();
@@ -67,11 +74,10 @@ export const useCreateAllSignatureLinks = () => {
       // 3. Generar enlaces para adherentes que requieren firma
       if (sale.beneficiaries && Array.isArray(sale.beneficiaries) && sale.beneficiaries.length > 0) {
         for (const beneficiary of sale.beneficiaries) {
-          // Solo generar enlace si signature_required no es false
           if (beneficiary.signature_required !== false && beneficiary.email) {
             const adhToken = crypto.randomUUID();
             const adhExpiresAt = new Date();
-            adhExpiresAt.setDate(adhExpiresAt.getDate() + 1); // 24 horas
+            adhExpiresAt.setDate(adhExpiresAt.getDate() + 1);
 
             const { data: adhLink, error: adhError } = await supabase
               .from('signature_links')
@@ -103,6 +109,40 @@ export const useCreateAllSignatureLinks = () => {
         }
       }
 
+      // 4. Generar enlace para CONTRATADA si está en modo 'link'
+      if (companySettings?.contratada_signature_mode === 'link' && companySettings?.contratada_signer_email) {
+        const contratadaToken = crypto.randomUUID();
+        const contratadaExpiresAt = new Date();
+        contratadaExpiresAt.setDate(contratadaExpiresAt.getDate() + 3); // 3 días para la empresa
+
+        const { data: contratadaLink, error: contratadaError } = await supabase
+          .from('signature_links')
+          .insert({
+            sale_id: saleId,
+            token: contratadaToken,
+            recipient_type: 'contratada',
+            recipient_email: companySettings.contratada_signer_email,
+            recipient_phone: null,
+            recipient_id: null,
+            expires_at: contratadaExpiresAt.toISOString(),
+            status: 'pendiente',
+          })
+          .select()
+          .single();
+
+        if (contratadaError) {
+          console.error('Error creating contratada link:', contratadaError);
+        } else if (contratadaLink) {
+          results.push({
+            type: 'contratada',
+            name: companySettings.contratada_signer_name || 'Representante Legal',
+            email: companySettings.contratada_signer_email,
+            token: contratadaLink.token,
+            expires_at: contratadaLink.expires_at,
+          });
+        }
+      }
+
       if (results.length === 0) {
         throw new Error('No se pudieron generar enlaces. Verifica que el cliente y adherentes tengan email.');
       }
@@ -114,10 +154,12 @@ export const useCreateAllSignatureLinks = () => {
 
       const titularCount = results.filter(r => r.type === 'titular').length;
       const adherenteCount = results.filter(r => r.type === 'adherente').length;
+      const contratadaCount = results.filter(r => r.type === 'contratada').length;
 
-      toast.success(
-        `${results.length} enlace(s) generado(s) exitosamente: ${titularCount} titular, ${adherenteCount} adherente(s)`
-      );
+      let desc = `${results.length} enlace(s) generado(s): ${titularCount} titular, ${adherenteCount} adherente(s)`;
+      if (contratadaCount > 0) desc += `, ${contratadaCount} contratada`;
+
+      toast.success(desc);
     },
     onError: (error: any) => {
       console.error('Error generating signature links:', error);

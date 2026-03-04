@@ -651,6 +651,10 @@ export type Database = {
       company_settings: {
         Row: {
           company_id: string
+          contratada_signature_mode: string
+          contratada_signer_dni: string | null
+          contratada_signer_email: string | null
+          contratada_signer_name: string | null
           created_at: string | null
           email_api_key: string | null
           email_from_address: string | null
@@ -674,6 +678,10 @@ export type Database = {
         }
         Insert: {
           company_id: string
+          contratada_signature_mode?: string
+          contratada_signer_dni?: string | null
+          contratada_signer_email?: string | null
+          contratada_signer_name?: string | null
           created_at?: string | null
           email_api_key?: string | null
           email_from_address?: string | null
@@ -697,6 +705,10 @@ export type Database = {
         }
         Update: {
           company_id?: string
+          contratada_signature_mode?: string
+          contratada_signer_dni?: string | null
+          contratada_signer_email?: string | null
+          contratada_signer_name?: string | null
           created_at?: string | null
           email_api_key?: string | null
           email_from_address?: string | null
