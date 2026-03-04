@@ -482,6 +482,7 @@ export type Database = {
           address: string | null
           border_radius: string | null
           created_at: string | null
+          custom_css: string | null
           dark_mode: boolean | null
           email: string | null
           font_family: string | null
@@ -504,6 +505,7 @@ export type Database = {
           address?: string | null
           border_radius?: string | null
           created_at?: string | null
+          custom_css?: string | null
           dark_mode?: boolean | null
           email?: string | null
           font_family?: string | null
@@ -526,6 +528,7 @@ export type Database = {
           address?: string | null
           border_radius?: string | null
           created_at?: string | null
+          custom_css?: string | null
           dark_mode?: boolean | null
           email?: string | null
           font_family?: string | null
