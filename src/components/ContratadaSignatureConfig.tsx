@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { toast } from 'sonner';
 
-export function ContratadaSignatureConfig() {
+function ContratadaSignatureConfigInner() {
   const { profile } = useSimpleAuthContext();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -69,6 +69,50 @@ export function ContratadaSignatureConfig() {
   if (loading) return <div className="flex justify-center p-4"><Loader2 className="h-5 w-5 animate-spin" /></div>;
 
   return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label>Modo de firma</Label>
+        <Select value={mode} onValueChange={setMode}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="auto">Automática (datos de empresa)</SelectItem>
+            <SelectItem value="link">Enviar link al representante</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          {mode === 'auto'
+            ? 'La firma se completa automáticamente con los datos del representante configurado.'
+            : 'Se genera un enlace de firma y se envía al email del representante legal.'}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <Label>Nombre del representante</Label>
+          <Input value={signerName} onChange={e => setSignerName(e.target.value)} placeholder="Nombre completo" />
+        </div>
+        <div className="space-y-2">
+          <Label>Email del representante</Label>
+          <Input value={signerEmail} onChange={e => setSignerEmail(e.target.value)} placeholder="email@empresa.com" type="email" />
+        </div>
+        <div className="space-y-2">
+          <Label>C.I. / DNI del representante</Label>
+          <Input value={signerDni} onChange={e => setSignerDni(e.target.value)} placeholder="Número de documento" />
+        </div>
+      </div>
+
+      <Button onClick={handleSave} disabled={saving}>
+        {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+        Guardar configuración
+      </Button>
+    </div>
+  );
+}
+
+function ContratadaSignatureConfig() {
+  return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
@@ -79,45 +123,11 @@ export function ContratadaSignatureConfig() {
           Configura cómo se firma en nombre de la empresa (contratada) en los contratos.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label>Modo de firma</Label>
-          <Select value={mode} onValueChange={setMode}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="auto">Automática (datos de empresa)</SelectItem>
-              <SelectItem value="link">Enviar link al representante</SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            {mode === 'auto'
-              ? 'La firma se completa automáticamente con los datos del representante configurado.'
-              : 'Se genera un enlace de firma y se envía al email del representante legal.'}
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label>Nombre del representante</Label>
-            <Input value={signerName} onChange={e => setSignerName(e.target.value)} placeholder="Nombre completo" />
-          </div>
-          <div className="space-y-2">
-            <Label>Email del representante</Label>
-            <Input value={signerEmail} onChange={e => setSignerEmail(e.target.value)} placeholder="email@empresa.com" type="email" />
-          </div>
-          <div className="space-y-2">
-            <Label>C.I. / DNI del representante</Label>
-            <Input value={signerDni} onChange={e => setSignerDni(e.target.value)} placeholder="Número de documento" />
-          </div>
-        </div>
-
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-          Guardar configuración
-        </Button>
+      <CardContent>
+        <ContratadaSignatureConfigInner />
       </CardContent>
     </Card>
   );
 }
+
+export { ContratadaSignatureConfig, ContratadaSignatureConfigInner };
