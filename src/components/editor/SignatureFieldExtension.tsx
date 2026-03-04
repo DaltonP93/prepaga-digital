@@ -68,6 +68,15 @@ export const SignatureFieldExtension = Node.create({
     const floatStyle = HTMLAttributes.float === 'left' ? 'float: left; margin-right: 16px;'
       : HTMLAttributes.float === 'right' ? 'float: right; margin-left: 16px;'
       : '';
+    
+    // Map signer role to variable names for Aclaración and C.I.
+    const roleVarMap: Record<string, { nombre: string; dni: string }> = {
+      cliente: { nombre: '{{titular_nombre}}', dni: '{{titular_dni}}' },
+      empresa: { nombre: '{{representante_nombre}}', dni: '{{representante_dni}}' },
+      testigo: { nombre: '{{testigo_nombre}}', dni: '{{testigo_dni}}' },
+    };
+    const vars = roleVarMap[HTMLAttributes.signerRole] || roleVarMap.cliente;
+
     return [
       'div',
       {
@@ -84,6 +93,13 @@ export const SignatureFieldExtension = Node.create({
         class: 'signature-field my-2 p-4 border-2 border-dashed border-primary/40 rounded-lg bg-primary/5',
       },
       ['div', { class: 'text-center text-sm text-muted-foreground' }, HTMLAttributes.label],
+      ['div', { class: 'signature-aclaracion', style: 'margin-top: 8px; font-size: 12px;' },
+        ['span', {}, `Firma`],
+        ['br'],
+        ['span', {}, `Aclaración: ${vars.nombre}`],
+        ['br'],
+        ['span', {}, `C.I. N.°: ${vars.dni}`],
+      ],
     ];
   },
 
