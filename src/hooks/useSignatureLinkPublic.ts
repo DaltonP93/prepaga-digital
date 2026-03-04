@@ -265,7 +265,7 @@ export const useSubmitSignatureLink = () => {
           .from('documents')
           .insert({
             sale_id: data.sale_id,
-            name: `Firma - ${data.recipient_type === 'titular' ? 'Titular' : 'Adherente'}`,
+            name: `Firma - ${data.recipient_type === 'titular' ? 'Titular' : data.recipient_type === 'contratada' ? 'Contratada' : 'Adherente'}`,
             document_type: 'firma',
             content: signatureData,
             status: 'firmado' as any,
@@ -293,11 +293,15 @@ export const useSubmitSignatureLink = () => {
 
         if (recipientType === 'adherente' && recipientId) {
           deleteQuery = deleteQuery.eq('beneficiary_id', recipientId);
+        } else if (recipientType === 'contratada') {
+          // Contratada only signs contracts (no beneficiary_id)
+          deleteQuery = deleteQuery.is('beneficiary_id', null).eq('document_type', 'contrato');
         } else if (recipientType === 'titular') {
           deleteQuery = deleteQuery.is('beneficiary_id', null);
         }
         await deleteQuery;
 
+        // Query documents to sign — filtered by role
         let docsQuery = signatureClient
           .from('documents')
           .select('*')
@@ -307,6 +311,9 @@ export const useSubmitSignatureLink = () => {
 
         if (recipientType === 'adherente' && recipientId) {
           docsQuery = docsQuery.eq('beneficiary_id', recipientId);
+        } else if (recipientType === 'contratada') {
+          // Contratada only signs the contract document
+          docsQuery = docsQuery.is('beneficiary_id', null).eq('document_type', 'contrato');
         } else if (recipientType === 'titular') {
           docsQuery = docsQuery.is('beneficiary_id', null);
         }
@@ -318,20 +325,57 @@ export const useSubmitSignatureLink = () => {
           const nowIso = new Date().toISOString();
           const safeSignedAt = new Date().toLocaleString('es-PY');
 
-          // Fetch company info + client/beneficiary data for signature blocks
+          // Fetch company info + client/beneficiary data + company settings for signature blocks
           let companyInfo: any = null;
           let saleClientInfo: any = null;
           let saleBeneficiaries: any[] = [];
+          let companySettings: any = null;
           try {
             const { data: saleInfo } = await signatureClient
               .from('sales')
-              .select('companies:company_id(name, tax_id, address, phone, email), clients:client_id(first_name, last_name, dni), beneficiaries(id, first_name, last_name, dni)')
+              .select('company_id, companies:company_id(name, tax_id, address, phone, email), clients:client_id(first_name, last_name, dni), beneficiaries(id, first_name, last_name, dni)')
               .eq('id', data.sale_id)
               .single();
             companyInfo = (saleInfo as any)?.companies || null;
             saleClientInfo = (saleInfo as any)?.clients || null;
             saleBeneficiaries = (saleInfo as any)?.beneficiaries || [];
+
+            // Fetch contratada signer info from company_settings
+            if ((saleInfo as any)?.company_id) {
+              const { data: cs } = await signatureClient
+                .from('company_settings')
+                .select('contratada_signer_name, contratada_signer_dni, contratada_signer_email')
+                .eq('company_id', (saleInfo as any).company_id)
+                .single();
+              companySettings = cs;
+            }
           } catch { /* ignore */ }
+
+          // Check if the other party (contratante or contratada) already signed the contract
+          let existingOtherPartyBlock: string | null = null;
+          if (recipientType === 'titular' || recipientType === 'contratada') {
+            try {
+              const otherType = recipientType === 'titular' ? 'contratada' : 'titular';
+              const { data: otherFinalDocs } = await signatureClient
+                .from('documents')
+                .select('content')
+                .eq('sale_id', data.sale_id)
+                .eq('is_final', true)
+                .is('beneficiary_id', null)
+                .like('document_type', '%contrato%')
+                .limit(1);
+              if (otherFinalDocs && otherFinalDocs.length > 0) {
+                // Extract the other party's signature block from the final doc
+                const otherContent = otherFinalDocs[0].content || '';
+                const blockLabel = otherType === 'contratada' ? 'CONTRATADA' : 'CONTRATANTE';
+                const blockRegex = new RegExp(`<div[^>]*style="[^"]*display:inline-block[^"]*"[^>]*>[\\s\\S]*?<p[^>]*>${blockLabel}<\\/p>[\\s\\S]*?<\\/div>`, 'i');
+                const match = otherContent.match(blockRegex);
+                if (match) {
+                  existingOtherPartyBlock = match[0];
+                }
+              }
+            } catch { /* ignore */ }
+          }
 
           const finalDocs = docsToSign.map((doc) => {
             const originalContent = doc.content?.trim()
@@ -355,23 +399,30 @@ export const useSubmitSignatureLink = () => {
 
               let signerName = '';
               let signerCI = '';
+              let roleLabel = 'CONTRATANTE';
+
               if (recipientType === 'adherente' && recipientId && saleBeneficiaries.length > 0) {
                 const ben = saleBeneficiaries.find((b: any) => b.id === recipientId);
                 if (ben) {
                   signerName = `${ben.first_name || ''} ${ben.last_name || ''}`.trim();
                   signerCI = ben.dni || '';
                 }
+                roleLabel = 'ADHERENTE';
+              } else if (recipientType === 'contratada') {
+                // Use company settings signer info or company name
+                signerName = companySettings?.contratada_signer_name || companyInfo?.name || '';
+                signerCI = companySettings?.contratada_signer_dni || companyInfo?.tax_id || '';
+                roleLabel = 'CONTRATADA';
               } else if (saleClientInfo) {
                 signerName = `${saleClientInfo.first_name || ''} ${saleClientInfo.last_name || ''}`.trim();
                 signerCI = saleClientInfo.dni || '';
+                roleLabel = 'CONTRATANTE';
               }
 
               const deviceSummary = navigator.userAgent.replace(/\s+/g, ' ').substring(0, 80);
               const hashRef = Array.from(new TextEncoder().encode(signatureData + isoTimestamp))
                 .reduce((a, b) => ((a << 5) - a + b) | 0, 0)
                 .toString(16).replace('-', '').toUpperCase().padStart(8, '0');
-
-              const roleLabel = recipientType === 'adherente' ? 'ADHERENTE' : 'CONTRATANTE';
 
               // Detect signature style from document content
               const useV1 = originalContent.includes('data-signature-style="v1"');
@@ -392,17 +443,19 @@ export const useSubmitSignatureLink = () => {
                     <p style="margin:4px 0 0;font-size:9px;color:#666;font-style:italic;">Firma válida conforme a Ley 4017/2010</p>
                     <div style="border-top:1px solid #333;width:80%;margin:6px 0 4px 0;"></div>
                     <p style="margin:0;text-align:center;font-weight:bold;font-size:10px;">${roleLabel}</p>
+                    <p style="margin:2px 0 0 0;font-size:10px;">Aclaración: ${signerName || '.............................'}</p>
                     <p style="margin:2px 0 0 0;font-size:10px;">C.I.Nº: ${signerCI || '.............................'}</p>
                   </div>
                 `;
               } else {
-                // v2.0 — Compact professional block
+                // v2.0 — Professional block matching reference PDF format
                 electronicBlock = `
                   <div style="display:inline-block;vertical-align:top;width:48%;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111;">
                     <p style="margin:0 0 2px 0;font-size:11px;">Firmado electrónicamente por: <strong>${signerName.toLowerCase()}</strong></p>
                     <p style="margin:0 0 8px 0;font-size:11px;">Fecha: ${formattedDate}</p>
-                    <div style="border-top:1px solid #333;width:80%;margin:0 0 4px 0;"></div>
-                    <p style="margin:0;font-size:11px;text-align:center;font-weight:bold;">${roleLabel}</p>
+                    <div style="border-top:2px solid #333;width:90%;margin:0 auto 4px auto;"></div>
+                    <p style="margin:0;font-size:12px;text-align:center;font-weight:bold;">${roleLabel}</p>
+                    <p style="margin:4px 0 0 0;font-size:11px;">Aclaración: ${signerName || '.............................'}</p>
                     <p style="margin:2px 0 0 0;font-size:11px;">C.I.Nº: ${signerCI || '.............................'}</p>
                   </div>
                 `;
@@ -430,19 +483,18 @@ export const useSubmitSignatureLink = () => {
             }
 
             // Try to replace signature placeholders in the document content
-            // Supports: {{firma_contratante}}, {{firma_titular}}, {{firma_adherente}}, Firma del Cliente
             const placeholderPatterns = recipientType === 'adherente'
               ? [/\{\{firma_adherente\}\}/gi, /\{\{firma_contratante\}\}/gi, /\{\{firma_titular\}\}/gi]
+              : recipientType === 'contratada'
+              ? [/\{\{firma_contratada\}\}/gi]
               : [/\{\{firma_contratante\}\}/gi, /\{\{firma_titular\}\}/gi];
 
-            // Also look for "Firma del Cliente" text marker
             const textMarkerPatterns = [/Firma del Cliente/gi];
 
             let finalContent = originalContent;
             let placeholderFound = false;
 
             // FIRST: Replace <div data-signature-field="true" ...>...</div> elements
-            // These come from the template editor's SignatureFieldExtension
             const sigFieldRegex = /<div[^>]*data-signature-field\s*=\s*["']true["'][^>]*>[\s\S]*?<\/div>/gi;
             if (sigFieldRegex.test(finalContent)) {
               finalContent = finalContent.replace(sigFieldRegex, signatureImgWithDate);
@@ -480,20 +532,11 @@ export const useSubmitSignatureLink = () => {
               finalContent = `${finalContent}${signatureBlock}`;
             }
 
-            // Append CONTRATADA (company) signature block — v2.0 compact layout side by side
-            if (companyInfo) {
-              const contratadaDate = new Date();
-              const contratadaFormattedDate = `${String(contratadaDate.getDate()).padStart(2,'0')}.${String(contratadaDate.getMonth()+1).padStart(2,'0')}.${contratadaDate.getFullYear()} ${String(contratadaDate.getHours()).padStart(2,'0')}:${String(contratadaDate.getMinutes()).padStart(2,'0')}:${String(contratadaDate.getSeconds()).padStart(2,'0')}`;
-              const contratadaBlock = `
-                <div style="display:inline-block;vertical-align:top;width:48%;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111;margin-left:4%;">
-                  <p style="margin:0 0 2px 0;font-size:11px;">Firmado electrónicamente por: <strong>${(companyInfo.name || '').toLowerCase()}</strong></p>
-                  <p style="margin:0 0 8px 0;font-size:11px;">Fecha: ${contratadaFormattedDate}</p>
-                  <div style="border-top:1px solid #333;width:80%;margin:0 0 4px 0;"></div>
-                  <p style="margin:0;font-size:11px;text-align:center;font-weight:bold;">CONTRATADA</p>
-                  <p style="margin:2px 0 0 0;font-size:11px;">C.I.Nº: ${companyInfo.tax_id || '.............................'}</p>
-                </div>
-              `;
-              finalContent = `${finalContent}${contratadaBlock}`;
+            // For contract documents: merge with existing other party block if available
+            const isContractDoc = doc.document_type === 'contrato' || doc.name?.toLowerCase().includes('contrato');
+            if (isContractDoc && existingOtherPartyBlock && (recipientType === 'titular' || recipientType === 'contratada')) {
+              // Add the other party's block side by side
+              finalContent = `${finalContent}${existingOtherPartyBlock}`;
             }
 
             return {
@@ -602,9 +645,11 @@ export const useSignatureLinkDocuments = (
       if (recipientType === 'adherente' && recipientId) {
         // Adherente only sees their own documents
         query = query.eq('beneficiary_id', recipientId);
+      } else if (recipientType === 'contratada') {
+        // Contratada only sees the contract document (no DDJJ, no annexes)
+        query = query.is('beneficiary_id', null).eq('document_type', 'contrato');
       } else if (recipientType === 'titular') {
         // Titular sees only documents without a beneficiary_id (their own docs)
-        // Adherent-specific DDJJ docs have beneficiary_id set and should NOT appear here
         query = query.is('beneficiary_id', null);
       }
 
