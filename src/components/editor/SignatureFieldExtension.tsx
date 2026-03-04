@@ -8,8 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Slider } from '@/components/ui/slider';
-import { Settings, PenTool, ShieldCheck, RotateCcw, User, Calendar, Hash, GripVertical, AlignLeft, AlignRight, AlignCenter, Trash2 } from 'lucide-react';
+import { Settings, PenTool, ShieldCheck, RotateCcw, User, Hash, GripVertical, AlignLeft, AlignRight, AlignCenter, Trash2, Pen, Type } from 'lucide-react';
 
 // ── TipTap Node Extension ──────────────────────────────────────────────
 
@@ -32,14 +31,12 @@ export const SignatureFieldExtension = Node.create({
       showSignerInfo: { default: true },
       showDate: { default: true },
       showToken: { default: true },
+      signatureStyle: { default: 'v2' },
       width: { default: 100 },
       height: { default: 200 },
-      float: { default: 'none' }, // none, left, right
+      float: { default: 'none' },
     };
   },
-
-
-
 
   parseHTML() {
     return [{
@@ -56,6 +53,7 @@ export const SignatureFieldExtension = Node.create({
           showSignerInfo: dom.getAttribute('data-show-signer-info') !== 'false',
           showDate: dom.getAttribute('data-show-date') !== 'false',
           showToken: dom.getAttribute('data-show-token') !== 'false',
+          signatureStyle: dom.getAttribute('data-signature-style') || 'v2',
           float: dom.getAttribute('data-float') || 'none',
           width: widthMatch ? parseInt(widthMatch[1], 10) : 100,
           height: heightMatch ? parseInt(heightMatch[1], 10) : 200,
@@ -69,7 +67,6 @@ export const SignatureFieldExtension = Node.create({
       : HTMLAttributes.float === 'right' ? 'float: right; margin-left: 16px;'
       : '';
     
-    // Map signer role to variable names for Aclaración and C.I.
     const roleVarMap: Record<string, { nombre: string; dni: string }> = {
       cliente: { nombre: '{{titular_nombre}}', dni: '{{titular_dni}}' },
       empresa: { nombre: '{{representante_nombre}}', dni: '{{representante_dni}}' },
@@ -88,6 +85,7 @@ export const SignatureFieldExtension = Node.create({
         'data-show-signer-info': HTMLAttributes.showSignerInfo,
         'data-show-date': HTMLAttributes.showDate,
         'data-show-token': HTMLAttributes.showToken,
+        'data-signature-style': HTMLAttributes.signatureStyle,
         'data-float': HTMLAttributes.float,
         style: `width: ${HTMLAttributes.width}%; min-height: ${HTMLAttributes.height}px; display: inline-block; vertical-align: top; ${floatStyle}`,
         class: 'signature-field my-2 p-4 border-2 border-dashed border-primary/40 rounded-lg bg-primary/5',
@@ -252,7 +250,6 @@ const useResizable = (
       document.removeEventListener('mouseup', onUp);
       const el = containerRef.current;
       if (el) {
-        // Convert width to percentage of parent
         const parent = el.parentElement;
         const parentWidth = parent ? parent.offsetWidth : el.offsetWidth;
         const pct = Math.round(Math.min(100, Math.max(20, (el.offsetWidth / parentWidth) * 100)));
@@ -267,6 +264,37 @@ const useResizable = (
   return { onMouseDown };
 };
 
+// ── Signature Action Button (Adobe-style) ──────────────────────────────
+
+const SignatureActionButton: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  description?: string;
+  active?: boolean;
+  onClick: () => void;
+}> = ({ icon, label, description, active, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`w-full flex items-center gap-3 rounded-lg border p-3 text-left transition-all hover:shadow-sm ${
+      active
+        ? 'border-primary bg-primary/10 shadow-sm'
+        : 'border-border hover:border-primary/40 hover:bg-muted/50'
+    }`}
+  >
+    <div className={`flex items-center justify-center w-8 h-8 rounded-md ${
+      active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+    }`}>
+      {icon}
+    </div>
+    <div className="flex-1 min-w-0">
+      <p className="text-xs font-semibold truncate">{label}</p>
+      {description && <p className="text-[10px] text-muted-foreground truncate">{description}</p>}
+    </div>
+    {active && <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />}
+  </button>
+);
+
 // ── Main Component ─────────────────────────────────────────────────────
 
 const SignatureFieldComponent = ({ node, updateAttributes, selected, deleteNode }: any) => {
@@ -278,6 +306,7 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected, deleteNode 
   const [showSignerInfo, setShowSignerInfo] = useState(node.attrs.showSignerInfo);
   const [showDate, setShowDate] = useState(node.attrs.showDate);
   const [showToken, setShowToken] = useState(node.attrs.showToken);
+  const [signatureStyle, setSignatureStyle] = useState(node.attrs.signatureStyle || 'v2');
   const [width, setWidth] = useState(node.attrs.width || 100);
   const [height, setHeight] = useState(node.attrs.height || 200);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -296,7 +325,7 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected, deleteNode 
   const handleSave = (e?: React.MouseEvent) => {
     e?.preventDefault();
     e?.stopPropagation();
-    updateAttributes({ label, signatureType, signerRole, required, showSignerInfo, showDate, showToken, width, height, float: floatDir });
+    updateAttributes({ label, signatureType, signerRole, required, showSignerInfo, showDate, showToken, signatureStyle, width, height, float: floatDir });
     setIsEditing(false);
   };
 
@@ -312,8 +341,9 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected, deleteNode 
     testigo: 'Testigo',
   };
 
-  const previewToken = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
-  const previewTimestamp = '2026-02-15T12:00:00.000Z';
+  const getVarName = () => signerRole === 'empresa' ? '{{representante_nombre}}' : signerRole === 'testigo' ? '{{testigo_nombre}}' : '{{titular_nombre}}';
+  const getVarDni = () => signerRole === 'empresa' ? '{{representante_dni}}' : signerRole === 'testigo' ? '{{testigo_dni}}' : '{{titular_dni}}';
+  const getRoleLabel = () => signerRole === 'empresa' ? 'CONTRATADA' : signerRole === 'testigo' ? 'TESTIGO' : 'CONTRATANTE';
 
   return (
     <NodeViewWrapper className="signature-field-wrapper" style={{
@@ -329,7 +359,7 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected, deleteNode 
     >
       <div
         ref={containerRef}
-        style={{ width: '100%', height: `${height}px` }}
+        style={{ width: '100%', minHeight: `${height}px` }}
         className={`border-2 border-dashed rounded-lg my-2 p-4 transition-colors relative overflow-hidden ${
           selected ? 'border-primary bg-primary/5' : 'border-amber-400 bg-amber-50'
         }`}
@@ -345,19 +375,16 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected, deleteNode 
         </div>
 
         {/* Resize handles */}
-        {/* Right edge */}
         <div
           contentEditable={false}
           onMouseDown={(e) => onMouseDown(e, 'e')}
           className="absolute top-0 right-0 w-2 h-full cursor-ew-resize z-10 hover:bg-primary/20 transition-colors"
         />
-        {/* Bottom edge */}
         <div
           contentEditable={false}
           onMouseDown={(e) => onMouseDown(e, 's')}
           className="absolute bottom-0 left-0 h-2 w-full cursor-ns-resize z-10 hover:bg-primary/20 transition-colors"
         />
-        {/* Bottom-right corner */}
         <div
           contentEditable={false}
           onMouseDown={(e) => onMouseDown(e, 'se')}
@@ -375,38 +402,20 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected, deleteNode 
             <PenTool className="h-4 w-4 text-amber-600" />
             <span className="text-amber-700 font-semibold text-sm">Firma</span>
             <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+              {signatureStyle === 'v2' ? 'v2.0' : 'v1.0'}
+            </Badge>
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
               {signatureType === 'digital' ? 'Digital' : signatureType === 'electronic' ? 'Electrónica' : 'Ambas'}
             </Badge>
           </div>
           <div className="flex items-center gap-0.5">
-            <Button
-              type="button"
-              variant={floatDir === 'left' ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => toggleFloat('left')}
-              className="h-6 w-6 p-0"
-              title="Acoplar a la izquierda"
-            >
+            <Button type="button" variant={floatDir === 'left' ? 'secondary' : 'ghost'} size="sm" onClick={() => toggleFloat('left')} className="h-6 w-6 p-0" title="Acoplar a la izquierda">
               <AlignLeft className="h-3 w-3" />
             </Button>
-            <Button
-              type="button"
-              variant={floatDir === 'none' ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => { setFloatDir('none'); updateAttributes({ float: 'none' }); }}
-              className="h-6 w-6 p-0"
-              title="Bloque completo"
-            >
+            <Button type="button" variant={floatDir === 'none' ? 'secondary' : 'ghost'} size="sm" onClick={() => { setFloatDir('none'); updateAttributes({ float: 'none' }); }} className="h-6 w-6 p-0" title="Bloque completo">
               <AlignCenter className="h-3 w-3" />
             </Button>
-            <Button
-              type="button"
-              variant={floatDir === 'right' ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => toggleFloat('right')}
-              className="h-6 w-6 p-0"
-              title="Acoplar a la derecha"
-            >
+            <Button type="button" variant={floatDir === 'right' ? 'secondary' : 'ghost'} size="sm" onClick={() => toggleFloat('right')} className="h-6 w-6 p-0" title="Acoplar a la derecha">
               <AlignRight className="h-3 w-3" />
             </Button>
             <span className="text-[10px] text-muted-foreground mx-1">{width}%</span>
@@ -426,25 +435,52 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected, deleteNode 
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
           >
+            {/* Adobe-style action buttons */}
+            <div>
+              <Label className="text-xs font-medium mb-2 block">Tipo de campo</Label>
+              <div className="grid grid-cols-1 gap-2">
+                <SignatureActionButton
+                  icon={<Pen className="h-4 w-4" />}
+                  label="Agregar firma"
+                  description="Firma manuscrita digital en canvas"
+                  active={signatureType === 'digital'}
+                  onClick={() => setSignatureType('digital')}
+                />
+                <SignatureActionButton
+                  icon={<ShieldCheck className="h-4 w-4" />}
+                  label="Firma electrónica"
+                  description="Invitar a firmar electrónicamente"
+                  active={signatureType === 'electronic'}
+                  onClick={() => setSignatureType('electronic')}
+                />
+                <SignatureActionButton
+                  icon={<Type className="h-4 w-4" />}
+                  label="Ambas (Digital + Electrónica)"
+                  description="Combina firma manuscrita y electrónica"
+                  active={signatureType === 'both'}
+                  onClick={() => setSignatureType('both')}
+                />
+              </div>
+            </div>
+
             <div>
               <Label className="text-xs font-medium">Etiqueta</Label>
               <Input value={label} onChange={(e) => setLabel(e.target.value)} className="text-sm mt-1" placeholder="Ej: Firma del Cliente" />
             </div>
 
             <div>
-              <Label className="text-xs font-medium">Tipo de Firma</Label>
-              <Select value={signatureType} onValueChange={(val) => { setSignatureType(val); }}>
+              <Label className="text-xs font-medium">Estilo de Firma Electrónica</Label>
+              <Select value={signatureStyle} onValueChange={(val) => setSignatureStyle(val)}>
                 <SelectTrigger type="button" className="mt-1" onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}><SelectValue /></SelectTrigger>
-                 <SelectContent
-                   className="z-[9999]"
-                   onPointerDownOutside={(e) => e.preventDefault()}
-                   onEscapeKeyDown={(e) => e.preventDefault()}
-                   onCloseAutoFocus={(e) => e.preventDefault()}
-                 >
-                   <SelectItem value="both">Ambas (Digital + Electrónica)</SelectItem>
-                   <SelectItem value="digital">Solo Digital (manuscrita)</SelectItem>
-                   <SelectItem value="electronic">Solo Electrónica (token)</SelectItem>
-                 </SelectContent>
+                <SelectContent
+                  className="z-[9999]"
+                  onPointerDownOutside={(e) => e.preventDefault()}
+                  onEscapeKeyDown={(e) => e.preventDefault()}
+                  onCloseAutoFocus={(e) => e.preventDefault()}
+                >
+                  <SelectItem value="v2">v2.0 — Compacto profesional</SelectItem>
+                  <SelectItem value="v1">v1.0 — Detallado con metadatos</SelectItem>
+                </SelectContent>
               </Select>
             </div>
 
@@ -466,7 +502,7 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected, deleteNode 
             </div>
 
             <div className="space-y-3">
-              <Label className="text-xs font-medium">Opciones de Firma Electrónica</Label>
+              <Label className="text-xs font-medium">Opciones adicionales</Label>
               <div className="flex items-center justify-between">
                 <Label className="text-xs">Mostrar datos del firmante</Label>
                 <Switch checked={showSignerInfo} onCheckedChange={setShowSignerInfo} />
@@ -475,10 +511,12 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected, deleteNode 
                 <Label className="text-xs">Mostrar fecha/hora de firma</Label>
                 <Switch checked={showDate} onCheckedChange={setShowDate} />
               </div>
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Token digital (UUID RFC 4122)</Label>
-                <Switch checked={showToken} onCheckedChange={setShowToken} />
-              </div>
+              {signatureStyle === 'v1' && (
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Token digital (UUID RFC 4122)</Label>
+                  <Switch checked={showToken} onCheckedChange={setShowToken} />
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <Label className="text-xs">Campo obligatorio</Label>
                 <Switch checked={required} onCheckedChange={setRequired} />
@@ -510,37 +548,58 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected, deleteNode 
               </div>
             )}
 
-            {/* Aclaración y C.I. N.º – datos del firmante */}
+            {/* Aclaración y C.I. N.º */}
             <div className="border-t border-border pt-2 space-y-1">
               <div className="flex items-center gap-2 text-xs">
                 <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                 <span className="text-muted-foreground whitespace-nowrap">Aclaración:</span>
-                <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px] truncate">
-                  {signerRole === 'empresa' ? '{{representante_nombre}}' : signerRole === 'testigo' ? '{{testigo_nombre}}' : '{{titular_nombre}}'}
-                </span>
+                <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px] truncate">{getVarName()}</span>
               </div>
               <div className="flex items-center gap-2 text-xs">
                 <Hash className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                 <span className="text-muted-foreground whitespace-nowrap">C.I. N.º:</span>
-                <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px] truncate">
-                  {signerRole === 'empresa' ? '{{representante_dni}}' : signerRole === 'testigo' ? '{{testigo_dni}}' : '{{titular_dni}}'}
-                </span>
+                <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px] truncate">{getVarDni()}</span>
               </div>
             </div>
 
             {(signatureType === 'electronic' || signatureType === 'both') && (
               <div className="bg-background rounded-lg border p-2 space-y-1">
                 <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                  <ShieldCheck className="h-3 w-3" /> Firma Electrónica v2.0
+                  <ShieldCheck className="h-3 w-3" /> Firma Electrónica {signatureStyle === 'v2' ? 'v2.0' : 'v1.0'}
                 </div>
-                <div className="text-[10px] space-y-0.5">
-                  <p className="m-0">Firmado electrónicamente por: <strong className="font-mono">{signerRole === 'empresa' ? '{{representante_nombre}}' : signerRole === 'testigo' ? '{{testigo_nombre}}' : '{{titular_nombre}}'}</strong></p>
-                  <p className="m-0">Fecha: DD.MM.YYYY HH:MM:SS</p>
-                  <div className="border-t border-border mt-1 pt-1">
-                    <p className="m-0 text-center font-bold text-[10px]">{signerRole === 'empresa' ? 'CONTRATADA' : signerRole === 'testigo' ? 'TESTIGO' : 'CONTRATANTE'}</p>
-                    <p className="m-0 text-[10px]">C.I.Nº: {signerRole === 'empresa' ? '{{representante_dni}}' : signerRole === 'testigo' ? '{{testigo_dni}}' : '{{titular_dni}}'}</p>
+
+                {signatureStyle === 'v2' ? (
+                  /* v2 — Compact professional block */
+                  <div className="text-[10px] space-y-0.5">
+                    <p className="m-0">Firmado electrónicamente por: <strong className="font-mono">{getVarName()}</strong></p>
+                    <p className="m-0">Fecha: DD.MM.YYYY HH:MM:SS</p>
+                    <div className="border-t border-border mt-1 pt-1">
+                      <p className="m-0 text-center font-bold text-[10px]">{getRoleLabel()}</p>
+                      <p className="m-0 text-[10px]">C.I.Nº: {getVarDni()}</p>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  /* v1 — Detailed block with metadata */
+                  <div className="text-[10px] space-y-1 border rounded p-2 bg-muted/30">
+                    <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
+                      <span className="text-muted-foreground">Firmante:</span>
+                      <span className="font-mono">{getVarName()}</span>
+                      <span className="text-muted-foreground">Fecha:</span>
+                      <span>DD.MM.YYYY HH:MM:SS</span>
+                      <span className="text-muted-foreground">Ref. Doc.:</span>
+                      <span className="font-mono text-[9px]">a1b2c3d4-e5f6-...</span>
+                      <span className="text-muted-foreground">IP:</span>
+                      <span className="font-mono">xxx.xxx.xxx.xxx</span>
+                      <span className="text-muted-foreground">Dispositivo:</span>
+                      <span className="truncate">Mozilla/5.0...</span>
+                      <span className="text-muted-foreground">Hash SHA-256:</span>
+                      <span className="font-mono text-[9px] truncate">0A1B2C3D...</span>
+                    </div>
+                    <p className="m-0 text-[9px] text-muted-foreground italic mt-1">
+                      Firma válida conforme a Ley 4017/2010
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
