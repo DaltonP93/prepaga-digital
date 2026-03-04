@@ -485,6 +485,7 @@ export type Database = {
           custom_css: string | null
           dark_mode: boolean | null
           email: string | null
+          favicon: string | null
           font_family: string | null
           id: string
           is_active: boolean | null
@@ -508,6 +509,7 @@ export type Database = {
           custom_css?: string | null
           dark_mode?: boolean | null
           email?: string | null
+          favicon?: string | null
           font_family?: string | null
           id?: string
           is_active?: boolean | null
@@ -531,6 +533,7 @@ export type Database = {
           custom_css?: string | null
           dark_mode?: boolean | null
           email?: string | null
+          favicon?: string | null
           font_family?: string | null
           id?: string
           is_active?: boolean | null
