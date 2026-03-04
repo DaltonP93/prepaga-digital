@@ -523,7 +523,8 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected, deleteNode 
               </div>
             </div>
 
-            <Button type="button" onClick={(e) => handleSave(e)} size="sm" className="w-full">Guardar Configuración</Button>
+            <Button type="button" onClick={(e) => handleSave(e)} size="sm" className="w-full">Aplicar Cambios</Button>
+            <p className="text-[10px] text-muted-foreground text-center mt-1">Los cambios se aplican al editor. Recuerda guardar el template con el botón "Guardar" principal.</p>
           </div>
         ) : (
           <div className="space-y-2 overflow-auto" style={{ maxHeight: `${height - 60}px` }}>
