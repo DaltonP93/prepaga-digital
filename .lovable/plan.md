@@ -1,59 +1,91 @@
 
 
-## Plan: Firmantes por Rol — Filtrado de Documentos y Bloque de Firma del Contrato
+## Plan: Firma Robusta End-to-End — DB + Edge Functions + Flujo
 
-### Problema Actual
-1. **Contratada** ve todos los documentos (no hay filtro para `recipient_type === 'contratada'`). Deberia ver solo el Contrato.
-2. **Contratante (titular)** ve el Contrato + DDJJ + Anexos, pero el bloque de firma del contrato agrega CONTRATADA automáticamente incluso cuando firma el titular, y viceversa.
-3. **Adherente** funciona correctamente (solo ve su DDJJ por `beneficiary_id`).
-4. El bloque de firma del contrato no separa correctamente la firma CONTRATANTE (solo cuando firma el titular) de la firma CONTRATADA (solo cuando firma la contratada). Actualmente se agrega el bloque CONTRATADA al momento que firma el titular.
+### Fase 1: Migraciones DB (estructura)
 
-### Cambios Planificados
+Crear tablas y columnas nuevas:
 
-**1. `src/hooks/useSignatureLinkPublic.ts` — Filtrado de documentos para contratada**
+- **`document_fields`**: campos posicionados por firmante (tipo DigiSigner) — `signer_role`, `field_type`, `page`, `x/y/w/h`, `required`, `label`, `meta`
+- **`document_field_values`**: valores completados por token — `field_id`, `signature_link_id`, `value_text`, `value_json`, `completed_at` (unique por field+link)
+- **`documents`**: agregar `base_pdf_url`, `signed_pdf_url`, `base_pdf_hash`, `signed_pdf_hash`
+- **`signature_links`**: agregar `step_order` (int default 1), `is_active` (bool default true)
+- **`signature_events`**: agregar `signed_pdf_hash`
+- RLS policies para `document_fields` (lectura por token) y `document_field_values` (lectura/escritura por token)
 
-En `useSignatureLinkDocuments` (~línea 602):
-- Agregar condición `else if (recipientType === 'contratada')` que filtre solo documentos de tipo `contrato` (sin `beneficiary_id`), excluyendo DDJJ y anexos.
+### Fase 2: Secrets
 
-En `useSubmitSignatureLink` — query de docs para firmar (~línea 301):
-- Agregar la misma lógica: si `recipientType === 'contratada'`, filtrar `document_type = 'contrato'` y `beneficiary_id IS NULL`.
+Solicitar al usuario que agregue 4 secrets nuevos:
+- `RENDER_URL`, `RENDER_KEY` — servicio HTML→PDF
+- `PADES_URL`, `PADES_KEY` — servicio PAdES
 
-**2. `src/hooks/useSignatureLinkPublic.ts` — Bloques de firma separados por rol**
+### Fase 3: Edge Functions
 
-Actualmente (línea ~483-497), el bloque CONTRATADA se agrega siempre que firma cualquier persona. Cambiar la lógica:
+**A) `generate-base-pdf`** (nueva)
+- Input: `{ document_id }`
+- Leer `documents.content` (HTML) y `sale_id`
+- POST a `RENDER_URL` con header `X-RENDER-KEY`
+- Subir PDF al bucket `documents` en `contracts/base/{saleId}/{documentId}.pdf`
+- Calcular SHA-256, actualizar `documents.base_pdf_url` y `base_pdf_hash`
 
-- **Cuando firma el TITULAR**: insertar solo el bloque CONTRATANTE (sin el bloque CONTRATADA). La CONTRATADA firmará en su propio flujo.
-- **Cuando firma la CONTRATADA**: insertar solo el bloque CONTRATADA en el documento.
-- **Cuando firma un ADHERENTE**: mantener comportamiento actual (solo su firma en su DDJJ, sin bloques de contrato).
+**B) `pades-sign-document`** (nueva)
+- Input: `{ document_id }`
+- Descargar PDF base desde Storage usando `base_pdf_url`
+- POST a `PADES_URL` (multipart) con header `X-SIGN-KEY`
+- Subir PDF firmado a `contracts/signed/{saleId}/{documentId}.pdf`
+- Calcular SHA-256, actualizar `signed_pdf_url`, `signed_pdf_hash`, `status='firmado'`, `is_final=true`
+- Insertar en `signature_events` con `signature_method='pades'` y hash
 
-El bloque CONTRATADA solo se agrega al documento del contrato cuando `recipientType === 'contratada'`.
+**C) `get-document-download-url`** (nueva)
+- Input: `{ document_id, kind: 'base'|'signed' }`
+- Leer el path desde `base_pdf_url` o `signed_pdf_url`
+- Generar signed URL desde bucket privado (expiración 1h)
+- Retornar `{ url, expires_at }`
 
-**3. Formato profesional del bloque de firma del contrato (según PDF de referencia)**
+Config en `supabase/config.toml`: agregar las 3 funciones con `verify_jwt = false`
 
-El PDF subido muestra un formato con:
-- Línea separadora larga `________________________________`
-- Label centrado: `CONTRATANTE` o `CONTRATADA`  
-- Línea: `Aclaración:...................................`
-- Línea: `C.I.Nº:...................................`
+### Fase 4: Flujo de firma actualizado
 
-Actualizar el bloque v2.0 para incluir el campo "Aclaración" (nombre completo) además del C.I., replicando el formato del PDF de referencia.
+En `src/hooks/useSignatureLinkPublic.ts`:
 
-**4. Documento final completo**
+1. **`is_active` check**: En `useSignatureLinkByToken`, si el link tiene `is_active === false`, marcar como "no disponible aún" (no bloquear query, pero exponer flag)
 
-Cuando **ambas partes** hayan firmado el contrato (titular + contratada), el documento final del contrato contendrá ambos bloques lado a lado. Esto se logra verificando si ya existe un documento final firmado por la otra parte y fusionando los bloques.
+2. **Al completar firma** (en `useSubmitSignatureLink`, después de crear documentos finales):
+   - Llamar `generate-base-pdf` para cada documento firmado
+   - Llamar `pades-sign-document` para cada documento
+   - Si `recipientType === 'titular'` y existe link de contratada con `step_order=2`:
+     - Activar link contratada (`is_active=true`)
+     - Enviar WhatsApp vía `send-whatsapp` con URL `/firmar/{token}`
 
-### Resumen de Filtrado por Firmante
+3. **Vista de éxito / descarga**: Reemplazar `window.print()` por botón que llama `get-document-download-url(doc_id, 'signed')`
+
+### Fase 5: Activación secuencial de firmantes
+
+En `src/hooks/useCreateAllSignatureLinks.ts`:
+- Titular: `step_order=1, is_active=true`
+- Contratada: `step_order=2, is_active=false`
+- Adherentes: `step_order=1, is_active=true` (firman en paralelo con titular)
+
+### Archivos a modificar/crear
 
 ```text
-┌─────────────┬──────────────────────────────┬──────────────┐
-│ Firmante    │ Ve / Firma                   │ Bloque firma │
-├─────────────┼──────────────────────────────┼──────────────┤
-│ Contratada  │ Solo Contrato                │ CONTRATADA   │
-│ Titular     │ Contrato + DDJJ + Anexos     │ CONTRATANTE  │
-│ Adherente   │ Solo su DDJJ                 │ ADHERENTE    │
-└─────────────┴──────────────────────────────┴──────────────┘
+Nuevos:
+  supabase/functions/generate-base-pdf/index.ts
+  supabase/functions/pades-sign-document/index.ts
+  supabase/functions/get-document-download-url/index.ts
+
+Modificar:
+  supabase/config.toml                          — agregar 3 funciones
+  src/hooks/useSignatureLinkPublic.ts            — is_active check, llamar edge functions post-firma, descarga
+  src/hooks/useCreateAllSignatureLinks.ts        — step_order + is_active por rol
+  src/pages/SignatureView.tsx                    — botón descarga PDF firmado (reemplazar print)
 ```
 
-### Archivos a Modificar
-- `src/hooks/useSignatureLinkPublic.ts` — Filtrado de docs por `contratada`, separación de bloques de firma, formato profesional con "Aclaración"
+### Orden de implementación recomendado
+
+1. Migración DB (tablas + columnas)
+2. Solicitar secrets al usuario
+3. Edge Functions (generate-base-pdf → pades-sign-document → get-document-download-url)
+4. Modificar flujo de firma (useSignatureLinkPublic + useCreateAllSignatureLinks)
+5. UI de descarga en SignatureView
 
