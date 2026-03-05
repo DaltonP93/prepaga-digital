@@ -760,6 +760,7 @@ export type Database = {
       }
       company_ui_settings: {
         Row: {
+          analytics_config: Json | null
           company_id: string
           created_at: string | null
           dashboard_layout: Json | null
@@ -770,6 +771,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          analytics_config?: Json | null
           company_id: string
           created_at?: string | null
           dashboard_layout?: Json | null
@@ -780,6 +782,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          analytics_config?: Json | null
           company_id?: string
           created_at?: string | null
           dashboard_layout?: Json | null
