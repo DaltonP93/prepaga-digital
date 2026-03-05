@@ -1,91 +1,99 @@
 
 
-## Plan: Firma Robusta End-to-End — DB + Edge Functions + Flujo
+## Plan: Fase 1 — Correcciones Críticas (4 puntos)
 
-### Fase 1: Migraciones DB (estructura)
+### Corrección 1: Eliminar hardcode del anon key en SignatureView.tsx
 
-Crear tablas y columnas nuevas:
+**Archivo**: `src/pages/SignatureView.tsx` (líneas 87-94)
 
-- **`document_fields`**: campos posicionados por firmante (tipo DigiSigner) — `signer_role`, `field_type`, `page`, `x/y/w/h`, `required`, `label`, `meta`
-- **`document_field_values`**: valores completados por token — `field_id`, `signature_link_id`, `value_text`, `value_json`, `completed_at` (unique por field+link)
-- **`documents`**: agregar `base_pdf_url`, `signed_pdf_url`, `base_pdf_hash`, `signed_pdf_hash`
-- **`signature_links`**: agregar `step_order` (int default 1), `is_active` (bool default true)
-- **`signature_events`**: agregar `signed_pdf_hash`
-- RLS policies para `document_fields` (lectura por token) y `document_field_values` (lectura/escritura por token)
+Reemplazar la URL hardcodeada y el apikey literal por las constantes que ya usa el proyecto. Importar desde env vars:
 
-### Fase 2: Secrets
-
-Solicitar al usuario que agregue 4 secrets nuevos:
-- `RENDER_URL`, `RENDER_KEY` — servicio HTML→PDF
-- `PADES_URL`, `PADES_KEY` — servicio PAdES
-
-### Fase 3: Edge Functions
-
-**A) `generate-base-pdf`** (nueva)
-- Input: `{ document_id }`
-- Leer `documents.content` (HTML) y `sale_id`
-- POST a `RENDER_URL` con header `X-RENDER-KEY`
-- Subir PDF al bucket `documents` en `contracts/base/{saleId}/{documentId}.pdf`
-- Calcular SHA-256, actualizar `documents.base_pdf_url` y `base_pdf_hash`
-
-**B) `pades-sign-document`** (nueva)
-- Input: `{ document_id }`
-- Descargar PDF base desde Storage usando `base_pdf_url`
-- POST a `PADES_URL` (multipart) con header `X-SIGN-KEY`
-- Subir PDF firmado a `contracts/signed/{saleId}/{documentId}.pdf`
-- Calcular SHA-256, actualizar `signed_pdf_url`, `signed_pdf_hash`, `status='firmado'`, `is_final=true`
-- Insertar en `signature_events` con `signature_method='pades'` y hash
-
-**C) `get-document-download-url`** (nueva)
-- Input: `{ document_id, kind: 'base'|'signed' }`
-- Leer el path desde `base_pdf_url` o `signed_pdf_url`
-- Generar signed URL desde bucket privado (expiración 1h)
-- Retornar `{ url, expires_at }`
-
-Config en `supabase/config.toml`: agregar las 3 funciones con `verify_jwt = false`
-
-### Fase 4: Flujo de firma actualizado
-
-En `src/hooks/useSignatureLinkPublic.ts`:
-
-1. **`is_active` check**: En `useSignatureLinkByToken`, si el link tiene `is_active === false`, marcar como "no disponible aún" (no bloquear query, pero exponer flag)
-
-2. **Al completar firma** (en `useSubmitSignatureLink`, después de crear documentos finales):
-   - Llamar `generate-base-pdf` para cada documento firmado
-   - Llamar `pades-sign-document` para cada documento
-   - Si `recipientType === 'titular'` y existe link de contratada con `step_order=2`:
-     - Activar link contratada (`is_active=true`)
-     - Enviar WhatsApp vía `send-whatsapp` con URL `/firmar/{token}`
-
-3. **Vista de éxito / descarga**: Reemplazar `window.print()` por botón que llama `get-document-download-url(doc_id, 'signed')`
-
-### Fase 5: Activación secuencial de firmantes
-
-En `src/hooks/useCreateAllSignatureLinks.ts`:
-- Titular: `step_order=1, is_active=true`
-- Contratada: `step_order=2, is_active=false`
-- Adherentes: `step_order=1, is_active=true` (firman en paralelo con titular)
-
-### Archivos a modificar/crear
-
-```text
-Nuevos:
-  supabase/functions/generate-base-pdf/index.ts
-  supabase/functions/pades-sign-document/index.ts
-  supabase/functions/get-document-download-url/index.ts
-
-Modificar:
-  supabase/config.toml                          — agregar 3 funciones
-  src/hooks/useSignatureLinkPublic.ts            — is_active check, llamar edge functions post-firma, descarga
-  src/hooks/useCreateAllSignatureLinks.ts        — step_order + is_active por rol
-  src/pages/SignatureView.tsx                    — botón descarga PDF firmado (reemplazar print)
+```typescript
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 ```
 
-### Orden de implementación recomendado
+Y en el fetch:
+```typescript
+fetch(`${SUPABASE_URL}/functions/v1/get-document-download-url`, {
+  headers: {
+    'Content-Type': 'application/json',
+    'apikey': SUPABASE_PUBLISHABLE_KEY,
+    'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+  },
+  ...
+})
+```
 
-1. Migración DB (tablas + columnas)
-2. Solicitar secrets al usuario
-3. Edge Functions (generate-base-pdf → pades-sign-document → get-document-download-url)
-4. Modificar flujo de firma (useSignatureLinkPublic + useCreateAllSignatureLinks)
-5. UI de descarga en SignatureView
+---
+
+### Corrección 2: WhatsApp — usar `recipient_phone` en lugar de `recipient_email`
+
+**Archivo**: `src/hooks/useSignatureLinkPublic.ts` (líneas 638-664)
+
+Tres cambios:
+
+1. **Query**: cambiar `.select('id, token, recipient_email')` → `.select('id, token, recipient_phone, recipient_name')`
+
+2. **Payload**: reemplazar el payload incorrecto `{ to, message, sale_id }` por el formato que espera `send-whatsapp`:
+```typescript
+{
+  to: cl.recipient_phone,
+  templateName: 'signature_link',
+  templateData: {
+    clientName: cl.recipient_name || 'Contratada',
+    companyName: 'Prepaga Digital',
+    signatureUrl: linkUrl,
+  },
+  companyId: data.sale?.company_id || '',
+  saleId: data.sale_id,
+}
+```
+
+3. **Guard**: solo enviar si `cl.recipient_phone` existe.
+
+> Nota: `send-whatsapp` requiere autenticación (Bearer token de usuario autenticado o service role). Como este código corre en contexto público (sin auth), el fetch podría fallar con 401. Pero dado que ya se usa `apikey` header y `verify_jwt = false`, el endpoint lo acepta. El warn catch ya maneja el fallo gracefully.
+
+---
+
+### Corrección 3: Robustez en `get-document-download-url` — parsear bucket dinámico
+
+**Archivo**: `supabase/functions/get-document-download-url/index.ts` (líneas 51-53)
+
+Cambiar la lógica de parseo para extraer el bucket del propio `storedUrl` si incluye el formato `bucket:path`, y solo usar `STORAGE_BUCKET` como fallback:
+
+```typescript
+let bucket: string;
+let storagePath: string;
+
+if (storedUrl.includes(':')) {
+  const colonIdx = storedUrl.indexOf(':');
+  bucket = storedUrl.substring(0, colonIdx);
+  storagePath = storedUrl.substring(colonIdx + 1);
+} else {
+  bucket = Deno.env.get("STORAGE_BUCKET") || "documents";
+  storagePath = storedUrl;
+}
+```
+
+---
+
+### Corrección 4 (menor): Agregar `Authorization` header en SignatureView
+
+En el mismo fetch de Corrección 1, agregar `Authorization: Bearer ${SUPABASE_PUBLISHABLE_KEY}` para consistencia con el patrón del resto de la app.
+
+---
+
+### Archivos a modificar
+
+| Archivo | Cambio |
+|---|---|
+| `src/pages/SignatureView.tsx` | Reemplazar hardcode por env vars + agregar Authorization header |
+| `src/hooks/useSignatureLinkPublic.ts` | Fix WhatsApp: `recipient_phone`, payload correcto |
+| `supabase/functions/get-document-download-url/index.ts` | Parseo dinámico de bucket:path |
+
+### Orden de ejecución
+1. SignatureView.tsx (hardcode key)
+2. useSignatureLinkPublic.ts (WhatsApp payload)
+3. get-document-download-url (bucket parsing)
 
