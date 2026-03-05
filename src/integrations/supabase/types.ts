@@ -932,6 +932,107 @@ export type Database = {
           },
         ]
       }
+      document_field_values: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          field_id: string
+          id: string
+          signature_link_id: string
+          value_json: Json | null
+          value_text: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          field_id: string
+          id?: string
+          signature_link_id: string
+          value_json?: Json | null
+          value_text?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          field_id?: string
+          id?: string
+          signature_link_id?: string
+          value_json?: Json | null
+          value_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_field_values_field_id_fkey"
+            columns: ["field_id"]
+            isOneToOne: false
+            referencedRelation: "document_fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_field_values_signature_link_id_fkey"
+            columns: ["signature_link_id"]
+            isOneToOne: false
+            referencedRelation: "signature_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_fields: {
+        Row: {
+          created_at: string
+          document_id: string
+          field_type: string
+          h: number
+          id: string
+          label: string | null
+          meta: Json
+          page: number
+          required: boolean
+          signer_role: string
+          w: number
+          x: number
+          y: number
+        }
+        Insert: {
+          created_at?: string
+          document_id: string
+          field_type: string
+          h: number
+          id?: string
+          label?: string | null
+          meta?: Json
+          page?: number
+          required?: boolean
+          signer_role: string
+          w: number
+          x: number
+          y: number
+        }
+        Update: {
+          created_at?: string
+          document_id?: string
+          field_type?: string
+          h?: number
+          id?: string
+          label?: string | null
+          meta?: Json
+          page?: number
+          required?: boolean
+          signer_role?: string
+          w?: number
+          x?: number
+          y?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_fields_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_package_items: {
         Row: {
           created_at: string | null
@@ -1070,6 +1171,8 @@ export type Database = {
       }
       documents: {
         Row: {
+          base_pdf_hash: string | null
+          base_pdf_url: string | null
           beneficiary_id: string | null
           content: string | null
           created_at: string | null
@@ -1085,11 +1188,15 @@ export type Database = {
           signature_data: string | null
           signed_at: string | null
           signed_by: string | null
+          signed_pdf_hash: string | null
+          signed_pdf_url: string | null
           status: Database["public"]["Enums"]["document_status"] | null
           updated_at: string | null
           version: number | null
         }
         Insert: {
+          base_pdf_hash?: string | null
+          base_pdf_url?: string | null
           beneficiary_id?: string | null
           content?: string | null
           created_at?: string | null
@@ -1105,11 +1212,15 @@ export type Database = {
           signature_data?: string | null
           signed_at?: string | null
           signed_by?: string | null
+          signed_pdf_hash?: string | null
+          signed_pdf_url?: string | null
           status?: Database["public"]["Enums"]["document_status"] | null
           updated_at?: string | null
           version?: number | null
         }
         Update: {
+          base_pdf_hash?: string | null
+          base_pdf_url?: string | null
           beneficiary_id?: string | null
           content?: string | null
           created_at?: string | null
@@ -1125,6 +1236,8 @@ export type Database = {
           signature_data?: string | null
           signed_at?: string | null
           signed_by?: string | null
+          signed_pdf_hash?: string | null
+          signed_pdf_url?: string | null
           status?: Database["public"]["Enums"]["document_status"] | null
           updated_at?: string | null
           version?: number | null
@@ -1989,6 +2102,7 @@ export type Database = {
           sale_id: string
           signature_link_id: string
           signature_method: string
+          signed_pdf_hash: string | null
           timestamp: string
           user_agent: string | null
         }
@@ -2007,6 +2121,7 @@ export type Database = {
           sale_id: string
           signature_link_id: string
           signature_method?: string
+          signed_pdf_hash?: string | null
           timestamp?: string
           user_agent?: string | null
         }
@@ -2025,6 +2140,7 @@ export type Database = {
           sale_id?: string
           signature_link_id?: string
           signature_method?: string
+          signed_pdf_hash?: string | null
           timestamp?: string
           user_agent?: string | null
         }
@@ -2216,6 +2332,7 @@ export type Database = {
           expires_at: string
           id: string
           ip_addresses: Json | null
+          is_active: boolean | null
           package_id: string | null
           recipient_email: string | null
           recipient_id: string | null
@@ -2225,6 +2342,7 @@ export type Database = {
           signwell_document_id: string | null
           signwell_signing_url: string | null
           status: string | null
+          step_order: number | null
           token: string
           updated_at: string | null
         }
@@ -2237,6 +2355,7 @@ export type Database = {
           expires_at: string
           id?: string
           ip_addresses?: Json | null
+          is_active?: boolean | null
           package_id?: string | null
           recipient_email?: string | null
           recipient_id?: string | null
@@ -2246,6 +2365,7 @@ export type Database = {
           signwell_document_id?: string | null
           signwell_signing_url?: string | null
           status?: string | null
+          step_order?: number | null
           token: string
           updated_at?: string | null
         }
@@ -2258,6 +2378,7 @@ export type Database = {
           expires_at?: string
           id?: string
           ip_addresses?: Json | null
+          is_active?: boolean | null
           package_id?: string | null
           recipient_email?: string | null
           recipient_id?: string | null
@@ -2267,6 +2388,7 @@ export type Database = {
           signwell_document_id?: string | null
           signwell_signing_url?: string | null
           status?: string | null
+          step_order?: number | null
           token?: string
           updated_at?: string | null
         }
