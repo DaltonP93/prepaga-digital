@@ -641,45 +641,62 @@ export const useSubmitSignatureLink = () => {
       // Activate contratada link if titular just completed
       if (data.recipient_type === 'titular') {
         try {
-          // Get company info for WhatsApp payload
-          const { data: saleForWa } = await signatureClient
+          const { data: saleRow, error: saleErr } = await signatureClient
             .from('sales')
-            .select('company_id, companies:company_id(name)')
+            .select('id, company_id')
             .eq('id', data.sale_id)
             .single();
 
-          const { data: contratadaLinks } = await signatureClient
-            .from('signature_links')
-            .select('id, token, recipient_phone, recipient_name')
-            .eq('sale_id', data.sale_id)
-            .eq('recipient_type', 'contratada')
-            .eq('status', 'pendiente');
+          if (saleErr || !saleRow?.company_id) {
+            console.warn('Could not fetch sale.company_id for WhatsApp:', saleErr);
+          } else {
+            const companyId = saleRow.company_id as string;
 
-          if (contratadaLinks && contratadaLinks.length > 0) {
-            for (const cl of contratadaLinks) {
-              // Activate
-              await signatureClient
-                .from('signature_links')
-                .update({ is_active: true } as any)
-                .eq('id', cl.id);
+            const { data: company } = await signatureClient
+              .from('companies')
+              .select('name')
+              .eq('id', companyId)
+              .single();
 
-              // Send WhatsApp notification (only if phone is available)
-              if (cl.recipient_phone) {
+            const { data: contratadaLinks, error: clErr } = await signatureClient
+              .from('signature_links')
+              .select('id, token, recipient_phone')
+              .eq('sale_id', data.sale_id)
+              .eq('recipient_type', 'contratada')
+              .eq('status', 'pendiente');
+
+            if (clErr) console.warn('Could not fetch contratada links:', clErr);
+
+            if (contratadaLinks && contratadaLinks.length > 0) {
+              for (const cl of contratadaLinks) {
+                await signatureClient
+                  .from('signature_links')
+                  .update({ is_active: true } as any)
+                  .eq('id', cl.id);
+
                 try {
+                  if (!cl.recipient_phone) {
+                    console.warn('No recipient_phone for contratada link', { linkId: cl.id });
+                    continue;
+                  }
                   const linkUrl = `${window.location.origin}/firmar/${cl.token}`;
                   await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_PUBLISHABLE_KEY },
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'apikey': SUPABASE_PUBLISHABLE_KEY,
+                      'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+                    },
                     body: JSON.stringify({
                       to: cl.recipient_phone,
                       templateName: 'signature_link',
                       templateData: {
-                        clientName: cl.recipient_name || 'Representante',
-                        companyName: (saleForWa as any)?.companies?.name || 'Empresa',
+                        clientName: 'Representante',
+                        companyName: company?.name || 'Empresa',
                         signatureUrl: linkUrl,
                       },
-                      companyId: (saleForWa as any)?.company_id || '',
                       saleId: data.sale_id,
+                      companyId,
                       messageType: 'signature_link',
                     }),
                   });
