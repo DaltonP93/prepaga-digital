@@ -48,9 +48,18 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Parse bucket:path format
-    const bucket = Deno.env.get("STORAGE_BUCKET") || "documents";
-    const storagePath = storedUrl.includes(":") ? storedUrl.split(":").slice(1).join(":") : storedUrl;
+    // Parse bucket:path format — extract bucket from storedUrl if present
+    let bucket: string;
+    let storagePath: string;
+
+    if (storedUrl.includes(":")) {
+      const colonIdx = storedUrl.indexOf(":");
+      bucket = storedUrl.substring(0, colonIdx);
+      storagePath = storedUrl.substring(colonIdx + 1);
+    } else {
+      bucket = Deno.env.get("STORAGE_BUCKET") || "documents";
+      storagePath = storedUrl;
+    }
 
     const expiresIn = 3600; // 1 hour
     const { data: signedUrlData, error: urlErr } = await supabaseAdmin.storage

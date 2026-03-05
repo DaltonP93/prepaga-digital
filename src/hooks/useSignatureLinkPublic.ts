@@ -637,7 +637,7 @@ export const useSubmitSignatureLink = () => {
         try {
           const { data: contratadaLinks } = await signatureClient
             .from('signature_links')
-            .select('id, token, recipient_email')
+            .select('id, token, recipient_phone, recipient_name')
             .eq('sale_id', data.sale_id)
             .eq('recipient_type', 'contratada')
             .eq('status', 'pendiente');
@@ -650,20 +650,28 @@ export const useSubmitSignatureLink = () => {
                 .update({ is_active: true } as any)
                 .eq('id', cl.id);
 
-              // Send WhatsApp notification
-              try {
-                const linkUrl = `${window.location.origin}/firmar/${cl.token}`;
-                await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_PUBLISHABLE_KEY },
-                  body: JSON.stringify({
-                    to: cl.recipient_email,
-                    message: `Su enlace de firma está listo: ${linkUrl}`,
-                    sale_id: data.sale_id,
-                  }),
-                });
-              } catch (waErr) {
-                console.warn('WhatsApp notification to contratada failed:', waErr);
+              // Send WhatsApp notification (only if phone is available)
+              if (cl.recipient_phone) {
+                try {
+                  const linkUrl = `${window.location.origin}/firmar/${cl.token}`;
+                  await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_PUBLISHABLE_KEY },
+                    body: JSON.stringify({
+                      to: cl.recipient_phone,
+                      templateName: 'signature_link',
+                      templateData: {
+                        clientName: cl.recipient_name || 'Contratada',
+                        companyName: 'Prepaga Digital',
+                        signatureUrl: linkUrl,
+                      },
+                      companyId: '',
+                      saleId: data.sale_id,
+                    }),
+                  });
+                } catch (waErr) {
+                  console.warn('WhatsApp notification to contratada failed:', waErr);
+                }
               }
             }
           }
