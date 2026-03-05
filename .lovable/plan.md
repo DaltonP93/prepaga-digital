@@ -1,86 +1,139 @@
 
 
-## Plan: Fase 1 — Correcciones Críticas (4 puntos)
+## Plan: Fase 2 — Correcciones de lógica post-firma y companyId en WhatsApp
 
-### Corrección 1: Eliminar hardcode del anon key en SignatureView.tsx
-
-**Archivo**: `src/pages/SignatureView.tsx` (líneas 87-94)
-
-Reemplazar la URL hardcodeada y el apikey literal por las constantes que ya usa el proyecto. Importar desde env vars:
-
-```typescript
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-```
-
-Y en el fetch:
-```typescript
-fetch(`${SUPABASE_URL}/functions/v1/get-document-download-url`, {
-  headers: {
-    'Content-Type': 'application/json',
-    'apikey': SUPABASE_PUBLISHABLE_KEY,
-    'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
-  },
-  ...
-})
-```
+### Resumen
+Tres cambios principales:
+1. **Post-firma condicional**: el contrato NO se firma con PAdES cuando firma el titular; solo cuando firma la contratada (último paso). DDJJ se firma inmediatamente.
+2. **companyId real en WhatsApp**: obtener `company_id` de `sales` antes de enviar la notificación.
+3. **companyName real**: usar el nombre de la empresa desde `companies` en lugar de hardcodear "Prepaga Digital".
 
 ---
 
-### Corrección 2: WhatsApp — usar `recipient_phone` en lugar de `recipient_email`
+### Cambio 1: Lógica condicional de PDF post-firma
 
-**Archivo**: `src/hooks/useSignatureLinkPublic.ts` (líneas 638-664)
+**Archivo**: `src/hooks/useSignatureLinkPublic.ts` (líneas 598-633)
 
-Tres cambios:
+Reemplazar el bloque actual que genera PDF base + PAdES para TODOS los `finalDocs` indiscriminadamente.
 
-1. **Query**: cambiar `.select('id, token, recipient_email')` → `.select('id, token, recipient_phone, recipient_name')`
-
-2. **Payload**: reemplazar el payload incorrecto `{ to, message, sale_id }` por el formato que espera `send-whatsapp`:
+Nueva lógica:
 ```typescript
-{
-  to: cl.recipient_phone,
-  templateName: 'signature_link',
-  templateData: {
-    clientName: cl.recipient_name || 'Contratada',
-    companyName: 'Prepaga Digital',
-    signatureUrl: linkUrl,
-  },
-  companyId: data.sale?.company_id || '',
-  saleId: data.sale_id,
+// Post-signature: generate base PDF + PAdES (conditional by document type)
+try {
+  // Determine which documents to sign with PAdES now
+  let pdfQuery = signatureClient
+    .from('documents')
+    .select('id, document_type')
+    .eq('sale_id', data.sale_id)
+    .eq('is_final', true)
+    .neq('document_type', 'firma');
+
+  if (data.recipient_type === 'titular') {
+    // Titular: only sign DDJJ (not contrato — that waits for contratada)
+    pdfQuery = pdfQuery.neq('document_type', 'contrato');
+  } else if (data.recipient_type === 'adherente') {
+    // Adherente: only their own DDJJ (by beneficiary_id)
+    pdfQuery = pdfQuery.eq('beneficiary_id', data.recipient_id);
+  }
+  // contratada: signs everything remaining (contrato included)
+
+  const { data: finalDocs } = await pdfQuery;
+
+  if (finalDocs && finalDocs.length > 0) {
+    for (const finalDoc of finalDocs) {
+      try {
+        await fetch(`${SUPABASE_URL}/functions/v1/generate-base-pdf`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_PUBLISHABLE_KEY },
+          body: JSON.stringify({ document_id: finalDoc.id }),
+        });
+        await fetch(`${SUPABASE_URL}/functions/v1/pades-sign-document`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_PUBLISHABLE_KEY },
+          body: JSON.stringify({ document_id: finalDoc.id }),
+        });
+      } catch (pdfErr) {
+        console.warn(`PDF generation failed for doc ${finalDoc.id}:`, pdfErr);
+      }
+    }
+  }
+} catch (pdfGenErr) {
+  console.warn('Post-signature PDF generation error:', pdfGenErr);
 }
 ```
 
-3. **Guard**: solo enviar si `cl.recipient_phone` existe.
-
-> Nota: `send-whatsapp` requiere autenticación (Bearer token de usuario autenticado o service role). Como este código corre en contexto público (sin auth), el fetch podría fallar con 401. Pero dado que ya se usa `apikey` header y `verify_jwt = false`, el endpoint lo acepta. El warn catch ya maneja el fallo gracefully.
+Resultado:
+- **Titular firma** → PAdES solo para DDJJ titular (no contrato)
+- **Adherente firma** → PAdES solo para su DDJJ específica
+- **Contratada firma** → PAdES para contrato (y cualquier doc restante)
 
 ---
 
-### Corrección 3: Robustez en `get-document-download-url` — parsear bucket dinámico
+### Cambio 2: companyId y companyName reales en WhatsApp
 
-**Archivo**: `supabase/functions/get-document-download-url/index.ts` (líneas 51-53)
+**Archivo**: `src/hooks/useSignatureLinkPublic.ts` (líneas 635-681)
 
-Cambiar la lógica de parseo para extraer el bucket del propio `storedUrl` si incluye el formato `bucket:path`, y solo usar `STORAGE_BUCKET` como fallback:
+El bloque de activación de contratada necesita obtener `company_id` y `company.name` de `sales`. Dado que este fetch ya se hace arriba (línea 337), podemos mover la variable `saleInfo` a un scope más amplio, o hacer una query ligera aquí.
+
+Opción más limpia: query ligera dentro del bloque:
 
 ```typescript
-let bucket: string;
-let storagePath: string;
+if (data.recipient_type === 'titular') {
+  try {
+    // Get company info for WhatsApp payload
+    const { data: saleForWa } = await signatureClient
+      .from('sales')
+      .select('company_id, companies:company_id(name)')
+      .eq('id', data.sale_id)
+      .single();
 
-if (storedUrl.includes(':')) {
-  const colonIdx = storedUrl.indexOf(':');
-  bucket = storedUrl.substring(0, colonIdx);
-  storagePath = storedUrl.substring(colonIdx + 1);
-} else {
-  bucket = Deno.env.get("STORAGE_BUCKET") || "documents";
-  storagePath = storedUrl;
+    const { data: contratadaLinks } = await signatureClient
+      .from('signature_links')
+      .select('id, token, recipient_phone, recipient_name')
+      .eq('sale_id', data.sale_id)
+      .eq('recipient_type', 'contratada')
+      .eq('status', 'pendiente');
+
+    if (contratadaLinks && contratadaLinks.length > 0) {
+      for (const cl of contratadaLinks) {
+        await signatureClient
+          .from('signature_links')
+          .update({ is_active: true } as any)
+          .eq('id', cl.id);
+
+        if (cl.recipient_phone) {
+          try {
+            const linkUrl = `${window.location.origin}/firmar/${cl.token}`;
+            await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_PUBLISHABLE_KEY,
+              },
+              body: JSON.stringify({
+                to: cl.recipient_phone,
+                templateName: 'signature_link',
+                templateData: {
+                  clientName: cl.recipient_name || 'Representante',
+                  companyName: (saleForWa as any)?.companies?.name || 'Empresa',
+                  signatureUrl: linkUrl,
+                },
+                companyId: (saleForWa as any)?.company_id || '',
+                saleId: data.sale_id,
+                messageType: 'signature_link',
+              }),
+            });
+          } catch (waErr) {
+            console.warn('WhatsApp notification to contratada failed:', waErr);
+          }
+        }
+      }
+    }
+  } catch (activateErr) {
+    console.warn('Could not activate contratada links:', activateErr);
+  }
 }
 ```
-
----
-
-### Corrección 4 (menor): Agregar `Authorization` header en SignatureView
-
-En el mismo fetch de Corrección 1, agregar `Authorization: Bearer ${SUPABASE_PUBLISHABLE_KEY}` para consistencia con el patrón del resto de la app.
 
 ---
 
@@ -88,12 +141,11 @@ En el mismo fetch de Corrección 1, agregar `Authorization: Bearer ${SUPABASE_PU
 
 | Archivo | Cambio |
 |---|---|
-| `src/pages/SignatureView.tsx` | Reemplazar hardcode por env vars + agregar Authorization header |
-| `src/hooks/useSignatureLinkPublic.ts` | Fix WhatsApp: `recipient_phone`, payload correcto |
-| `supabase/functions/get-document-download-url/index.ts` | Parseo dinámico de bucket:path |
+| `src/hooks/useSignatureLinkPublic.ts` (L598-633) | Post-firma condicional: excluir contrato para titular, filtrar por beneficiary_id para adherente |
+| `src/hooks/useSignatureLinkPublic.ts` (L635-681) | WhatsApp: agregar query de company_id/name, usar companyId real, messageType, companyName dinámico |
 
-### Orden de ejecución
-1. SignatureView.tsx (hardcode key)
-2. useSignatureLinkPublic.ts (WhatsApp payload)
-3. get-document-download-url (bucket parsing)
+### No se toca
+- `SignatureView.tsx` — ya corregido en Fase 1
+- `get-document-download-url` — ya corregido en Fase 1
+- Edge Functions server-side — no requieren cambios
 
