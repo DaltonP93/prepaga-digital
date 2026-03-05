@@ -595,32 +595,38 @@ export const useSubmitSignatureLink = () => {
         console.warn('Could not log process trace:', traceErr);
       }
 
-      // Post-signature: generate base PDF + PAdES for final documents
+      // Post-signature: generate base PDF + PAdES (conditional by document type)
       try {
-        const { data: finalDocs } = await signatureClient
+        // Determine which documents to sign with PAdES now
+        let pdfQuery = signatureClient
           .from('documents')
-          .select('id')
+          .select('id, document_type')
           .eq('sale_id', data.sale_id)
           .eq('is_final', true)
           .neq('document_type', 'firma');
 
-        if (finalDocs && finalDocs.length > 0) {
-          const supabaseUrl = SUPABASE_URL;
-          const anonKey = SUPABASE_PUBLISHABLE_KEY;
+        if (data.recipient_type === 'titular') {
+          // Titular: only sign DDJJ (not contrato — that waits for contratada)
+          pdfQuery = pdfQuery.neq('document_type', 'contrato');
+        } else if (data.recipient_type === 'adherente') {
+          // Adherente: only their own DDJJ (by beneficiary_id)
+          pdfQuery = pdfQuery.eq('beneficiary_id', data.recipient_id);
+        }
+        // contratada: signs everything remaining (contrato included)
 
+        const { data: finalDocs } = await pdfQuery;
+
+        if (finalDocs && finalDocs.length > 0) {
           for (const finalDoc of finalDocs) {
             try {
-              // Generate base PDF
-              await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
+              await fetch(`${SUPABASE_URL}/functions/v1/generate-base-pdf`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'apikey': anonKey },
+                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_PUBLISHABLE_KEY },
                 body: JSON.stringify({ document_id: finalDoc.id }),
               });
-
-              // Sign with PAdES
-              await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
+              await fetch(`${SUPABASE_URL}/functions/v1/pades-sign-document`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'apikey': anonKey },
+                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_PUBLISHABLE_KEY },
                 body: JSON.stringify({ document_id: finalDoc.id }),
               });
             } catch (pdfErr) {
@@ -635,6 +641,13 @@ export const useSubmitSignatureLink = () => {
       // Activate contratada link if titular just completed
       if (data.recipient_type === 'titular') {
         try {
+          // Get company info for WhatsApp payload
+          const { data: saleForWa } = await signatureClient
+            .from('sales')
+            .select('company_id, companies:company_id(name)')
+            .eq('id', data.sale_id)
+            .single();
+
           const { data: contratadaLinks } = await signatureClient
             .from('signature_links')
             .select('id, token, recipient_phone, recipient_name')
@@ -661,12 +674,13 @@ export const useSubmitSignatureLink = () => {
                       to: cl.recipient_phone,
                       templateName: 'signature_link',
                       templateData: {
-                        clientName: cl.recipient_name || 'Contratada',
-                        companyName: 'Prepaga Digital',
+                        clientName: cl.recipient_name || 'Representante',
+                        companyName: (saleForWa as any)?.companies?.name || 'Empresa',
                         signatureUrl: linkUrl,
                       },
-                      companyId: '',
+                      companyId: (saleForWa as any)?.company_id || '',
                       saleId: data.sale_id,
+                      messageType: 'signature_link',
                     }),
                   });
                 } catch (waErr) {
