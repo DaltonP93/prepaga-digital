@@ -44,13 +44,13 @@ export const useAnalyticsFilters = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, role')
+        .select('id, first_name, last_name')
         .order('first_name');
       if (error) throw error;
       return (data || []).map(p => ({
         id: p.id,
         name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Sin nombre',
-        role: p.role,
+        role: (p as any).role,
       }));
     },
     enabled: isAdminRole,

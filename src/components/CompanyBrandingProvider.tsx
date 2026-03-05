@@ -60,7 +60,7 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
         pc: configuration.primary_color,
         sc: configuration.secondary_color,
         ac: configuration.accent_color,
-        fv: configuration.favicon,
+        fv: (configuration as any).favicon,
         lb: configuration.login_background_url,
         lu: configuration.login_logo_url,
         lt: configuration.login_title,
@@ -107,7 +107,7 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
       
       // Actualizar favicon si existe
       const faviconUrl =
-        sanitizeMediaUrl(configuration.favicon) ||
+        sanitizeMediaUrl((configuration as any).favicon) ||
         sanitizeMediaUrl(configuration.login_logo_url) ||
         sanitizeMediaUrl(configuration.logo_url);
       if (faviconUrl) {
@@ -123,7 +123,7 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
         const currentSubtitle = localStorage.getItem('samap_branding_login_subtitle') || '';
 
         const loginFavicon =
-          sanitizeMediaUrl(configuration.favicon) ||
+          sanitizeMediaUrl((configuration as any).favicon) ||
           sanitizeMediaUrl(configuration.login_logo_url) ||
           sanitizeMediaUrl(configuration.logo_url) ||
           currentFavicon ||
