@@ -80,7 +80,32 @@ const SignatureView = () => {
     }
   }, [verification.otpPolicy]);
 
-  const handleDownloadSignedContent = (doc: any) => {
+  const handleDownloadSignedContent = async (doc: any) => {
+    // Try to download the signed PDF from storage first
+    if (doc.signed_pdf_url) {
+      try {
+        const response = await fetch(
+          `https://ykducvvcjzdpoojxlsig.supabase.co/functions/v1/get-document-download-url`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrZHVjdnZjanpkcG9vanhsc2lnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwNzgwNzQsImV4cCI6MjA4NTY1NDA3NH0.SpX3e1GgENTB3kpQPPedPds0E13vxDeOmnmFYSJhfPM',
+            },
+            body: JSON.stringify({ document_id: doc.id, kind: 'signed' }),
+          }
+        );
+        const result = await response.json();
+        if (result.url) {
+          window.open(result.url, '_blank');
+          return;
+        }
+      } catch (err) {
+        console.warn('Could not get signed PDF URL, falling back to print:', err);
+      }
+    }
+
+    // Fallback: open HTML content for printing
     if (!doc?.content) return;
     const htmlContent = `
       <!doctype html>
@@ -280,6 +305,30 @@ const SignatureView = () => {
     );
   }
 
+  // Link not yet active (sequential signing)
+  if ((linkData as any).isActive === false) {
+    return (
+      <PublicLayout>
+        <div className="flex justify-center py-12">
+          <Card className="max-w-md">
+            <CardHeader className="text-center">
+              <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <CardTitle>Enlace aún no disponible</CardTitle>
+              <CardDescription>
+                Este enlace de firma se activará cuando el firmante anterior complete su proceso.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-center">
+              <p className="text-sm text-muted-foreground">
+                Recibirá una notificación cuando sea su turno de firmar.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </PublicLayout>
+    );
+  }
+
   // Already signed state
   if (linkData.status === 'completado') {
     const isTitular = linkData.recipient_type === 'titular';
@@ -356,10 +405,10 @@ const SignatureView = () => {
                             Descargar
                           </Button>
                         )}
-                        {doc.content && (
+                        {(doc.content || doc.signed_pdf_url) && (
                           <Button size="sm" variant="outline" onClick={() => handleDownloadSignedContent(doc)}>
                             <Download className="h-3 w-3 mr-1" />
-                            Descargar PDF
+                            {doc.signed_pdf_url ? 'Descargar PDF firmado' : 'Descargar PDF'}
                           </Button>
                         )}
                       </div>

@@ -55,7 +55,9 @@ export const useCreateAllSignatureLinks = () => {
           recipient_id: sale.client_id,
           expires_at: expiresAt.toISOString(),
           status: 'pendiente',
-        })
+          step_order: 1,
+          is_active: true,
+        } as any)
         .select()
         .single();
 
@@ -90,7 +92,9 @@ export const useCreateAllSignatureLinks = () => {
                 recipient_id: beneficiary.id,
                 expires_at: adhExpiresAt.toISOString(),
                 status: 'pendiente',
-              })
+                step_order: 1,
+                is_active: true,
+              } as any)
               .select()
               .single();
 
@@ -126,7 +130,9 @@ export const useCreateAllSignatureLinks = () => {
             recipient_id: null,
             expires_at: contratadaExpiresAt.toISOString(),
             status: 'pendiente',
-          })
+            step_order: 2,
+            is_active: false,
+          } as any)
           .select()
           .single();
 
