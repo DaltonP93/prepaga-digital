@@ -1,9 +1,11 @@
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { UserPlus, Pencil, Trash2, Mail, Phone } from "lucide-react";
+import { UserPlus, Pencil, Trash2, Mail, Phone, Search, FilterX } from "lucide-react";
 import { ClientForm } from "@/components/ClientForm";
 import { useClients, useDeleteClient } from "@/hooks/useClients";
 import { Database } from "@/integrations/supabase/types";
@@ -25,6 +27,9 @@ type Client = Database['public']['Tables']['clients']['Row'];
 export function ClientsList() {
   const [showClientForm, setShowClientForm] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [emailFilter, setEmailFilter] = useState<"all" | "with" | "without">("all");
+  const [phoneFilter, setPhoneFilter] = useState<"all" | "with" | "without">("all");
   const { user, profile, userRole } = useSimpleAuthContext();
   const { data: clients = [], isLoading } = useClients();
   const deleteClient = useDeleteClient();
@@ -46,6 +51,37 @@ export function ClientsList() {
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('es-PY');
+  };
+
+  const filteredClients = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return clients.filter((client) => {
+      const fullName = `${client.first_name || ''} ${client.last_name || ''}`.trim().toLowerCase();
+      const email = (client.email || '').toLowerCase();
+      const phone = (client.phone || '').toLowerCase();
+      const dni = (client.dni || '').toLowerCase();
+
+      const matchesSearch =
+        normalizedSearch.length === 0 ||
+        fullName.includes(normalizedSearch) ||
+        email.includes(normalizedSearch) ||
+        phone.includes(normalizedSearch) ||
+        dni.includes(normalizedSearch);
+
+      const hasEmail = Boolean(client.email && client.email.trim().length > 0);
+      const hasPhone = Boolean(client.phone && client.phone.trim().length > 0);
+      const matchesEmail = emailFilter === "all" || (emailFilter === "with" ? hasEmail : !hasEmail);
+      const matchesPhone = phoneFilter === "all" || (phoneFilter === "with" ? hasPhone : !hasPhone);
+
+      return matchesSearch && matchesEmail && matchesPhone;
+    });
+  }, [clients, searchTerm, emailFilter, phoneFilter]);
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setEmailFilter("all");
+    setPhoneFilter("all");
   };
 
   if (isLoading) {
@@ -75,7 +111,7 @@ export function ClientsList() {
         <CardHeader>
           <CardTitle>Lista de Clientes</CardTitle>
           <CardDescription>
-            {clients.length} cliente{clients.length !== 1 ? 's' : ''} registrado{clients.length !== 1 ? 's' : ''}
+            Mostrando {filteredClients.length} de {clients.length} cliente{clients.length !== 1 ? 's' : ''} registrado{clients.length !== 1 ? 's' : ''}
           </CardDescription>
           {clients.length === 0 && user && !profile?.company_id && userRole !== 'super_admin' &&
           <p className="text-sm text-amber-600">
@@ -84,6 +120,43 @@ export function ClientsList() {
           }
         </CardHeader>
         <CardContent>
+          <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+            <div className="relative md:col-span-2">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar por nombre, email, teléfono o DNI/CI"
+                className="pl-9"
+              />
+            </div>
+            <Select value={emailFilter} onValueChange={(value: "all" | "with" | "without") => setEmailFilter(value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Filtrar por email" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Email: todos</SelectItem>
+                <SelectItem value="with">Con email</SelectItem>
+                <SelectItem value="without">Sin email</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex gap-2">
+              <Select value={phoneFilter} onValueChange={(value: "all" | "with" | "without") => setPhoneFilter(value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrar por teléfono" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Teléfono: todos</SelectItem>
+                  <SelectItem value="with">Con teléfono</SelectItem>
+                  <SelectItem value="without">Sin teléfono</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" onClick={clearFilters} title="Limpiar filtros">
+                <FilterX className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
           <Table>
             <TableHeader>
               <TableRow>
@@ -96,7 +169,7 @@ export function ClientsList() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {clients.map((client) =>
+              {filteredClients.map((client) =>
               <TableRow key={client.id}>
                   <TableCell className="font-medium">
                     {client.first_name} {client.last_name}
@@ -168,6 +241,14 @@ export function ClientsList() {
               </Button>
             </div>
           }
+          {clients.length > 0 && filteredClients.length === 0 && (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No se encontraron clientes con esos filtros</p>
+              <Button className="mt-4" variant="outline" onClick={clearFilters}>
+                Limpiar filtros
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
