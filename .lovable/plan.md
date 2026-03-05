@@ -1,125 +1,81 @@
 
 
-## Plan: Fase 2 — Correcciones de lógica post-firma y companyId en WhatsApp
+## Plan: Fase 3 — Bloque contratada corregido + company name dinámico
 
-### Resumen
-Tres cambios principales:
-1. **Post-firma condicional**: el contrato NO se firma con PAdES cuando firma el titular; solo cuando firma la contratada (último paso). DDJJ se firma inmediatamente.
-2. **companyId real en WhatsApp**: obtener `company_id` de `sales` antes de enviar la notificación.
-3. **companyName real**: usar el nombre de la empresa desde `companies` en lugar de hardcodear "Prepaga Digital".
+### Archivo único a modificar
+`src/hooks/useSignatureLinkPublic.ts` — líneas 641-695
 
----
+### Cambio
+Reemplazar el bloque completo de activación de contratada con la versión corregida del usuario. Diferencias clave vs. código actual:
 
-### Cambio 1: Lógica condicional de PDF post-firma
+1. **Separar queries**: primero `sales.company_id`, luego `companies.name` como query independiente (evita el join `companies:company_id(name)` que puede fallar con RLS en contexto público)
+2. **Authorization header**: agregar `Authorization: Bearer ${SUPABASE_PUBLISHABLE_KEY}` al fetch de `send-whatsapp`
+3. **Guard mejorado**: mover el check de `recipient_phone` ANTES del fetch con `continue` explícito y log de warning con `linkId`
+4. **Sin recipient_name en query**: simplificar select a `id, token, recipient_phone` (el nombre se hardcodea como "Representante" ya que viene de config empresa)
+5. **companyName dinámico**: query separada a `companies` por `companyId` para obtener nombre real en vez de hardcodear "Prepaga Digital"
 
-**Archivo**: `src/hooks/useSignatureLinkPublic.ts` (líneas 598-633)
-
-Reemplazar el bloque actual que genera PDF base + PAdES para TODOS los `finalDocs` indiscriminadamente.
-
-Nueva lógica:
-```typescript
-// Post-signature: generate base PDF + PAdES (conditional by document type)
-try {
-  // Determine which documents to sign with PAdES now
-  let pdfQuery = signatureClient
-    .from('documents')
-    .select('id, document_type')
-    .eq('sale_id', data.sale_id)
-    .eq('is_final', true)
-    .neq('document_type', 'firma');
-
-  if (data.recipient_type === 'titular') {
-    // Titular: only sign DDJJ (not contrato — that waits for contratada)
-    pdfQuery = pdfQuery.neq('document_type', 'contrato');
-  } else if (data.recipient_type === 'adherente') {
-    // Adherente: only their own DDJJ (by beneficiary_id)
-    pdfQuery = pdfQuery.eq('beneficiary_id', data.recipient_id);
-  }
-  // contratada: signs everything remaining (contrato included)
-
-  const { data: finalDocs } = await pdfQuery;
-
-  if (finalDocs && finalDocs.length > 0) {
-    for (const finalDoc of finalDocs) {
-      try {
-        await fetch(`${SUPABASE_URL}/functions/v1/generate-base-pdf`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_PUBLISHABLE_KEY },
-          body: JSON.stringify({ document_id: finalDoc.id }),
-        });
-        await fetch(`${SUPABASE_URL}/functions/v1/pades-sign-document`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_PUBLISHABLE_KEY },
-          body: JSON.stringify({ document_id: finalDoc.id }),
-        });
-      } catch (pdfErr) {
-        console.warn(`PDF generation failed for doc ${finalDoc.id}:`, pdfErr);
-      }
-    }
-  }
-} catch (pdfGenErr) {
-  console.warn('Post-signature PDF generation error:', pdfGenErr);
-}
-```
-
-Resultado:
-- **Titular firma** → PAdES solo para DDJJ titular (no contrato)
-- **Adherente firma** → PAdES solo para su DDJJ específica
-- **Contratada firma** → PAdES para contrato (y cualquier doc restante)
-
----
-
-### Cambio 2: companyId y companyName reales en WhatsApp
-
-**Archivo**: `src/hooks/useSignatureLinkPublic.ts` (líneas 635-681)
-
-El bloque de activación de contratada necesita obtener `company_id` y `company.name` de `sales`. Dado que este fetch ya se hace arriba (línea 337), podemos mover la variable `saleInfo` a un scope más amplio, o hacer una query ligera aquí.
-
-Opción más limpia: query ligera dentro del bloque:
+### Código resultante (líneas 641-723)
 
 ```typescript
+// Activate contratada link if titular just completed
 if (data.recipient_type === 'titular') {
   try {
-    // Get company info for WhatsApp payload
-    const { data: saleForWa } = await signatureClient
+    const { data: saleRow, error: saleErr } = await signatureClient
       .from('sales')
-      .select('company_id, companies:company_id(name)')
+      .select('id, company_id')
       .eq('id', data.sale_id)
       .single();
 
-    const { data: contratadaLinks } = await signatureClient
-      .from('signature_links')
-      .select('id, token, recipient_phone, recipient_name')
-      .eq('sale_id', data.sale_id)
-      .eq('recipient_type', 'contratada')
-      .eq('status', 'pendiente');
+    if (saleErr || !saleRow?.company_id) {
+      console.warn('Could not fetch sale.company_id for WhatsApp:', saleErr);
+    } else {
+      const companyId = saleRow.company_id as string;
 
-    if (contratadaLinks && contratadaLinks.length > 0) {
-      for (const cl of contratadaLinks) {
-        await signatureClient
-          .from('signature_links')
-          .update({ is_active: true } as any)
-          .eq('id', cl.id);
+      const { data: company } = await signatureClient
+        .from('companies')
+        .select('name')
+        .eq('id', companyId)
+        .single();
 
-        if (cl.recipient_phone) {
+      const { data: contratadaLinks, error: clErr } = await signatureClient
+        .from('signature_links')
+        .select('id, token, recipient_phone')
+        .eq('sale_id', data.sale_id)
+        .eq('recipient_type', 'contratada')
+        .eq('status', 'pendiente');
+
+      if (clErr) console.warn('Could not fetch contratada links:', clErr);
+
+      if (contratadaLinks && contratadaLinks.length > 0) {
+        for (const cl of contratadaLinks) {
+          await signatureClient
+            .from('signature_links')
+            .update({ is_active: true } as any)
+            .eq('id', cl.id);
+
           try {
+            if (!cl.recipient_phone) {
+              console.warn('No recipient_phone for contratada link', { linkId: cl.id });
+              continue;
+            }
             const linkUrl = `${window.location.origin}/firmar/${cl.token}`;
             await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
                 'apikey': SUPABASE_PUBLISHABLE_KEY,
+                'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
               },
               body: JSON.stringify({
                 to: cl.recipient_phone,
                 templateName: 'signature_link',
                 templateData: {
-                  clientName: cl.recipient_name || 'Representante',
-                  companyName: (saleForWa as any)?.companies?.name || 'Empresa',
+                  clientName: 'Representante',
+                  companyName: company?.name || 'Empresa',
                   signatureUrl: linkUrl,
                 },
-                companyId: (saleForWa as any)?.company_id || '',
                 saleId: data.sale_id,
+                companyId,
                 messageType: 'signature_link',
               }),
             });
@@ -135,17 +91,8 @@ if (data.recipient_type === 'titular') {
 }
 ```
 
----
-
-### Archivos a modificar
-
-| Archivo | Cambio |
-|---|---|
-| `src/hooks/useSignatureLinkPublic.ts` (L598-633) | Post-firma condicional: excluir contrato para titular, filtrar por beneficiary_id para adherente |
-| `src/hooks/useSignatureLinkPublic.ts` (L635-681) | WhatsApp: agregar query de company_id/name, usar companyId real, messageType, companyName dinámico |
-
-### No se toca
-- `SignatureView.tsx` — ya corregido en Fase 1
-- `get-document-download-url` — ya corregido en Fase 1
-- Edge Functions server-side — no requieren cambios
+### Impacto
+- Solo 1 archivo, 1 bloque de ~55 líneas reemplazado por ~70 líneas
+- No afecta el bloque de PAdES condicional (ya corregido en Fase 2)
+- No requiere migraciones ni cambios en Edge Functions
 
