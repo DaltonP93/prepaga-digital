@@ -72,7 +72,7 @@ export const useSignatureLinkByToken = (token: string) => {
 
       const { data: linkData, error: linkError } = await signatureClient
         .from('signature_links')
-        .select('id,sale_id,package_id,recipient_type,recipient_id,expires_at,accessed_at,access_count,status,completed_at,created_at,updated_at,signwell_signing_url')
+        .select('id,sale_id,package_id,recipient_type,recipient_id,expires_at,accessed_at,access_count,status,completed_at,created_at,updated_at,signwell_signing_url,is_active,step_order')
         .eq('token', token)
         .gt('expires_at', new Date().toISOString())
         .single();
@@ -136,10 +136,13 @@ export const useSignatureLinkByToken = (token: string) => {
         throw new Error('No se pudo cargar la información de la venta');
       }
 
-      return {
+      const result = {
         ...linkData,
         sale: saleData as any,
+        isActive: (linkData as any).is_active !== false,
       } as SignatureLinkData;
+
+      return result;
     },
     enabled: !!token,
     retry: 2,
@@ -590,6 +593,83 @@ export const useSubmitSignatureLink = () => {
           });
       } catch (traceErr) {
         console.warn('Could not log process trace:', traceErr);
+      }
+
+      // Post-signature: generate base PDF + PAdES for final documents
+      try {
+        const { data: finalDocs } = await signatureClient
+          .from('documents')
+          .select('id')
+          .eq('sale_id', data.sale_id)
+          .eq('is_final', true)
+          .neq('document_type', 'firma');
+
+        if (finalDocs && finalDocs.length > 0) {
+          const supabaseUrl = SUPABASE_URL;
+          const anonKey = SUPABASE_PUBLISHABLE_KEY;
+
+          for (const finalDoc of finalDocs) {
+            try {
+              // Generate base PDF
+              await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'apikey': anonKey },
+                body: JSON.stringify({ document_id: finalDoc.id }),
+              });
+
+              // Sign with PAdES
+              await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'apikey': anonKey },
+                body: JSON.stringify({ document_id: finalDoc.id }),
+              });
+            } catch (pdfErr) {
+              console.warn(`PDF generation failed for doc ${finalDoc.id}:`, pdfErr);
+            }
+          }
+        }
+      } catch (pdfGenErr) {
+        console.warn('Post-signature PDF generation error:', pdfGenErr);
+      }
+
+      // Activate contratada link if titular just completed
+      if (data.recipient_type === 'titular') {
+        try {
+          const { data: contratadaLinks } = await signatureClient
+            .from('signature_links')
+            .select('id, token, recipient_email')
+            .eq('sale_id', data.sale_id)
+            .eq('recipient_type', 'contratada')
+            .eq('status', 'pendiente');
+
+          if (contratadaLinks && contratadaLinks.length > 0) {
+            for (const cl of contratadaLinks) {
+              // Activate
+              await signatureClient
+                .from('signature_links')
+                .update({ is_active: true } as any)
+                .eq('id', cl.id);
+
+              // Send WhatsApp notification
+              try {
+                const linkUrl = `${window.location.origin}/firmar/${cl.token}`;
+                await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_PUBLISHABLE_KEY },
+                  body: JSON.stringify({
+                    to: cl.recipient_email,
+                    message: `Su enlace de firma está listo: ${linkUrl}`,
+                    sale_id: data.sale_id,
+                  }),
+                });
+              } catch (waErr) {
+                console.warn('WhatsApp notification to contratada failed:', waErr);
+              }
+            }
+          }
+        } catch (activateErr) {
+          console.warn('Could not activate contratada links:', activateErr);
+        }
       }
 
       return data;

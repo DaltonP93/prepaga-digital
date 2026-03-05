@@ -41,3 +41,12 @@ verify_jwt = false
 
 [functions.generate-evidence-pdf]
 verify_jwt = false
+
+[functions.generate-base-pdf]
+verify_jwt = false
+
+[functions.pades-sign-document]
+verify_jwt = false
+
+[functions.get-document-download-url]
+verify_jwt = false
