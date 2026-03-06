@@ -189,6 +189,7 @@ const SignatureWorkflow = () => {
     }
   };
 
+  const handleDownloadSignedDocs = async (link: any) => {
     // Find signed (final) documents for this recipient
     const recipientDocs = signedDocs.filter((doc: any) => {
       if (doc.document_type === 'firma') return false;
