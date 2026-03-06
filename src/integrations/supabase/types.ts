@@ -1329,32 +1329,38 @@ export type Database = {
       email_templates: {
         Row: {
           body: string
+          channel: string
           company_id: string
           created_at: string | null
           id: string
           is_active: boolean | null
           name: string
           subject: string
+          template_key: string | null
           updated_at: string | null
         }
         Insert: {
           body: string
+          channel?: string
           company_id: string
           created_at?: string | null
           id?: string
           is_active?: boolean | null
           name: string
           subject: string
+          template_key?: string | null
           updated_at?: string | null
         }
         Update: {
           body?: string
+          channel?: string
           company_id?: string
           created_at?: string | null
           id?: string
           is_active?: boolean | null
           name?: string
           subject?: string
+          template_key?: string | null
           updated_at?: string | null
         }
         Relationships: [

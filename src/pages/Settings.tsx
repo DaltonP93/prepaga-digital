@@ -36,6 +36,7 @@ import { AdminConfigPanel } from '@/components/AdminConfigPanel';
 import { MenuConfigPanel } from '@/components/MenuConfigPanel';
 import { OtpPolicyConfigPanel } from '@/components/OtpPolicyConfigPanel';
 import { useRolePermissions } from '@/hooks/useRolePermissions';
+import { WhatsAppTemplatesPanel } from '@/components/WhatsAppTemplatesPanel';
 
 export default function Settings() {
   const { profile } = useSimpleAuthContext();
@@ -205,6 +206,8 @@ export default function Settings() {
               <AdminConfigPanel />
               
               <OtpPolicyConfigPanel />
+
+              <WhatsAppTemplatesPanel />
             </>
           ) : (
             <Card>

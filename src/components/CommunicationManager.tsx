@@ -178,6 +178,8 @@ export const CommunicationManager = () => {
         body: templateForm.body,
         company_id: user?.user_metadata?.company_id || "",
         is_active: true,
+        channel: 'email',
+        template_key: templateForm.name.toLowerCase().replace(/\s+/g, '_'),
       });
       setTemplateForm({ name: "", subject: "", body: "" });
       setIsTemplateDialogOpen(false);

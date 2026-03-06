@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { ArrowLeft, FileText, Users, Send, Copy, Check, MessageCircle, Download, RefreshCw, Eye, Clock, CheckCircle, Info, Monitor, Smartphone, Tablet, Globe } from 'lucide-react';
+import { ArrowLeft, FileText, Users, Send, Copy, Check, MessageCircle, Download, RefreshCw, Eye, Clock, CheckCircle, Info, Monitor, Smartphone, Tablet, Globe, Building } from 'lucide-react';
 import { useSales } from '@/hooks/useSales';
 import { useSignatureLinks, useResendSignatureLink } from '@/hooks/useSignatureLinks';
 import { useBeneficiaries } from '@/hooks/useBeneficiaries';
@@ -192,10 +192,15 @@ const SignatureWorkflow = () => {
       const client = selectedSale?.clients as any;
       return `Titular: ${client ? `${client.first_name} ${client.last_name}` : 'Sin datos'}`;
     }
-    const beneficiary = beneficiaries?.find((b: any) => b.id === link.recipient_id);
-    if (beneficiary) {
-      return `Adherente: ${beneficiary.first_name} ${beneficiary.last_name}`;
+    if (link.recipient_type === 'contratada') {
+      const name = link.recipient_name
+        || (link.recipient_phone && !link.recipient_phone.includes('@') ? link.recipient_phone : null)
+        || link.recipient_email
+        || 'Representante Legal';
+      return `Contratada: ${name}`;
     }
+    const beneficiary = beneficiaries?.find((b: any) => b.id === link.recipient_id);
+    if (beneficiary) return `Adherente: ${beneficiary.first_name} ${beneficiary.last_name}`;
     return `Adherente: ${link.recipient_email || link.recipient_phone || 'Sin datos'}`;
   };
 
@@ -205,6 +210,7 @@ const SignatureWorkflow = () => {
       const client = selectedSale?.clients as any;
       return client?.phone || null;
     }
+    if (link.recipient_type === 'contratada') return null;
     const beneficiary = beneficiaries?.find((b: any) => b.id === link.recipient_id);
     return beneficiary?.phone || null;
   };
@@ -214,6 +220,9 @@ const SignatureWorkflow = () => {
       const client = selectedSale?.clients as any;
       return client ? `${client.first_name} ${client.last_name}` : 'Cliente';
     }
+    if (link.recipient_type === 'contratada') {
+      return link.recipient_name || link.recipient_phone || link.recipient_email || 'Representante Legal';
+    }
     const beneficiary = beneficiaries?.find((b: any) => b.id === link.recipient_id);
     return beneficiary ? `${beneficiary.first_name} ${beneficiary.last_name}` : 'Adherente';
   };
@@ -221,9 +230,10 @@ const SignatureWorkflow = () => {
   // Get the most recent active link for each recipient (skip revoked old ones)
   const getActiveLinks = (links: any[]) => {
     const byRecipient = new Map<string, any>();
-    // Links come sorted by created_at DESC, so first match per recipient is newest
     for (const link of links) {
-      const key = link.recipient_type === 'titular' ? 'titular' : `adherente-${link.recipient_id}`;
+      const key = link.recipient_type === 'titular' ? 'titular'
+        : link.recipient_type === 'contratada' ? 'contratada'
+        : `adherente-${link.recipient_id}`;
       if (!byRecipient.has(key)) {
         byRecipient.set(key, link);
       }
@@ -340,6 +350,7 @@ const SignatureWorkflow = () => {
 
   const titularLinks = getActiveLinks(signatureLinks?.filter((l: any) => l.recipient_type === 'titular') || []);
   const adherenteLinks = getActiveLinks(signatureLinks?.filter((l: any) => l.recipient_type === 'adherente') || []);
+  const contratadaLinks = getActiveLinks(signatureLinks?.filter((l: any) => l.recipient_type === 'contratada') || []);
 
   function renderSignatureLinks(links: any[]) {
     if (linksLoading) {
@@ -605,6 +616,31 @@ const SignatureWorkflow = () => {
             </CardHeader>
             <CardContent>
               {renderSignatureLinks(adherenteLinks)}
+            </CardContent>
+          </Card>
+        )}
+
+        {contratadaLinks.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building className="h-5 w-5" />
+                Firma de la Contratada ({contratadaLinks.length})
+                {contratadaLinks.every((l: any) => l.status === 'completado') && (
+                  <Badge className="bg-green-600 ml-2">✓ Completado</Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                El representante firma el contrato como último paso.
+                {contratadaLinks.some((l: any) => (l as any).is_active === false && l.status !== 'completado') && (
+                  <span className="text-amber-600 font-medium ml-1">
+                    ⏳ Se activa cuando titular y todos los adherentes completen su firma.
+                  </span>
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {renderSignatureLinks(contratadaLinks)}
             </CardContent>
           </Card>
         )}
