@@ -207,7 +207,7 @@ async function triggerPadesSigning(
     }
   }
 
-  return signedCount
+  return { count: signedCount, docIds: signedDocIds }
 }
 
 /**
