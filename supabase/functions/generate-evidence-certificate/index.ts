@@ -4,9 +4,24 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-function escapeHtml(input: string): string {
+function json(status: number, body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function sha256Hex(data: Uint8Array) {
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return [...new Uint8Array(hash)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function escapeHtml(input: unknown) {
   return String(input ?? "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
@@ -15,63 +30,169 @@ function escapeHtml(input: string): string {
     .replaceAll("'", "&#39;");
 }
 
-function renderTemplate(html: string, data: Record<string, string | null | undefined>): string {
+function renderTemplate(html: string, data: Record<string, any>) {
   return html.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_m, key) => {
     const value = data[key];
     return value === undefined || value === null ? "" : String(value);
   });
 }
 
-async function sha256Hex(data: Uint8Array): Promise<string> {
-  const hash = await crypto.subtle.digest("SHA-256", data);
-  return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
+function formatDate(value?: string | null) {
+  if (!value) return "";
+  try {
+    return new Date(value).toLocaleString("es-PY", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  } catch {
+    return value;
+  }
 }
 
-function formatDatePY(dateStr: string | null): string {
-  if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleString("es-PY", {
-    day: "2-digit", month: "2-digit", year: "numeric",
-    hour: "2-digit", minute: "2-digit", second: "2-digit",
-  });
+function tokenReference(token?: string | null) {
+  if (!token) return "";
+  if (token.length <= 10) return token;
+  return `${token.slice(0, 6)}...${token.slice(-4)}`;
 }
 
-const CERTIFICATE_HTML = `<!DOCTYPE html>
+function buildEvidenceCertificateHtml() {
+  return `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
   <title>Certificado de Evidencia Legal</title>
   <style>
     @page { size: A4; margin: 18mm; }
-    body { font-family: Arial, Helvetica, sans-serif; color: #1f2937; font-size: 12px; line-height: 1.45; margin: 0; padding: 0; background: #ffffff; }
-    .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #d1d5db; padding-bottom: 12px; margin-bottom: 18px; }
-    .brand { display: flex; align-items: center; gap: 14px; }
-    .brand img { max-height: 56px; max-width: 140px; object-fit: contain; }
-    .brand-text h1 { margin: 0; font-size: 20px; color: #111827; }
-    .brand-text p { margin: 4px 0 0 0; color: #4b5563; font-size: 11px; }
-    .badge { font-size: 11px; font-weight: bold; color: #065f46; background: #d1fae5; border: 1px solid #a7f3d0; border-radius: 999px; padding: 6px 10px; }
-    .section { margin-bottom: 18px; page-break-inside: avoid; }
-    .section h2 { font-size: 14px; margin: 0 0 10px 0; padding-bottom: 6px; border-bottom: 1px solid #e5e7eb; color: #111827; }
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      color: #1f2937;
+      font-size: 12px;
+      line-height: 1.45;
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 2px solid #d1d5db;
+      padding-bottom: 12px;
+      margin-bottom: 18px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .brand img {
+      max-height: 56px;
+      max-width: 140px;
+      object-fit: contain;
+    }
+    .brand-text h1 {
+      margin: 0;
+      font-size: 20px;
+      color: #111827;
+    }
+    .brand-text p {
+      margin: 4px 0 0 0;
+      color: #4b5563;
+      font-size: 11px;
+    }
+    .badge {
+      font-size: 11px;
+      font-weight: bold;
+      color: #065f46;
+      background: #d1fae5;
+      border: 1px solid #a7f3d0;
+      border-radius: 999px;
+      padding: 6px 10px;
+    }
+    .section {
+      margin-bottom: 18px;
+      page-break-inside: avoid;
+    }
+    .section h2 {
+      font-size: 14px;
+      margin: 0 0 10px 0;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #e5e7eb;
+      color: #111827;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 18px;
+    }
     .field { margin-bottom: 8px; }
-    .label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: #6b7280; margin-bottom: 2px; }
-    .value { font-size: 12px; color: #111827; word-break: break-word; }
-    .mono { font-family: "Courier New", monospace; font-size: 11px; word-break: break-all; }
-    .summary-box { border: 1px solid #d1d5db; background: #f9fafb; border-radius: 8px; padding: 12px; }
-    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-    th, td { border: 1px solid #d1d5db; padding: 8px; vertical-align: top; text-align: left; word-break: break-word; }
-    th { background: #f3f4f6; font-size: 11px; color: #111827; }
-    td { font-size: 11px; color: #1f2937; }
-    .footer { margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 10px; font-size: 10px; color: #6b7280; }
-    .small { font-size: 10px; color: #6b7280; }
+    .label {
+      display: block;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #6b7280;
+      margin-bottom: 2px;
+    }
+    .value {
+      font-size: 12px;
+      color: #111827;
+      word-break: break-word;
+    }
+    .mono {
+      font-family: "Courier New", monospace;
+      font-size: 11px;
+      word-break: break-all;
+    }
+    .summary-box {
+      border: 1px solid #d1d5db;
+      background: #f9fafb;
+      border-radius: 8px;
+      padding: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    th, td {
+      border: 1px solid #d1d5db;
+      padding: 8px;
+      vertical-align: top;
+      text-align: left;
+      word-break: break-word;
+    }
+    th {
+      background: #f3f4f6;
+      font-size: 11px;
+      color: #111827;
+    }
+    td {
+      font-size: 11px;
+      color: #1f2937;
+    }
+    .footer {
+      margin-top: 24px;
+      border-top: 1px solid #e5e7eb;
+      padding-top: 10px;
+      font-size: 10px;
+      color: #6b7280;
+    }
+    .small {
+      font-size: 10px;
+      color: #6b7280;
+    }
     .mt-8 { margin-top: 8px; }
-    .mt-12 { margin-top: 12px; }
-    .mt-16 { margin-top: 16px; }
   </style>
 </head>
 <body>
   <div class="header">
     <div class="brand">
-      {{companyLogo}}
+      {{companyLogoImg}}
       <div class="brand-text">
         <h1>Certificado de Evidencia Legal</h1>
         <p>{{companyName}}</p>
@@ -235,252 +356,350 @@ const CERTIFICATE_HTML = `<!DOCTYPE html>
   </div>
 </body>
 </html>`;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
+  if (req.method !== "POST") {
+    return json(405, { error: "Method not allowed" });
+  }
+
   try {
     const { document_id, signature_link_id } = await req.json();
+
     if (!document_id) {
-      return new Response(JSON.stringify({ error: "document_id is required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json(400, { error: "document_id is required" });
     }
 
-    const supabaseAdmin = createClient(
+    const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // 1. Fetch document + sale + company
-    const { data: doc, error: docErr } = await supabaseAdmin
+    const bucket = Deno.env.get("STORAGE_BUCKET") || "documents";
+    const renderUrl = Deno.env.get("RENDER_URL");
+    const renderKey = Deno.env.get("RENDER_KEY");
+
+    if (!renderUrl || !renderKey) {
+      return json(500, { error: "RENDER_URL or RENDER_KEY not configured" });
+    }
+
+    // 1) Document
+    const { data: doc, error: docErr } = await supabase
       .from("documents")
-      .select("id, sale_id, name, document_type, base_pdf_hash, signed_pdf_hash, signed_at, status")
+      .select(`
+        id,
+        sale_id,
+        name,
+        document_type,
+        base_pdf_hash,
+        signed_pdf_hash,
+        base_pdf_url,
+        signed_pdf_url
+      `)
       .eq("id", document_id)
       .single();
 
     if (docErr || !doc) {
-      return new Response(JSON.stringify({ error: "Document not found" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json(404, { error: "Document not found", details: docErr?.message });
     }
 
-    const { data: sale } = await supabaseAdmin
+    // 2) Sale
+    const { data: sale, error: saleErr } = await supabase
       .from("sales")
-      .select("id, contract_number, company_id, companies:company_id(name, logo_url)")
+      .select(`
+        id,
+        company_id,
+        contract_number,
+        signer_name,
+        signer_dni,
+        signer_type
+      `)
       .eq("id", doc.sale_id)
       .single();
 
-    const companyName = (sale?.companies as any)?.name || "Empresa";
-    const companyLogoUrl = (sale?.companies as any)?.logo_url || null;
+    if (saleErr || !sale) {
+      return json(404, { error: "Sale not found", details: saleErr?.message });
+    }
 
-    // 2. Fetch signature link
+    // 3) Company
+    const { data: company } = await supabase
+      .from("companies")
+      .select("id, name, logo_url")
+      .eq("id", sale.company_id)
+      .single();
+
+    // 4) Signature link
     let link: any = null;
     if (signature_link_id) {
-      const { data } = await supabaseAdmin
+      const { data } = await supabase
         .from("signature_links")
-        .select("id, token, recipient_type, recipient_email, recipient_phone, recipient_name, step_order, ip_addresses, completed_at")
+        .select(`
+          id,
+          token,
+          recipient_type,
+          recipient_id,
+          recipient_email,
+          recipient_phone,
+          step_order,
+          completed_at,
+          expires_at
+        `)
         .eq("id", signature_link_id)
         .single();
       link = data;
-    }
-
-    // 3. Fetch signature events
-    const { data: sigEvents = [] } = await supabaseAdmin
-      .from("signature_events")
-      .select("*")
-      .eq("document_id", document_id)
-      .order("timestamp", { ascending: true });
-
-    // 4. Fetch identity verification
-    let verification: any = null;
-    if (signature_link_id) {
-      const { data } = await supabaseAdmin
-        .from("signature_identity_verification")
-        .select("*")
-        .eq("signature_link_id", signature_link_id)
-        .order("created_at", { ascending: false })
+    } else {
+      // fallback: last completed link for this sale
+      const { data } = await supabase
+        .from("signature_links")
+        .select(`
+          id,
+          token,
+          recipient_type,
+          recipient_id,
+          recipient_email,
+          recipient_phone,
+          step_order,
+          completed_at,
+          expires_at
+        `)
+        .eq("sale_id", doc.sale_id)
+        .eq("status", "completado")
+        .order("completed_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      verification = data;
+      link = data;
     }
 
-    // 5. Fetch consent records
+    // 5) Signature event
+    const { data: signEvent } = await supabase
+      .from("signature_events")
+      .select(`
+        id,
+        timestamp,
+        ip_address,
+        user_agent,
+        signature_method,
+        identity_verification_id,
+        consent_record_id,
+        signed_pdf_hash
+      `)
+      .eq("document_id", doc.id)
+      .order("timestamp", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // 6) OTP verification
+    let otp: any = null;
+    if (signEvent?.identity_verification_id) {
+      const { data } = await supabase
+        .from("signature_identity_verification")
+        .select(`
+          id,
+          auth_method,
+          result,
+          verified_at,
+          channel
+        `)
+        .eq("id", signEvent.identity_verification_id)
+        .maybeSingle();
+      otp = data;
+    }
+
+    // 7) Consent
     let consent: any = null;
-    if (signature_link_id) {
-      const { data } = await supabaseAdmin
+    if (signEvent?.consent_record_id) {
+      const { data } = await supabase
         .from("signature_consent_records")
-        .select("*")
-        .eq("signature_link_id", signature_link_id)
-        .order("created_at", { ascending: false })
-        .limit(1)
+        .select(`
+          id,
+          consent_text_version,
+          checkbox_state,
+          created_at
+        `)
+        .eq("id", signEvent.consent_record_id)
         .maybeSingle();
       consent = data;
     }
 
-    // 6. Fetch process traces for timeline
-    const { data: traces = [] } = await supabaseAdmin
+    // 8) Process traces / chronology
+    const { data: traces } = await supabase
       .from("process_traces")
-      .select("*")
+      .select("action, details, created_at")
       .eq("sale_id", doc.sale_id)
       .order("created_at", { ascending: true });
 
-    // 7. Build events rows
-    const timelineEvents: Array<{ date: string; event: string; actor: string; detail: string }> = [];
+    const eventsRows = (traces || [])
+      .map((t: any) => {
+        const action = escapeHtml(t.action || "");
+        const actor = escapeHtml(t.details?.recipient_type || t.details?.actor || "");
+        const detail = escapeHtml(
+          JSON.stringify(t.details || {})
+            .replaceAll("{", "")
+            .replaceAll("}", "")
+        );
+        return `<tr><td>${escapeHtml(formatDate(t.created_at))}</td><td>${action}</td><td>${actor}</td><td>${detail}</td></tr>`;
+      })
+      .join("");
 
-    for (const t of traces || []) {
-      timelineEvents.push({
-        date: formatDatePY(t.created_at),
-        event: t.action || "trace",
-        actor: (t.details as any)?.recipient_type || "sistema",
-        detail: (t.details as any)?.description || JSON.stringify(t.details || {}).substring(0, 120),
-      });
+    // 9) Resolve signer name
+    let signerName = "";
+    if (link?.recipient_type === "titular") {
+      signerName = sale.signer_name || "Titular";
+    } else if (link?.recipient_type === "contratada") {
+      const { data: companySettings } = await supabase
+        .from("company_settings")
+        .select("contratada_signer_name, contratada_signer_email")
+        .eq("company_id", sale.company_id)
+        .maybeSingle();
+
+      signerName =
+        companySettings?.contratada_signer_name ||
+        company?.name ||
+        "Contratada";
+    } else if (link?.recipient_type === "adherente" && link?.recipient_id) {
+      const { data: beneficiary } = await supabase
+        .from("beneficiaries")
+        .select("first_name, last_name, email, phone")
+        .eq("id", link.recipient_id)
+        .maybeSingle();
+
+      signerName = beneficiary
+        ? `${beneficiary.first_name || ""} ${beneficiary.last_name || ""}`.trim()
+        : "Adherente";
     }
 
-    for (const se of sigEvents || []) {
-      timelineEvents.push({
-        date: formatDatePY(se.timestamp),
-        event: `signature_event (${se.signature_method || "n/a"})`,
-        actor: "sistema",
-        detail: `Hash: ${(se.signed_pdf_hash || "").substring(0, 16)}…`,
-      });
-    }
+    // 10) HTML data
+    const companyLogoImg =
+      company?.logo_url
+        ? `<img src="${escapeHtml(company.logo_url)}" alt="Logo" />`
+        : "";
 
-    timelineEvents.sort((a, b) => a.date.localeCompare(b.date));
-
-    const eventsRows = timelineEvents.length > 0
-      ? timelineEvents.map((e) => `<tr><td>${escapeHtml(e.date)}</td><td>${escapeHtml(e.event)}</td><td>${escapeHtml(e.actor)}</td><td>${escapeHtml(e.detail)}</td></tr>`).join("")
-      : `<tr><td colspan="4" style="text-align:center;color:#6b7280;">Sin eventos registrados</td></tr>`;
-
-    // 8. Build IP / UA from link
-    const ipAddress = link?.ip_addresses
-      ? (Array.isArray(link.ip_addresses) ? link.ip_addresses.join(", ") : String(link.ip_addresses))
-      : "—";
-
-    // Try to get user agent from workflow steps or traces
-    let userAgent = "—";
-    if (signature_link_id) {
-      const { data: steps } = await supabaseAdmin
-        .from("signature_workflow_steps")
-        .select("data")
-        .eq("signature_link_id", signature_link_id)
-        .order("created_at", { ascending: false })
-        .limit(1);
-      if (steps && steps.length > 0) {
-        userAgent = (steps[0].data as any)?.user_agent || "—";
-      }
-    }
-
-    const nowIso = new Date().toISOString();
-
-    const companyLogo = companyLogoUrl
-      ? `<img src="${escapeHtml(companyLogoUrl)}" alt="Logo" />`
-      : "";
-
-    const templateData: Record<string, string> = {
-      companyName: escapeHtml(companyName),
-      companyLogo,
+    const htmlData: Record<string, string> = {
+      companyLogoImg,
+      companyName: escapeHtml(company?.name || ""),
       documentName: escapeHtml(doc.name || ""),
-      documentType: escapeHtml(doc.document_type || "documento"),
-      contractNumber: escapeHtml(sale?.contract_number || "—"),
-      certificateIssuedAt: formatDatePY(nowIso),
+      documentType: escapeHtml(doc.document_type || ""),
+      contractNumber: escapeHtml(sale.contract_number || ""),
+      certificateIssuedAt: escapeHtml(formatDate(new Date().toISOString())),
       saleId: escapeHtml(doc.sale_id),
       documentId: escapeHtml(doc.id),
-      signerName: escapeHtml(link?.recipient_name || link?.recipient_email || "—"),
-      recipientType: escapeHtml(link?.recipient_type || "—"),
-      signerEmail: escapeHtml(link?.recipient_email || "—"),
-      signerPhone: escapeHtml(link?.recipient_phone || "—"),
-      stepOrder: String(link?.step_order ?? "—"),
-      signatureLinkId: escapeHtml(signature_link_id || "—"),
-      basePdfHash: escapeHtml(doc.base_pdf_hash || "No generado"),
-      signedPdfHash: escapeHtml(doc.signed_pdf_hash || "No generado"),
-      tokenReference: escapeHtml(link?.token || "—"),
-      signatureMethod: escapeHtml((sigEvents && sigEvents.length > 0 ? sigEvents[sigEvents.length - 1].signature_method : null) || "PAdES"),
-      ipAddress,
-      userAgent: escapeHtml(userAgent.substring(0, 200)),
-      otpMethod: escapeHtml(verification?.verification_method || "—"),
-      otpResult: escapeHtml(verification?.status || "—"),
-      otpVerifiedAt: formatDatePY(verification?.verified_at || verification?.created_at || null),
-      consentVersion: escapeHtml(consent?.consent_version || "v1.0"),
-      consentAccepted: consent ? "Sí" : "—",
-      consentCreatedAt: formatDatePY(consent?.created_at || null),
+      signerName: escapeHtml(signerName),
+      recipientType: escapeHtml(link?.recipient_type || ""),
+      signerEmail: escapeHtml(link?.recipient_email || ""),
+      signerPhone: escapeHtml(link?.recipient_phone || ""),
+      stepOrder: escapeHtml(String(link?.step_order ?? "")),
+      signatureLinkId: escapeHtml(link?.id || ""),
+      basePdfHash: escapeHtml(doc.base_pdf_hash || ""),
+      signedPdfHash: escapeHtml(doc.signed_pdf_hash || signEvent?.signed_pdf_hash || ""),
+      tokenReference: escapeHtml(tokenReference(link?.token)),
+      signatureMethod: escapeHtml(signEvent?.signature_method || "PAdES"),
+      ipAddress: escapeHtml(signEvent?.ip_address || ""),
+      userAgent: escapeHtml(signEvent?.user_agent || ""),
+      otpMethod: escapeHtml(otp?.auth_method || ""),
+      otpResult: escapeHtml(otp?.result || ""),
+      otpVerifiedAt: escapeHtml(formatDate(otp?.verified_at)),
+      consentVersion: escapeHtml(consent?.consent_text_version || ""),
+      consentAccepted: consent?.checkbox_state ? "Sí" : "No",
+      consentCreatedAt: escapeHtml(formatDate(consent?.created_at)),
       eventsRows,
     };
 
-    const renderedHtml = renderTemplate(CERTIFICATE_HTML, templateData);
-
-    // 9. Send to render service
-    const renderUrl = Deno.env.get("RENDER_URL");
-    const renderKey = Deno.env.get("RENDER_KEY");
-    if (!renderUrl || !renderKey) {
-      return new Response(JSON.stringify({ error: "RENDER_URL or RENDER_KEY not configured" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // 11) Render HTML
+    const rawHtml = buildEvidenceCertificateHtml();
+    const renderedHtml = renderTemplate(rawHtml, htmlData);
 
     const renderResponse = await fetch(renderUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-RENDER-KEY": renderKey },
-      body: JSON.stringify({ html: renderedHtml, options: { format: "A4", printBackground: true } }),
+      headers: {
+        "Content-Type": "application/json",
+        "X-RENDER-KEY": renderKey,
+      },
+      body: JSON.stringify({
+        html: renderedHtml,
+        options: {
+          format: "A4",
+          printBackground: true,
+          margin: { top: "15mm", right: "15mm", bottom: "15mm", left: "15mm" },
+        },
+      }),
     });
 
     if (!renderResponse.ok) {
       const errText = await renderResponse.text();
       console.error("Render service error:", errText);
-      return new Response(JSON.stringify({ error: "Render service failed", details: errText }), {
-        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json(502, { error: "Render service failed", details: errText });
     }
 
     const pdfBytes = new Uint8Array(await renderResponse.arrayBuffer());
-    const hash = await sha256Hex(pdfBytes);
+    const certHash = await sha256Hex(pdfBytes);
 
-    // 10. Upload to Storage
-    const bucket = Deno.env.get("STORAGE_BUCKET") || "documents";
+    // 12) Upload PDF
     const storagePath = `contracts/evidence/${doc.sale_id}/${doc.id}.pdf`;
 
-    const { error: uploadErr } = await supabaseAdmin.storage
+    const { error: uploadErr } = await supabase.storage
       .from(bucket)
-      .upload(storagePath, pdfBytes, { contentType: "application/pdf", upsert: true });
+      .upload(storagePath, pdfBytes, {
+        contentType: "application/pdf",
+        upsert: true,
+      });
 
     if (uploadErr) {
       console.error("Storage upload error:", uploadErr);
-      return new Response(JSON.stringify({ error: "Storage upload failed", details: uploadErr.message }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json(500, { error: "Storage upload failed", details: uploadErr.message });
     }
 
-    const certificateUrl = `${bucket}:${storagePath}`;
+    const certUrl = `${bucket}:${storagePath}`;
 
-    // 11. Update documents table
-    await supabaseAdmin
+    // 13) Update document
+    const { error: docUpdateErr } = await supabase
       .from("documents")
-      .update({ evidence_certificate_url: certificateUrl, evidence_certificate_hash: hash })
-      .eq("id", document_id);
+      .update({
+        evidence_certificate_url: certUrl,
+        evidence_certificate_hash: certHash,
+      })
+      .eq("id", doc.id);
 
-    // 12. Insert into legal_evidence_certificates
-    await supabaseAdmin
+    if (docUpdateErr) {
+      console.error("Document update error:", docUpdateErr);
+      return json(500, { error: "Could not update document", details: docUpdateErr.message });
+    }
+
+    // 14) Insert legal_evidence_certificates
+    const payload = {
+      saleId: doc.sale_id,
+      documentId: doc.id,
+      signatureLinkId: link?.id || null,
+      htmlData,
+    };
+
+    const { error: certErr } = await supabase
       .from("legal_evidence_certificates")
       .insert({
         sale_id: doc.sale_id,
         document_id: doc.id,
-        signature_link_id: signature_link_id || null,
-        certificate_url: certificateUrl,
-        certificate_hash: hash,
-        payload: templateData,
+        signature_link_id: link?.id || null,
+        certificate_url: certUrl,
+        certificate_hash: certHash,
+        payload,
       });
 
-    return new Response(
-      JSON.stringify({ success: true, document_id, certificate_url: certificateUrl, certificate_hash: hash }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    if (certErr) {
+      console.error("Legal evidence insert error:", certErr);
+      return json(500, { error: "Could not insert legal evidence record", details: certErr.message });
+    }
+
+    return json(200, {
+      ok: true,
+      document_id: doc.id,
+      evidence_certificate_url: certUrl,
+      evidence_certificate_hash: certHash,
+    });
   } catch (err) {
     console.error("generate-evidence-certificate error:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json(500, { error: err?.message || "Unexpected error" });
   }
 });
