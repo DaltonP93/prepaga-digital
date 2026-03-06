@@ -48,12 +48,27 @@ serve(async (req) => {
     }
 
     // 2. Trigger PAdES signing for appropriate documents
+    const signedDocIds: string[] = []
     try {
-      const signedCount = await triggerPadesSigning(supabase, link, supabaseUrl, serviceKey)
-      result.signed_documents = signedCount
+      const { count, docIds } = await triggerPadesSigning(supabase, link, supabaseUrl, serviceKey)
+      result.signed_documents = count
+      signedDocIds.push(...docIds)
     } catch (padesErr) {
       console.error('PAdES signing error (non-blocking):', padesErr)
       result.pades_error = String(padesErr)
+    }
+
+    // 2b. Generate evidence certificates for successfully signed docs
+    for (const docId of signedDocIds) {
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/generate-evidence-certificate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
+          body: JSON.stringify({ document_id: docId, signature_link_id: link.id }),
+        })
+      } catch (certErr) {
+        console.error('Evidence certificate error (non-blocking):', certErr)
+      }
     }
 
     // 3. Sequential activation: if titular/adherentes completed, activate contratada
@@ -104,8 +119,9 @@ async function triggerPadesSigning(
   link: any,
   supabaseUrl: string,
   serviceKey: string
-): Promise<number> {
+): Promise<{ count: number; docIds: string[] }> {
   let signedCount = 0
+  const signedDocIds: string[] = []
 
   // Get documents for this sale
   const { data: docs } = await supabase
@@ -182,6 +198,7 @@ async function triggerPadesSigning(
       const signResult = await signResponse.json()
       if (signResult.success) {
         signedCount++
+        signedDocIds.push(doc.id)
       } else {
         console.error(`pades-sign-document failed for doc ${doc.id}:`, signResult)
       }
@@ -190,7 +207,7 @@ async function triggerPadesSigning(
     }
   }
 
-  return signedCount
+  return { count: signedCount, docIds: signedDocIds }
 }
 
 /**

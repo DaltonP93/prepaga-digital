@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { ArrowLeft, FileText, Users, Send, Copy, Check, MessageCircle, Download, RefreshCw, Eye, Clock, CheckCircle, Info, Monitor, Smartphone, Tablet, Globe, Building } from 'lucide-react';
+import { ArrowLeft, FileText, Users, Send, Copy, Check, MessageCircle, Download, RefreshCw, Eye, Clock, CheckCircle, Info, Monitor, Smartphone, Tablet, Globe, Building, ShieldCheck } from 'lucide-react';
 import { useSales } from '@/hooks/useSales';
 import { useSignatureLinks, useResendSignatureLink } from '@/hooks/useSignatureLinks';
 import { useBeneficiaries } from '@/hooks/useBeneficiaries';
@@ -159,6 +159,33 @@ const SignatureWorkflow = () => {
       printWindow.onload = () => {
         printWindow.print();
       };
+    }
+  };
+
+  const handleDownloadEvidence = async (docId: string) => {
+    try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const response = await fetch(
+        `${SUPABASE_URL}/functions/v1/get-document-download-url`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+          },
+          body: JSON.stringify({ document_id: docId, kind: 'evidence' }),
+        }
+      );
+      const result = await response.json();
+      if (result.url) {
+        window.open(result.url, '_blank');
+      } else {
+        toast.error('Certificado de evidencia no disponible');
+      }
+    } catch {
+      toast.error('Error al descargar certificado de evidencia');
     }
   };
 
@@ -726,6 +753,16 @@ const SignatureWorkflow = () => {
                           >
                             <Download className="h-3 w-3 mr-1" />
                             Descargar
+                          </Button>
+                        )}
+                        {doc.evidence_certificate_url && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDownloadEvidence(doc.id)}
+                          >
+                            <ShieldCheck className="h-3 w-3 mr-1" />
+                            Evidencia
                           </Button>
                         )}
                       </div>

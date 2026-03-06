@@ -25,7 +25,12 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const column = kind === "signed" ? "signed_pdf_url" : "base_pdf_url";
+    const columnMap: Record<string, string> = {
+      signed: "signed_pdf_url",
+      base: "base_pdf_url",
+      evidence: "evidence_certificate_url",
+    };
+    const column = columnMap[kind] || "base_pdf_url";
 
     const { data: doc, error: docErr } = await supabaseAdmin
       .from("documents")

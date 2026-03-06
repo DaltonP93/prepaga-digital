@@ -57,3 +57,6 @@ verify_jwt = false
 
 [functions.cleanup-expired-signature-links]
 verify_jwt = false
+
+[functions.generate-evidence-certificate]
+verify_jwt = false
