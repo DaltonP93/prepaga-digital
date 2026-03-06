@@ -755,6 +755,16 @@ const SignatureWorkflow = () => {
                             Descargar
                           </Button>
                         )}
+                        {doc.evidence_certificate_url && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDownloadEvidence(doc.id)}
+                          >
+                            <ShieldCheck className="h-3 w-3 mr-1" />
+                            Evidencia
+                          </Button>
+                        )}
                       </div>
                     </div>
                   );
