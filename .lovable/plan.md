@@ -1,98 +1,88 @@
 
 
-## Plan: Fase 3 — Bloque contratada corregido + company name dinámico
+## Plan: Fase 4 — Bloque PAdES robusto con filtrado por rol, orden y re-firma
 
 ### Archivo único a modificar
-`src/hooks/useSignatureLinkPublic.ts` — líneas 641-695
+`src/hooks/useSignatureLinkPublic.ts` — líneas 598-639
 
 ### Cambio
-Reemplazar el bloque completo de activación de contratada con la versión corregida del usuario. Diferencias clave vs. código actual:
+Reemplazar el bloque actual de post-firma (42 líneas) con la versión robusta (~90 líneas) que implementa:
 
-1. **Separar queries**: primero `sales.company_id`, luego `companies.name` como query independiente (evita el join `companies:company_id(name)` que puede fallar con RLS en contexto público)
-2. **Authorization header**: agregar `Authorization: Bearer ${SUPABASE_PUBLISHABLE_KEY}` al fetch de `send-whatsapp`
-3. **Guard mejorado**: mover el check de `recipient_phone` ANTES del fetch con `continue` explícito y log de warning con `linkId`
-4. **Sin recipient_name en query**: simplificar select a `id, token, recipient_phone` (el nombre se hardcodea como "Representante" ya que viene de config empresa)
-5. **companyName dinámico**: query separada a `companies` por `companyId` para obtener nombre real en vez de hardcodear "Prepaga Digital"
+1. **Fetch completo de docs**: incluye `beneficiary_id` y `signed_pdf_url` en el select
+2. **Check de contratada pendiente**: query a `signature_links` para saber si existe un paso contratada en status `pendiente` — si existe, el contrato NO se firma aún
+3. **Filtrado inteligente por `recipient_type`**:
+   - **contratada** → solo firma contratos
+   - **titular** → firma docs sin `beneficiary_id` y que no sean contrato (si hay contratada pendiente)
+   - **adherente** → solo firma docs donde `beneficiary_id === data.recipient_id`
+4. **Anti re-firma**: si `signed_pdf_url` ya existe, se salta el documento
+5. **Authorization header**: incluido en ambos fetch (generate-base-pdf y pades-sign-document)
 
-### Código resultante (líneas 641-723)
+### Código resultante (reemplaza líneas 598-639)
 
 ```typescript
-// Activate contratada link if titular just completed
-if (data.recipient_type === 'titular') {
-  try {
-    const { data: saleRow, error: saleErr } = await signatureClient
-      .from('sales')
-      .select('id, company_id')
-      .eq('id', data.sale_id)
-      .single();
+// Post-signature: generate base PDF + PAdES only when it actually corresponds
+try {
+  const supabaseUrl = SUPABASE_URL;
+  const anonKey = SUPABASE_PUBLISHABLE_KEY;
 
-    if (saleErr || !saleRow?.company_id) {
-      console.warn('Could not fetch sale.company_id for WhatsApp:', saleErr);
-    } else {
-      const companyId = saleRow.company_id as string;
+  const { data: docs, error: docsErr } = await signatureClient
+    .from('documents')
+    .select('id, document_type, beneficiary_id, is_final, signed_pdf_url')
+    .eq('sale_id', data.sale_id)
+    .eq('is_final', true)
+    .neq('document_type', 'firma');
 
-      const { data: company } = await signatureClient
-        .from('companies')
-        .select('name')
-        .eq('id', companyId)
-        .single();
+  if (docsErr) {
+    console.warn('Could not fetch final documents:', docsErr);
+  } else if (docs && docs.length > 0) {
+    const recipientType = data.recipient_type;
 
-      const { data: contratadaLinks, error: clErr } = await signatureClient
+    let hasPendingContratada = false;
+    try {
+      const { data: pendingCL } = await signatureClient
         .from('signature_links')
-        .select('id, token, recipient_phone')
+        .select('id')
         .eq('sale_id', data.sale_id)
         .eq('recipient_type', 'contratada')
         .eq('status', 'pendiente');
+      hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
+    } catch (e) {
+      console.warn('Could not check pending contratada links:', e);
+      hasPendingContratada = true;
+    }
 
-      if (clErr) console.warn('Could not fetch contratada links:', clErr);
+    const docsToSign = docs.filter((d: any) => {
+      if (d.signed_pdf_url) return false;
+      const dt = (d.document_type || '').toLowerCase();
+      const isContract = dt === 'contrato' || dt === 'contract';
 
-      if (contratadaLinks && contratadaLinks.length > 0) {
-        for (const cl of contratadaLinks) {
-          await signatureClient
-            .from('signature_links')
-            .update({ is_active: true } as any)
-            .eq('id', cl.id);
+      if (recipientType === 'contratada') return isContract;
+      if (recipientType === 'titular') {
+        if (isContract && hasPendingContratada) return false;
+        return d.beneficiary_id == null && !isContract;
+      }
+      if (recipientType === 'adherente') {
+        return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
+      }
+      return false;
+    });
 
-          try {
-            if (!cl.recipient_phone) {
-              console.warn('No recipient_phone for contratada link', { linkId: cl.id });
-              continue;
-            }
-            const linkUrl = `${window.location.origin}/firmar/${cl.token}`;
-            await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'apikey': SUPABASE_PUBLISHABLE_KEY,
-                'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
-              },
-              body: JSON.stringify({
-                to: cl.recipient_phone,
-                templateName: 'signature_link',
-                templateData: {
-                  clientName: 'Representante',
-                  companyName: company?.name || 'Empresa',
-                  signatureUrl: linkUrl,
-                },
-                saleId: data.sale_id,
-                companyId,
-                messageType: 'signature_link',
-              }),
-            });
-          } catch (waErr) {
-            console.warn('WhatsApp notification to contratada failed:', waErr);
-          }
-        }
+    for (const doc of docsToSign) {
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, { ... });
+        await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, { ... });
+      } catch (pdfErr) {
+        console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
       }
     }
-  } catch (activateErr) {
-    console.warn('Could not activate contratada links:', activateErr);
   }
+} catch (pdfGenErr) {
+  console.warn('Post-signature PDF generation error:', pdfGenErr);
 }
 ```
 
 ### Impacto
-- Solo 1 archivo, 1 bloque de ~55 líneas reemplazado por ~70 líneas
-- No afecta el bloque de PAdES condicional (ya corregido en Fase 2)
-- No requiere migraciones ni cambios en Edge Functions
+- Solo 1 archivo, 1 bloque reemplazado
+- No afecta el bloque de activación de contratada (Fase 3)
+- No requiere migraciones
 
