@@ -162,7 +162,33 @@ const SignatureWorkflow = () => {
     }
   };
 
-  const handleDownloadSignedDocs = async (link: any) => {
+  const handleDownloadEvidence = async (docId: string) => {
+    try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const response = await fetch(
+        `${SUPABASE_URL}/functions/v1/get-document-download-url`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+          },
+          body: JSON.stringify({ document_id: docId, kind: 'evidence' }),
+        }
+      );
+      const result = await response.json();
+      if (result.url) {
+        window.open(result.url, '_blank');
+      } else {
+        toast.error('Certificado de evidencia no disponible');
+      }
+    } catch {
+      toast.error('Error al descargar certificado de evidencia');
+    }
+  };
+
     // Find signed (final) documents for this recipient
     const recipientDocs = signedDocs.filter((doc: any) => {
       if (doc.document_type === 'firma') return false;
