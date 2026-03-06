@@ -10,6 +10,7 @@ const corsHeaders = {
 interface WhatsAppRequest {
   to: string;
   templateName: string;
+  templateKey?: string;
   templateData: Record<string, string>;
   saleId?: string;
   companyId: string;

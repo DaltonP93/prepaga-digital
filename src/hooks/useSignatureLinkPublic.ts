@@ -561,7 +561,7 @@ export const useSubmitSignatureLink = () => {
               sale_id: doc.sale_id,
               beneficiary_id: doc.beneficiary_id,
               name: `${doc.name} (Firmado)`,
-              document_type: doc.document_type ? `${doc.document_type}_firmado` : 'documento_firmado',
+              document_type: doc.document_type || 'documento',
               document_type_id: doc.document_type_id,
               generated_from_template: doc.generated_from_template,
               requires_signature: false,
