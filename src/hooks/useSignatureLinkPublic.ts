@@ -595,42 +595,85 @@ export const useSubmitSignatureLink = () => {
         console.warn('Could not log process trace:', traceErr);
       }
 
-      // Post-signature: generate base PDF + PAdES (conditional by document type)
+      // Post-signature: generate base PDF + PAdES only when it actually corresponds
       try {
-        // Determine which documents to sign with PAdES now
-        let pdfQuery = signatureClient
+        const supabaseUrl = SUPABASE_URL;
+        const anonKey = SUPABASE_PUBLISHABLE_KEY;
+
+        // 1) Fetch candidate docs for this sale (exclude internal 'firma')
+        const { data: docs, error: docsErr } = await signatureClient
           .from('documents')
-          .select('id, document_type')
+          .select('id, document_type, beneficiary_id, is_final, signed_pdf_url')
           .eq('sale_id', data.sale_id)
           .eq('is_final', true)
           .neq('document_type', 'firma');
 
-        if (data.recipient_type === 'titular') {
-          // Titular: only sign DDJJ (not contrato — that waits for contratada)
-          pdfQuery = pdfQuery.neq('document_type', 'contrato');
-        } else if (data.recipient_type === 'adherente') {
-          // Adherente: only their own DDJJ (by beneficiary_id)
-          pdfQuery = pdfQuery.eq('beneficiary_id', data.recipient_id);
-        }
-        // contratada: signs everything remaining (contrato included)
+        if (docsErr) {
+          console.warn('Could not fetch final documents:', docsErr);
+        } else if (docs && docs.length > 0) {
+          const recipientType = data.recipient_type;
 
-        const { data: finalDocs } = await pdfQuery;
+          // Check if there is a pending contratada link (means contract must wait)
+          let hasPendingContratada = false;
+          try {
+            const { data: pendingCL } = await signatureClient
+              .from('signature_links')
+              .select('id')
+              .eq('sale_id', data.sale_id)
+              .eq('recipient_type', 'contratada')
+              .eq('status', 'pendiente');
+            hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
+          } catch (e) {
+            console.warn('Could not check pending contratada links, using conservative mode:', e);
+            hasPendingContratada = true;
+          }
 
-        if (finalDocs && finalDocs.length > 0) {
-          for (const finalDoc of finalDocs) {
-            try {
-              await fetch(`${SUPABASE_URL}/functions/v1/generate-base-pdf`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_PUBLISHABLE_KEY },
-                body: JSON.stringify({ document_id: finalDoc.id }),
-              });
-              await fetch(`${SUPABASE_URL}/functions/v1/pades-sign-document`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_PUBLISHABLE_KEY },
-                body: JSON.stringify({ document_id: finalDoc.id }),
-              });
-            } catch (pdfErr) {
-              console.warn(`PDF generation failed for doc ${finalDoc.id}:`, pdfErr);
+          const docsToSign = docs.filter((d: any) => {
+            if (d.signed_pdf_url) return false; // already signed -> skip
+
+            const dt = (d.document_type || '').toLowerCase();
+            const isContract = dt === 'contrato' || dt === 'contract';
+
+            if (recipientType === 'contratada') {
+              return isContract;
+            }
+
+            if (recipientType === 'titular') {
+              if (isContract && hasPendingContratada) return false;
+              return d.beneficiary_id == null && !isContract;
+            }
+
+            if (recipientType === 'adherente') {
+              return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
+            }
+
+            return false;
+          });
+
+          if (docsToSign.length > 0) {
+            for (const doc of docsToSign) {
+              try {
+                await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': anonKey,
+                    'Authorization': `Bearer ${anonKey}`,
+                  },
+                  body: JSON.stringify({ document_id: doc.id }),
+                });
+                await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': anonKey,
+                    'Authorization': `Bearer ${anonKey}`,
+                  },
+                  body: JSON.stringify({ document_id: doc.id }),
+                });
+              } catch (pdfErr) {
+                console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
+              }
             }
           }
         }
