@@ -119,8 +119,9 @@ async function triggerPadesSigning(
   link: any,
   supabaseUrl: string,
   serviceKey: string
-): Promise<number> {
+): Promise<{ count: number; docIds: string[] }> {
   let signedCount = 0
+  const signedDocIds: string[] = []
 
   // Get documents for this sale
   const { data: docs } = await supabase
