@@ -347,7 +347,7 @@ export const useSubmitSignatureLink = () => {
             if ((saleInfo as any)?.company_id) {
               const { data: cs } = await signatureClient
                 .from('company_settings')
-                .select('contratada_signer_name, contratada_signer_dni, contratada_signer_email')
+                .select('contratada_signer_name, contratada_signer_dni, contratada_signer_email, contratada_signature_mode')
                 .eq('company_id', (saleInfo as any).company_id)
                 .single();
               companySettings = cs;
@@ -368,14 +368,28 @@ export const useSubmitSignatureLink = () => {
                 .like('document_type', '%contrato%')
                 .limit(1);
               if (otherFinalDocs && otherFinalDocs.length > 0) {
-                // Extract the other party's signature block from the final doc
                 const otherContent = otherFinalDocs[0].content || '';
-                const blockLabel = otherType === 'contratada' ? 'CONTRATADA' : 'CONTRATANTE';
-                const blockRegex = new RegExp(`<div[^>]*style="[^"]*display:inline-block[^"]*"[^>]*>[\\s\\S]*?<p[^>]*>${blockLabel}<\\/p>[\\s\\S]*?<\\/div>`, 'i');
-                const match = otherContent.match(blockRegex);
-                if (match) {
-                  existingOtherPartyBlock = match[0];
-                }
+                try {
+                  const parser = new DOMParser();
+                  const parsedDoc = parser.parseFromString(otherContent, 'text/html');
+                  const signerBlock = parsedDoc.querySelector(`[data-signer="${otherType}"]`);
+                  if (signerBlock) {
+                    existingOtherPartyBlock = signerBlock.outerHTML;
+                  } else {
+                    const roleText = otherType === 'contratada' ? 'CONTRATADA' : 'CONTRATANTE';
+                    const allDivs = parsedDoc.querySelectorAll('div');
+                    for (const div of Array.from(allDivs)) {
+                      if (
+                        div.textContent?.includes(roleText) &&
+                        div.querySelectorAll('p').length >= 2 &&
+                        !div.querySelector('div')
+                      ) {
+                        existingOtherPartyBlock = div.outerHTML;
+                        break;
+                      }
+                    }
+                  }
+                } catch { /* ignore parsing errors */ }
               }
             } catch { /* ignore */ }
           }
@@ -412,8 +426,7 @@ export const useSubmitSignatureLink = () => {
                 }
                 roleLabel = 'ADHERENTE';
               } else if (recipientType === 'contratada') {
-                // Use company settings signer info or company name
-                signerName = companySettings?.contratada_signer_name || companyInfo?.name || '';
+                signerName = companySettings?.contratada_signer_name || companyInfo?.name || 'Representante';
                 signerCI = companySettings?.contratada_signer_dni || companyInfo?.tax_id || '';
                 roleLabel = 'CONTRATADA';
               } else if (saleClientInfo) {
@@ -433,8 +446,9 @@ export const useSubmitSignatureLink = () => {
               let electronicBlock: string;
               if (useV1) {
                 // v1.0 — Detailed block with metadata
+                const signerAttr = recipientType === 'contratada' ? 'contratada' : recipientType === 'adherente' ? 'adherente' : 'titular';
                 electronicBlock = `
-                  <div style="display:inline-block;vertical-align:top;width:48%;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#111;border:1px solid #ccc;border-radius:6px;padding:10px;">
+                  <div data-signer="${signerAttr}" style="display:inline-block;vertical-align:top;width:48%;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#111;border:1px solid #ccc;border-radius:6px;padding:10px;">
                     <table style="width:100%;border-collapse:collapse;font-size:10px;">
                       <tr><td style="color:#666;padding:1px 4px;">Firmante:</td><td><strong>${signerName}</strong></td></tr>
                       <tr><td style="color:#666;padding:1px 4px;">Fecha:</td><td>${formattedDate}</td></tr>
@@ -452,8 +466,9 @@ export const useSubmitSignatureLink = () => {
                 `;
               } else {
                 // v2.0 — Professional block matching reference PDF format
+                const signerAttrV2 = recipientType === 'contratada' ? 'contratada' : recipientType === 'adherente' ? 'adherente' : 'titular';
                 electronicBlock = `
-                  <div style="display:inline-block;vertical-align:top;width:48%;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111;">
+                  <div data-signer="${signerAttrV2}" style="display:inline-block;vertical-align:top;width:48%;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111;">
                     <p style="margin:0 0 2px 0;font-size:11px;">Firmado electrónicamente por: <strong>${signerName.toLowerCase()}</strong></p>
                     <p style="margin:0 0 8px 0;font-size:11px;">Fecha: ${formattedDate}</p>
                     <div style="border-top:2px solid #333;width:90%;margin:0 auto 4px auto;"></div>
@@ -595,155 +610,36 @@ export const useSubmitSignatureLink = () => {
         console.warn('Could not log process trace:', traceErr);
       }
 
-      // Post-signature: generate base PDF + PAdES only when it corresponds to this signer + step
+      // --- POST FIRMA: delegar todo al backend ---
       try {
-        const supabaseUrl = SUPABASE_URL;
-        const anonKey = SUPABASE_PUBLISHABLE_KEY;
-
-        const { data: docs, error: docsErr } = await signatureClient
-          .from('documents')
-          .select('id, document_type, beneficiary_id, is_final, signed_pdf_url')
-          .eq('sale_id', data.sale_id)
-          .eq('is_final', true)
-          .neq('document_type', 'firma');
-
-        if (docsErr) {
-          console.warn('Could not fetch final documents:', docsErr);
-        } else if (docs && docs.length > 0) {
-          const recipientType = data.recipient_type;
-
-          let hasPendingContratada = false;
-          try {
-            const { data: pendingCL, error: pendingErr } = await signatureClient
-              .from('signature_links')
-              .select('id')
-              .eq('sale_id', data.sale_id)
-              .eq('recipient_type', 'contratada')
-              .eq('status', 'pendiente');
-            if (pendingErr) {
-              console.warn('Could not check pending contratada links:', pendingErr);
-              hasPendingContratada = true;
-            } else {
-              hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
-            }
-          } catch (e) {
-            console.warn('Could not check pending contratada links (exception):', e);
-            hasPendingContratada = true;
+        const finalizeResponse = await fetch(
+          `${SUPABASE_URL}/functions/v1/finalize-signature-link`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_PUBLISHABLE_KEY,
+              'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+            },
+            body: JSON.stringify({
+              token,
+              clientIp,
+              userAgent: navigator.userAgent,
+            }),
           }
-
-          const docsToSign = docs.filter((d: any) => {
-            if (d.signed_pdf_url) return false;
-            const dt = d.document_type;
-
-            if (dt === 'contrato') {
-              return recipientType === 'contratada';
-            }
-            if (dt === 'ddjj_salud') {
-              if (recipientType === 'titular') return d.beneficiary_id == null;
-              if (recipientType === 'adherente') return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
-              return false;
-            }
-            if (dt === 'anexo') return false;
-            return false;
+        );
+        const finalizeResult = await finalizeResponse.json();
+        if (!finalizeResult.ok) {
+          console.warn('finalize-signature-link devolvió error:', finalizeResult);
+        } else {
+          console.log('finalize ok:', {
+            signed: finalizeResult.signed_documents,
+            activated: finalizeResult.activated_contratada,
           });
-
-          const safeDocsToSign = docsToSign.filter((d: any) => {
-            if (d.document_type === 'contrato' && hasPendingContratada) return false;
-            return true;
-          });
-
-          for (const doc of safeDocsToSign) {
-            try {
-              await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-                body: JSON.stringify({ document_id: doc.id }),
-              });
-              await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-                body: JSON.stringify({ document_id: doc.id }),
-              });
-            } catch (pdfErr) {
-              console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
-            }
-          }
         }
-      } catch (pdfGenErr) {
-        console.warn('Post-signature PDF generation error:', pdfGenErr);
-      }
-
-      // Activate contratada link if titular just completed
-      if (data.recipient_type === 'titular') {
-        try {
-          const { data: saleRow, error: saleErr } = await signatureClient
-            .from('sales')
-            .select('id, company_id')
-            .eq('id', data.sale_id)
-            .single();
-
-          if (saleErr || !saleRow?.company_id) {
-            console.warn('Could not fetch sale.company_id for WhatsApp:', saleErr);
-          } else {
-            const companyId = saleRow.company_id as string;
-
-            const { data: company } = await signatureClient
-              .from('companies')
-              .select('name')
-              .eq('id', companyId)
-              .single();
-
-            const { data: contratadaLinks, error: clErr } = await signatureClient
-              .from('signature_links')
-              .select('id, token, recipient_phone')
-              .eq('sale_id', data.sale_id)
-              .eq('recipient_type', 'contratada')
-              .eq('status', 'pendiente');
-
-            if (clErr) console.warn('Could not fetch contratada links:', clErr);
-
-            if (contratadaLinks && contratadaLinks.length > 0) {
-              for (const cl of contratadaLinks) {
-                await signatureClient
-                  .from('signature_links')
-                  .update({ is_active: true } as any)
-                  .eq('id', cl.id);
-
-                try {
-                  if (!cl.recipient_phone) {
-                    console.warn('No recipient_phone for contratada link', { linkId: cl.id });
-                    continue;
-                  }
-                  const linkUrl = `${window.location.origin}/firmar/${cl.token}`;
-                  await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp`, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'apikey': SUPABASE_PUBLISHABLE_KEY,
-                      'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
-                    },
-                    body: JSON.stringify({
-                      to: cl.recipient_phone,
-                      templateName: 'signature_link',
-                      templateData: {
-                        clientName: 'Representante',
-                        companyName: company?.name || 'Empresa',
-                        signatureUrl: linkUrl,
-                      },
-                      saleId: data.sale_id,
-                      companyId,
-                      messageType: 'signature_link',
-                    }),
-                  });
-                } catch (waErr) {
-                  console.warn('WhatsApp notification to contratada failed:', waErr);
-                }
-              }
-            }
-          }
-        } catch (activateErr) {
-          console.warn('Could not activate contratada links:', activateErr);
-        }
+      } catch (finalizeErr) {
+        // No bloquear la firma si falla el pipeline backend
+        console.warn('finalize-signature-link error (no bloqueante):', finalizeErr);
       }
 
       return data;
