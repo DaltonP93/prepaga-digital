@@ -48,5 +48,9 @@ verify_jwt = false
 [functions.pades-sign-document]
 verify_jwt = false
 
-[functions.get-document-download-url]
+
+[functions.finalize-signature-link]
+verify_jwt = false
+
+[functions.cleanup-expired-signature-links]
 verify_jwt = false

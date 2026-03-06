@@ -59,7 +59,7 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    const { to, templateName, templateData, saleId, companyId, messageType = 'general' }: WhatsAppRequest = await req.json()
+    const { to, templateName, templateKey, templateData, saleId, companyId, messageType = 'general' }: WhatsAppRequest = await req.json()
 
     if (!to || !companyId) {
       return new Response(JSON.stringify({
@@ -79,7 +79,33 @@ serve(async (req) => {
       .single()
 
     const provider = companySettings?.whatsapp_provider || 'wame_fallback'
-    const message = buildMessageFromTemplate(templateName, templateData)
+
+    // Build message: prefer custom DB template (templateKey), fallback to built-in templateName
+    let message: string
+    if (templateKey) {
+      try {
+        const { data: customTpl } = await supabase
+          .from('email_templates')
+          .select('body')
+          .eq('company_id', companyId)
+          .eq('template_key', templateKey)
+          .eq('channel', 'whatsapp')
+          .eq('is_active', true)
+          .single()
+        if (customTpl?.body) {
+          message = customTpl.body
+          Object.entries(templateData).forEach(([key, value]) => {
+            message = message.replace(new RegExp(`{{${key}}}`, 'g'), value)
+          })
+        } else {
+          message = buildMessageFromTemplate(templateName, templateData)
+        }
+      } catch {
+        message = buildMessageFromTemplate(templateName, templateData)
+      }
+    } else {
+      message = buildMessageFromTemplate(templateName, templateData)
+    }
 
     // Route by provider
     if (provider === 'wame_fallback' || (!companySettings && provider !== 'meta' && provider !== 'twilio')) {
