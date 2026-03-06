@@ -1181,6 +1181,8 @@ export type Database = {
           created_at: string | null
           document_type: string | null
           document_type_id: string | null
+          evidence_certificate_hash: string | null
+          evidence_certificate_url: string | null
           file_url: string | null
           generated_from_template: boolean | null
           id: string
@@ -1205,6 +1207,8 @@ export type Database = {
           created_at?: string | null
           document_type?: string | null
           document_type_id?: string | null
+          evidence_certificate_hash?: string | null
+          evidence_certificate_url?: string | null
           file_url?: string | null
           generated_from_template?: boolean | null
           id?: string
@@ -1229,6 +1233,8 @@ export type Database = {
           created_at?: string | null
           document_type?: string | null
           document_type_id?: string | null
+          evidence_certificate_hash?: string | null
+          evidence_certificate_url?: string | null
           file_url?: string | null
           generated_from_template?: boolean | null
           id?: string
@@ -1498,6 +1504,61 @@ export type Database = {
             columns: ["sale_id"]
             isOneToOne: false
             referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      legal_evidence_certificates: {
+        Row: {
+          certificate_hash: string | null
+          certificate_url: string | null
+          created_at: string
+          document_id: string | null
+          id: string
+          payload: Json
+          sale_id: string
+          signature_link_id: string | null
+        }
+        Insert: {
+          certificate_hash?: string | null
+          certificate_url?: string | null
+          created_at?: string
+          document_id?: string | null
+          id?: string
+          payload?: Json
+          sale_id: string
+          signature_link_id?: string | null
+        }
+        Update: {
+          certificate_hash?: string | null
+          certificate_url?: string | null
+          created_at?: string
+          document_id?: string | null
+          id?: string
+          payload?: Json
+          sale_id?: string
+          signature_link_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_evidence_certificates_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legal_evidence_certificates_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legal_evidence_certificates_signature_link_id_fkey"
+            columns: ["signature_link_id"]
+            isOneToOne: false
+            referencedRelation: "signature_links"
             referencedColumns: ["id"]
           },
         ]
