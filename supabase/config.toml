@@ -49,6 +49,9 @@ verify_jwt = false
 verify_jwt = false
 
 
+[functions.get-document-download-url]
+verify_jwt = false
+
 [functions.finalize-signature-link]
 verify_jwt = false
 
