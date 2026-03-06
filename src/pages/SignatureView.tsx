@@ -240,9 +240,11 @@ const SignatureView = () => {
     try {
       // Use a client with the signature token header for RLS
       const { createClient } = await import('@supabase/supabase-js');
+      const SUPABASE_URL_CONSENT = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY_CONSENT = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const signatureClient = createClient(
-        'https://ykducvvcjzdpoojxlsig.supabase.co',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrZHVjdnZjanpkcG9vanhsc2lnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwNzgwNzQsImV4cCI6MjA4NTY1NDA3NH0.SpX3e1GgENTB3kpQPPedPds0E13vxDeOmnmFYSJhfPM',
+        SUPABASE_URL_CONSENT,
+        SUPABASE_KEY_CONSENT,
         { global: { headers: { 'x-signature-token': token } } }
       );
 

@@ -162,13 +162,16 @@ const SignatureWorkflow = () => {
     }
   };
 
-  const handleDownloadSignedDocs = (link: any) => {
+  const handleDownloadSignedDocs = async (link: any) => {
     // Find signed (final) documents for this recipient
     const recipientDocs = signedDocs.filter((doc: any) => {
       if (doc.document_type === 'firma') return false;
       if (!doc.is_final) return false;
       if (link.recipient_type === 'adherente' && link.recipient_id) {
         return doc.beneficiary_id === link.recipient_id;
+      }
+      if (link.recipient_type === 'contratada') {
+        return doc.document_type === 'contrato' && !doc.beneficiary_id;
       }
       return !doc.beneficiary_id;
     });
@@ -178,13 +181,40 @@ const SignatureWorkflow = () => {
       return;
     }
 
-    recipientDocs.forEach((doc: any) => {
+    for (const doc of recipientDocs) {
+      // Try signed PDF via edge function first
+      if (doc.signed_pdf_url) {
+        try {
+          const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+          const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+          const response = await fetch(
+            `${SUPABASE_URL}/functions/v1/get-document-download-url`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_KEY,
+                'Authorization': `Bearer ${SUPABASE_KEY}`,
+              },
+              body: JSON.stringify({ document_id: doc.id, kind: 'signed' }),
+            }
+          );
+          const result = await response.json();
+          if (result.url) {
+            window.open(result.url, '_blank');
+            continue;
+          }
+        } catch (err) {
+          console.warn('Could not get signed PDF URL, falling back:', err);
+        }
+      }
+      // Fallback
       if (doc.file_url) {
         window.open(doc.file_url, '_blank');
       } else if (doc.content) {
         handleDownloadContent(doc);
       }
-    });
+    }
   };
 
   const getRecipientLabel = (link: any) => {
