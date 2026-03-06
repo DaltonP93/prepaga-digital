@@ -1,26 +1,25 @@
 
 
-## Plan: Fase 4 — Bloque PAdES robusto con filtrado por rol, orden y re-firma
+## Plan: Fase 5 — PAdES con document_type exactos y doble safeguard
 
-### Archivo único a modificar
-`src/hooks/useSignatureLinkPublic.ts` — líneas 598-639
+### Archivo único
+`src/hooks/useSignatureLinkPublic.ts` — líneas 598-682
 
 ### Cambio
-Reemplazar el bloque actual de post-firma (42 líneas) con la versión robusta (~90 líneas) que implementa:
+Reemplazar el bloque PAdES actual por la versión con valores exactos de `document_type` (`contrato`, `ddjj_salud`, `anexo`) en lugar de comparaciones genéricas con `.toLowerCase()`. Agrega doble safeguard para contratada pendiente.
 
-1. **Fetch completo de docs**: incluye `beneficiary_id` y `signed_pdf_url` en el select
-2. **Check de contratada pendiente**: query a `signature_links` para saber si existe un paso contratada en status `pendiente` — si existe, el contrato NO se firma aún
-3. **Filtrado inteligente por `recipient_type`**:
-   - **contratada** → solo firma contratos
-   - **titular** → firma docs sin `beneficiary_id` y que no sean contrato (si hay contratada pendiente)
-   - **adherente** → solo firma docs donde `beneficiary_id === data.recipient_id`
-4. **Anti re-firma**: si `signed_pdf_url` ya existe, se salta el documento
-5. **Authorization header**: incluido en ambos fetch (generate-base-pdf y pades-sign-document)
+### Diferencias clave vs. código actual (Fase 4)
 
-### Código resultante (reemplaza líneas 598-639)
+1. **document_type exacto**: usa `dt === 'contrato'` directo (sin `.toLowerCase()` ni check de `'contract'`)
+2. **ddjj_salud explícito**: filtra por `dt === 'ddjj_salud'` en vez de "todo lo que no sea contrato"
+3. **Anexos excluidos**: `dt === 'anexo'` retorna `false` explícitamente
+4. **Doble safeguard**: `safeDocsToSign` filtra contrato si `hasPendingContratada` como segunda capa
+5. **Error handling mejorado**: `pendingErr` se maneja separadamente del catch
+
+### Código resultante (reemplaza líneas 598-682)
 
 ```typescript
-// Post-signature: generate base PDF + PAdES only when it actually corresponds
+// Post-signature: generate base PDF + PAdES only when it corresponds to this signer + step
 try {
   const supabaseUrl = SUPABASE_URL;
   const anonKey = SUPABASE_PUBLISHABLE_KEY;
@@ -39,38 +38,55 @@ try {
 
     let hasPendingContratada = false;
     try {
-      const { data: pendingCL } = await signatureClient
-        .from('signature_links')
-        .select('id')
+      const { data: pendingCL, error: pendingErr } = await signatureClient
+        .from('signature_links').select('id')
         .eq('sale_id', data.sale_id)
         .eq('recipient_type', 'contratada')
         .eq('status', 'pendiente');
-      hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
+      if (pendingErr) {
+        console.warn('Could not check pending contratada links:', pendingErr);
+        hasPendingContratada = true;
+      } else {
+        hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
+      }
     } catch (e) {
-      console.warn('Could not check pending contratada links:', e);
+      console.warn('Could not check pending contratada links (exception):', e);
       hasPendingContratada = true;
     }
 
     const docsToSign = docs.filter((d: any) => {
       if (d.signed_pdf_url) return false;
-      const dt = (d.document_type || '').toLowerCase();
-      const isContract = dt === 'contrato' || dt === 'contract';
+      const dt = d.document_type;
 
-      if (recipientType === 'contratada') return isContract;
-      if (recipientType === 'titular') {
-        if (isContract && hasPendingContratada) return false;
-        return d.beneficiary_id == null && !isContract;
+      if (dt === 'contrato') {
+        return recipientType === 'contratada';
       }
-      if (recipientType === 'adherente') {
-        return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
+      if (dt === 'ddjj_salud') {
+        if (recipientType === 'titular') return d.beneficiary_id == null;
+        if (recipientType === 'adherente') return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
+        return false;
       }
+      if (dt === 'anexo') return false;
       return false;
     });
 
-    for (const doc of docsToSign) {
+    const safeDocsToSign = docsToSign.filter((d: any) => {
+      if (d.document_type === 'contrato' && hasPendingContratada) return false;
+      return true;
+    });
+
+    for (const doc of safeDocsToSign) {
       try {
-        await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, { ... });
-        await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, { ... });
+        await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
+          body: JSON.stringify({ document_id: doc.id }),
+        });
+        await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
+          body: JSON.stringify({ document_id: doc.id }),
+        });
       } catch (pdfErr) {
         console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
       }
@@ -82,7 +98,7 @@ try {
 ```
 
 ### Impacto
-- Solo 1 archivo, 1 bloque reemplazado
-- No afecta el bloque de activación de contratada (Fase 3)
+- 1 archivo, 1 bloque (~85 líneas reemplaza ~85 líneas)
+- No afecta bloque de activación contratada (Fase 3)
 - No requiere migraciones
 
