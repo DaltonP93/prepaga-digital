@@ -198,6 +198,7 @@ async function triggerPadesSigning(
       const signResult = await signResponse.json()
       if (signResult.success) {
         signedCount++
+        signedDocIds.push(doc.id)
       } else {
         console.error(`pades-sign-document failed for doc ${doc.id}:`, signResult)
       }
