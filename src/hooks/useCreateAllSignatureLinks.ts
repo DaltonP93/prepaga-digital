@@ -33,7 +33,7 @@ export const useCreateAllSignatureLinks = () => {
       // Fetch company settings for contratada signature config
       const { data: companySettings } = await supabase
         .from('company_settings')
-        .select('contratada_signature_mode, contratada_signer_name, contratada_signer_email, contratada_signer_dni')
+        .select('contratada_signature_mode, contratada_signer_name, contratada_signer_email, contratada_signer_dni, contratada_signer_phone')
         .eq('company_id', sale.company_id)
         .single();
 
@@ -126,7 +126,7 @@ export const useCreateAllSignatureLinks = () => {
             token: contratadaToken,
             recipient_type: 'contratada',
             recipient_email: companySettings.contratada_signer_email,
-            recipient_phone: null,
+            recipient_phone: companySettings.contratada_signer_phone || null,
             recipient_id: null,
             expires_at: contratadaExpiresAt.toISOString(),
             status: 'pendiente',

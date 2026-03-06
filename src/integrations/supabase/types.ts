@@ -673,6 +673,7 @@ export type Database = {
           contratada_signer_dni: string | null
           contratada_signer_email: string | null
           contratada_signer_name: string | null
+          contratada_signer_phone: string | null
           created_at: string | null
           email_api_key: string | null
           email_from_address: string | null
@@ -700,6 +701,7 @@ export type Database = {
           contratada_signer_dni?: string | null
           contratada_signer_email?: string | null
           contratada_signer_name?: string | null
+          contratada_signer_phone?: string | null
           created_at?: string | null
           email_api_key?: string | null
           email_from_address?: string | null
@@ -727,6 +729,7 @@ export type Database = {
           contratada_signer_dni?: string | null
           contratada_signer_email?: string | null
           contratada_signer_name?: string | null
+          contratada_signer_phone?: string | null
           created_at?: string | null
           email_api_key?: string | null
           email_from_address?: string | null

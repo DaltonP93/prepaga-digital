@@ -17,6 +17,7 @@ function ContratadaSignatureConfigInner() {
   const [signerName, setSignerName] = useState('');
   const [signerEmail, setSignerEmail] = useState('');
   const [signerDni, setSignerDni] = useState('');
+  const [signerPhone, setSignerPhone] = useState('');
 
   useEffect(() => {
     if (profile?.company_id) loadConfig();
@@ -26,7 +27,7 @@ function ContratadaSignatureConfigInner() {
     try {
       const { data } = await supabase
         .from('company_settings')
-        .select('contratada_signature_mode, contratada_signer_name, contratada_signer_email, contratada_signer_dni')
+        .select('contratada_signature_mode, contratada_signer_name, contratada_signer_email, contratada_signer_dni, contratada_signer_phone')
         .eq('company_id', profile!.company_id!)
         .single();
 
@@ -35,6 +36,7 @@ function ContratadaSignatureConfigInner() {
         setSignerName(data.contratada_signer_name || '');
         setSignerEmail(data.contratada_signer_email || '');
         setSignerDni(data.contratada_signer_dni || '');
+        setSignerPhone(data.contratada_signer_phone || '');
       }
     } catch {
       // No config yet
@@ -54,6 +56,7 @@ function ContratadaSignatureConfigInner() {
           contratada_signer_name: signerName || null,
           contratada_signer_email: signerEmail || null,
           contratada_signer_dni: signerDni || null,
+          contratada_signer_phone: signerPhone || null,
         })
         .eq('company_id', profile.company_id);
 
@@ -88,7 +91,7 @@ function ContratadaSignatureConfigInner() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Nombre del representante</Label>
           <Input value={signerName} onChange={e => setSignerName(e.target.value)} placeholder="Nombre completo" />
@@ -100,6 +103,16 @@ function ContratadaSignatureConfigInner() {
         <div className="space-y-2">
           <Label>C.I. / DNI del representante</Label>
           <Input value={signerDni} onChange={e => setSignerDni(e.target.value)} placeholder="Número de documento" />
+        </div>
+        <div className="space-y-2">
+          <Label>Teléfono del representante</Label>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">+595</span>
+            <Input value={signerPhone} onChange={e => setSignerPhone(e.target.value)} placeholder="981123456" />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Número sin el 0 inicial. Se usa para enviar OTP por WhatsApp al representante.
+          </p>
         </div>
       </div>
 
