@@ -108,6 +108,23 @@ const SignatureWorkflow = () => {
   const [detailLink, setDetailLink] = useState<any>(null);
 
   const selectedSale = saleId ? sales.find(s => s.id === saleId) : null;
+  const selectedSaleCompanyId = selectedSale?.company_id;
+
+  // Fetch company settings for contratada signer info
+  const { data: companySettings } = useQuery({
+    queryKey: ['company-settings-contratada', selectedSaleCompanyId],
+    queryFn: async () => {
+      if (!selectedSaleCompanyId) return null;
+      const { data, error } = await supabase
+        .from('company_settings')
+        .select('contratada_signature_mode, contratada_signer_name, contratada_signer_email, contratada_signer_dni, contratada_signer_phone')
+        .eq('company_id', selectedSaleCompanyId)
+        .single();
+      if (error) return null;
+      return data;
+    },
+    enabled: !!selectedSaleCompanyId,
+  });
 
   const getSignatureUrl = (linkToken: string) => {
     return getSignatureLinkUrl(linkToken);
@@ -710,11 +727,52 @@ const SignatureWorkflow = () => {
             {contratadaLinks.length > 0
               ? renderSignatureLinks(contratadaLinks)
               : selectedSale?.status === 'completado' ? (
-                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <span className="text-sm text-green-800">
-                    Venta completada. La firma de la contratada fue aplicada automáticamente.
-                  </span>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span className="text-sm text-green-800">
+                      {companySettings?.contratada_signature_mode === 'auto'
+                        ? 'Firma de la contratada aplicada automáticamente.'
+                        : 'Venta completada. Firma de la contratada registrada.'}
+                    </span>
+                  </div>
+                  {companySettings && (
+                    <div className="border rounded-lg p-4 space-y-2">
+                      <p className="font-medium text-sm">Datos del firmante (Contratada)</p>
+                      <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                        {companySettings.contratada_signer_name && (
+                          <div>
+                            <span className="font-medium text-foreground">Nombre:</span>{' '}
+                            {companySettings.contratada_signer_name}
+                          </div>
+                        )}
+                        {companySettings.contratada_signer_email && (
+                          <div>
+                            <span className="font-medium text-foreground">Email:</span>{' '}
+                            {companySettings.contratada_signer_email}
+                          </div>
+                        )}
+                        {companySettings.contratada_signer_dni && (
+                          <div>
+                            <span className="font-medium text-foreground">C.I.:</span>{' '}
+                            {companySettings.contratada_signer_dni}
+                          </div>
+                        )}
+                        {companySettings.contratada_signer_phone && (
+                          <div>
+                            <span className="font-medium text-foreground">Teléfono:</span>{' '}
+                            {companySettings.contratada_signer_phone}
+                          </div>
+                        )}
+                        {selectedSale.signature_completed_at && (
+                          <div>
+                            <span className="font-medium text-foreground">Completado:</span>{' '}
+                            {formatDateTimePY(selectedSale.signature_completed_at)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground italic">
