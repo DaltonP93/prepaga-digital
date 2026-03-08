@@ -104,6 +104,12 @@ const SignatureWorkflow = () => {
     enabled: !!saleId && signatureLinks && signatureLinks.length > 0,
   });
 
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [detailLink, setDetailLink] = useState<any>(null);
+
+  const selectedSale = saleId ? sales.find(s => s.id === saleId) : null;
+  const selectedSaleCompanyId = selectedSale?.company_id;
+
   // Fetch company settings for contratada signer info
   const { data: companySettings } = useQuery({
     queryKey: ['company-settings-contratada', selectedSaleCompanyId],
@@ -119,12 +125,6 @@ const SignatureWorkflow = () => {
     },
     enabled: !!selectedSaleCompanyId,
   });
-
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [detailLink, setDetailLink] = useState<any>(null);
-
-  const selectedSale = saleId ? sales.find(s => s.id === saleId) : null;
-  const selectedSaleCompanyId = selectedSale?.company_id;
 
   const getSignatureUrl = (linkToken: string) => {
     return getSignatureLinkUrl(linkToken);
