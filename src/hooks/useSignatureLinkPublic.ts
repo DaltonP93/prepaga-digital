@@ -290,6 +290,131 @@ export const useSubmitSignatureLink = () => {
         const recipientType = data.recipient_type;
         const recipientId = data.recipient_id;
 
+        let contratadaMergedOk = false;
+
+        // === CONTRATADA SPECIAL CASE ===
+        // Merge contratada's signature into the existing titular's final contract
+        // instead of creating a separate document
+        if (recipientType === 'contratada') {
+          try {
+            const { data: titularFinalDocs } = await signatureClient
+              .from('documents')
+              .select('*')
+              .eq('sale_id', data.sale_id)
+              .eq('is_final', true)
+              .is('beneficiary_id', null)
+              .eq('document_type', 'contrato')
+              .order('created_at', { ascending: false })
+              .limit(1);
+
+            if (titularFinalDocs && titularFinalDocs.length > 0) {
+              const titularDoc = titularFinalDocs[0];
+              let finalContent = titularDoc.content || '';
+              const nowIso = new Date().toISOString();
+              const safeSignedAt = new Date().toLocaleString('es-PY');
+
+              // Fetch company settings for contratada signer info
+              let companyInfo: any = null;
+              let companySettings: any = null;
+              try {
+                const { data: saleInfo } = await signatureClient
+                  .from('sales')
+                  .select('company_id, companies:company_id(name, tax_id)')
+                  .eq('id', data.sale_id)
+                  .single();
+                companyInfo = (saleInfo as any)?.companies || null;
+                if ((saleInfo as any)?.company_id) {
+                  const { data: cs } = await signatureClient
+                    .from('company_settings')
+                    .select('contratada_signer_name, contratada_signer_dni')
+                    .eq('company_id', (saleInfo as any).company_id)
+                    .single();
+                  companySettings = cs;
+                }
+              } catch { /* ignore */ }
+
+              let isElecSig = false;
+              try {
+                const parsed = JSON.parse(signatureData);
+                if (parsed.type === 'electronica') isElecSig = true;
+              } catch { /* not JSON */ }
+
+              const signerName = companySettings?.contratada_signer_name || companyInfo?.name || 'Representante';
+              const signerCI = companySettings?.contratada_signer_dni || companyInfo?.tax_id || '';
+
+              let contratadaBlock: string;
+              if (isElecSig) {
+                const d = new Date();
+                const fd = `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+                contratadaBlock = `
+                  <div data-signer="contratada" style="display:inline-block;vertical-align:top;width:48%;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111;">
+                    <p style="margin:0 0 2px 0;font-size:11px;">Firmado electrónicamente por: <strong>${signerName.toLowerCase()}</strong></p>
+                    <p style="margin:0 0 12px 0;font-size:11px;">Fecha: ${fd}</p>
+                    <div style="border-top:1px solid #555;width:80%;margin:0 0 6px 0;"></div>
+                    <p style="margin:0;font-size:11px;font-weight:bold;">CONTRATADA</p>
+                    <p style="margin:4px 0 0 0;font-size:11px;">Aclaración: ${signerName}</p>
+                    <p style="margin:2px 0 0 0;font-size:11px;">C.I.Nº: ${signerCI}</p>
+                  </div>
+                `;
+              } else {
+                contratadaBlock = `
+                  <div data-signer="contratada" style="display:inline-block;vertical-align:top;width:48%;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111;">
+                    <div style="text-align:center;">
+                      <img src="${signatureData}" alt="Firma digital" style="max-width:280px;max-height:120px;display:block;" />
+                      <p style="margin:4px 0 0 0;font-size:10px;color:#6b7280;">Firmado el: ${safeSignedAt}</p>
+                    </div>
+                    <div style="border-top:1px solid #555;width:80%;margin:6px 0 6px 0;"></div>
+                    <p style="margin:0;font-size:11px;font-weight:bold;">CONTRATADA</p>
+                    <p style="margin:4px 0 0 0;font-size:11px;">Aclaración: ${signerName}</p>
+                    <p style="margin:2px 0 0 0;font-size:11px;">C.I.Nº: ${signerCI}</p>
+                  </div>
+                `;
+              }
+
+              // Replace "Pendiente firma de la empresa" placeholder with actual contratada signature
+              const replaced = finalContent.replace(
+                /<div[^>]*style="[^"]*display:\s*inline-block[^"]*"[^>]*>[\s\S]*?Pendiente\s+firma\s+de\s+la\s+empresa[\s\S]*?C\.I\.N[ºo°]\s*:[\s\S]*?<\/div>/i,
+                contratadaBlock
+              );
+
+              if (replaced !== finalContent) {
+                finalContent = replaced;
+              } else {
+                // Fallback: append contratada signature block
+                finalContent += contratadaBlock;
+              }
+
+              // Update the existing final doc with both signatures merged
+              await signatureClient
+                .from('documents')
+                .update({
+                  content: finalContent,
+                  signed_at: nowIso,
+                  signature_data: signatureData,
+                } as any)
+                .eq('id', titularDoc.id);
+
+              // Update original doc status
+              await signatureClient
+                .from('documents')
+                .update({
+                  status: 'firmado' as any,
+                  signed_at: nowIso,
+                  signature_data: signatureData,
+                } as any)
+                .eq('sale_id', data.sale_id)
+                .eq('is_final', false)
+                .is('beneficiary_id', null)
+                .eq('document_type', 'contrato');
+
+              contratadaMergedOk = true;
+            }
+          } catch (mergeErr) {
+            console.warn('Contratada merge failed, falling back to general flow:', mergeErr);
+          }
+        }
+
+        if (!contratadaMergedOk) {
         // First, delete any existing final copies for this recipient to avoid duplicates
         let deleteQuery = signatureClient
           .from('documents')
@@ -651,6 +776,7 @@ export const useSubmitSignatureLink = () => {
             } as any)
             .in('id', docsToSign.map((d) => d.id));
         }
+        } // end if (!contratadaMergedOk)
       } catch (signedDocsErr) {
         console.warn('Could not build signed final documents:', signedDocsErr);
       }
