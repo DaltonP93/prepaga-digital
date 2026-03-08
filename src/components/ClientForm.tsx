@@ -366,8 +366,8 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
                       <SelectValue placeholder="Seleccionar" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="masculino">Masculino</SelectItem>
-                      <SelectItem value="femenino">Femenino</SelectItem>
+                      <SelectItem value="Masculino">Masculino</SelectItem>
+                      <SelectItem value="Femenino">Femenino</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -378,11 +378,11 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
                       <SelectValue placeholder="Seleccionar" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="soltero">Soltero/a</SelectItem>
-                      <SelectItem value="casado">Casado/a</SelectItem>
-                      <SelectItem value="divorciado">Divorciado/a</SelectItem>
-                      <SelectItem value="viudo">Viudo/a</SelectItem>
-                      <SelectItem value="union_libre">Unión libre</SelectItem>
+                      <SelectItem value="Soltero/a">Soltero/a</SelectItem>
+                      <SelectItem value="Casado/a">Casado/a</SelectItem>
+                      <SelectItem value="Divorciado/a">Divorciado/a</SelectItem>
+                      <SelectItem value="Viudo/a">Viudo/a</SelectItem>
+                      <SelectItem value="Unión libre">Unión libre</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
