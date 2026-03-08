@@ -767,15 +767,21 @@ export const useSignatureLinkDocuments = (
         query = query.is('beneficiary_id', null);
       }
 
-      // For contratada: deduplicate contract documents - show only the best version
+      // For contratada: deduplicate contract documents
+      // Show only the UNSIGNED original for signing; exclude already-signed copies
       if (recipientType === 'contratada') {
         const { data, error } = await query;
         if (error) { console.error('Error fetching documents:', error); throw error; }
         const docs = data || [];
         if (docs.length === 0) return [];
         
-        // Group by base document name (remove " (Firmado)" suffix)
-        const baseName = (name: string) => name.replace(/\s*\(Firmado\)\s*$/i, '').trim();
+        // Group by base document name (strip " (Firmado)" and role suffixes)
+        const baseName = (name: string) => 
+          name
+            .replace(/\s*\(Firmado\)(\s*\(Firmado\))*/gi, '')
+            .replace(/\s*-\s*Representante\s*Legal\s*$/i, '')
+            .trim();
+        
         const groups: Record<string, any[]> = {};
         for (const doc of docs) {
           const key = baseName(doc.name);
@@ -783,14 +789,21 @@ export const useSignatureLinkDocuments = (
           groups[key].push(doc);
         }
         
-        // For each group, prefer the signed/final version, otherwise the original
+        // For each group: if there's an unsigned original (is_final: false), show that for signing.
+        // If ALL copies are final/signed, show the latest signed one as read-only.
         const result: any[] = [];
         for (const key of Object.keys(groups)) {
           const group = groups[key];
-          // Prefer: signed_pdf_url > is_final > latest
-          const signed = group.find((d: any) => d.signed_pdf_url);
-          const final_ = group.find((d: any) => d.is_final);
-          result.push(signed || final_ || group[group.length - 1]);
+          const unsigned = group.find((d: any) => !d.is_final && !d.signed_pdf_url);
+          if (unsigned) {
+            result.push(unsigned);
+          } else {
+            // All signed — pick the latest
+            const sorted = group.sort((a: any, b: any) => 
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            );
+            result.push(sorted[0]);
+          }
         }
         return result;
       }
