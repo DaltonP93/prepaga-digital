@@ -649,7 +649,9 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         try {
           const hasContent = !!template.content?.trim();
           const lower = template.name.toLowerCase();
-          const isDDJJ = lower.includes('ddjj') || lower.includes('declaración') || lower.includes('declaracion');
+          const lowerNorm = lower.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          const isDDJJ = lower.includes('ddjj') || lower.includes('declaración') || lower.includes('declaracion')
+            || lowerNorm.includes('declaracion') || lowerNorm.includes('ddjj');
           const isContrato = lower.includes('contrato');
           const isAnexo = isAnexoPlanName(template.name) || (!isDDJJ && !isContrato);
 
