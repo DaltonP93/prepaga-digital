@@ -447,7 +447,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
             beneficiary_id: null,
           });
         }
-      }
+      });
 
       // Create signature link for titular
       await createSignatureLink.mutateAsync({
