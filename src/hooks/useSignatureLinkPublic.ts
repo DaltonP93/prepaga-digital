@@ -722,7 +722,7 @@ export const useSubmitSignatureLink = () => {
                 const emptyContratadaBlock = `
                   <div style="display:inline-block;vertical-align:top;width:48%;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111;">
                     <p style="margin:0 0 12px 0;font-size:11px;">Pendiente firma de la empresa</p>
-                    <div style="border-top:1px solid #555;width:80%;margin:0 0 6px 0;"></div>
+                    <hr style="border:none;border-top:1px solid #555;width:80%;margin:0 0 6px 0;" />
                     <p style="margin:0;font-size:11px;font-weight:bold;">CONTRATADA</p>
                     <p style="margin:4px 0 0 0;font-size:11px;">Aclaración: .............................</p>
                     <p style="margin:2px 0 0 0;font-size:11px;">C.I.Nº: .............................</p>

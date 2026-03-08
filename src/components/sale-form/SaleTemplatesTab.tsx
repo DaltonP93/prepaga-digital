@@ -321,7 +321,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           ? `<p>Documento de anexo cargado sin estructura de diseñador. Procesado como template interno.</p>`
           : renderedContent;
 
-        await supabase.from('documents').insert({
+        const { error: insertError } = await supabase.from('documents').insert({
           sale_id: saleId,
           name: template.name,
           document_type: isAnexo ? 'anexo' : (isDDJJ ? 'ddjj_salud' : 'contrato'),
@@ -332,6 +332,10 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           generated_from_template: true,
           beneficiary_id: null,
         });
+        if (insertError) {
+          console.error(`Error inserting document "${template.name}":`, insertError);
+          toast.error(`Error al generar documento: ${template.name}`);
+        }
       }
 
       // Generate DDJJ documents per beneficiary (adherente)
