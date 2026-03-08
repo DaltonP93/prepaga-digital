@@ -118,6 +118,24 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
     },
   });
 
+  // Activate contratada link manually
+  const activateLink = useMutation({
+    mutationFn: async (linkId: string) => {
+      const { error } = await supabase
+        .from('signature_links')
+        .update({ is_active: true } as any)
+        .eq('id', linkId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['signature-links', saleId] });
+      toast({ title: 'Enlace activado', description: 'El enlace de la contratada ha sido activado para firma.' });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'No se pudo activar el enlace.', variant: 'destructive' });
+    },
+  });
+
   const copyLink = (token: string) => {
     const baseUrl = window.location.origin;
     const link = `${baseUrl}/firmar/${token}`;
@@ -228,6 +246,9 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
 
   const hasBeneficiaries = beneficiaries.length > 0;
   const showGenerateAllButton = !hasAnyLinks;
+  const allStep1Completed = signatureLinks
+    .filter((l: any) => l.step_order === 1 && l.status !== 'revocado')
+    .every((l: any) => l.status === 'completado') && signatureLinks.some((l: any) => l.step_order === 1);
 
   return (
     <Card>
@@ -378,11 +399,36 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
                     <Alert className="mt-3 border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800">
                       <AlertCircle className="h-4 w-4 text-orange-500" />
                       <AlertDescription className="text-sm text-orange-700 dark:text-orange-300">
-                        <strong>Enlace aún no disponible</strong>
-                        <br />
-                        Este enlace de firma se activará cuando el firmante anterior complete su proceso.
-                        <br />
-                        <span className="text-xs">Recibirá una notificación cuando sea su turno de firmar.</span>
+                        {allStep1Completed ? (
+                          <>
+                            <strong>Todos los firmantes anteriores completaron su firma.</strong>
+                            <br />
+                            <span className="text-xs">Este enlace debería haberse activado automáticamente. Puede activarlo manualmente.</span>
+                            <br />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="mt-2"
+                              onClick={() => activateLink.mutate(link.id)}
+                              disabled={activateLink.isPending}
+                            >
+                              {activateLink.isPending ? (
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              ) : (
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                              )}
+                              Activar enlace
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <strong>Enlace aún no disponible</strong>
+                            <br />
+                            Este enlace de firma se activará cuando el firmante anterior complete su proceso.
+                            <br />
+                            <span className="text-xs">Recibirá una notificación cuando sea su turno de firmar.</span>
+                          </>
+                        )}
                       </AlertDescription>
                     </Alert>
                   )}
