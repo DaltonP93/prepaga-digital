@@ -677,30 +677,35 @@ const SignatureWorkflow = () => {
           </Card>
         )}
 
-        {contratadaLinks.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building className="h-5 w-5" />
-                Firma de la Contratada ({contratadaLinks.length})
-                {contratadaLinks.every((l: any) => l.status === 'completado') && (
-                  <Badge className="bg-green-600 ml-2">✓ Completado</Badge>
-                )}
-              </CardTitle>
-              <CardDescription>
-                El representante firma el contrato como último paso.
-                {contratadaLinks.some((l: any) => (l as any).is_active === false && l.status !== 'completado') && (
-                  <span className="text-amber-600 font-medium ml-1">
-                    ⏳ Se activa cuando titular y todos los adherentes completen su firma.
-                  </span>
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {renderSignatureLinks(contratadaLinks)}
-            </CardContent>
-          </Card>
-        )}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building className="h-5 w-5" />
+              Firma de la Contratada ({contratadaLinks.length})
+              {contratadaLinks.length > 0 && contratadaLinks.every((l: any) => l.status === 'completado') && (
+                <Badge className="bg-green-600 ml-2">✓ Completado</Badge>
+              )}
+            </CardTitle>
+            <CardDescription>
+              El representante legal de la empresa firma el contrato en el último paso
+              {contratadaLinks.some((l: any) => (l as any).is_active === false && l.status !== 'completado') && (
+                <span className="text-amber-600 font-medium ml-1">
+                  ⏳ Se activa cuando titular y todos los adherentes completen su firma.
+                </span>
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {contratadaLinks.length > 0
+              ? renderSignatureLinks(contratadaLinks)
+              : (
+                <p className="text-sm text-muted-foreground italic">
+                  El link de firma de la contratada se genera automáticamente cuando el titular complete su firma.
+                </p>
+              )
+            }
+          </CardContent>
+        </Card>
 
         {/* Documents section */}
         {signedDocs.length > 0 && (

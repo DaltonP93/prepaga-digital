@@ -461,12 +461,15 @@ export const useSubmitSignatureLink = () => {
         await deleteQuery;
 
         // Query documents to sign — filtered by role
+        // IMPORTANT: always filter requires_signature = true to exclude annexes
         let docsQuery = signatureClient
           .from('documents')
           .select('*')
           .eq('sale_id', data.sale_id)
           .neq('document_type', 'firma')
-          .eq('is_final', false);
+          .neq('document_type', 'anexo')
+          .eq('is_final', false)
+          .eq('requires_signature', true);
 
         if (recipientType === 'adherente' && recipientId) {
           docsQuery = docsQuery.eq('beneficiary_id', recipientId);
