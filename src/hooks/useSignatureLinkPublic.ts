@@ -74,7 +74,7 @@ export const useSignatureLinkByToken = (token: string) => {
 
       const { data: linkData, error: linkError } = await signatureClient
         .from('signature_links')
-        .select('id,sale_id,package_id,recipient_type,recipient_id,expires_at,accessed_at,access_count,status,completed_at,created_at,updated_at,signwell_signing_url,is_active,step_order')
+        .select('id,sale_id,package_id,recipient_type,recipient_id,recipient_email,recipient_phone,expires_at,accessed_at,access_count,status,completed_at,created_at,updated_at,signwell_signing_url,is_active,step_order')
         .eq('token', token)
         .gt('expires_at', new Date().toISOString())
         .single();
@@ -765,6 +765,34 @@ export const useSignatureLinkDocuments = (
       } else if (recipientType === 'titular') {
         // Titular sees only documents without a beneficiary_id (their own docs)
         query = query.is('beneficiary_id', null);
+      }
+
+      // For contratada: deduplicate contract documents - show only the best version
+      if (recipientType === 'contratada') {
+        const { data, error } = await query;
+        if (error) { console.error('Error fetching documents:', error); throw error; }
+        const docs = data || [];
+        if (docs.length === 0) return [];
+        
+        // Group by base document name (remove " (Firmado)" suffix)
+        const baseName = (name: string) => name.replace(/\s*\(Firmado\)\s*$/i, '').trim();
+        const groups: Record<string, any[]> = {};
+        for (const doc of docs) {
+          const key = baseName(doc.name);
+          if (!groups[key]) groups[key] = [];
+          groups[key].push(doc);
+        }
+        
+        // For each group, prefer the signed/final version, otherwise the original
+        const result: any[] = [];
+        for (const key of Object.keys(groups)) {
+          const group = groups[key];
+          // Prefer: signed_pdf_url > is_final > latest
+          const signed = group.find((d: any) => d.signed_pdf_url);
+          const final_ = group.find((d: any) => d.is_final);
+          result.push(signed || final_ || group[group.length - 1]);
+        }
+        return result;
       }
 
       const { data, error } = await query;

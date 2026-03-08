@@ -459,10 +459,12 @@ const SignatureView = () => {
   const plan = sale?.plans;
   const company = sale?.companies;
   const isTitular = linkData.recipient_type === 'titular';
+  const isContratada = linkData.recipient_type === 'contratada';
 
   // Build recipient name for display
   const getRecipientName = () => {
     if (isTitular && client) return `${client.first_name} ${client.last_name}`;
+    if (isContratada) return 'Representante Legal';
     if (!isTitular && linkData.recipient_id && sale?.beneficiaries) {
       const ben = sale.beneficiaries.find((b: any) => b.id === linkData.recipient_id);
       if (ben) return `${ben.first_name} ${ben.last_name}`;
@@ -494,11 +496,15 @@ const SignatureView = () => {
                 <FileText className="h-6 w-6 text-primary" />
                 <div>
                   <CardTitle>
-                    {isTitular ? 'Documentos para Firma - Titular' : 'DDJJ de Salud - Adherente'}
+                    {isTitular ? 'Documentos para Firma - Titular' 
+                      : isContratada ? 'Firma del Contrato - Contratada'
+                      : 'DDJJ de Salud - Adherente'}
                   </CardTitle>
                   <CardDescription>
                     {isTitular 
                       ? 'Revise los documentos y firme al final'
+                      : isContratada
+                      ? 'Revise y firme el contrato en nombre de la empresa'
                       : 'Revise su Declaración Jurada y firme al final'
                     }
                   </CardDescription>
@@ -551,7 +557,12 @@ const SignatureView = () => {
         {/* Documents List - Separated into signature-required and annexes */}
         {(() => {
           // Annexes are documents that don't require signature OR have annex-related document_type
-          const isAnnex = (d: any) => d.requires_signature === false || d.document_type === 'anexo' || d.document_type?.includes('anexo');
+          // BUT: signed contracts (is_final with signed_pdf_url) should NOT be classified as annexes
+          const isAnnex = (d: any) => {
+            // Never treat a signed final contract as an annex
+            if (d.document_type === 'contrato' && (d.signed_pdf_url || d.is_final)) return false;
+            return d.requires_signature === false || d.document_type === 'anexo' || d.document_type?.includes('anexo');
+          };
           const annexDocs = documents?.filter((d: any) => isAnnex(d)) || [];
           const docsToSign = documents?.filter((d: any) => !isAnnex(d)) || [];
           const hasAnyDocs = docsToSign.length > 0 || annexDocs.length > 0;
@@ -758,8 +769,11 @@ const SignatureView = () => {
                               onClick={() => {
                                 const email = linkData.recipient_email || 
                                   (isTitular ? client?.email : '') || '';
-                                const phone = isTitular ? (client as any)?.phone : 
-                                  (sale?.beneficiaries?.find((b: any) => b.id === linkData.recipient_id) as any)?.phone || '';
+                                // For contratada, use recipient_phone from the link itself
+                                const phone = isContratada
+                                  ? (linkData as any).recipient_phone || ''
+                                  : isTitular ? (client as any)?.phone : 
+                                    (sale?.beneficiaries?.find((b: any) => b.id === linkData.recipient_id) as any)?.phone || '';
                                 const normalizedPhone = phone && !phone.startsWith('+') ? `+595${phone}` : phone;
                                 const effectiveChannel = verification.otpPolicy?.allowed_channels?.includes(selectedChannel)
                                   ? selectedChannel
@@ -827,11 +841,15 @@ const SignatureView = () => {
                                 setOtpCode('');
                                 // Re-send OTP automatically
                                 setTimeout(() => {
-                                  const email = isTitular ? (client as any)?.email :
-                                    (sale?.beneficiaries?.find((b: any) => b.id === linkData.recipient_id) as any)?.email ||
-                                    (isTitular ? client?.email : '') || '';
-                                  const phone = isTitular ? (client as any)?.phone :
-                                    (sale?.beneficiaries?.find((b: any) => b.id === linkData.recipient_id) as any)?.phone || '';
+                                  const email = isContratada
+                                    ? linkData.recipient_email || ''
+                                    : isTitular ? (client as any)?.email :
+                                      (sale?.beneficiaries?.find((b: any) => b.id === linkData.recipient_id) as any)?.email ||
+                                      (isTitular ? client?.email : '') || '';
+                                  const phone = isContratada
+                                    ? (linkData as any).recipient_phone || ''
+                                    : isTitular ? (client as any)?.phone :
+                                      (sale?.beneficiaries?.find((b: any) => b.id === linkData.recipient_id) as any)?.phone || '';
                                   const normalizedPhone = phone && !phone.startsWith('+') ? `+595${phone}` : phone;
                                   const effectiveChannel = verification.otpPolicy?.allowed_channels?.includes(selectedChannel)
                                     ? selectedChannel
