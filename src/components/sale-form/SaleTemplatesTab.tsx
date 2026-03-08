@@ -447,7 +447,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
             beneficiary_id: null,
           });
         }
-      });
+      }
 
       // Create signature link for titular
       await createSignatureLink.mutateAsync({
@@ -455,7 +455,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         recipientType: 'titular',
         recipientEmail: client?.email || '',
         recipientPhone: client?.phone || undefined,
-            }
+      });
       // Create separate signature links for each adherente
       if (effectiveBeneficiaries && effectiveBeneficiaries.length > 0) {
         for (const b of effectiveBeneficiaries) {
