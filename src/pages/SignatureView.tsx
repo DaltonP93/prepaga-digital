@@ -94,6 +94,7 @@ const SignatureView = () => {
               'Content-Type': 'application/json',
               'apikey': SUPABASE_PUBLISHABLE_KEY,
               'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+              'x-signature-token': token || '',
             },
             body: JSON.stringify({ document_id: doc.id, kind: 'signed' }),
           }
@@ -127,7 +128,7 @@ const SignatureView = () => {
         </style>
       </head>
       <body>
-        ${doc.content}
+        ${DOMPurify.sanitize(doc.content || '', { FORCE_BODY: true })}
       </body>
       </html>
     `;

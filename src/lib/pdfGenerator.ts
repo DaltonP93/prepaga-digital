@@ -1,5 +1,6 @@
 
 import { formatCurrency } from '@/lib/utils';
+import DOMPurify from 'dompurify';
 
 // PDF Generation utilities
 export interface PDFDocument {
@@ -169,7 +170,8 @@ export const downloadPDF = async (content: string, filename: string) => {
     // Fallback: open content in new window
     const newWindow = window.open('', '_blank');
     if (newWindow) {
-      newWindow.document.write(content);
+      const safeContent = DOMPurify.sanitize(content, { FORCE_BODY: true, WHOLE_DOCUMENT: true });
+      newWindow.document.write(safeContent);
       newWindow.document.close();
     }
   }

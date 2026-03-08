@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "authorization, x-client-info, apikey, content-type, x-signature-token, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 Deno.serve(async (req) => {
@@ -14,16 +14,68 @@ Deno.serve(async (req) => {
   try {
     const { document_id, kind } = await req.json();
     if (!document_id || !kind) {
-      return new Response(JSON.stringify({ error: "document_id and kind ('base'|'signed') are required" }), {
+      return new Response(JSON.stringify({ error: "document_id and kind ('base'|'signed'|'evidence') are required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    // --- Authentication: support JWT user OR public signature token ---
+    const authHeader = req.headers.get("Authorization") || "";
+    const signatureToken = req.headers.get("x-signature-token") || "";
+    const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.replace("Bearer ", "") : "";
+
+    let authorized = false;
+
+    // 1) Try authenticated user JWT (not the anon key itself)
+    if (bearerToken && bearerToken !== supabaseAnonKey) {
+      const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: `Bearer ${bearerToken}` } },
+      });
+      const { data, error } = await userClient.auth.getUser(bearerToken);
+      if (!error && data?.user) {
+        authorized = true;
+      }
+    }
+
+    // 2) Try public signature token — validate it maps to a sale that owns this document
+    if (!authorized && signatureToken) {
+      const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+      const { data: link } = await supabaseAdmin
+        .from("signature_links")
+        .select("sale_id")
+        .eq("token", signatureToken)
+        .gt("expires_at", new Date().toISOString())
+        .neq("status", "revocado")
+        .single();
+
+      if (link) {
+        // Verify the document belongs to this sale
+        const { data: doc } = await supabaseAdmin
+          .from("documents")
+          .select("id")
+          .eq("id", document_id)
+          .eq("sale_id", link.sale_id)
+          .single();
+        if (doc) {
+          authorized = true;
+        }
+      }
+    }
+
+    if (!authorized) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // --- Authorized: generate signed URL ---
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     const columnMap: Record<string, string> = {
       signed: "signed_pdf_url",
@@ -53,7 +105,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Parse bucket:path format — extract bucket from storedUrl if present
     let bucket: string;
     let storagePath: string;
 
@@ -66,13 +117,13 @@ Deno.serve(async (req) => {
       storagePath = storedUrl;
     }
 
-    const expiresIn = 3600; // 1 hour
+    const expiresIn = 3600;
     const { data: signedUrlData, error: urlErr } = await supabaseAdmin.storage
       .from(bucket)
       .createSignedUrl(storagePath, expiresIn);
 
     if (urlErr || !signedUrlData) {
-      return new Response(JSON.stringify({ error: "Could not generate download URL", details: urlErr?.message }), {
+      return new Response(JSON.stringify({ error: "Could not generate download URL" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -89,7 +140,7 @@ Deno.serve(async (req) => {
     );
   } catch (err) {
     console.error("get-document-download-url error:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

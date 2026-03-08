@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import DOMPurify from 'dompurify';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -178,7 +179,7 @@ const SignatureWorkflow = () => {
   @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
 </style>
 </head>
-<body>${doc.content}</body>
+<body>${DOMPurify.sanitize(doc.content || '', { FORCE_BODY: true })}</body>
 </html>`;
     const printWindow = window.open('', '_blank');
     if (printWindow) {
@@ -194,6 +195,7 @@ const SignatureWorkflow = () => {
     try {
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const session = (await supabase.auth.getSession()).data.session;
       const response = await fetch(
         `${SUPABASE_URL}/functions/v1/get-document-download-url`,
         {
@@ -201,7 +203,7 @@ const SignatureWorkflow = () => {
           headers: {
             'Content-Type': 'application/json',
             'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Authorization': `Bearer ${session?.access_token || SUPABASE_KEY}`,
           },
           body: JSON.stringify({ document_id: docId, kind: 'evidence' }),
         }
@@ -242,6 +244,7 @@ const SignatureWorkflow = () => {
         try {
           const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
           const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+          const session = (await supabase.auth.getSession()).data.session;
           const response = await fetch(
             `${SUPABASE_URL}/functions/v1/get-document-download-url`,
             {
@@ -249,7 +252,7 @@ const SignatureWorkflow = () => {
               headers: {
                 'Content-Type': 'application/json',
                 'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`,
+                'Authorization': `Bearer ${session?.access_token || SUPABASE_KEY}`,
               },
               body: JSON.stringify({ document_id: doc.id, kind: 'signed' }),
             }
