@@ -1,104 +1,31 @@
 
 
-## Plan: Fase 5 — PAdES con document_type exactos y doble safeguard
+## Analysis
 
-### Archivo único
-`src/hooks/useSignatureLinkPublic.ts` — líneas 598-682
+After extensive investigation, I found the root cause of the DDJJ document not being generated:
 
-### Cambio
-Reemplazar el bloque PAdES actual por la versión con valores exactos de `document_type` (`contrato`, `ddjj_salud`, `anexo`) en lugar de comparaciones genéricas con `.toLowerCase()`. Agrega doble safeguard para contratada pendiente.
+The generation loop in `handleSendDocuments` and `handleRegenerateDocuments` calls `interpolateEnhancedTemplate()` on ALL templates, including the **Anexo PLAN SEVEN** which has **3.17 MB** of content (likely embedded base64 images). Running complex regex operations on 3.17 MB of text is extremely heavy and can cause silent failures that prevent subsequent templates (DDJJ) from being processed. There is **no individual try/catch** around each template in the loop, so any issue in one template's processing breaks the entire sequence.
 
-### Diferencias clave vs. código actual (Fase 4)
+Additionally, annexo documents don't need variable interpolation at all -- they contain static content/images.
 
-1. **document_type exacto**: usa `dt === 'contrato'` directo (sin `.toLowerCase()` ni check de `'contract'`)
-2. **ddjj_salud explícito**: filtra por `dt === 'ddjj_salud'` en vez de "todo lo que no sea contrato"
-3. **Anexos excluidos**: `dt === 'anexo'` retorna `false` explícitamente
-4. **Doble safeguard**: `safeDocsToSign` filtra contrato si `hasPendingContratada` como segunda capa
-5. **Error handling mejorado**: `pendingErr` se maneja separadamente del catch
+## Plan
 
-### Código resultante (reemplaza líneas 598-682)
+### 1. Add per-template try/catch in both generation functions
 
-```typescript
-// Post-signature: generate base PDF + PAdES only when it corresponds to this signer + step
-try {
-  const supabaseUrl = SUPABASE_URL;
-  const anonKey = SUPABASE_PUBLISHABLE_KEY;
+In `SaleTemplatesTab.tsx`, wrap each template processing iteration (in both `handleSendDocuments` at ~line 303 and `handleRegenerateDocuments` at ~line 610) with individual try/catch blocks. This prevents one template failure from blocking others.
 
-  const { data: docs, error: docsErr } = await signatureClient
-    .from('documents')
-    .select('id, document_type, beneficiary_id, is_final, signed_pdf_url')
-    .eq('sale_id', data.sale_id)
-    .eq('is_final', true)
-    .neq('document_type', 'firma');
+### 2. Skip interpolation for anexo templates
 
-  if (docsErr) {
-    console.warn('Could not fetch final documents:', docsErr);
-  } else if (docs && docs.length > 0) {
-    const recipientType = data.recipient_type;
+For templates identified as `isAnexo`, skip the `interpolateEnhancedTemplate()` call entirely and use the raw content. This avoids running expensive regex operations on the 3.17 MB Anexo template content.
 
-    let hasPendingContratada = false;
-    try {
-      const { data: pendingCL, error: pendingErr } = await signatureClient
-        .from('signature_links').select('id')
-        .eq('sale_id', data.sale_id)
-        .eq('recipient_type', 'contratada')
-        .eq('status', 'pendiente');
-      if (pendingErr) {
-        console.warn('Could not check pending contratada links:', pendingErr);
-        hasPendingContratada = true;
-      } else {
-        hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
-      }
-    } catch (e) {
-      console.warn('Could not check pending contratada links (exception):', e);
-      hasPendingContratada = true;
-    }
+### 3. Reorder template processing: DDJJ and Contrato first
 
-    const docsToSign = docs.filter((d: any) => {
-      if (d.signed_pdf_url) return false;
-      const dt = d.document_type;
+Sort `templateContents` so that DDJJ and Contrato templates are processed before Anexo templates. This ensures critical signature documents are generated even if an Anexo fails.
 
-      if (dt === 'contrato') {
-        return recipientType === 'contratada';
-      }
-      if (dt === 'ddjj_salud') {
-        if (recipientType === 'titular') return d.beneficiary_id == null;
-        if (recipientType === 'adherente') return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
-        return false;
-      }
-      if (dt === 'anexo') return false;
-      return false;
-    });
+### 4. Add diagnostic logging
 
-    const safeDocsToSign = docsToSign.filter((d: any) => {
-      if (d.document_type === 'contrato' && hasPendingContratada) return false;
-      return true;
-    });
+Add `console.log` for each template processed (name + success/failure) so future issues can be diagnosed from console output.
 
-    for (const doc of safeDocsToSign) {
-      try {
-        await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-        await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-      } catch (pdfErr) {
-        console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
-      }
-    }
-  }
-} catch (pdfGenErr) {
-  console.warn('Post-signature PDF generation error:', pdfGenErr);
-}
-```
-
-### Impacto
-- 1 archivo, 1 bloque (~85 líneas reemplaza ~85 líneas)
-- No afecta bloque de activación contratada (Fase 3)
-- No requiere migraciones
+### Files to modify
+- `src/components/sale-form/SaleTemplatesTab.tsx` -- both `handleSendDocuments` (~lines 303-339) and `handleRegenerateDocuments` (~lines 610-631) loops
 
