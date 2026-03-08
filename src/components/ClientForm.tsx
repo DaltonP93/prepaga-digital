@@ -366,8 +366,8 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
                       <SelectValue placeholder="Seleccionar" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="masculino">Masculino</SelectItem>
-                      <SelectItem value="femenino">Femenino</SelectItem>
+                      <SelectItem value="Masculino">Masculino</SelectItem>
+                      <SelectItem value="Femenino">Femenino</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
