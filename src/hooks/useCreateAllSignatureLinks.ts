@@ -119,6 +119,16 @@ export const useCreateAllSignatureLinks = () => {
         const contratadaExpiresAt = new Date();
         contratadaExpiresAt.setDate(contratadaExpiresAt.getDate() + 3); // 3 días para la empresa
 
+        // Check if all step 1 links are already completed (titular signed before contratada was created)
+        const { data: step1Links } = await supabase
+          .from('signature_links')
+          .select('id, status')
+          .eq('sale_id', saleId)
+          .eq('step_order', 1)
+          .neq('status', 'revocado');
+
+        const allStep1Done = step1Links && step1Links.length > 0 && step1Links.every((l: any) => l.status === 'completado');
+
         const { data: contratadaLink, error: contratadaError } = await supabase
           .from('signature_links')
           .insert({
@@ -131,7 +141,7 @@ export const useCreateAllSignatureLinks = () => {
             expires_at: contratadaExpiresAt.toISOString(),
             status: 'pendiente',
             step_order: 2,
-            is_active: false,
+            is_active: allStep1Done ? true : false,
           } as any)
           .select()
           .single();

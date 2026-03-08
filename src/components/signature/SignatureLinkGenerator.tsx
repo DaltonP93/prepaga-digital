@@ -118,6 +118,24 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
     },
   });
 
+  // Activate contratada link manually
+  const activateLink = useMutation({
+    mutationFn: async (linkId: string) => {
+      const { error } = await supabase
+        .from('signature_links')
+        .update({ is_active: true } as any)
+        .eq('id', linkId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['signature-links', saleId] });
+      toast({ title: 'Enlace activado', description: 'El enlace de la contratada ha sido activado para firma.' });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'No se pudo activar el enlace.', variant: 'destructive' });
+    },
+  });
+
   const copyLink = (token: string) => {
     const baseUrl = window.location.origin;
     const link = `${baseUrl}/firmar/${token}`;
