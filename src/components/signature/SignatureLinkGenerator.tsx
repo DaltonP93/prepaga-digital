@@ -246,6 +246,9 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
 
   const hasBeneficiaries = beneficiaries.length > 0;
   const showGenerateAllButton = !hasAnyLinks;
+  const allStep1Completed = signatureLinks
+    .filter((l: any) => l.step_order === 1 && l.status !== 'revocado')
+    .every((l: any) => l.status === 'completado') && signatureLinks.some((l: any) => l.step_order === 1);
 
   return (
     <Card>
