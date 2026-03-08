@@ -195,6 +195,7 @@ const SignatureWorkflow = () => {
     try {
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const session = (await supabase.auth.getSession()).data.session;
       const response = await fetch(
         `${SUPABASE_URL}/functions/v1/get-document-download-url`,
         {
@@ -202,7 +203,7 @@ const SignatureWorkflow = () => {
           headers: {
             'Content-Type': 'application/json',
             'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Authorization': `Bearer ${session?.access_token || SUPABASE_KEY}`,
           },
           body: JSON.stringify({ document_id: docId, kind: 'evidence' }),
         }
