@@ -321,7 +321,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           ? `<p>Documento de anexo cargado sin estructura de diseñador. Procesado como template interno.</p>`
           : renderedContent;
 
-        await supabase.from('documents').insert({
+        const { error: insertError } = await supabase.from('documents').insert({
           sale_id: saleId,
           name: template.name,
           document_type: isAnexo ? 'anexo' : (isDDJJ ? 'ddjj_salud' : 'contrato'),
@@ -332,6 +332,10 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           generated_from_template: true,
           beneficiary_id: null,
         });
+        if (insertError) {
+          console.error(`Error inserting document "${template.name}":`, insertError);
+          toast.error(`Error al generar documento: ${template.name}`);
+        }
       }
 
       // Generate DDJJ documents per beneficiary (adherente)
@@ -386,7 +390,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
               );
               const renderedContent = interpolateEnhancedTemplate(ddjiTemplate.content || '', beneficiaryContext);
 
-              await supabase.from('documents').insert({
+              const { error: benInsertError } = await supabase.from('documents').insert({
                 sale_id: saleId,
                 name: `${ddjiTemplate.name} - ${b.first_name} ${b.last_name}`,
                 document_type: 'ddjj_salud',
@@ -395,6 +399,9 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
                 requires_signature: true,
                 beneficiary_id: b.id,
               });
+              if (benInsertError) {
+                console.error(`Error inserting DDJJ for ${b.first_name}:`, benInsertError);
+              }
             }
           }
         }
@@ -449,7 +456,6 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         recipientEmail: client?.email || '',
         recipientPhone: client?.phone || undefined,
       });
-
       // Create separate signature links for each adherente
       if (effectiveBeneficiaries && effectiveBeneficiaries.length > 0) {
         for (const b of effectiveBeneficiaries) {
