@@ -629,27 +629,61 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         .from('template_attachments' as any).select('template_id').in('template_id', tplIds);
       const templatesWithAttachments = new Set((allAttachments || []).map((a: any) => a.template_id));
 
-      for (const template of (templateContents || [])) {
-        const hasContent = !!template.content?.trim();
-        const rendered = hasContent ? interpolateEnhancedTemplate(template.content || '', context) : '';
-        const lower = template.name.toLowerCase();
-        const isDDJJ = lower.includes('ddjj') || lower.includes('declaración') || lower.includes('declaracion');
-        const isContrato = lower.includes('contrato');
-        const isAnexo = isAnexoPlanName(template.name) || (!isDDJJ && !isContrato);
+      // Sort templates: DDJJ and Contrato first, Anexo last
+      const sortedTpls = [...(templateContents || [])].sort((a, b) => {
+        const aL = a.name.toLowerCase();
+        const bL = b.name.toLowerCase();
+        const aIsAnexo = isAnexoPlanName(a.name) || (!aL.includes('ddjj') && !aL.includes('declaración') && !aL.includes('declaracion') && !aL.includes('contrato'));
+        const bIsAnexo = isAnexoPlanName(b.name) || (!bL.includes('ddjj') && !bL.includes('declaración') && !bL.includes('declaracion') && !bL.includes('contrato'));
+        if (aIsAnexo && !bIsAnexo) return 1;
+        if (!aIsAnexo && bIsAnexo) return -1;
+        return 0;
+      });
 
-        if (isAnexo && !hasContent && templatesWithAttachments.has(template.id)) continue;
+      for (const template of sortedTpls) {
+        try {
+          const hasContent = !!template.content?.trim();
+          const lower = template.name.toLowerCase();
+          const isDDJJ = lower.includes('ddjj') || lower.includes('declaración') || lower.includes('declaracion');
+          const isContrato = lower.includes('contrato');
+          const isAnexo = isAnexoPlanName(template.name) || (!isDDJJ && !isContrato);
 
-        await supabase.from('documents').insert({
-          sale_id: saleId,
-          name: template.name,
-          document_type: isAnexo ? 'anexo' : (isDDJJ ? 'ddjj_salud' : 'contrato'),
-          content: !hasContent && isAnexo ? '<p>Documento de anexo.</p>' : rendered,
-          status: 'pendiente' as any,
-          requires_signature: !isAnexo,
-          is_final: isAnexo,
-          generated_from_template: true,
-          beneficiary_id: null,
-        });
+          if (isAnexo && !hasContent && templatesWithAttachments.has(template.id)) {
+            console.log(`[RegenDoc] Skipped "${template.name}" (anexo with attachments)`);
+            continue;
+          }
+
+          // Skip interpolation for anexo templates (static content)
+          let rendered: string;
+          if (!hasContent && isAnexo) {
+            rendered = '<p>Documento de anexo.</p>';
+          } else if (isAnexo && hasContent) {
+            rendered = template.content || '';
+            console.log(`[RegenDoc] Skipped interpolation for anexo "${template.name}"`);
+          } else {
+            rendered = interpolateEnhancedTemplate(template.content || '', context);
+          }
+
+          const { error: insertErr } = await supabase.from('documents').insert({
+            sale_id: saleId,
+            name: template.name,
+            document_type: isAnexo ? 'anexo' : (isDDJJ ? 'ddjj_salud' : 'contrato'),
+            content: rendered,
+            status: 'pendiente' as any,
+            requires_signature: !isAnexo,
+            is_final: isAnexo,
+            generated_from_template: true,
+            beneficiary_id: null,
+          });
+          if (insertErr) {
+            console.error(`[RegenDoc] Error inserting "${template.name}":`, insertErr);
+          } else {
+            console.log(`[RegenDoc] ✓ Generated "${template.name}"`);
+          }
+        } catch (templateError) {
+          console.error(`[RegenDoc] Exception processing "${template.name}":`, templateError);
+          toast.error(`Error procesando template: ${template.name}`);
+        }
       }
 
       // DDJJ per adherente
