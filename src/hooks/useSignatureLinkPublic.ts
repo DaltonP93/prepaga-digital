@@ -776,6 +776,7 @@ export const useSubmitSignatureLink = () => {
             } as any)
             .in('id', docsToSign.map((d) => d.id));
         }
+        } // end if (!contratadaMergedOk)
       } catch (signedDocsErr) {
         console.warn('Could not build signed final documents:', signedDocsErr);
       }
