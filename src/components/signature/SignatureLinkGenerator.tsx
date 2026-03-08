@@ -399,11 +399,36 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
                     <Alert className="mt-3 border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800">
                       <AlertCircle className="h-4 w-4 text-orange-500" />
                       <AlertDescription className="text-sm text-orange-700 dark:text-orange-300">
-                        <strong>Enlace aún no disponible</strong>
-                        <br />
-                        Este enlace de firma se activará cuando el firmante anterior complete su proceso.
-                        <br />
-                        <span className="text-xs">Recibirá una notificación cuando sea su turno de firmar.</span>
+                        {allStep1Completed ? (
+                          <>
+                            <strong>Todos los firmantes anteriores completaron su firma.</strong>
+                            <br />
+                            <span className="text-xs">Este enlace debería haberse activado automáticamente. Puede activarlo manualmente.</span>
+                            <br />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="mt-2"
+                              onClick={() => activateLink.mutate(link.id)}
+                              disabled={activateLink.isPending}
+                            >
+                              {activateLink.isPending ? (
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              ) : (
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                              )}
+                              Activar enlace
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <strong>Enlace aún no disponible</strong>
+                            <br />
+                            Este enlace de firma se activará cuando el firmante anterior complete su proceso.
+                            <br />
+                            <span className="text-xs">Recibirá una notificación cuando sea su turno de firmar.</span>
+                          </>
+                        )}
                       </AlertDescription>
                     </Alert>
                   )}
