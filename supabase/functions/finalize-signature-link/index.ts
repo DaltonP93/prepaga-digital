@@ -325,7 +325,7 @@ async function activateNextStep(
             templateData: {
               clientName: 'Representante Legal',
               companyName,
-              signatureUrl: `${Deno.env.get('PUBLIC_APP_URL') || 'https://prepaga-digital.lovable.app'}/firmar/${s2Link.id}`,
+              signatureUrl: `${Deno.env.get('PUBLIC_APP_URL') || 'https://prepaga-digital.lovable.app'}/firmar/${s2Link.token}`,
               expirationDate: 'en 3 días',
             },
             companyId: sale?.company_id,
