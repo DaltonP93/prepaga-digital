@@ -131,7 +131,7 @@ async function triggerPadesSigning(
     .eq('is_final', true)
     .neq('document_type', 'firma')
 
-  if (!docs || docs.length === 0) return 0
+  if (!docs || docs.length === 0) return { count: 0, docIds: [] }
 
   for (const doc of docs) {
     // Skip if already has signed PDF
