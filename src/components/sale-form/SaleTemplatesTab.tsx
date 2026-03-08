@@ -402,7 +402,6 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
               if (benInsertError) {
                 console.error(`Error inserting DDJJ for ${b.first_name}:`, benInsertError);
               }
-              });
             }
           }
         }
