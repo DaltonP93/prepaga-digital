@@ -390,7 +390,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
               );
               const renderedContent = interpolateEnhancedTemplate(ddjiTemplate.content || '', beneficiaryContext);
 
-              await supabase.from('documents').insert({
+              const { error: benInsertError } = await supabase.from('documents').insert({
                 sale_id: saleId,
                 name: `${ddjiTemplate.name} - ${b.first_name} ${b.last_name}`,
                 document_type: 'ddjj_salud',
@@ -398,6 +398,10 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
                 status: 'pendiente' as any,
                 requires_signature: true,
                 beneficiary_id: b.id,
+              });
+              if (benInsertError) {
+                console.error(`Error inserting DDJJ for ${b.first_name}:`, benInsertError);
+              }
               });
             }
           }
