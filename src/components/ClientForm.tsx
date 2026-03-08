@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,6 +27,8 @@ interface ClientFormData {
   phone?: string;
   dni?: string;
   birth_date?: string;
+  gender?: string;
+  marital_status?: string;
   address?: string;
   barrio?: string;
   city?: string;
@@ -72,6 +75,8 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
 
   const latitudeValue = watch("latitude");
   const longitudeValue = watch("longitude");
+  const genderValue = watch("gender");
+  const maritalStatusValue = watch("marital_status");
 
   const hasValidCoords = Number.isFinite(Number(latitudeValue)) && Number.isFinite(Number(longitudeValue));
 
@@ -221,6 +226,8 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
         phone: client.phone || "",
         dni: client.dni || "",
         birth_date: client.birth_date || "",
+        gender: (client as any).gender || "",
+        marital_status: (client as any).marital_status || "",
         address: client.address || "",
         barrio: (client as any).barrio || "",
         city: client.city || "",
@@ -238,6 +245,8 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
       phone: "",
       dni: "",
       birth_date: "",
+      gender: "",
+      marital_status: "",
       address: "",
       barrio: "",
       city: "",
@@ -249,17 +258,30 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
 
   const normalizePhone = (raw: string | undefined): string => {
     if (!raw) return "";
-    // Strip spaces, dashes
     let phone = raw.replace(/[\s\-()]/g, "");
-    // Remove leading +595 if user typed it manually
     if (phone.startsWith("+595")) phone = phone.slice(4);
-    // Remove leading 0
     if (phone.startsWith("0")) phone = phone.slice(1);
     return phone;
   };
 
   const onSubmit = async (data: ClientFormData) => {
     try {
+      // Validación de campos de ubicación obligatorios (solo para nuevo cliente)
+      if (!isEditing) {
+        const missingFields: string[] = [];
+        if (!data.city?.trim()) missingFields.push("Ciudad");
+        if (!data.province?.trim()) missingFields.push("Departamento");
+        if (!data.address?.trim()) missingFields.push("Dirección");
+        if (!data.barrio?.trim()) missingFields.push("Barrio");
+        if (!data.latitude?.trim() || !data.longitude?.trim()) missingFields.push("Ubicación en el mapa");
+
+        if (missingFields.length > 0) {
+          setActiveTab("location");
+          toast.error(`Completá los campos de ubicación: ${missingFields.join(", ")}`);
+          return;
+        }
+      }
+
       const latitude = parseCoordinate(data.latitude, -90, 90, "Latitud");
       const longitude = parseCoordinate(data.longitude, -180, 180, "Longitud");
 
@@ -267,10 +289,8 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
         throw new Error("Debes cargar latitud y longitud juntas");
       }
 
-      // Normalize phone: strip leading 0 and +595, store only digits after country code
       data.phone = normalizePhone(data.phone);
 
-      // Remove latitude/longitude from payload; keep barrio (cast as any for untyped column)
       const { latitude: _lat, longitude: _lng, ...cleanData } = data;
 
       if (isEditing && client) {
@@ -337,27 +357,62 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
                 <Label htmlFor="birth_date">Fecha de Nacimiento</Label>
                 <Input id="birth_date" type="date" {...register("birth_date")} />
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Género</Label>
+                  <Select value={genderValue || ""} onValueChange={(value) => setValue("gender", value, { shouldDirty: true })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="masculino">Masculino</SelectItem>
+                      <SelectItem value="femenino">Femenino</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Estado Civil</Label>
+                  <Select value={maritalStatusValue || ""} onValueChange={(value) => setValue("marital_status", value, { shouldDirty: true })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="soltero">Soltero/a</SelectItem>
+                      <SelectItem value="casado">Casado/a</SelectItem>
+                      <SelectItem value="divorciado">Divorciado/a</SelectItem>
+                      <SelectItem value="viudo">Viudo/a</SelectItem>
+                      <SelectItem value="union_libre">Unión libre</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </TabsContent>
 
             <TabsContent value="location" className="space-y-3 pt-2">
+              {!isEditing && (
+                <p className="text-xs text-destructive font-medium">
+                  Todos los campos de ubicación son obligatorios para crear un cliente.
+                </p>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="city">Ciudad</Label>
+                  <Label htmlFor="city">Ciudad *</Label>
                   <Input id="city" {...register("city")} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="province">Departamento</Label>
+                  <Label htmlFor="province">Departamento *</Label>
                   <Input id="province" {...register("province")} />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="address">Direccion</Label>
+                  <Label htmlFor="address">Dirección *</Label>
                   <Input id="address" placeholder="Ej: Boqueron 123" {...register("address")} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="barrio">Barrio</Label>
+                  <Label htmlFor="barrio">Barrio *</Label>
                   <Input id="barrio" placeholder="Ej: Villa Morra" {...register("barrio")} />
                 </div>
               </div>

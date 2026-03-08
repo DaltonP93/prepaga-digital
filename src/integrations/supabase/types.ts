@@ -346,9 +346,11 @@ export type Database = {
           dni: string | null
           email: string | null
           first_name: string
+          gender: string | null
           id: string
           is_active: boolean | null
           last_name: string
+          marital_status: string | null
           notes: string | null
           phone: string | null
           postal_code: string | null
@@ -366,9 +368,11 @@ export type Database = {
           dni?: string | null
           email?: string | null
           first_name: string
+          gender?: string | null
           id?: string
           is_active?: boolean | null
           last_name: string
+          marital_status?: string | null
           notes?: string | null
           phone?: string | null
           postal_code?: string | null
@@ -386,9 +390,11 @@ export type Database = {
           dni?: string | null
           email?: string | null
           first_name?: string
+          gender?: string | null
           id?: string
           is_active?: boolean | null
           last_name?: string
+          marital_status?: string | null
           notes?: string | null
           phone?: string | null
           postal_code?: string | null
