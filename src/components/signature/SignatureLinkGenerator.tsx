@@ -6,9 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { Link, Copy, Send, CheckCircle, Clock, ExternalLink, RefreshCw, PenTool, Building2 } from 'lucide-react';
+import { Link, Copy, Send, CheckCircle, Clock, ExternalLink, RefreshCw, PenTool, Building2, Users, AlertCircle, Loader2 } from 'lucide-react';
 import { useSignWellConfig, useSignWellCreateDocument } from '@/hooks/useSignWell';
+import { useCreateAllSignatureLinks } from '@/hooks/useCreateAllSignatureLinks';
+import { useBeneficiaries } from '@/hooks/useBeneficiaries';
 
 interface SignatureLinkGeneratorProps {
   saleId: string;
@@ -26,12 +29,13 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
   const [expirationDays, setExpirationDays] = useState(1);
   const { isEnabled: signwellEnabled } = useSignWellConfig();
   const signwellCreate = useSignWellCreateDocument();
+  const createAllLinks = useCreateAllSignatureLinks();
+  const { data: beneficiaries = [] } = useBeneficiaries(saleId);
 
   // Fetch contratada config
   const { data: contratadaConfig } = useQuery({
     queryKey: ['contratada-config', saleId],
     queryFn: async () => {
-      // Get sale's company_id
       const { data: sale } = await supabase
         .from('sales')
         .select('company_id')
@@ -57,7 +61,7 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
         .from('signature_links')
         .select('*')
         .eq('sale_id', saleId)
-        .order('created_at', { ascending: false });
+        .order('step_order', { ascending: true });
 
       if (error) throw error;
       return data;
@@ -65,7 +69,7 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
     enabled: !!saleId,
   });
 
-  // Generate new signature link
+  // Generate single link (for individual buttons)
   const generateLink = useMutation({
     mutationFn: async (recipientType: string) => {
       const token = crypto.randomUUID();
@@ -83,35 +87,8 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
         expires_at: expiresAt.toISOString(),
         status: 'pendiente',
         step_order: isContratada ? 2 : 1,
-        is_active: !isContratada, // contratada starts inactive (sequential)
+        is_active: !isContratada,
       };
-
-      // If SignWell is enabled and we have an email, create SignWell document
-      const recipientEmail = isContratada ? contratadaConfig?.contratada_signer_email : clientEmail;
-      if (signwellEnabled && recipientEmail) {
-        try {
-          const { data: saleDocs } = await supabase
-            .from('documents')
-            .select('name, content, file_url')
-            .eq('sale_id', saleId)
-            .neq('document_type', 'firma')
-            .eq('is_final', false)
-            .limit(1);
-
-          const docToSign = saleDocs?.[0];
-          if (docToSign) {
-            const result = await signwellCreate.mutateAsync({
-              name: docToSign.name || 'Documento SAMAP',
-              fileUrl: docToSign.file_url || undefined,
-              recipients: [{ name: recipientEmail.split('@')[0], email: recipientEmail }],
-            });
-            insertData.signwell_document_id = result.document_id;
-            insertData.signwell_signing_url = result.signing_url;
-          }
-        } catch (swErr) {
-          console.warn('SignWell create failed, falling back to canvas:', swErr);
-        }
-      }
 
       const { data, error } = await supabase
         .from('signature_links')
@@ -120,53 +97,16 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
         .single();
 
       if (error) throw error;
-
-      // Send WhatsApp notification for contratada if phone available
-      if (isContratada && contratadaConfig?.contratada_signer_phone) {
-        try {
-          const link = `${window.location.origin}/firmar/${token}`;
-          const { data: { user } } = await supabase.auth.getUser();
-          const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user?.id).single();
-          const { data: sale } = await supabase
-            .from('sales')
-            .select('*, companies(*)')
-            .eq('id', saleId)
-            .single();
-
-          if (profile?.company_id && sale) {
-            await supabase.functions.invoke('send-whatsapp', {
-              body: {
-                to: contratadaConfig.contratada_signer_phone,
-                templateName: 'signature_link',
-                templateData: {
-                  clientName: contratadaConfig.contratada_signer_name || 'Representante',
-                  companyName: sale.companies?.name || 'SAMAP',
-                  signatureUrl: link,
-                },
-                saleId,
-                companyId: profile.company_id,
-                messageType: 'signature_link',
-              },
-            });
-          }
-        } catch (err) {
-          console.warn('WhatsApp notification to contratada failed:', err);
-        }
-      }
-
       return data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['signature-links', saleId] });
-      const isSignWell = !!(data as any).signwell_document_id;
       const isContratada = (data as any).recipient_type === 'contratada';
       toast({
         title: isContratada ? 'Enlace para Contratada generado' : 'Enlace generado',
         description: isContratada
-          ? 'Se generó el enlace de firma para el representante de la empresa.'
-          : isSignWell
-            ? 'Enlace de firma SignWell creado exitosamente.'
-            : 'El enlace de firma ha sido creado exitosamente.',
+          ? 'Se generó el enlace de firma para el representante de la empresa (se activará cuando el titular firme).'
+          : 'El enlace de firma ha sido creado exitosamente.',
       });
     },
     onError: (error: any) => {
@@ -241,9 +181,17 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
     },
   });
 
-  const getStatusBadge = (status: string, expiresAt: string) => {
+  const getStatusBadge = (status: string, expiresAt: string, isActive?: boolean) => {
     const isExpired = new Date(expiresAt) < new Date();
     if (isExpired) return <Badge variant="destructive">Expirado</Badge>;
+    if (isActive === false && status === 'pendiente') {
+      return (
+        <Badge variant="outline" className="text-orange-500 border-orange-300">
+          <Clock className="h-3 w-3 mr-1" />
+          Esperando turno
+        </Badge>
+      );
+    }
     switch (status) {
       case 'completado':
         return <Badge className="bg-green-600"><CheckCircle className="h-3 w-3 mr-1" />Firmado</Badge>;
@@ -273,9 +221,13 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
   };
 
   const hasContratadaLink = signatureLinks.some((l: any) => l.recipient_type === 'contratada');
+  const hasAnyLinks = signatureLinks.length > 0;
   const showContratadaButton = contratadaConfig?.contratada_signature_mode === 'link'
     && contratadaConfig?.contratada_signer_email
     && !hasContratadaLink;
+
+  const hasBeneficiaries = beneficiaries.length > 0;
+  const showGenerateAllButton = !hasAnyLinks;
 
   return (
     <Card>
@@ -292,44 +244,74 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Generate New Link Section */}
+        {/* Generate All Links Section */}
         <div className="p-4 border rounded-lg bg-muted/30 space-y-4">
-          <h4 className="font-medium">Generar nuevo enlace</h4>
-          <div className="flex items-end gap-4 flex-wrap">
-            <div className="flex-1 min-w-[100px]">
-              <Label htmlFor="expiration">Días de validez</Label>
-              <Input
-                id="expiration"
-                type="number"
-                min={1}
-                max={30}
-                value={expirationDays}
-                onChange={(e) => setExpirationDays(Number(e.target.value))}
-                className="w-24"
-              />
-            </div>
-            <Button
-              onClick={() => generateLink.mutate('cliente')}
-              disabled={generateLink.isPending}
-            >
-              <Link className="h-4 w-4 mr-2" />
-              Enlace para Cliente
-            </Button>
-            {showContratadaButton && (
+          <h4 className="font-medium">Generar enlaces de firma</h4>
+
+          {showGenerateAllButton && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Genera todos los enlaces de firma en un solo paso: Titular
+                {hasBeneficiaries ? `, ${beneficiaries.length} Adherente(s)` : ''}
+                {contratadaConfig?.contratada_signature_mode === 'link' ? ' y Contratada (Empresa)' : ''}.
+              </p>
+              {contratadaConfig?.contratada_signature_mode === 'link' && contratadaConfig?.contratada_signer_name && (
+                <p className="text-xs text-muted-foreground">
+                  <Building2 className="h-3 w-3 inline mr-1" />
+                  Representante: {contratadaConfig.contratada_signer_name} ({contratadaConfig.contratada_signer_email})
+                  — El enlace de la contratada se activará automáticamente cuando el titular firme.
+                </p>
+              )}
               <Button
-                variant="secondary"
-                onClick={() => generateLink.mutate('contratada')}
-                disabled={generateLink.isPending}
+                onClick={() => createAllLinks.mutate({ saleId })}
+                disabled={createAllLinks.isPending}
+                className="w-full sm:w-auto"
               >
-                <Building2 className="h-4 w-4 mr-2" />
-                Enlace para Contratada
+                {createAllLinks.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Users className="h-4 w-4 mr-2" />
+                )}
+                {createAllLinks.isPending ? 'Generando...' : 'Generar Todos los Enlaces'}
               </Button>
-            )}
-          </div>
-          {showContratadaButton && contratadaConfig && (
-            <p className="text-xs text-muted-foreground">
-              Representante: {contratadaConfig.contratada_signer_name} ({contratadaConfig.contratada_signer_email})
-            </p>
+            </div>
+          )}
+
+          {hasAnyLinks && (
+            <div className="flex items-end gap-4 flex-wrap">
+              <div className="flex-1 min-w-[100px]">
+                <Label htmlFor="expiration">Días de validez</Label>
+                <Input
+                  id="expiration"
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={expirationDays}
+                  onChange={(e) => setExpirationDays(Number(e.target.value))}
+                  className="w-24"
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => generateLink.mutate('cliente')}
+                disabled={generateLink.isPending}
+                size="sm"
+              >
+                <Link className="h-4 w-4 mr-2" />
+                + Enlace Cliente
+              </Button>
+              {showContratadaButton && (
+                <Button
+                  variant="secondary"
+                  onClick={() => generateLink.mutate('contratada')}
+                  disabled={generateLink.isPending}
+                  size="sm"
+                >
+                  <Building2 className="h-4 w-4 mr-2" />
+                  + Enlace Contratada
+                </Button>
+              )}
+            </div>
           )}
         </div>
 
@@ -338,59 +320,75 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
           <p className="text-sm text-muted-foreground text-center py-4">Cargando enlaces...</p>
         ) : signatureLinks.length > 0 ? (
           <div className="space-y-3">
-            <h4 className="font-medium">Enlaces existentes</h4>
-            {signatureLinks.map((link: any) => (
-              <div key={link.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{getRecipientLabel(link.recipient_type)}</span>
-                    {getStatusBadge(link.status, link.expires_at)}
-                    {link.recipient_type === 'contratada' && (
-                      <Badge variant="outline" className="text-xs">
-                        <Building2 className="h-3 w-3 mr-1" />
-                        Empresa
-                      </Badge>
-                    )}
-                    {link.signwell_document_id && (
-                      <Badge variant="outline" className="text-xs text-green-600">
-                        <PenTool className="h-3 w-3 mr-1" />
-                        SignWell
-                      </Badge>
-                    )}
-                    {link.is_active === false && link.status === 'pendiente' && (
-                      <Badge variant="outline" className="text-xs text-orange-500">
-                        Paso {link.step_order || 2} - Esperando
-                      </Badge>
-                    )}
+            <h4 className="font-medium">Enlaces generados ({signatureLinks.length})</h4>
+            {signatureLinks.map((link: any) => {
+              const isInactive = link.is_active === false && link.status === 'pendiente';
+
+              return (
+                <div key={link.id} className={`p-4 border rounded-lg ${isInactive ? 'bg-muted/40 border-dashed' : ''}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium">{getRecipientLabel(link.recipient_type)}</span>
+                        {getStatusBadge(link.status, link.expires_at, link.is_active)}
+                        {link.recipient_type === 'contratada' && (
+                          <Badge variant="outline" className="text-xs">
+                            <Building2 className="h-3 w-3 mr-1" />
+                            Paso 2
+                          </Badge>
+                        )}
+                        {link.signwell_document_id && (
+                          <Badge variant="outline" className="text-xs text-green-600">
+                            <PenTool className="h-3 w-3 mr-1" />
+                            SignWell
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-0.5">
+                        <p>Creado: {formatDate(link.created_at)}</p>
+                        <p>Expira: {formatDate(link.expires_at)}</p>
+                        {link.recipient_email && <p>Email: {link.recipient_email}</p>}
+                        {link.recipient_phone && <p>Tel: {link.recipient_phone}</p>}
+                        {link.access_count > 0 && <p>Accesos: {link.access_count}</p>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => copyLink(link.token)}>
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => window.open(`/firmar/${link.token}`, '_blank')}>
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                      {link.status === 'pendiente' && link.is_active !== false && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => resendNotification.mutate(link)}
+                          disabled={resendNotification.isPending}
+                          title="Reenviar notificación por WhatsApp"
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-xs text-muted-foreground space-y-0.5">
-                    <p>Creado: {formatDate(link.created_at)}</p>
-                    <p>Expira: {formatDate(link.expires_at)}</p>
-                    {link.recipient_email && <p>Email: {link.recipient_email}</p>}
-                    {link.access_count > 0 && <p>Accesos: {link.access_count}</p>}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => copyLink(link.token)}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => window.open(`/firmar/${link.token}`, '_blank')}>
-                    <ExternalLink className="h-4 w-4" />
-                  </Button>
-                  {link.status === 'pendiente' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => resendNotification.mutate(link)}
-                      disabled={resendNotification.isPending}
-                      title="Reenviar notificación por WhatsApp"
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                    </Button>
+
+                  {/* Inline "not yet available" message for inactive links */}
+                  {isInactive && (
+                    <Alert className="mt-3 border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800">
+                      <AlertCircle className="h-4 w-4 text-orange-500" />
+                      <AlertDescription className="text-sm text-orange-700 dark:text-orange-300">
+                        <strong>Enlace aún no disponible</strong>
+                        <br />
+                        Este enlace de firma se activará cuando el firmante anterior complete su proceso.
+                        <br />
+                        <span className="text-xs">Recibirá una notificación cuando sea su turno de firmar.</span>
+                      </AlertDescription>
+                    </Alert>
                   )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <p className="text-sm text-muted-foreground text-center py-4">
