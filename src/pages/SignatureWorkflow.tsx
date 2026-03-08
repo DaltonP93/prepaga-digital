@@ -41,21 +41,32 @@ const SignatureWorkflow = () => {
   const queryClient = useQueryClient();
 
   // Realtime subscription for signature_links updates
+  // Realtime subscription + polling fallback for auto-refresh
   useEffect(() => {
     if (!saleId) return;
+
+    const invalidateAll = () => {
+      queryClient.invalidateQueries({ queryKey: ['signature-links', saleId] });
+      queryClient.invalidateQueries({ queryKey: ['signed-documents', saleId] });
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      queryClient.invalidateQueries({ queryKey: ['signature-workflow-steps', saleId] });
+    };
+
+    // Primary: realtime subscription
     const channel = supabase
-      .channel(`signature-links-${saleId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'signature_links', filter: `sale_id=eq.${saleId}` },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['signature-links', saleId] });
-          queryClient.invalidateQueries({ queryKey: ['signed-documents', saleId] });
-          queryClient.invalidateQueries({ queryKey: ['sales'] });
-        }
-      )
+      .channel(`sig-workflow-${saleId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'signature_links', filter: `sale_id=eq.${saleId}` }, invalidateAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'documents', filter: `sale_id=eq.${saleId}` }, invalidateAll)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales', filter: `id=eq.${saleId}` }, invalidateAll)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+
+    // Fallback: polling every 10 seconds
+    const pollInterval = setInterval(invalidateAll, 10000);
+
+    return () => {
+      clearInterval(pollInterval);
+      supabase.removeChannel(channel);
+    };
   }, [saleId, queryClient]);
 
   // Fetch documents for this sale
@@ -698,7 +709,14 @@ const SignatureWorkflow = () => {
           <CardContent>
             {contratadaLinks.length > 0
               ? renderSignatureLinks(contratadaLinks)
-              : (
+              : selectedSale?.status === 'completado' ? (
+                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span className="text-sm text-green-800">
+                    Venta completada. La firma de la contratada fue aplicada automáticamente.
+                  </span>
+                </div>
+              ) : (
                 <p className="text-sm text-muted-foreground italic">
                   El link de firma de la contratada se genera automáticamente cuando el titular complete su firma.
                 </p>
