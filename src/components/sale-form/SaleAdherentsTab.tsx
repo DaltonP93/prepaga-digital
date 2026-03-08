@@ -155,6 +155,17 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
                 />
               </div>
               <div className="space-y-2">
+                <Label>Teléfono *</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground whitespace-nowrap">+595</span>
+                  <Input
+                    value={newBeneficiary.phone}
+                    onChange={(e) => setNewBeneficiary(prev => ({ ...prev, phone: e.target.value.replace(/\D/g, '') }))}
+                    placeholder="981123456"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
                 <Label>Monto (Gs.)</Label>
                 <Input
                   type="number"
@@ -211,6 +222,7 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
                     <div className="font-medium">{b.first_name} {b.last_name}</div>
                     <div className="text-sm text-muted-foreground">
                       {b.dni && `C.I.: ${b.dni}`} {b.relationship && `• ${b.relationship}`}
+                      {b.phone && ` • Tel: +595${b.phone}`}
                       {b.amount ? ` • ${formatCurrency(Number(b.amount) || 0)}` : ''}
                     </div>
                   </div>
