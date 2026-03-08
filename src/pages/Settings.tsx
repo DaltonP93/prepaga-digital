@@ -34,7 +34,7 @@ import { WorkflowConfigPanel } from '@/components/workflow/WorkflowConfigPanel';
 import { SaleProgressConfigPanel } from '@/components/workflow/SaleProgressConfigPanel';
 import { AdminConfigPanel } from '@/components/AdminConfigPanel';
 import { MenuConfigPanel } from '@/components/MenuConfigPanel';
-import { OtpPolicyConfigPanel } from '@/components/OtpPolicyConfigPanel';
+
 import { useRolePermissions } from '@/hooks/useRolePermissions';
 import { WhatsAppTemplatesPanel } from '@/components/WhatsAppTemplatesPanel';
 
@@ -204,8 +204,6 @@ export default function Settings() {
           {canManageWorkflow ? (
             <>
               <AdminConfigPanel />
-              
-              <OtpPolicyConfigPanel />
 
               <WhatsAppTemplatesPanel />
             </>

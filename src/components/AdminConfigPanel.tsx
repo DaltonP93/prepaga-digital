@@ -10,7 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Settings, Palette, MessageSquare, Mail, Smartphone, Eye, CheckCircle, XCircle, ExternalLink, Copy, PenTool, Loader2, TestTube, AlertTriangle } from 'lucide-react';
+import { Settings, Palette, MessageSquare, Mail, Smartphone, Eye, CheckCircle, XCircle, ExternalLink, Copy, PenTool, Loader2, TestTube, AlertTriangle, KeyRound } from 'lucide-react';
+import { OtpPolicyConfigPanel } from '@/components/OtpPolicyConfigPanel';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { supabase } from '@/integrations/supabase/client';
@@ -205,30 +206,34 @@ export const AdminConfigPanel: React.FC = () => {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="whatsapp" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
-          <TabsTrigger value="ui" className="flex items-center gap-2">
-            <Palette className="h-4 w-4" />
+        <TabsList className="grid w-full grid-cols-4 md:grid-cols-7">
+          <TabsTrigger value="ui" className="flex items-center gap-1 text-xs">
+            <Palette className="h-3.5 w-3.5" />
             Interfaz
           </TabsTrigger>
-          <TabsTrigger value="whatsapp" className="flex items-center gap-2">
-            <MessageSquare className="h-4 w-4" />
+          <TabsTrigger value="whatsapp" className="flex items-center gap-1 text-xs">
+            <MessageSquare className="h-3.5 w-3.5" />
             WhatsApp
           </TabsTrigger>
-          <TabsTrigger value="sms" className="flex items-center gap-2">
-            <Smartphone className="h-4 w-4" />
+          <TabsTrigger value="sms" className="flex items-center gap-1 text-xs">
+            <Smartphone className="h-3.5 w-3.5" />
             SMS
           </TabsTrigger>
-          <TabsTrigger value="email" className="flex items-center gap-2">
-            <Mail className="h-4 w-4" />
+          <TabsTrigger value="email" className="flex items-center gap-1 text-xs">
+            <Mail className="h-3.5 w-3.5" />
             Email
           </TabsTrigger>
-          <TabsTrigger value="signwell" className="flex items-center gap-2">
-            <PenTool className="h-4 w-4" />
+          <TabsTrigger value="otp" className="flex items-center gap-1 text-xs">
+            <KeyRound className="h-3.5 w-3.5" />
+            Canales OTP
+          </TabsTrigger>
+          <TabsTrigger value="signwell" className="flex items-center gap-1 text-xs">
+            <PenTool className="h-3.5 w-3.5" />
             Firma Digital
           </TabsTrigger>
-          <TabsTrigger value="contratada" className="flex items-center gap-2">
-            <PenTool className="h-4 w-4" />
-            Firma Contratada
+          <TabsTrigger value="contratada" className="flex items-center gap-1 text-xs">
+            <PenTool className="h-3.5 w-3.5" />
+            Contratada
           </TabsTrigger>
         </TabsList>
 
@@ -847,6 +852,11 @@ export const AdminConfigPanel: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* OTP Channels Tab */}
+        <TabsContent value="otp" className="space-y-6">
+          <OtpPolicyConfigPanel />
         </TabsContent>
 
         {/* Firma Contratada Tab */}
