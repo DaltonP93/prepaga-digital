@@ -315,7 +315,9 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         try {
           const hasDesignerContent = !!template.content?.trim();
           const lower = template.name.toLowerCase();
-          const isDDJJ = lower.includes('ddjj') || lower.includes('declaración') || lower.includes('declaracion');
+          const lowerNorm = lower.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          const isDDJJ = lower.includes('ddjj') || lower.includes('declaración') || lower.includes('declaracion')
+            || lowerNorm.includes('declaracion') || lowerNorm.includes('ddjj');
           const isContrato = lower.includes('contrato');
           const isAnexoPlan = isAnexoPlanName(template.name);
           const isAnexo = isAnexoPlan || (!isDDJJ && !isContrato);
@@ -361,9 +363,12 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       }
 
       // Generate DDJJ documents per beneficiary (adherente)
-      const ddjiTemplates = (templateContents || []).filter(t =>
-        t.name.toLowerCase().includes('ddjj') || t.name.toLowerCase().includes('declaración')
-      );
+      const ddjiTemplates = (templateContents || []).filter(t => {
+        const n = t.name.toLowerCase();
+        const nNorm = n.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        return n.includes('ddjj') || n.includes('declaración') || n.includes('declaracion')
+          || nNorm.includes('declaracion');
+      });
 
       if (effectiveBeneficiaries && effectiveBeneficiaries.length > 0 && ddjiTemplates.length > 0) {
         for (const b of effectiveBeneficiaries) {
@@ -644,7 +649,9 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         try {
           const hasContent = !!template.content?.trim();
           const lower = template.name.toLowerCase();
-          const isDDJJ = lower.includes('ddjj') || lower.includes('declaración') || lower.includes('declaracion');
+          const lowerNorm = lower.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          const isDDJJ = lower.includes('ddjj') || lower.includes('declaración') || lower.includes('declaracion')
+            || lowerNorm.includes('declaracion') || lowerNorm.includes('ddjj');
           const isContrato = lower.includes('contrato');
           const isAnexo = isAnexoPlanName(template.name) || (!isDDJJ && !isContrato);
 
