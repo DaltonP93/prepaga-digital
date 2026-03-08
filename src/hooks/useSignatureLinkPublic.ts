@@ -372,14 +372,41 @@ export const useSubmitSignatureLink = () => {
               }
 
               // Replace "Pendiente firma de la empresa" placeholder with actual contratada signature
-              const replaced = finalContent.replace(
-                /<div[^>]*style="[^"]*display:\s*inline-block[^"]*"[^>]*>[\s\S]*?Pendiente\s+firma\s+de\s+la\s+empresa[\s\S]*?C\.I\.N[ºo°]\s*:[\s\S]*?<\/div>/i,
-                contratadaBlock
-              );
+              // Use a robust parser approach instead of regex (nested divs break lazy regex)
+              let mergeSuccess = false;
+              const pendienteIdx = finalContent.indexOf('Pendiente firma de la empresa');
+              if (pendienteIdx !== -1) {
+                // Walk backwards to find the opening <div with display:inline-block
+                const before = finalContent.substring(0, pendienteIdx);
+                const lastDivOpen = before.lastIndexOf('<div');
+                if (lastDivOpen !== -1) {
+                  // Check if this div has inline-block style
+                  const divTag = finalContent.substring(lastDivOpen, pendienteIdx);
+                  if (divTag.includes('inline-block') || divTag.includes('display:')) {
+                    // Find the matching closing </div> by counting depth
+                    let depth = 1;
+                    let pos = finalContent.indexOf('>', lastDivOpen) + 1;
+                    while (pos < finalContent.length && depth > 0) {
+                      const nextOpen = finalContent.indexOf('<div', pos);
+                      const nextClose = finalContent.indexOf('</div>', pos);
+                      if (nextClose === -1) break;
+                      if (nextOpen !== -1 && nextOpen < nextClose) {
+                        depth++;
+                        pos = nextOpen + 4;
+                      } else {
+                        depth--;
+                        pos = nextClose + 6;
+                      }
+                    }
+                    if (depth === 0) {
+                      finalContent = finalContent.substring(0, lastDivOpen) + contratadaBlock + finalContent.substring(pos);
+                      mergeSuccess = true;
+                    }
+                  }
+                }
+              }
 
-              if (replaced !== finalContent) {
-                finalContent = replaced;
-              } else {
+              if (!mergeSuccess) {
                 // Fallback: append contratada signature block
                 finalContent += contratadaBlock;
               }
