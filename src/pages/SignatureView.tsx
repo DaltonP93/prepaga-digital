@@ -464,6 +464,7 @@ const SignatureView = () => {
   // Build recipient name for display
   const getRecipientName = () => {
     if (isTitular && client) return `${client.first_name} ${client.last_name}`;
+    if (isContratada) return 'Representante Legal';
     if (!isTitular && linkData.recipient_id && sale?.beneficiaries) {
       const ben = sale.beneficiaries.find((b: any) => b.id === linkData.recipient_id);
       if (ben) return `${ben.first_name} ${ben.last_name}`;
