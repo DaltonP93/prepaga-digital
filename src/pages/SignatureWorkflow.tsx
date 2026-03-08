@@ -709,7 +709,14 @@ const SignatureWorkflow = () => {
           <CardContent>
             {contratadaLinks.length > 0
               ? renderSignatureLinks(contratadaLinks)
-              : (
+              : selectedSale?.status === 'completado' ? (
+                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span className="text-sm text-green-800">
+                    Venta completada. La firma de la contratada fue aplicada automáticamente.
+                  </span>
+                </div>
+              ) : (
                 <p className="text-sm text-muted-foreground italic">
                   El link de firma de la contratada se genera automáticamente cuando el titular complete su firma.
                 </p>
