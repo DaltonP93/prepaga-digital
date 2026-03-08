@@ -557,7 +557,12 @@ const SignatureView = () => {
         {/* Documents List - Separated into signature-required and annexes */}
         {(() => {
           // Annexes are documents that don't require signature OR have annex-related document_type
-          const isAnnex = (d: any) => d.requires_signature === false || d.document_type === 'anexo' || d.document_type?.includes('anexo');
+          // BUT: signed contracts (is_final with signed_pdf_url) should NOT be classified as annexes
+          const isAnnex = (d: any) => {
+            // Never treat a signed final contract as an annex
+            if (d.document_type === 'contrato' && (d.signed_pdf_url || d.is_final)) return false;
+            return d.requires_signature === false || d.document_type === 'anexo' || d.document_type?.includes('anexo');
+          };
           const annexDocs = documents?.filter((d: any) => isAnnex(d)) || [];
           const docsToSign = documents?.filter((d: any) => !isAnnex(d)) || [];
           const hasAnyDocs = docsToSign.length > 0 || annexDocs.length > 0;
