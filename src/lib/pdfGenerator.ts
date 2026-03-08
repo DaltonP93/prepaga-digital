@@ -1,5 +1,6 @@
 
 import { formatCurrency } from '@/lib/utils';
+import DOMPurify from 'dompurify';
 
 // PDF Generation utilities
 export interface PDFDocument {
