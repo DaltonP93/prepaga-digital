@@ -127,7 +127,7 @@ const SignatureView = () => {
         </style>
       </head>
       <body>
-        ${doc.content}
+        ${DOMPurify.sanitize(doc.content || '', { FORCE_BODY: true })}
       </body>
       </html>
     `;

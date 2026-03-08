@@ -179,7 +179,7 @@ const SignatureWorkflow = () => {
   @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
 </style>
 </head>
-<body>${doc.content}</body>
+<body>${DOMPurify.sanitize(doc.content || '', { FORCE_BODY: true })}</body>
 </html>`;
     const printWindow = window.open('', '_blank');
     if (printWindow) {
