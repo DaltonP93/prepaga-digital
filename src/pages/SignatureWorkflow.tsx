@@ -104,10 +104,27 @@ const SignatureWorkflow = () => {
     enabled: !!saleId && signatureLinks && signatureLinks.length > 0,
   });
 
+  // Fetch company settings for contratada signer info
+  const { data: companySettings } = useQuery({
+    queryKey: ['company-settings-contratada', selectedSaleCompanyId],
+    queryFn: async () => {
+      if (!selectedSaleCompanyId) return null;
+      const { data, error } = await supabase
+        .from('company_settings')
+        .select('contratada_signature_mode, contratada_signer_name, contratada_signer_email, contratada_signer_dni, contratada_signer_phone')
+        .eq('company_id', selectedSaleCompanyId)
+        .single();
+      if (error) return null;
+      return data;
+    },
+    enabled: !!selectedSaleCompanyId,
+  });
+
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [detailLink, setDetailLink] = useState<any>(null);
 
   const selectedSale = saleId ? sales.find(s => s.id === saleId) : null;
+  const selectedSaleCompanyId = selectedSale?.company_id;
 
   const getSignatureUrl = (linkToken: string) => {
     return getSignatureLinkUrl(linkToken);
