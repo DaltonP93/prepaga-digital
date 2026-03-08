@@ -237,13 +237,58 @@ async function activateNextStep(
   if (!allStep1Done) return false
 
   // Activate step 2 links (contratada)
-  const { data: step2Links } = await supabase
+  let { data: step2Links } = await supabase
     .from('signature_links')
-    .select('id, recipient_email, recipient_phone')
+    .select('id, recipient_email, recipient_phone, token')
     .eq('sale_id', link.sale_id)
     .eq('step_order', 2)
     .eq('is_active', false)
     .neq('status', 'revocado')
+
+  // If no step 2 link exists, create it from company_settings (mode=link)
+  if (!step2Links || step2Links.length === 0) {
+    const { data: sale } = await supabase
+      .from('sales')
+      .select('company_id')
+      .eq('id', link.sale_id)
+      .single()
+
+    if (sale) {
+      const { data: cs } = await supabase
+        .from('company_settings')
+        .select('contratada_signature_mode, contratada_signer_email, contratada_signer_phone, contratada_signer_name')
+        .eq('company_id', sale.company_id)
+        .single()
+
+      if (cs?.contratada_signature_mode === 'link' && cs?.contratada_signer_email) {
+        const contratadaToken = crypto.randomUUID()
+        const expiresAt = new Date()
+        expiresAt.setDate(expiresAt.getDate() + 3)
+
+        const { data: newLink } = await supabase
+          .from('signature_links')
+          .insert({
+            sale_id: link.sale_id,
+            token: contratadaToken,
+            recipient_type: 'contratada',
+            recipient_email: cs.contratada_signer_email,
+            recipient_phone: cs.contratada_signer_phone || null,
+            recipient_id: null,
+            expires_at: expiresAt.toISOString(),
+            status: 'pendiente',
+            step_order: 2,
+            is_active: true,
+          })
+          .select('id, recipient_email, recipient_phone, token')
+          .single()
+
+        if (newLink) {
+          step2Links = [newLink]
+          console.info(`Created contratada link for sale ${link.sale_id}`)
+        }
+      }
+    }
+  }
 
   if (!step2Links || step2Links.length === 0) return false
 
