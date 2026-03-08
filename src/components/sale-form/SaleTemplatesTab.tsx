@@ -363,9 +363,12 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       }
 
       // Generate DDJJ documents per beneficiary (adherente)
-      const ddjiTemplates = (templateContents || []).filter(t =>
-        t.name.toLowerCase().includes('ddjj') || t.name.toLowerCase().includes('declaración')
-      );
+      const ddjiTemplates = (templateContents || []).filter(t => {
+        const n = t.name.toLowerCase();
+        const nNorm = n.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        return n.includes('ddjj') || n.includes('declaración') || n.includes('declaracion')
+          || nNorm.includes('declaracion');
+      });
 
       if (effectiveBeneficiaries && effectiveBeneficiaries.length > 0 && ddjiTemplates.length > 0) {
         for (const b of effectiveBeneficiaries) {
