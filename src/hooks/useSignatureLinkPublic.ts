@@ -58,6 +58,8 @@ interface SignatureLinkData {
       first_name: string;
       last_name: string;
       dni: string | null;
+      phone: string | null;
+      email: string | null;
     }>;
   };
 }
@@ -125,7 +127,9 @@ export const useSignatureLinkByToken = (token: string) => {
             id,
             first_name,
             last_name,
-            dni
+            dni,
+            phone,
+            email
           )
         `)
         .eq('id', linkData.sale_id)
@@ -470,9 +474,9 @@ export const useSubmitSignatureLink = () => {
                 electronicBlock = `
                   <div data-signer="${signerAttrV2}" style="display:inline-block;vertical-align:top;width:48%;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111;">
                     <p style="margin:0 0 2px 0;font-size:11px;">Firmado electrónicamente por: <strong>${signerName.toLowerCase()}</strong></p>
-                    <p style="margin:0 0 8px 0;font-size:11px;">Fecha: ${formattedDate}</p>
-                    <div style="border-top:2px solid #333;width:90%;margin:0 auto 4px auto;"></div>
-                    <p style="margin:0;font-size:12px;text-align:center;font-weight:bold;">${roleLabel}</p>
+                    <p style="margin:0 0 12px 0;font-size:11px;">Fecha: ${formattedDate}</p>
+                    <div style="border-top:1px solid #555;width:80%;margin:0 0 6px 0;"></div>
+                    <p style="margin:0;font-size:11px;font-weight:bold;">${roleLabel}</p>
                     <p style="margin:4px 0 0 0;font-size:11px;">Aclaración: ${signerName || '.............................'}</p>
                     <p style="margin:2px 0 0 0;font-size:11px;">C.I.Nº: ${signerCI || '.............................'}</p>
                   </div>
@@ -513,13 +517,73 @@ export const useSubmitSignatureLink = () => {
             let placeholderFound = false;
 
             // FIRST: Replace <div data-signature-field="true" ...>...</div> elements
-            const sigFieldRegex = /<div[^>]*data-signature-field\s*=\s*["']true["'][^>]*>[\s\S]*?<\/div>/gi;
-            if (sigFieldRegex.test(finalContent)) {
-              finalContent = finalContent.replace(sigFieldRegex, signatureImgWithDate);
+            // Role-aware: only replace the field matching the current signer
+            // 'cliente' role = titular / adherente; 'empresa' role = contratada
+            const signerRoleForField = recipientType === 'contratada' ? 'empresa' : 'cliente';
+
+            // Helper: find the full outer div (handles nested divs)
+            const findFullSignatureDiv = (html: string, role: string): { start: number; end: number } | null => {
+              const tagRegex = /<div\b([^>]*)>/gi;
+              let m: RegExpExecArray | null;
+              while ((m = tagRegex.exec(html)) !== null) {
+                const attrs = m[1];
+                const hasField = /data-signature-field\s*=\s*["']true["']/i.test(attrs);
+                const hasRole = new RegExp(`data-signer-role\\s*=\\s*["']${role}["']`, 'i').test(attrs);
+                const noRoleAttr = !/data-signer-role/i.test(attrs);
+                if (!hasField) continue;
+                if (!hasRole && !(noRoleAttr && role === 'cliente')) continue;
+
+                const start = m.index;
+                let depth = 1;
+                let pos = start + m[0].length;
+                while (pos < html.length && depth > 0) {
+                  const nextOpen = html.indexOf('<div', pos);
+                  const nextClose = html.indexOf('</div>', pos);
+                  if (nextClose === -1) break;
+                  if (nextOpen !== -1 && nextOpen < nextClose) {
+                    depth++;
+                    pos = nextOpen + 4;
+                  } else {
+                    depth--;
+                    pos = nextClose + 6;
+                  }
+                }
+                return { start, end: pos };
+              }
+              return null;
+            };
+
+            const sigDivRange = findFullSignatureDiv(finalContent, signerRoleForField);
+            if (sigDivRange) {
+              finalContent =
+                finalContent.substring(0, sigDivRange.start) +
+                signatureImgWithDate +
+                finalContent.substring(sigDivRange.end);
               placeholderFound = true;
             }
 
-            // Also clean up any raw attribute text that leaked from sanitization
+            // If signer is titular/adherente: clean up the 'empresa' field to leave it blank
+            // (Contratada will sign in their own step)
+            if (recipientType !== 'contratada') {
+              const empresaRange = findFullSignatureDiv(finalContent, 'empresa');
+              if (empresaRange) {
+                const emptyContratadaBlock = `
+                  <div style="display:inline-block;vertical-align:top;width:48%;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111;">
+                    <p style="margin:0 0 12px 0;font-size:11px;">Pendiente firma de la empresa</p>
+                    <div style="border-top:1px solid #555;width:80%;margin:0 0 6px 0;"></div>
+                    <p style="margin:0;font-size:11px;font-weight:bold;">CONTRATADA</p>
+                    <p style="margin:4px 0 0 0;font-size:11px;">Aclaración: .............................</p>
+                    <p style="margin:2px 0 0 0;font-size:11px;">C.I.Nº: .............................</p>
+                  </div>
+                `;
+                finalContent =
+                  finalContent.substring(0, empresaRange.start) +
+                  emptyContratadaBlock +
+                  finalContent.substring(empresaRange.end);
+              }
+            }
+
+            // Clean up any raw attribute text that leaked from sanitization
             const rawAttrRegex = /data-signature-field\s*=\s*["']true["'][^<]*/gi;
             finalContent = finalContent.replace(rawAttrRegex, '');
 

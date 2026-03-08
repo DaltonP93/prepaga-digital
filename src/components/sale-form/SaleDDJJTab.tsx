@@ -553,9 +553,9 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
           <div className="space-y-2 border-b pb-4">
             <Label className="text-sm font-medium">Fecha de última menstruación o embarazo (si corresponde):</Label>
             <Input
-              type="text"
-              placeholder="Ej: 15/01/2026 o N/A"
-              value={d.lastMenstruation}
+              type="date"
+              placeholder="Seleccione fecha o deje vacío si N/A"
+              value={d.lastMenstruation || ''}
               onChange={(e) => update(currentBeneficiary.id, { lastMenstruation: e.target.value })}
             />
           </div>
