@@ -230,9 +230,14 @@ const Sales = () => {
                           </TableCell>
 
                           <TableCell>
-                            <Badge variant={getStatusBadgeVariant(sale.status || 'borrador')}>
-                              {getStatusText(sale.status || 'borrador')}
-                            </Badge>
+                            {(() => {
+                              const displayStatus = (sale as any).all_signatures_completed ? 'completado' : (sale.status || 'borrador');
+                              return (
+                                <Badge variant={getStatusBadgeVariant(displayStatus)} className={displayStatus === 'completado' ? 'bg-green-600' : ''}>
+                                  {getStatusText(displayStatus)}
+                                </Badge>
+                              );
+                            })()}
                           </TableCell>
 
                           <TableCell>
