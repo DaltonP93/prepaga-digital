@@ -47,9 +47,54 @@ serve(async (req) => {
       });
     }
 
-    const { campaignId, recipients, subject, content, companyId } = await req.json();
-
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Role authorization: only admin, super_admin, gestor can send campaigns
+    const { data: roles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userData.user.id);
+
+    const allowedRoles = ['admin', 'super_admin', 'gestor'];
+    const hasPermission = roles?.some((r: any) => allowedRoles.includes(r.role));
+    if (!hasPermission) {
+      return new Response(JSON.stringify({ error: "Forbidden: insufficient role" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { campaignId, recipients, subject, content } = await req.json();
+
+    // Derive companyId server-side from the user's profile
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('id', userData.user.id)
+      .single();
+
+    const companyId = profile?.company_id;
+    if (!companyId) {
+      return new Response(JSON.stringify({ error: "User has no company assigned" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Validate campaignId belongs to the caller's company
+    if (campaignId) {
+      const { data: campaign } = await supabase
+        .from('email_campaigns')
+        .select('company_id')
+        .eq('id', campaignId)
+        .single();
+      if (campaign?.company_id !== companyId) {
+        return new Response(JSON.stringify({ error: "Campaign does not belong to your company" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
 
     const results = [];
     let sentCount = 0;

@@ -698,8 +698,8 @@ Deno.serve(async (req) => {
       evidence_certificate_url: certUrl,
       evidence_certificate_hash: certHash,
     });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("generate-evidence-certificate error:", err);
-    return json(500, { error: err?.message || "Unexpected error" });
+    return json(500, { error: (err as Error)?.message || "Unexpected error" });
   }
 });
