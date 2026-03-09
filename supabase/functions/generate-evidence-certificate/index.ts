@@ -15,7 +15,7 @@ function json(status: number, body: unknown) {
 }
 
 async function sha256Hex(data: Uint8Array) {
-  const hash = await crypto.subtle.digest("SHA-256", data);
+  const hash = await crypto.subtle.digest("SHA-256", data.buffer as ArrayBuffer);
   return [...new Uint8Array(hash)]
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
@@ -698,8 +698,8 @@ Deno.serve(async (req) => {
       evidence_certificate_url: certUrl,
       evidence_certificate_hash: certHash,
     });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("generate-evidence-certificate error:", err);
-    return json(500, { error: err?.message || "Unexpected error" });
+    return json(500, { error: (err as Error)?.message || "Unexpected error" });
   }
 });

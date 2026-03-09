@@ -48,7 +48,7 @@ serve(async (req) => {
       case "delete":
         return await handleFileDelete(supabase, req);
       case "get-url":
-        return await handleGetSignedUrl(supabase, req);
+        return await handleGetSignedUrl(supabase, req, userData.user.id);
       default:
         throw new Error("Invalid action parameter");
     }
@@ -243,16 +243,68 @@ async function handleFileDelete(supabase: any, req: Request) {
   });
 }
 
-async function handleGetSignedUrl(supabase: any, req: Request) {
-  const { filePath, bucketName, expiresIn = 3600 } = await req.json();
-  
-  if (!filePath || !bucketName) {
-    throw new Error("File path and bucket name required");
+async function handleGetSignedUrl(supabase: any, req: Request, userId: string) {
+  const { filePath, bucketName, fileId, expiresIn = 3600 } = await req.json();
+
+  let resolvedPath: string;
+  let resolvedBucket: string;
+
+  if (fileId) {
+    // Preferred: look up by fileId with ownership check
+    const { data: fileRecord, error: fileErr } = await supabase
+      .from('file_uploads')
+      .select('file_url, company_id')
+      .eq('id', fileId)
+      .single();
+
+    if (fileErr || !fileRecord) {
+      throw new Error("File not found or access denied");
+    }
+
+    // Verify the user belongs to the same company
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('id', userId)
+      .single();
+
+    if (!profile?.company_id || profile.company_id !== fileRecord.company_id) {
+      throw new Error("Access denied: file does not belong to your company");
+    }
+
+    resolvedBucket = bucketName || 'documents';
+    resolvedPath = fileRecord.file_url;
+  } else if (filePath && bucketName) {
+    // Fallback: validate path ownership via file_uploads table
+    const { data: fileRecord, error: fileErr } = await supabase
+      .from('file_uploads')
+      .select('id, company_id')
+      .eq('file_url', filePath)
+      .single();
+
+    if (fileErr || !fileRecord) {
+      throw new Error("File not found or access denied");
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('id', userId)
+      .single();
+
+    if (!profile?.company_id || profile.company_id !== fileRecord.company_id) {
+      throw new Error("Access denied: file does not belong to your company");
+    }
+
+    resolvedBucket = bucketName;
+    resolvedPath = filePath;
+  } else {
+    throw new Error("fileId or (filePath + bucketName) required");
   }
 
   const { data, error } = await supabase.storage
-    .from(bucketName)
-    .createSignedUrl(filePath, expiresIn);
+    .from(resolvedBucket)
+    .createSignedUrl(resolvedPath, expiresIn);
 
   if (error) {
     throw new Error(`Failed to create signed URL: ${error.message}`);

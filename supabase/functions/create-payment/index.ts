@@ -27,8 +27,26 @@ serve(async (req) => {
     const user = data.user;
     if (!user?.email) throw new Error("Usuario no autenticado");
 
-    // Get request body
-    const { amount, currency = 'usd', description, planId } = await req.json();
+    // Get request body — amount is IGNORED, derived from DB
+    const { currency = 'usd', description, planId } = await req.json();
+
+    if (!planId) throw new Error("planId is required");
+
+    // Look up the plan price server-side
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+    const { data: plan, error: planError } = await adminClient
+      .from("plans")
+      .select("name, price")
+      .eq("id", planId)
+      .single();
+
+    if (planError || !plan) throw new Error("Plan not found");
+    if (typeof plan.price !== 'number' || plan.price <= 0) throw new Error("Invalid plan price");
+
+    const amount = Math.round(plan.price * 100); // convert to cents
 
     // Initialize Stripe
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
@@ -51,10 +69,10 @@ serve(async (req) => {
           price_data: {
             currency: currency,
             product_data: { 
-              name: description || "Pago único",
-              description: planId ? `Plan ID: ${planId}` : undefined
+              name: plan.name || description || "Pago único",
+              description: `Plan ID: ${planId}`
             },
-            unit_amount: amount, // Amount in cents
+            unit_amount: amount,
           },
           quantity: 1,
         },
@@ -64,7 +82,7 @@ serve(async (req) => {
       cancel_url: `${req.headers.get("origin")}/payment-canceled`,
       metadata: {
         user_id: user.id,
-        plan_id: planId || '',
+        plan_id: planId,
       }
     });
 
