@@ -645,6 +645,88 @@ export const AdminConfigPanel: React.FC = () => {
               )}
             </CardContent>
           </Card>
+
+          {/* WhatsApp Templates Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Plantillas de WhatsApp</CardTitle>
+              <CardDescription>
+                Personaliza los mensajes que se envían junto con los enlaces de firma
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {waTemplatesLoading ? (
+                <p className="text-muted-foreground text-sm">Cargando plantillas...</p>
+              ) : waTemplates.length === 0 ? (
+                <p className="text-muted-foreground text-sm">No hay plantillas configuradas.</p>
+              ) : (
+                waTemplates.map((tpl) => (
+                  <div key={tpl.id} className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-sm">{tpl.template_name}</p>
+                        {tpl.description && <p className="text-xs text-muted-foreground">{tpl.description}</p>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={tpl.is_active ? 'default' : 'secondary'}>
+                          {tpl.is_active ? 'Activo' : 'Inactivo'}
+                        </Badge>
+                        <Switch
+                          checked={tpl.is_active}
+                          onCheckedChange={(checked) => updateWaTemplate.mutate({ id: tpl.id, is_active: checked })}
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            if (editingTemplateId === tpl.id) {
+                              setEditingTemplateId(null);
+                            } else {
+                              setEditingTemplateId(tpl.id);
+                              setEditingTemplateBody(tpl.message_body);
+                            }
+                          }}
+                        >
+                          {editingTemplateId === tpl.id ? 'Cancelar' : 'Editar'}
+                        </Button>
+                      </div>
+                    </div>
+                    {editingTemplateId === tpl.id && (
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap gap-1">
+                          {['{{clientName}}', '{{companyName}}', '{{signatureUrl}}', '{{expirationDate}}', '{{contractNumber}}'].map((v) => (
+                            <Badge
+                              key={v}
+                              variant="outline"
+                              className="cursor-pointer hover:bg-primary/10 text-xs"
+                              onClick={() => setEditingTemplateBody((prev) => prev + ' ' + v)}
+                            >
+                              {v}
+                            </Badge>
+                          ))}
+                        </div>
+                        <Textarea
+                          value={editingTemplateBody}
+                          onChange={(e) => setEditingTemplateBody(e.target.value)}
+                          rows={5}
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            updateWaTemplate.mutate({ id: tpl.id, message_body: editingTemplateBody });
+                            setEditingTemplateId(null);
+                          }}
+                          disabled={updateWaTemplate.isPending}
+                        >
+                          Guardar Plantilla
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* SMS Tab */}
