@@ -23,6 +23,9 @@ import { toast } from 'sonner';
 export const AdminConfigPanel: React.FC = () => {
   const { configuration: uiConfig, isLoading: uiLoading, updateConfiguration: updateUiConfig, isUpdating: uiUpdating } = useCompanyConfiguration();
   const { configuration: apiConfig, isLoading: apiLoading, updateConfiguration: updateApiConfig, updateConfigurationAsync: updateApiConfigAsync, isUpdating: apiUpdating } = useCompanyApiConfiguration();
+  const { templates: waTemplates, isLoading: waTemplatesLoading, updateTemplate: updateWaTemplate } = useWhatsAppTemplates();
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [editingTemplateBody, setEditingTemplateBody] = useState('');
 
   const defaultUiFormData = {
     login_title: 'Sistema de Gestión',
