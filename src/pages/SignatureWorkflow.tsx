@@ -79,6 +79,9 @@ const SignatureWorkflow = () => {
         .from('documents')
         .select('*')
         .eq('sale_id', saleId)
+        .eq('is_final', true)
+        .neq('document_type', 'firma')
+        .in('document_type', ['contrato', 'ddjj_salud'])
         .order('created_at', { ascending: true });
       if (error) throw error;
       return data || [];
@@ -837,6 +840,42 @@ const SignatureWorkflow = () => {
                           >
                             <Download className="h-3 w-3 mr-1" />
                             Descargar
+                          </Button>
+                        )}
+                        {doc.signed_pdf_url && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              try {
+                                const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+                                const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+                                const session = (await supabase.auth.getSession()).data.session;
+                                const response = await fetch(
+                                  `${SUPABASE_URL}/functions/v1/get-document-download-url`,
+                                  {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                      'apikey': SUPABASE_KEY,
+                                      'Authorization': `Bearer ${session?.access_token || SUPABASE_KEY}`,
+                                    },
+                                    body: JSON.stringify({ document_id: doc.id, kind: 'signed' }),
+                                  }
+                                );
+                                const result = await response.json();
+                                if (result.url) {
+                                  window.open(result.url, '_blank');
+                                } else {
+                                  toast.error('PDF firmado no disponible');
+                                }
+                              } catch {
+                                toast.error('Error al descargar PDF firmado');
+                              }
+                            }}
+                          >
+                            <ShieldCheck className="h-3 w-3 mr-1" />
+                            PDF Firmado
                           </Button>
                         )}
                         {doc.evidence_certificate_url && (

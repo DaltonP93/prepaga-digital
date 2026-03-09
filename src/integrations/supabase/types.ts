@@ -687,6 +687,7 @@ export type Database = {
           email_provider: string | null
           id: string
           menu_config: Json | null
+          signature_block_style: Json | null
           signwell_api_key: string | null
           signwell_enabled: boolean | null
           sms_api_key: string | null
@@ -715,6 +716,7 @@ export type Database = {
           email_provider?: string | null
           id?: string
           menu_config?: Json | null
+          signature_block_style?: Json | null
           signwell_api_key?: string | null
           signwell_enabled?: boolean | null
           sms_api_key?: string | null
@@ -743,6 +745,7 @@ export type Database = {
           email_provider?: string | null
           id?: string
           menu_config?: Json | null
+          signature_block_style?: Json | null
           signwell_api_key?: string | null
           signwell_enabled?: boolean | null
           sms_api_key?: string | null
@@ -3212,6 +3215,50 @@ export type Database = {
             columns: ["sale_id"]
             isOneToOne: false
             referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_templates: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          message_body: string
+          template_key: string
+          template_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          message_body: string
+          template_key: string
+          template_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          message_body?: string
+          template_key?: string
+          template_name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]

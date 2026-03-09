@@ -1,7 +1,9 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { ContratadaSignatureConfigInner } from '@/components/ContratadaSignatureConfig';
+import { SignatureBlockStyleCard } from '@/components/SignatureBlockStyleCard';
 import { useCompanyConfiguration } from '@/hooks/useCompanyConfiguration';
 import { useCompanyApiConfiguration, WhatsAppProvider, EmailProvider } from '@/hooks/useCompanyApiConfiguration';
+import { useWhatsAppTemplates } from '@/hooks/useWhatsAppTemplates';
 import { getWhatsAppWebhookUrl } from '@/lib/appUrls';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +12,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Settings, Palette, MessageSquare, Mail, Smartphone, Eye, CheckCircle, XCircle, ExternalLink, Copy, PenTool, Loader2, TestTube, AlertTriangle, KeyRound } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Settings, Palette, MessageSquare, Mail, Smartphone, Eye, CheckCircle, XCircle, ExternalLink, Copy, PenTool, Loader2, TestTube, AlertTriangle, KeyRound, QrCode, Info } from 'lucide-react';
 import { OtpPolicyConfigPanel } from '@/components/OtpPolicyConfigPanel';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
@@ -20,6 +24,9 @@ import { toast } from 'sonner';
 export const AdminConfigPanel: React.FC = () => {
   const { configuration: uiConfig, isLoading: uiLoading, updateConfiguration: updateUiConfig, isUpdating: uiUpdating } = useCompanyConfiguration();
   const { configuration: apiConfig, isLoading: apiLoading, updateConfiguration: updateApiConfig, updateConfigurationAsync: updateApiConfigAsync, isUpdating: apiUpdating } = useCompanyApiConfiguration();
+  const { templates: waTemplates, isLoading: waTemplatesLoading, updateTemplate: updateWaTemplate } = useWhatsAppTemplates();
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [editingTemplateBody, setEditingTemplateBody] = useState('');
 
   const defaultUiFormData = {
     login_title: 'Sistema de Gestión',
@@ -187,6 +194,12 @@ export const AdminConfigPanel: React.FC = () => {
         label: 'Sesión QR',
       };
     }
+    if (provider === 'waha') {
+      return {
+        connected: !!apiFormData.whatsapp_gateway_url && !!apiFormData.whatsapp_linked_phone,
+        label: 'WAHA',
+      };
+    }
     return { connected: true, label: 'wa.me (Manual)' };
   };
 
@@ -333,10 +346,18 @@ export const AdminConfigPanel: React.FC = () => {
               </Button>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Info note */}
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  Este canal envía los <strong>links de firma</strong>. El canal de <strong>OTP</strong> (códigos de verificación) se configura en la pestaña "Canales OTP".
+                </AlertDescription>
+              </Alert>
+
               {/* Provider Selector */}
               <div className="space-y-3">
                 <Label className="text-base font-medium">Proveedor de WhatsApp</Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
                   {/* Meta Business API */}
                   <div
                     className={`relative cursor-pointer rounded-lg border-2 p-4 transition-all ${apiFormData.whatsapp_provider === 'meta' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
@@ -382,6 +403,25 @@ export const AdminConfigPanel: React.FC = () => {
                       Abre WhatsApp Web con mensaje pre-cargado. No requiere API.
                     </p>
                     {apiFormData.whatsapp_provider === 'wame_fallback' && (
+                      <div className="absolute top-2 right-2">
+                        <CheckCircle className="h-5 w-5 text-primary" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* WAHA */}
+                  <div
+                    className={`relative cursor-pointer rounded-lg border-2 p-4 transition-all ${apiFormData.whatsapp_provider === 'waha' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                    onClick={() => handleApiInputChange('whatsapp_provider', 'waha')}
+                  >
+                    <div className="font-medium flex items-center gap-1">
+                      <QrCode className="h-4 w-4" />
+                      WAHA
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      WhatsApp HTTP API self-hosted. Vincula tu número vía QR.
+                    </p>
+                    {apiFormData.whatsapp_provider === 'waha' && (
                       <div className="absolute top-2 right-2">
                         <CheckCircle className="h-5 w-5 text-primary" />
                       </div>
@@ -478,6 +518,59 @@ export const AdminConfigPanel: React.FC = () => {
                 </div>
               )}
 
+              {/* WAHA Fields */}
+              {apiFormData.whatsapp_provider === 'waha' && (
+                <div className="space-y-4 p-4 rounded-lg border bg-muted/30">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <QrCode className="h-4 w-4" />
+                    Configuración WAHA
+                  </h4>
+                  <div>
+                    <Label htmlFor="waha_url">URL del servidor WAHA</Label>
+                    <Input
+                      id="waha_url"
+                      value={apiFormData.whatsapp_gateway_url}
+                      onChange={(e) => handleApiInputChange('whatsapp_gateway_url', e.target.value)}
+                      placeholder="https://waha.miservidor.com"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      URL base de tu instancia WAHA (sin /api al final)
+                    </p>
+                  </div>
+                  <div>
+                    <Label htmlFor="waha_key">API Key</Label>
+                    <Input
+                      id="waha_key"
+                      type="password"
+                      value={(apiFormData as any).whatsapp_api_token || ''}
+                      onChange={(e) => handleApiInputChange('whatsapp_api_token', e.target.value)}
+                      placeholder="Tu API Key de WAHA"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="waha_phone">Número vinculado</Label>
+                    <Input
+                      id="waha_phone"
+                      value={apiFormData.whatsapp_linked_phone}
+                      onChange={(e) => handleApiInputChange('whatsapp_linked_phone', e.target.value)}
+                      placeholder="+595981234567"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Número de WhatsApp vinculado a la sesión WAHA
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={apiFormData.whatsapp_gateway_url && apiFormData.whatsapp_linked_phone ? 'default' : 'destructive'} className="text-xs">
+                      {apiFormData.whatsapp_gateway_url && apiFormData.whatsapp_linked_phone ? (
+                        <><CheckCircle className="h-3 w-3 mr-1" /> Configurado</>
+                      ) : (
+                        <><XCircle className="h-3 w-3 mr-1" /> Sin configurar</>
+                      )}
+                    </Badge>
+                  </div>
+                </div>
+              )}
+
               {(apiFormData.whatsapp_provider === 'meta' || apiFormData.whatsapp_provider === 'twilio') && (
                 <div className="space-y-2 p-4 rounded-lg border bg-muted/30">
                   <Label className="text-sm font-medium">URL de Webhook</Label>
@@ -550,6 +643,88 @@ export const AdminConfigPanel: React.FC = () => {
                     </Button>
                   </div>
                 </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* WhatsApp Templates Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Plantillas de WhatsApp</CardTitle>
+              <CardDescription>
+                Personaliza los mensajes que se envían junto con los enlaces de firma
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {waTemplatesLoading ? (
+                <p className="text-muted-foreground text-sm">Cargando plantillas...</p>
+              ) : waTemplates.length === 0 ? (
+                <p className="text-muted-foreground text-sm">No hay plantillas configuradas.</p>
+              ) : (
+                waTemplates.map((tpl) => (
+                  <div key={tpl.id} className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-sm">{tpl.template_name}</p>
+                        {tpl.description && <p className="text-xs text-muted-foreground">{tpl.description}</p>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={tpl.is_active ? 'default' : 'secondary'}>
+                          {tpl.is_active ? 'Activo' : 'Inactivo'}
+                        </Badge>
+                        <Switch
+                          checked={tpl.is_active}
+                          onCheckedChange={(checked) => updateWaTemplate.mutate({ id: tpl.id, is_active: checked })}
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            if (editingTemplateId === tpl.id) {
+                              setEditingTemplateId(null);
+                            } else {
+                              setEditingTemplateId(tpl.id);
+                              setEditingTemplateBody(tpl.message_body);
+                            }
+                          }}
+                        >
+                          {editingTemplateId === tpl.id ? 'Cancelar' : 'Editar'}
+                        </Button>
+                      </div>
+                    </div>
+                    {editingTemplateId === tpl.id && (
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap gap-1">
+                          {['{{clientName}}', '{{companyName}}', '{{signatureUrl}}', '{{expirationDate}}', '{{contractNumber}}'].map((v) => (
+                            <Badge
+                              key={v}
+                              variant="outline"
+                              className="cursor-pointer hover:bg-primary/10 text-xs"
+                              onClick={() => setEditingTemplateBody((prev) => prev + ' ' + v)}
+                            >
+                              {v}
+                            </Badge>
+                          ))}
+                        </div>
+                        <Textarea
+                          value={editingTemplateBody}
+                          onChange={(e) => setEditingTemplateBody(e.target.value)}
+                          rows={5}
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            updateWaTemplate.mutate({ id: tpl.id, message_body: editingTemplateBody });
+                            setEditingTemplateId(null);
+                          }}
+                          disabled={updateWaTemplate.isPending}
+                        >
+                          Guardar Plantilla
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))
               )}
             </CardContent>
           </Card>
@@ -682,6 +857,8 @@ export const AdminConfigPanel: React.FC = () => {
 
         {/* SignWell / Firma Digital Tab */}
         <TabsContent value="signwell" className="space-y-6">
+          {/* Signature Block Style Config */}
+          <SignatureBlockStyleCard />
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div className="space-y-1">

@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 
-export type WhatsAppProvider = 'meta' | 'twilio' | 'wame_fallback' | 'qr_session';
+export type WhatsAppProvider = 'meta' | 'twilio' | 'wame_fallback' | 'qr_session' | 'waha';
 export type EmailProvider = 'resend' | 'smtp';
 
 export interface CompanyApiConfig {
