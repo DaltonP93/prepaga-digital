@@ -345,10 +345,18 @@ export const AdminConfigPanel: React.FC = () => {
               </Button>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Info note */}
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  Este canal envía los <strong>links de firma</strong>. El canal de <strong>OTP</strong> (códigos de verificación) se configura en la pestaña "Canales OTP".
+                </AlertDescription>
+              </Alert>
+
               {/* Provider Selector */}
               <div className="space-y-3">
                 <Label className="text-base font-medium">Proveedor de WhatsApp</Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
                   {/* Meta Business API */}
                   <div
                     className={`relative cursor-pointer rounded-lg border-2 p-4 transition-all ${apiFormData.whatsapp_provider === 'meta' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
@@ -394,6 +402,25 @@ export const AdminConfigPanel: React.FC = () => {
                       Abre WhatsApp Web con mensaje pre-cargado. No requiere API.
                     </p>
                     {apiFormData.whatsapp_provider === 'wame_fallback' && (
+                      <div className="absolute top-2 right-2">
+                        <CheckCircle className="h-5 w-5 text-primary" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* WAHA */}
+                  <div
+                    className={`relative cursor-pointer rounded-lg border-2 p-4 transition-all ${apiFormData.whatsapp_provider === 'waha' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                    onClick={() => handleApiInputChange('whatsapp_provider', 'waha')}
+                  >
+                    <div className="font-medium flex items-center gap-1">
+                      <QrCode className="h-4 w-4" />
+                      WAHA
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      WhatsApp HTTP API self-hosted. Vincula tu número vía QR.
+                    </p>
+                    {apiFormData.whatsapp_provider === 'waha' && (
                       <div className="absolute top-2 right-2">
                         <CheckCircle className="h-5 w-5 text-primary" />
                       </div>
