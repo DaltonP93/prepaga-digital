@@ -517,6 +517,59 @@ export const AdminConfigPanel: React.FC = () => {
                 </div>
               )}
 
+              {/* WAHA Fields */}
+              {apiFormData.whatsapp_provider === 'waha' && (
+                <div className="space-y-4 p-4 rounded-lg border bg-muted/30">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <QrCode className="h-4 w-4" />
+                    Configuración WAHA
+                  </h4>
+                  <div>
+                    <Label htmlFor="waha_url">URL del servidor WAHA</Label>
+                    <Input
+                      id="waha_url"
+                      value={apiFormData.whatsapp_gateway_url}
+                      onChange={(e) => handleApiInputChange('whatsapp_gateway_url', e.target.value)}
+                      placeholder="https://waha.miservidor.com"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      URL base de tu instancia WAHA (sin /api al final)
+                    </p>
+                  </div>
+                  <div>
+                    <Label htmlFor="waha_key">API Key</Label>
+                    <Input
+                      id="waha_key"
+                      type="password"
+                      value={(apiFormData as any).whatsapp_api_token || ''}
+                      onChange={(e) => handleApiInputChange('whatsapp_api_token', e.target.value)}
+                      placeholder="Tu API Key de WAHA"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="waha_phone">Número vinculado</Label>
+                    <Input
+                      id="waha_phone"
+                      value={apiFormData.whatsapp_linked_phone}
+                      onChange={(e) => handleApiInputChange('whatsapp_linked_phone', e.target.value)}
+                      placeholder="+595981234567"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Número de WhatsApp vinculado a la sesión WAHA
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={apiFormData.whatsapp_gateway_url && apiFormData.whatsapp_linked_phone ? 'default' : 'destructive'} className="text-xs">
+                      {apiFormData.whatsapp_gateway_url && apiFormData.whatsapp_linked_phone ? (
+                        <><CheckCircle className="h-3 w-3 mr-1" /> Configurado</>
+                      ) : (
+                        <><XCircle className="h-3 w-3 mr-1" /> Sin configurar</>
+                      )}
+                    </Badge>
+                  </div>
+                </div>
+              )}
+
               {(apiFormData.whatsapp_provider === 'meta' || apiFormData.whatsapp_provider === 'twilio') && (
                 <div className="space-y-2 p-4 rounded-lg border bg-muted/30">
                   <Label className="text-sm font-medium">URL de Webhook</Label>
