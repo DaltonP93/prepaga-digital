@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { ContratadaSignatureConfigInner } from '@/components/ContratadaSignatureConfig';
+import { SignatureBlockStyleCard } from '@/components/SignatureBlockStyleCard';
 import { useCompanyConfiguration } from '@/hooks/useCompanyConfiguration';
 import { useCompanyApiConfiguration, WhatsAppProvider, EmailProvider } from '@/hooks/useCompanyApiConfiguration';
 import { useWhatsAppTemplates } from '@/hooks/useWhatsAppTemplates';
