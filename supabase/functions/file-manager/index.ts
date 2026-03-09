@@ -48,7 +48,7 @@ serve(async (req) => {
       case "delete":
         return await handleFileDelete(supabase, req);
       case "get-url":
-        return await handleGetSignedUrl(supabase, req);
+        return await handleGetSignedUrl(supabase, req, userData.user.id);
       default:
         throw new Error("Invalid action parameter");
     }
