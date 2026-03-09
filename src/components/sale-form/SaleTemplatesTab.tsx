@@ -305,10 +305,10 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
 
       // Sort templates: DDJJ and Contrato first, Anexo last (large content processed last)
       const sortedTemplates = [...(templateContents || [])].sort((a, b) => {
-        const aLower = a.name.toLowerCase();
-        const bLower = b.name.toLowerCase();
-        const aIsAnexo = isAnexoPlanName(a.name) || (!aLower.includes('ddjj') && !aLower.includes('declaración') && !aLower.includes('declaracion') && !aLower.includes('contrato'));
-        const bIsAnexo = isAnexoPlanName(b.name) || (!bLower.includes('ddjj') && !bLower.includes('declaración') && !bLower.includes('declaracion') && !bLower.includes('contrato'));
+        const aNorm = normalizeAccents(a.name);
+        const bNorm = normalizeAccents(b.name);
+        const aIsAnexo = isAnexoPlanName(a.name) || (!aNorm.includes('ddjj') && !aNorm.includes('declaracion') && !aNorm.includes('contrato'));
+        const bIsAnexo = isAnexoPlanName(b.name) || (!bNorm.includes('ddjj') && !bNorm.includes('declaracion') && !bNorm.includes('contrato'));
         if (aIsAnexo && !bIsAnexo) return 1;
         if (!aIsAnexo && bIsAnexo) return -1;
         return 0;
