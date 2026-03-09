@@ -79,6 +79,9 @@ const SignatureWorkflow = () => {
         .from('documents')
         .select('*')
         .eq('sale_id', saleId)
+        .eq('is_final', true)
+        .neq('document_type', 'firma')
+        .in('document_type', ['contrato', 'ddjj_salud'])
         .order('created_at', { ascending: true });
       if (error) throw error;
       return data || [];
