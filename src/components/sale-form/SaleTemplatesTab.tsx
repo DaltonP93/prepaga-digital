@@ -318,7 +318,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         try {
           const hasDesignerContent = !!template.content?.trim();
           const norm = normalizeAccents(template.name);
-          const isDDJJ = norm.includes('ddjj') || norm.includes('declaracion') || template.document_type === 'ddjj_salud';
+          const isDDJJ = norm.includes('ddjj') || norm.includes('declaracion') || (template as any).document_type === 'ddjj_salud';
           const isContrato = norm.includes('contrato');
           const isAnexoPlan = isAnexoPlanName(template.name);
           const isAnexo = isAnexoPlan || (!isDDJJ && !isContrato);
