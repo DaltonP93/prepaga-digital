@@ -187,6 +187,12 @@ export const AdminConfigPanel: React.FC = () => {
         label: 'Sesión QR',
       };
     }
+    if (provider === 'waha') {
+      return {
+        connected: !!apiFormData.whatsapp_gateway_url && !!apiFormData.whatsapp_linked_phone,
+        label: 'WAHA',
+      };
+    }
     return { connected: true, label: 'wa.me (Manual)' };
   };
 
