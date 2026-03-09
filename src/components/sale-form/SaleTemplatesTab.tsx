@@ -317,11 +317,9 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       for (const template of sortedTemplates) {
         try {
           const hasDesignerContent = !!template.content?.trim();
-          const lower = template.name.toLowerCase();
-          const lowerNorm = lower.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-          const isDDJJ = lower.includes('ddjj') || lower.includes('declaración') || lower.includes('declaracion')
-            || lowerNorm.includes('declaracion') || lowerNorm.includes('ddjj');
-          const isContrato = lower.includes('contrato');
+          const norm = normalizeAccents(template.name);
+          const isDDJJ = norm.includes('ddjj') || norm.includes('declaracion') || template.document_type === 'ddjj_salud';
+          const isContrato = norm.includes('contrato');
           const isAnexoPlan = isAnexoPlanName(template.name);
           const isAnexo = isAnexoPlan || (!isDDJJ && !isContrato);
 
