@@ -856,6 +856,8 @@ export const AdminConfigPanel: React.FC = () => {
 
         {/* SignWell / Firma Digital Tab */}
         <TabsContent value="signwell" className="space-y-6">
+          {/* Signature Block Style Config */}
+          <SignatureBlockStyleCard />
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div className="space-y-1">
