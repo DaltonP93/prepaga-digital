@@ -38,6 +38,19 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
     amount: 0,
   });
 
+  const formatAmountInput = (value: number) => {
+    if (!value) return '';
+    return value.toLocaleString('es-PY', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+  };
+
+  const parseAmountInput = (value: string) => {
+    const digitsOnly = value.replace(/\D/g, '');
+    return digitsOnly ? Number(digitsOnly) : 0;
+  };
+
   if (!saleId) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -168,10 +181,9 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
               <div className="space-y-2">
                 <Label>Monto (Gs.)</Label>
                 <Input
-                  type="number"
-                  step="1"
-                  value={newBeneficiary.amount}
-                  onChange={(e) => setNewBeneficiary(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
+                  inputMode="numeric"
+                  value={formatAmountInput(newBeneficiary.amount)}
+                  onChange={(e) => setNewBeneficiary(prev => ({ ...prev, amount: parseAmountInput(e.target.value) }))}
                   placeholder="0"
                 />
               </div>

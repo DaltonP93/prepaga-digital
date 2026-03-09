@@ -369,25 +369,6 @@ export const AdminConfigPanel: React.FC = () => {
                     )}
                   </div>
 
-                  {/* QR Session Gateway */}
-                  <div
-                    className={`relative cursor-pointer rounded-lg border-2 p-4 transition-all ${apiFormData.whatsapp_provider === 'qr_session' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
-                    onClick={() => handleApiInputChange('whatsapp_provider', 'qr_session')}
-                  >
-                    <div className="font-medium flex items-center gap-1">
-                      Sesión QR
-                      <Badge variant="secondary" className="text-[10px]">Gateway</Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Vincula tu número escaneando QR. Usa whatsapp-web.js o Baileys como gateway.
-                    </p>
-                    {apiFormData.whatsapp_provider === 'qr_session' && (
-                      <div className="absolute top-2 right-2">
-                        <CheckCircle className="h-5 w-5 text-primary" />
-                      </div>
-                    )}
-                  </div>
-
                   {/* wa.me Fallback */}
                   <div
                     className={`relative cursor-pointer rounded-lg border-2 p-4 transition-all ${apiFormData.whatsapp_provider === 'wame_fallback' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
@@ -479,53 +460,6 @@ export const AdminConfigPanel: React.FC = () => {
                 </div>
               )}
 
-              {/* QR Session Gateway Fields */}
-              {apiFormData.whatsapp_provider === 'qr_session' && (
-                <div className="space-y-4 p-4 rounded-lg border bg-muted/30">
-                  <h4 className="font-medium flex items-center gap-2">
-                    <Smartphone className="h-4 w-4" />
-                    Gateway WhatsApp con Sesión QR
-                  </h4>
-                  <p className="text-sm text-muted-foreground">
-                    Conecta un servidor gateway (whatsapp-web.js, Baileys, WPPConnect) que expone una API HTTP.
-                    El admin escanea el QR desde el gateway y el número queda vinculado para envío automático.
-                  </p>
-                  <div>
-                    <Label htmlFor="gateway_url">URL del Gateway</Label>
-                    <Input
-                      id="gateway_url"
-                      value={apiFormData.whatsapp_gateway_url}
-                      onChange={(e) => handleApiInputChange('whatsapp_gateway_url', e.target.value)}
-                      placeholder="https://mi-gateway.example.com"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Endpoint base del servidor gateway. Ej: POST /send-otp
-                    </p>
-                  </div>
-                  <div>
-                    <Label htmlFor="linked_phone">Número Vinculado (QR)</Label>
-                    <Input
-                      id="linked_phone"
-                      value={apiFormData.whatsapp_linked_phone}
-                      onChange={(e) => handleApiInputChange('whatsapp_linked_phone', e.target.value)}
-                      placeholder="+5959XXXXXXX"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Número que escaneó el QR y queda como remitente de los mensajes OTP.
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm space-y-1">
-                    <p className="font-medium">Flujo de vinculación:</p>
-                    <ol className="list-decimal list-inside text-muted-foreground space-y-0.5">
-                      <li>Despliega el gateway en tu servidor (whatsapp-web.js / Baileys)</li>
-                      <li>Accede a la interfaz del gateway y escanea el QR con tu WhatsApp</li>
-                      <li>Copia la URL del gateway y el número vinculado aquí</li>
-                      <li>El sistema enviará OTP automáticamente por este número</li>
-                    </ol>
-                  </div>
-                </div>
-              )}
-
               {/* wa.me Fallback Info */}
               {apiFormData.whatsapp_provider === 'wame_fallback' && (
                 <div className="p-4 rounded-lg border bg-muted/30 space-y-2">
@@ -572,7 +506,7 @@ export const AdminConfigPanel: React.FC = () => {
               )}
 
               {/* WhatsApp Test Button */}
-              {apiFormData.whatsapp_provider !== 'wame_fallback' && (
+              {(apiFormData.whatsapp_provider === 'meta' || apiFormData.whatsapp_provider === 'twilio') && (
                 <div className="space-y-3 p-4 rounded-lg border bg-muted/30">
                   <h4 className="font-medium flex items-center gap-2">
                     <TestTube className="h-4 w-4" />

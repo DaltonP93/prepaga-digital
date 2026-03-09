@@ -5,6 +5,7 @@ import { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
 import { validateSaleTransition } from '@/lib/workflowValidator';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
+import { generateUUID } from '@/lib/utils';
 
 const ADMIN_ROLES = ['super_admin', 'admin', 'supervisor', 'gestor', 'auditor'];
 
@@ -242,7 +243,7 @@ export const useGenerateQuestionnaireLink = () => {
           if (!check.allowed) throw new Error(check.reasons.join(', '));
         }
 
-        token = crypto.randomUUID();
+        token = generateUUID();
         const expiresAtDate = new Date();
         expiresAtDate.setDate(expiresAtDate.getDate() + 7); // Expires in 7 days
         expiresAtString = expiresAtDate.toISOString();
@@ -342,7 +343,7 @@ export const useGenerateSignatureLink = () => {
           if (!check.allowed) throw new Error(check.reasons.join(', '));
         }
 
-        token = crypto.randomUUID();
+        token = generateUUID();
         const expiresAtDate = new Date();
         expiresAtDate.setDate(expiresAtDate.getDate() + 7); // Expires in 7 days
         expiresAt = expiresAtDate.toISOString();

@@ -12,6 +12,7 @@ import { Link, Copy, Send, CheckCircle, Clock, ExternalLink, RefreshCw, PenTool,
 import { useSignWellConfig, useSignWellCreateDocument } from '@/hooks/useSignWell';
 import { useCreateAllSignatureLinks } from '@/hooks/useCreateAllSignatureLinks';
 import { useBeneficiaries } from '@/hooks/useBeneficiaries';
+import { generateUUID } from '@/lib/utils';
 
 interface SignatureLinkGeneratorProps {
   saleId: string;
@@ -72,7 +73,7 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
   // Generate single link (for individual buttons)
   const generateLink = useMutation({
     mutationFn: async (recipientType: string) => {
-      const token = crypto.randomUUID();
+      const token = generateUUID();
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + (recipientType === 'contratada' ? 3 : expirationDays));
 

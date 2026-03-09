@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, generateUUID } from '@/lib/utils';
 
 interface AutomationRule {
   id: string;
@@ -110,7 +110,7 @@ export const useSignatureAutomation = () => {
       const results = await Promise.allSettled(
         expiredSales.map(async (sale) => {
           // Generar nuevo token (válido por 7 días)
-          const newToken = crypto.randomUUID();
+          const newToken = generateUUID();
           const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
           // Actualizar venta con nuevo token
@@ -265,7 +265,7 @@ export const useSignatureAutomation = () => {
       const existingRules = JSON.parse(localStorage.getItem('automation_rules') || '[]');
       const newRule = {
         ...rule,
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         created_at: new Date().toISOString(),
         active: true
       };

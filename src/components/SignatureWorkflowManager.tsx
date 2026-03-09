@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
+import { generateUUID } from "@/lib/utils";
 import { 
   Send, 
   Clock, 
@@ -60,7 +61,7 @@ export const SignatureWorkflowManager = ({
   const generateSignatureLink = async () => {
     setIsGenerating(true);
     try {
-      const token = crypto.randomUUID();
+      const token = generateUUID();
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + expirationHours);
 

@@ -8,23 +8,38 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { KeyRound, Mail, MessageSquare, Smartphone, Shield, Server, Save, Loader2, Wifi, CheckCircle2, AlertCircle, Phone } from 'lucide-react';
+import { KeyRound, Mail, MessageSquare, Smartphone, Shield, Server, Save, Loader2, Wifi, CheckCircle2, AlertCircle, Phone, TestTube } from 'lucide-react';
 import { useOtpPolicy, OtpPolicyConfig } from '@/hooks/useOtpPolicy';
+import { useCompanyApiConfiguration, type CompanyApiConfig } from '@/hooks/useCompanyApiConfiguration';
 import { supabase } from '@/integrations/supabase/client';
+import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { toast } from 'sonner';
 
 export const OtpPolicyConfigPanel: React.FC = () => {
   const { policy, isLoading, updatePolicy, isUpdating } = useOtpPolicy();
+  const { configuration: apiConfig, isLoading: isLoadingApiConfig, updateConfigurationAsync, isUpdating: isUpdatingApiConfig } = useCompanyApiConfiguration();
   const [formData, setFormData] = useState<OtpPolicyConfig>(policy);
+  const [apiFormData, setApiFormData] = useState<CompanyApiConfig>(apiConfig);
   const [testingSmtp, setTestingSmtp] = useState(false);
+  const [testingWhatsapp, setTestingWhatsapp] = useState(false);
+  const [whatsappTestPhone, setWhatsappTestPhone] = useState('');
   const [smtpTestResult, setSmtpTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const { profile } = useSimpleAuthContext();
 
   useEffect(() => {
     if (policy) setFormData(policy);
   }, [policy]);
 
+  useEffect(() => {
+    if (apiConfig) setApiFormData(apiConfig);
+  }, [apiConfig]);
+
   const handleChange = (field: keyof OtpPolicyConfig, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleApiConfigChange = (field: keyof CompanyApiConfig, value: any) => {
+    setApiFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const toggleChannel = (channel: string) => {
@@ -40,9 +55,18 @@ export const OtpPolicyConfigPanel: React.FC = () => {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const { id, company_id, ...updates } = formData;
-    updatePolicy(updates);
+    try {
+      await updateConfigurationAsync({
+        whatsapp_provider: apiFormData.whatsapp_provider,
+        whatsapp_gateway_url: apiFormData.whatsapp_gateway_url,
+        whatsapp_linked_phone: apiFormData.whatsapp_linked_phone,
+      });
+      updatePolicy(updates);
+    } catch {
+      // Error feedback comes from the hook mutation.
+    }
   };
 
   const handleTestSmtp = async () => {
@@ -81,7 +105,43 @@ export const OtpPolicyConfigPanel: React.FC = () => {
     }
   };
 
-  if (isLoading) {
+  const handleTestWhatsapp = async () => {
+    if (!whatsappTestPhone) {
+      toast.error('Ingresa un numero de prueba antes de enviar');
+      return;
+    }
+
+    setTestingWhatsapp(true);
+    try {
+      await updateConfigurationAsync({
+        whatsapp_provider: apiFormData.whatsapp_provider,
+        whatsapp_gateway_url: apiFormData.whatsapp_gateway_url,
+        whatsapp_linked_phone: apiFormData.whatsapp_linked_phone,
+      });
+
+      const { data, error } = await supabase.functions.invoke('signature-otp', {
+        body: {
+          action: 'test_whatsapp',
+          test_phone: whatsappTestPhone,
+          company_id: profile?.company_id,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        toast.success(data.message || 'WhatsApp de prueba enviado');
+      } else {
+        toast.error(data?.error || data?.message || 'Error al enviar prueba');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error al probar WhatsApp');
+    } finally {
+      setTestingWhatsapp(false);
+    }
+  };
+
+  if (isLoading || isLoadingApiConfig) {
     return (
       <Card>
         <CardContent className="p-6 text-center">
@@ -110,7 +170,7 @@ export const OtpPolicyConfigPanel: React.FC = () => {
             Autenticación multifactor para firma electrónica (ISO 29115)
           </CardDescription>
         </div>
-        <Button onClick={handleSave} disabled={isUpdating} size="sm">
+        <Button onClick={handleSave} disabled={isUpdating || isUpdatingApiConfig} size="sm">
           {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
           Guardar
         </Button>
@@ -254,6 +314,80 @@ export const OtpPolicyConfigPanel: React.FC = () => {
                   checked={formData.whatsapp_otp_enabled}
                   onCheckedChange={(v) => handleChange('whatsapp_otp_enabled', v)}
                 />
+              </div>
+              <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <Label className="text-sm font-medium">Usar Sesion QR para OTP</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Mueve el canal OTP de WhatsApp a un gateway con numero vinculado por QR.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={apiFormData.whatsapp_provider === 'qr_session'}
+                    onCheckedChange={(enabled) => handleApiConfigChange('whatsapp_provider', enabled ? 'qr_session' : 'meta')}
+                  />
+                </div>
+                {apiFormData.whatsapp_provider === 'qr_session' && (
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-xs">URL del Gateway</Label>
+                      <Input
+                        className="h-9"
+                        value={apiFormData.whatsapp_gateway_url}
+                        onChange={(e) => handleApiConfigChange('whatsapp_gateway_url', e.target.value)}
+                        placeholder="https://tu-gateway-whatsapp.com"
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Endpoint base del servidor gateway. Ej: POST /send-otp
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Numero vinculado (QR)</Label>
+                      <Input
+                        className="h-9"
+                        value={apiFormData.whatsapp_linked_phone}
+                        onChange={(e) => handleApiConfigChange('whatsapp_linked_phone', e.target.value)}
+                        placeholder="+595974451232"
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Numero que escaneo el QR y queda como remitente de los mensajes OTP.
+                      </p>
+                    </div>
+                    <div className="rounded-lg border bg-background/40 p-3 text-xs text-muted-foreground">
+                      1. Despliega el gateway en tu servidor.
+                      <br />
+                      2. Escanea el QR con el WhatsApp que enviara OTP.
+                      <br />
+                      3. Guarda aqui la URL y el numero vinculado.
+                    </div>
+                    <div className="space-y-2 rounded-lg border bg-background/40 p-3">
+                      <Label className="text-xs font-medium flex items-center gap-2">
+                        <TestTube className="h-3.5 w-3.5" />
+                        Probar envio OTP por Sesion QR
+                      </Label>
+                      <div className="flex gap-2">
+                        <Input
+                          className="h-9"
+                          value={whatsappTestPhone}
+                          onChange={(e) => setWhatsappTestPhone(e.target.value)}
+                          placeholder="+5959XXXXXXX"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={testingWhatsapp || !whatsappTestPhone || !apiFormData.whatsapp_gateway_url || !apiFormData.whatsapp_linked_phone}
+                          onClick={handleTestWhatsapp}
+                        >
+                          {testingWhatsapp ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Enviar prueba'}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Guarda la configuracion del gateway y envia un OTP de prueba al numero indicado.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </>

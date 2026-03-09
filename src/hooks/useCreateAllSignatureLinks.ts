@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { generateUUID } from '@/lib/utils';
 import { toast } from 'sonner';
 
 interface GeneratedLink {
@@ -42,7 +43,7 @@ export const useCreateAllSignatureLinks = () => {
       expiresAt.setDate(expiresAt.getDate() + 1); // 24 horas
 
       // 2. Generar enlace para titular
-      const titularToken = crypto.randomUUID();
+      const titularToken = generateUUID();
 
       const { data: titularLink, error: titularError } = await supabase
         .from('signature_links')
@@ -77,7 +78,7 @@ export const useCreateAllSignatureLinks = () => {
       if (sale.beneficiaries && Array.isArray(sale.beneficiaries) && sale.beneficiaries.length > 0) {
         for (const beneficiary of sale.beneficiaries) {
           if (beneficiary.signature_required !== false && beneficiary.email) {
-            const adhToken = crypto.randomUUID();
+            const adhToken = generateUUID();
             const adhExpiresAt = new Date();
             adhExpiresAt.setDate(adhExpiresAt.getDate() + 1);
 
@@ -115,7 +116,7 @@ export const useCreateAllSignatureLinks = () => {
 
       // 4. Generar enlace para CONTRATADA si está en modo 'link'
       if (companySettings?.contratada_signature_mode === 'link' && companySettings?.contratada_signer_email) {
-        const contratadaToken = crypto.randomUUID();
+        const contratadaToken = generateUUID();
         const contratadaExpiresAt = new Date();
         contratadaExpiresAt.setDate(contratadaExpiresAt.getDate() + 3); // 3 días para la empresa
 

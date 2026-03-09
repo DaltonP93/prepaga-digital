@@ -2,6 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { generateUUID } from '@/lib/utils';
 
 export const useSignatureLinks = (saleId: string) => {
   return useQuery({
@@ -83,7 +84,7 @@ export const useCreateSignatureLink = () => {
       expirationDays?: number;
       beneficiaryId?: string;
     }) => {
-      const token = crypto.randomUUID();
+      const token = generateUUID();
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + expirationDays);
 
@@ -276,7 +277,7 @@ export const useResendSignatureLink = () => {
       }
 
       // 3. Create new link with same recipient data
-      const token = crypto.randomUUID();
+      const token = generateUUID();
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 1);
 
