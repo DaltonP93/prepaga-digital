@@ -20,13 +20,16 @@ interface SaleTemplatesTabProps {
   disabled?: boolean;
 }
 
+const normalizeAccents = (s: string) =>
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
 /** Determine document type badge from name */
 const getTemplateTypeBadge = (name: string) => {
-  const lower = name.toLowerCase();
-  if (lower.includes('ddjj') || lower.includes('declaración') || lower.includes('declaracion')) {
+  const norm = normalizeAccents(name);
+  if (norm.includes('ddjj') || norm.includes('declaracion')) {
     return <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50 text-[10px]">DDJJ</Badge>;
   }
-  if (lower.includes('contrato')) {
+  if (norm.includes('contrato')) {
     return <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-50 text-[10px]">Contrato</Badge>;
   }
   return <Badge variant="outline" className="text-gray-600 border-gray-300 bg-gray-50 text-[10px]">Anexo</Badge>;
