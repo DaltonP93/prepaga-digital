@@ -469,7 +469,13 @@ async function sendViaWAHA(
   message: string
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
-    const formattedPhone = to.replace(/[\s+\-()]/g, '')
+    let formattedPhone = to.replace(/[\s+\-()]/g, '')
+    // Remove leading '0' and prepend country code if number looks local (no country code)
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '595' + formattedPhone.substring(1)
+    } else if (formattedPhone.length <= 10 && !formattedPhone.startsWith('595')) {
+      formattedPhone = '595' + formattedPhone
+    }
     const chatId = formattedPhone.includes('@') ? formattedPhone : `${formattedPhone}@c.us`
 
     const headers: Record<string, string> = {
