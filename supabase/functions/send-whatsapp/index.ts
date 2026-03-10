@@ -211,6 +211,56 @@ serve(async (req) => {
       })
     }
 
+    if (provider === 'waha' || provider === 'qr_session') {
+      // WAHA (WhatsApp HTTP API) self-hosted gateway
+      const gatewayUrl = companySettings?.whatsapp_gateway_url
+      const apiToken = companySettings?.whatsapp_api_key
+
+      if (!gatewayUrl) {
+        await supabase.from('whatsapp_messages').insert({
+          sale_id: saleId,
+          phone_number: to,
+          message_type: messageType,
+          message_body: message,
+          status: 'failed',
+          error_message: 'WAHA gateway URL not configured',
+          company_id: companyId,
+        })
+
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'WAHA gateway not configured for this company'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        })
+      }
+
+      const wahaResult = await sendViaWAHA(gatewayUrl, apiToken || '', to, message)
+
+      await supabase.from('whatsapp_messages').insert({
+        sale_id: saleId,
+        phone_number: to,
+        message_type: messageType,
+        message_body: message,
+        status: wahaResult.success ? 'sent' : 'failed',
+        error_message: wahaResult.error || null,
+        whatsapp_message_id: wahaResult.messageId || null,
+        company_id: companyId,
+        sent_at: wahaResult.success ? new Date().toISOString() : null,
+      })
+
+      return new Response(JSON.stringify({
+        success: wahaResult.success,
+        provider: 'waha',
+        messageId: wahaResult.messageId,
+        error: wahaResult.error,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: wahaResult.success ? 200 : 500,
+      })
+    }
+
     // Default: Meta Business API
     if (!companySettings?.whatsapp_api_key || !companySettings?.whatsapp_phone_id) {
       // Fallback to wa.me link instead of failing
