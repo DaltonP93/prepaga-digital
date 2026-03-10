@@ -460,3 +460,59 @@ async function sendViaTwilio(
     }
   }
 }
+
+// Send message via WAHA (WhatsApp HTTP API) self-hosted gateway
+async function sendViaWAHA(
+  gatewayUrl: string,
+  apiToken: string,
+  to: string,
+  message: string
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  try {
+    const formattedPhone = to.replace(/[\s+\-()]/g, '')
+    const chatId = formattedPhone.includes('@') ? formattedPhone : `${formattedPhone}@c.us`
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+    if (apiToken) {
+      headers['Authorization'] = `Bearer ${apiToken}`
+    }
+
+    const baseUrl = gatewayUrl.replace(/\/+$/, '')
+
+    const response = await fetch(
+      `${baseUrl}/api/sendText`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          chatId,
+          text: message,
+          session: 'default',
+        }),
+      }
+    )
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      console.error('WAHA API error:', result)
+      return {
+        success: false,
+        error: result.message || result.error || 'Failed to send via WAHA'
+      }
+    }
+
+    return {
+      success: true,
+      messageId: result.id || result.key?.id || undefined,
+    }
+  } catch (error: any) {
+    console.error('Error calling WAHA API:', error)
+    return {
+      success: false,
+      error: error?.message || 'Network error sending via WAHA'
+    }
+  }
+}
