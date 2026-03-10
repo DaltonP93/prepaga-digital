@@ -504,6 +504,12 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
           </div>
         </div>
       )}
+
+      <SignatureInsertDialog
+        open={showSignatureDialog}
+        onOpenChange={setShowSignatureDialog}
+        onInsert={doInsertSignature}
+      />
     </div>
   );
 });
