@@ -21,7 +21,7 @@ import { toast } from 'sonner';
 const formatDateTimePY = (dateStr: string) => {
   return new Date(dateStr).toLocaleString('es-PY', {
     day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+    hour: '2-digit', minute: '2-digit'
   });
 };
 
@@ -54,12 +54,12 @@ const SignatureWorkflow = () => {
     };
 
     // Primary: realtime subscription
-    const channel = supabase
-      .channel(`sig-workflow-${saleId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'signature_links', filter: `sale_id=eq.${saleId}` }, invalidateAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'documents', filter: `sale_id=eq.${saleId}` }, invalidateAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales', filter: `id=eq.${saleId}` }, invalidateAll)
-      .subscribe();
+    const channel = supabase.
+    channel(`sig-workflow-${saleId}`).
+    on('postgres_changes', { event: '*', schema: 'public', table: 'signature_links', filter: `sale_id=eq.${saleId}` }, invalidateAll).
+    on('postgres_changes', { event: '*', schema: 'public', table: 'documents', filter: `sale_id=eq.${saleId}` }, invalidateAll).
+    on('postgres_changes', { event: '*', schema: 'public', table: 'sales', filter: `id=eq.${saleId}` }, invalidateAll).
+    subscribe();
 
     // Fallback: polling every 10 seconds
     const pollInterval = setInterval(invalidateAll, 10000);
@@ -75,18 +75,18 @@ const SignatureWorkflow = () => {
     queryKey: ['signed-documents', saleId],
     queryFn: async () => {
       if (!saleId) return [];
-      const { data, error } = await supabase
-        .from('documents')
-        .select('*')
-        .eq('sale_id', saleId)
-        .eq('is_final', true)
-        .neq('document_type', 'firma')
-        .in('document_type', ['contrato', 'ddjj_salud'])
-        .order('created_at', { ascending: true });
+      const { data, error } = await supabase.
+      from('documents').
+      select('*').
+      eq('sale_id', saleId).
+      eq('is_final', true).
+      neq('document_type', 'firma').
+      in('document_type', ['contrato', 'ddjj_salud']).
+      order('created_at', { ascending: true });
       if (error) throw error;
       return data || [];
     },
-    enabled: !!saleId,
+    enabled: !!saleId
   });
 
   // Fetch workflow steps for detail view
@@ -97,21 +97,21 @@ const SignatureWorkflow = () => {
       // Get all signature link IDs for this sale
       const linkIds = signatureLinks?.map((l: any) => l.id) || [];
       if (linkIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from('signature_workflow_steps')
-        .select('*')
-        .in('signature_link_id', linkIds)
-        .order('created_at', { ascending: true });
+      const { data, error } = await supabase.
+      from('signature_workflow_steps').
+      select('*').
+      in('signature_link_id', linkIds).
+      order('created_at', { ascending: true });
       if (error) throw error;
       return data || [];
     },
-    enabled: !!saleId && signatureLinks && signatureLinks.length > 0,
+    enabled: !!saleId && signatureLinks && signatureLinks.length > 0
   });
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [detailLink, setDetailLink] = useState<any>(null);
 
-  const selectedSale = saleId ? sales.find(s => s.id === saleId) : null;
+  const selectedSale = saleId ? sales.find((s) => s.id === saleId) : null;
   const selectedSaleCompanyId = selectedSale?.company_id;
 
   // Fetch company settings for contratada signer info
@@ -119,15 +119,15 @@ const SignatureWorkflow = () => {
     queryKey: ['company-settings-contratada', selectedSaleCompanyId],
     queryFn: async () => {
       if (!selectedSaleCompanyId) return null;
-      const { data, error } = await supabase
-        .from('company_settings')
-        .select('contratada_signature_mode, contratada_signer_name, contratada_signer_email, contratada_signer_dni, contratada_signer_phone')
-        .eq('company_id', selectedSaleCompanyId)
-        .single();
+      const { data, error } = await supabase.
+      from('company_settings').
+      select('contratada_signature_mode, contratada_signer_name, contratada_signer_email, contratada_signer_dni, contratada_signer_phone').
+      eq('company_id', selectedSaleCompanyId).
+      single();
       if (error) return null;
       return data;
     },
-    enabled: !!selectedSaleCompanyId,
+    enabled: !!selectedSaleCompanyId
   });
 
   const getSignatureUrl = (linkToken: string) => {
@@ -151,9 +151,9 @@ const SignatureWorkflow = () => {
       `Hola ${recipientName}, le enviamos el enlace para firmar los documentos de su contrato:\n\n${url}\n\nPor favor ingrese al enlace para revisar y firmar los documentos. Gracias.`
     );
     const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
-    const waUrl = cleanPhone
-      ? `https://wa.me/${cleanPhone}?text=${message}`
-      : `https://wa.me/?text=${message}`;
+    const waUrl = cleanPhone ?
+    `https://wa.me/${cleanPhone}?text=${message}` :
+    `https://wa.me/?text=${message}`;
     window.open(waUrl, '_blank');
   };
 
@@ -164,7 +164,7 @@ const SignatureWorkflow = () => {
       recipient_type: link.recipient_type,
       recipient_id: link.recipient_id,
       recipient_email: link.recipient_email || '',
-      recipient_phone: link.recipient_phone,
+      recipient_phone: link.recipient_phone
     });
   };
 
@@ -206,9 +206,9 @@ const SignatureWorkflow = () => {
           headers: {
             'Content-Type': 'application/json',
             'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${session?.access_token || SUPABASE_KEY}`,
+            'Authorization': `Bearer ${session?.access_token || SUPABASE_KEY}`
           },
-          body: JSON.stringify({ document_id: docId, kind: 'evidence' }),
+          body: JSON.stringify({ document_id: docId, kind: 'evidence' })
         }
       );
       const result = await response.json();
@@ -255,9 +255,9 @@ const SignatureWorkflow = () => {
               headers: {
                 'Content-Type': 'application/json',
                 'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${session?.access_token || SUPABASE_KEY}`,
+                'Authorization': `Bearer ${session?.access_token || SUPABASE_KEY}`
               },
-              body: JSON.stringify({ document_id: doc.id, kind: 'signed' }),
+              body: JSON.stringify({ document_id: doc.id, kind: 'signed' })
             }
           );
           const result = await response.json();
@@ -284,10 +284,10 @@ const SignatureWorkflow = () => {
       return `Titular: ${client ? `${client.first_name} ${client.last_name}` : 'Sin datos'}`;
     }
     if (link.recipient_type === 'contratada') {
-      const name = link.recipient_name
-        || (link.recipient_phone && !link.recipient_phone.includes('@') ? link.recipient_phone : null)
-        || link.recipient_email
-        || 'Representante Legal';
+      const name = link.recipient_name || (
+      link.recipient_phone && !link.recipient_phone.includes('@') ? link.recipient_phone : null) ||
+      link.recipient_email ||
+      'Representante Legal';
       return `Contratada: ${name}`;
     }
     const beneficiary = beneficiaries?.find((b: any) => b.id === link.recipient_id);
@@ -322,9 +322,9 @@ const SignatureWorkflow = () => {
   const getActiveLinks = (links: any[]) => {
     const byRecipient = new Map<string, any>();
     for (const link of links) {
-      const key = link.recipient_type === 'titular' ? 'titular'
-        : link.recipient_type === 'contratada' ? 'contratada'
-        : `adherente-${link.recipient_id}`;
+      const key = link.recipient_type === 'titular' ? 'titular' :
+      link.recipient_type === 'contratada' ? 'contratada' :
+      `adherente-${link.recipient_id}`;
       if (!byRecipient.has(key)) {
         byRecipient.set(key, link);
       }
@@ -352,8 +352,8 @@ const SignatureWorkflow = () => {
             <p className="text-muted-foreground">Acceso publico al flujo de firmas</p>
           </CardContent>
         </Card>
-      </div>
-    );
+      </div>);
+
   }
 
   if (isLoading) {
@@ -362,18 +362,18 @@ const SignatureWorkflow = () => {
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
         </div>
-      </div>
-    );
+      </div>);
+
   }
 
   if (!saleId || !selectedSale) {
     const isSeller = effectiveRole === 'vendedor';
     const canViewAllSales = permissions.sales.viewAll;
 
-    const availableSales = sales.filter(sale =>
-      ['enviado', 'firmado', 'completado'].includes(sale.status) ||
-      (isSeller && sale.salesperson_id === profile?.id) ||
-      canViewAllSales
+    const availableSales = sales.filter((sale) =>
+    ['enviado', 'firmado', 'completado'].includes(sale.status) ||
+    isSeller && sale.salesperson_id === profile?.id ||
+    canViewAllSales
     );
 
     return (
@@ -389,17 +389,17 @@ const SignatureWorkflow = () => {
           </Button>
         </div>
         <div className="grid gap-4">
-          {availableSales.length === 0 ? (
-            <Card>
+          {availableSales.length === 0 ?
+          <Card>
               <CardContent className="text-center py-8">
                 <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                 <p className="text-muted-foreground mb-4">No hay ventas disponibles para firma</p>
                 <Button onClick={() => navigate('/sales')}>Ir a Ventas</Button>
               </CardContent>
-            </Card>
-          ) : (
-            availableSales.map((sale) => (
-              <Card key={sale.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/signature-workflow/${sale.id}`)}>
+            </Card> :
+
+          availableSales.map((sale) =>
+          <Card key={sale.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/signature-workflow/${sale.id}`)}>
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <div>
@@ -411,11 +411,11 @@ const SignatureWorkflow = () => {
                       </CardDescription>
                     </div>
                     <Badge variant={
-                      sale.status === 'completado' ? 'default' :
-                      sale.status === 'firmado' ? 'secondary' :
-                      sale.status === 'enviado' ? 'outline' :
-                      'destructive'
-                    }>
+                sale.status === 'completado' ? 'default' :
+                sale.status === 'firmado' ? 'secondary' :
+                sale.status === 'enviado' ? 'outline' :
+                'destructive'
+                }>
                       {sale.status}
                     </Badge>
                   </div>
@@ -429,11 +429,11 @@ const SignatureWorkflow = () => {
                   </div>
                 </CardContent>
               </Card>
-            ))
-          )}
+          )
+          }
         </div>
-      </div>
-    );
+      </div>);
+
   }
 
   const client = selectedSale.clients as any;
@@ -451,8 +451,8 @@ const SignatureWorkflow = () => {
       return (
         <div className="text-center py-4 text-muted-foreground">
           <p>No hay enlaces de firma generados.</p>
-        </div>
-      );
+        </div>);
+
     }
 
     return (
@@ -473,10 +473,10 @@ const SignatureWorkflow = () => {
                   <p className="font-medium">{getRecipientLabel(link)}</p>
                 </div>
                 <Badge variant={
-                  isCompleted ? 'default' :
-                  isExpired || isRevoked ? 'destructive' :
-                  link.status === 'visualizado' ? 'secondary' :
-                  'outline'
+                isCompleted ? 'default' :
+                isExpired || isRevoked ? 'destructive' :
+                link.status === 'visualizado' ? 'secondary' :
+                'outline'
                 }>
                   {isCompleted ? '✓ Firmado' : isExpired ? 'Expirado' : isRevoked ? 'Revocado' : link.status === 'visualizado' ? 'Visualizado' : 'Pendiente'}
                 </Badge>
@@ -492,139 +492,139 @@ const SignatureWorkflow = () => {
                 <div className="w-4 h-px bg-border" />
 
                 {/* Step 2: Visualizado */}
-                {link.accessed_at ? (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                {link.accessed_at ?
+                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
                     <Eye className="h-3 w-3" />
                     <span>Visto: {formatDateTimePY(link.accessed_at)} ({link.access_count}x)</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-muted text-muted-foreground border">
+                  </div> :
+
+                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-muted text-muted-foreground border">
                     <Eye className="h-3 w-3" />
                     <span>No visto</span>
                   </div>
-                )}
+                }
                 <div className="w-4 h-px bg-border" />
 
                 {/* Step 3: Firmado */}
-                {isCompleted && link.completed_at ? (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-50 text-green-700 border border-green-200">
+                {isCompleted && link.completed_at ?
+                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-50 text-green-700 border border-green-200">
                     <CheckCircle className="h-3 w-3" />
                     <span>Firmado: {formatDateTimePY(link.completed_at)}</span>
-                  </div>
-                ) : isExpired ? (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-red-50 text-red-600 border border-red-200">
+                  </div> :
+                isExpired ?
+                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-red-50 text-red-600 border border-red-200">
                     <Clock className="h-3 w-3" />
                     <span>Expirado: {formatDateTimePY(link.expires_at)}</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-muted text-muted-foreground border">
+                  </div> :
+
+                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-muted text-muted-foreground border">
                     <CheckCircle className="h-3 w-3" />
                     <span>Pendiente</span>
                   </div>
-                )}
+                }
               </div>
 
               {/* 3 Botones: Copiar, WhatsApp, Reenviar (para enlaces activos) */}
-              {isActive && (
-                <div className="flex flex-wrap gap-2">
+              {isActive &&
+              <div className="flex flex-wrap gap-2">
                   <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleCopyLink(link.token, link.id)}
-                  >
-                    {copiedId === link.id ? (
-                      <Check className="h-4 w-4 mr-1 text-green-600" />
-                    ) : (
-                      <Copy className="h-4 w-4 mr-1" />
-                    )}
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleCopyLink(link.token, link.id)}>
+                  
+                    {copiedId === link.id ?
+                  <Check className="h-4 w-4 mr-1 text-green-600" /> :
+
+                  <Copy className="h-4 w-4 mr-1" />
+                  }
                     {copiedId === link.id ? 'Copiado' : 'Copiar Enlace'}
                   </Button>
                   <Button
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => handleSendWhatsApp(phone, link.token, name)}
-                  >
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                  onClick={() => handleSendWhatsApp(phone, link.token, name)}>
+                  
                     <MessageCircle className="h-4 w-4 mr-1" />
                     Enviar por WhatsApp
                   </Button>
                   <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleResendLink(link)}
-                    disabled={resendLink.isPending}
-                  >
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleResendLink(link)}
+                  disabled={resendLink.isPending}>
+                  
                     <RefreshCw className={`h-4 w-4 mr-1 ${resendLink.isPending ? 'animate-spin' : ''}`} />
                     Reenviar
                   </Button>
                   <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={(e) => { e.stopPropagation(); setDetailLink(link); }}
-                  >
+                  size="sm"
+                  variant="ghost"
+                  onClick={(e) => {e.stopPropagation();setDetailLink(link);}}>
+                  
                     <Info className="h-4 w-4 mr-1" />
                     Ver Detalles
                   </Button>
                 </div>
-              )}
+              }
 
               {/* Para expirados/revocados: solo Reenviar */}
-              {(isExpired || isRevoked) && (
-                <div className="flex flex-wrap gap-2">
+              {(isExpired || isRevoked) &&
+              <div className="flex flex-wrap gap-2">
                   <Button
-                    size="sm"
-                    variant="default"
-                    onClick={() => handleResendLink(link)}
-                    disabled={resendLink.isPending}
-                  >
+                  size="sm"
+                  variant="default"
+                  onClick={() => handleResendLink(link)}
+                  disabled={resendLink.isPending}>
+                  
                     <RefreshCw className={`h-4 w-4 mr-1 ${resendLink.isPending ? 'animate-spin' : ''}`} />
                     Regenerar Enlace
                   </Button>
                   <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={(e) => { e.stopPropagation(); setDetailLink(link); }}
-                  >
+                  size="sm"
+                  variant="ghost"
+                  onClick={(e) => {e.stopPropagation();setDetailLink(link);}}>
+                  
                     <Info className="h-4 w-4 mr-1" />
                     Ver Detalles
                   </Button>
                 </div>
-              )}
+              }
 
               {/* Para completados: Descargar firmado + Reenviar */}
-              {isCompleted && (
-                <div className="flex flex-wrap gap-2">
+              {isCompleted &&
+              <div className="flex flex-wrap gap-2">
                   <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleDownloadSignedDocs(link)}
-                  >
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleDownloadSignedDocs(link)}>
+                  
                     <Download className="h-4 w-4 mr-1" />
                     Descargar Documento Firmado
                   </Button>
                   <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleResendLink(link)}
-                    disabled={resendLink.isPending}
-                  >
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleResendLink(link)}
+                  disabled={resendLink.isPending}>
+                  
                     <RefreshCw className={`h-4 w-4 mr-1 ${resendLink.isPending ? 'animate-spin' : ''}`} />
                     Reenviar
                   </Button>
                   <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={(e) => { e.stopPropagation(); setDetailLink(link); }}
-                  >
+                  size="sm"
+                  variant="ghost"
+                  onClick={(e) => {e.stopPropagation();setDetailLink(link);}}>
+                  
                     <Info className="h-4 w-4 mr-1" />
                     Ver Detalles
                   </Button>
                 </div>
-              )}
-            </div>
-          );
+              }
+            </div>);
+
         })}
-      </div>
-    );
+      </div>);
+
   }
 
   return (
@@ -670,8 +670,8 @@ const SignatureWorkflow = () => {
                 <p className="font-medium">Vendedor:</p>
                 <p className="text-muted-foreground">
                   {selectedSale.salesperson ?
-                    `${(selectedSale.salesperson as any).first_name} ${(selectedSale.salesperson as any).last_name}` :
-                    'No asignado'
+                  `${(selectedSale.salesperson as any).first_name} ${(selectedSale.salesperson as any).last_name}` :
+                  'No asignado'
                   }
                 </p>
               </div>
@@ -694,8 +694,8 @@ const SignatureWorkflow = () => {
           </CardContent>
         </Card>
 
-        {adherenteLinks.length > 0 && (
-          <Card>
+        {adherenteLinks.length > 0 &&
+        <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
@@ -709,89 +709,89 @@ const SignatureWorkflow = () => {
               {renderSignatureLinks(adherenteLinks)}
             </CardContent>
           </Card>
-        )}
+        }
 
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Building className="h-5 w-5" />
               Firma de la Contratada ({contratadaLinks.length})
-              {contratadaLinks.length > 0 && contratadaLinks.every((l: any) => l.status === 'completado') && (
-                <Badge className="bg-green-600 ml-2">✓ Completado</Badge>
-              )}
+              {contratadaLinks.length > 0 && contratadaLinks.every((l: any) => l.status === 'completado') &&
+              <Badge className="bg-green-600 ml-2">✓ Completado</Badge>
+              }
             </CardTitle>
             <CardDescription>
               El representante legal de la empresa firma el contrato en el último paso
-              {contratadaLinks.some((l: any) => (l as any).is_active === false && l.status !== 'completado') && (
-                <span className="text-amber-600 font-medium ml-1">
+              {contratadaLinks.some((l: any) => (l as any).is_active === false && l.status !== 'completado') &&
+              <span className="text-amber-600 font-medium ml-1">
                   ⏳ Se activa cuando titular y todos los adherentes completen su firma.
                 </span>
-              )}
+              }
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {contratadaLinks.length > 0
-              ? renderSignatureLinks(contratadaLinks)
-              : selectedSale?.status === 'completado' ? (
-                <div className="space-y-3">
+            {contratadaLinks.length > 0 ?
+            renderSignatureLinks(contratadaLinks) :
+            selectedSale?.status === 'completado' ?
+            <div className="space-y-3">
                   <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
                     <CheckCircle className="h-4 w-4 text-green-600" />
                     <span className="text-sm text-green-800">
-                      {companySettings?.contratada_signature_mode === 'auto'
-                        ? 'Firma de la contratada aplicada automáticamente.'
-                        : 'Venta completada. Firma de la contratada registrada.'}
+                      {companySettings?.contratada_signature_mode === 'auto' ?
+                  'Firma de la contratada aplicada automáticamente.' :
+                  'Venta completada. Firma de la contratada registrada.'}
                     </span>
                   </div>
-                  {companySettings && (
-                    <div className="border rounded-lg p-4 space-y-2">
+                  {companySettings &&
+              <div className="border rounded-lg p-4 space-y-2">
                       <p className="font-medium text-sm">Datos del firmante (Contratada)</p>
                       <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
-                        {companySettings.contratada_signer_name && (
-                          <div>
+                        {companySettings.contratada_signer_name &&
+                  <div>
                             <span className="font-medium text-foreground">Nombre:</span>{' '}
                             {companySettings.contratada_signer_name}
                           </div>
-                        )}
-                        {companySettings.contratada_signer_email && (
-                          <div>
+                  }
+                        {companySettings.contratada_signer_email &&
+                  <div>
                             <span className="font-medium text-foreground">Email:</span>{' '}
                             {companySettings.contratada_signer_email}
                           </div>
-                        )}
-                        {companySettings.contratada_signer_dni && (
-                          <div>
+                  }
+                        {companySettings.contratada_signer_dni &&
+                  <div>
                             <span className="font-medium text-foreground">C.I.:</span>{' '}
                             {companySettings.contratada_signer_dni}
                           </div>
-                        )}
-                        {companySettings.contratada_signer_phone && (
-                          <div>
+                  }
+                        {companySettings.contratada_signer_phone &&
+                  <div>
                             <span className="font-medium text-foreground">Teléfono:</span>{' '}
                             {companySettings.contratada_signer_phone}
                           </div>
-                        )}
-                        {selectedSale.signature_completed_at && (
-                          <div>
+                  }
+                        {selectedSale.signature_completed_at &&
+                  <div>
                             <span className="font-medium text-foreground">Completado:</span>{' '}
                             {formatDateTimePY(selectedSale.signature_completed_at)}
                           </div>
-                        )}
+                  }
                       </div>
                     </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground italic">
+              }
+                </div> :
+
+            <p className="text-sm text-muted-foreground italic">
                   El link de firma de la contratada se genera automáticamente cuando el titular complete su firma.
                 </p>
-              )
+
             }
           </CardContent>
         </Card>
 
         {/* Documents section */}
-        {signedDocs.length > 0 && (
-          <Card>
+        {signedDocs.length > 0 &&
+        <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Download className="h-5 w-5" />
@@ -804,14 +804,14 @@ const SignatureWorkflow = () => {
             <CardContent>
               <div className="space-y-3">
                 {signedDocs.map((doc: any) => {
-                  const isSigned = doc.status === 'firmado' || doc.signed_at;
-                  const beneficiary = doc.beneficiary_id
-                    ? beneficiaries?.find((b: any) => b.id === doc.beneficiary_id)
-                    : null;
-                  const canDownload = doc.file_url || doc.content;
+                const isSigned = doc.status === 'firmado' || doc.signed_at;
+                const beneficiary = doc.beneficiary_id ?
+                beneficiaries?.find((b: any) => b.id === doc.beneficiary_id) :
+                null;
+                const canDownload = doc.file_url || doc.content;
 
-                  return (
-                    <div key={doc.id} className="border rounded-lg p-3 flex items-center justify-between">
+                return (
+                  <div key={doc.id} className="border rounded-lg p-3 flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <FileText className="h-4 w-4 text-primary flex-shrink-0" />
                         <div>
@@ -826,76 +826,76 @@ const SignatureWorkflow = () => {
                         <Badge variant={isSigned ? 'default' : 'outline'}>
                           {isSigned ? '✓ Firmado' : 'Pendiente'}
                         </Badge>
-                        {canDownload && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              if (doc.file_url) {
-                                window.open(doc.file_url, '_blank');
-                              } else {
-                                handleDownloadContent(doc);
-                              }
-                            }}
-                          >
+                        {canDownload &&
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (doc.file_url) {
+                            window.open(doc.file_url, '_blank');
+                          } else {
+                            handleDownloadContent(doc);
+                          }
+                        }}>
+                        
                             <Download className="h-3 w-3 mr-1" />
                             Descargar
                           </Button>
-                        )}
-                        {doc.signed_pdf_url && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={async () => {
-                              try {
-                                const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-                                const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-                                const session = (await supabase.auth.getSession()).data.session;
-                                const response = await fetch(
-                                  `${SUPABASE_URL}/functions/v1/get-document-download-url`,
-                                  {
-                                    method: 'POST',
-                                    headers: {
-                                      'Content-Type': 'application/json',
-                                      'apikey': SUPABASE_KEY,
-                                      'Authorization': `Bearer ${session?.access_token || SUPABASE_KEY}`,
-                                    },
-                                    body: JSON.stringify({ document_id: doc.id, kind: 'signed' }),
-                                  }
-                                );
-                                const result = await response.json();
-                                if (result.url) {
-                                  window.open(result.url, '_blank');
-                                } else {
-                                  toast.error('PDF firmado no disponible');
-                                }
-                              } catch {
-                                toast.error('Error al descargar PDF firmado');
-                              }
-                            }}
-                          >
-                            <ShieldCheck className="h-3 w-3 mr-1" />
-                            PDF Firmado
-                          </Button>
-                        )}
-                        {doc.evidence_certificate_url && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDownloadEvidence(doc.id)}
-                          >
+                      }
+                        {doc.signed_pdf_url
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                      }
+                        {doc.evidence_certificate_url &&
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDownloadEvidence(doc.id)}>
+                        
                             <ShieldCheck className="h-3 w-3 mr-1" />
                             Evidencia
                           </Button>
-                        )}
+                      }
                       </div>
-                    </div>
-                  );
-                })}
+                    </div>);
+
+              })}
               </div>
             </CardContent>
           </Card>
-        )}
+        }
       </div>
 
       {/* Detail Dialog */}
@@ -910,8 +910,8 @@ const SignatureWorkflow = () => {
               {detailLink && getRecipientLabel(detailLink)}
             </DialogDescription>
           </DialogHeader>
-          {detailLink && (
-            <div className="space-y-4">
+          {detailLink &&
+          <div className="space-y-4">
               {/* General Info */}
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
@@ -932,80 +932,80 @@ const SignatureWorkflow = () => {
                   <p className="text-muted-foreground">Accesos</p>
                   <p className="font-medium">{detailLink.access_count || 0} veces</p>
                 </div>
-                {detailLink.accessed_at && (
-                  <div>
+                {detailLink.accessed_at &&
+              <div>
                     <p className="text-muted-foreground">Último acceso</p>
                     <p className="font-medium">{new Date(detailLink.accessed_at).toLocaleString('es-PY')}</p>
                   </div>
-                )}
-                {detailLink.completed_at && (
-                  <div>
+              }
+                {detailLink.completed_at &&
+              <div>
                     <p className="text-muted-foreground">Firmado el</p>
                     <p className="font-medium">{new Date(detailLink.completed_at).toLocaleString('es-PY')}</p>
                   </div>
-                )}
+              }
               </div>
 
               {/* IP Addresses */}
-              {detailLink.ip_addresses && (
-                <div>
+              {detailLink.ip_addresses &&
+            <div>
                   <p className="text-sm font-medium mb-1 flex items-center gap-1">
                     <Globe className="h-3.5 w-3.5" /> Direcciones IP
                   </p>
                   <div className="bg-muted rounded p-2 text-xs font-mono">
-                    {Array.isArray(detailLink.ip_addresses)
-                      ? detailLink.ip_addresses.join(', ')
-                      : typeof detailLink.ip_addresses === 'string'
-                        ? detailLink.ip_addresses
-                        : JSON.stringify(detailLink.ip_addresses)
-                    }
+                    {Array.isArray(detailLink.ip_addresses) ?
+                detailLink.ip_addresses.join(', ') :
+                typeof detailLink.ip_addresses === 'string' ?
+                detailLink.ip_addresses :
+                JSON.stringify(detailLink.ip_addresses)
+                }
                   </div>
                 </div>
-              )}
+            }
 
               {/* Workflow Steps */}
               {(() => {
-                const steps = getStepsForLink(detailLink.id);
-                if (steps.length === 0) return null;
-                return (
-                  <div>
+              const steps = getStepsForLink(detailLink.id);
+              if (steps.length === 0) return null;
+              return (
+                <div>
                     <p className="text-sm font-medium mb-2">Historial de Actividad</p>
                     <div className="space-y-2">
                       {steps.map((step: any) => {
-                        const stepData = step.data || {};
-                        const device = detectDevice(stepData.user_agent);
-                        const DeviceIcon = device.icon;
-                        return (
-                          <div key={step.id} className="border rounded p-3 text-xs space-y-1">
+                      const stepData = step.data || {};
+                      const device = detectDevice(stepData.user_agent);
+                      const DeviceIcon = device.icon;
+                      return (
+                        <div key={step.id} className="border rounded p-3 text-xs space-y-1">
                             <div className="flex items-center justify-between">
                               <Badge variant="outline" className="text-[10px]">{step.step_type}</Badge>
                               <span className="text-muted-foreground">
                                 {new Date(step.completed_at || step.created_at).toLocaleString('es-PY')}
                               </span>
                             </div>
-                            {stepData.signed_ip && (
-                              <p className="text-muted-foreground">IP: {stepData.signed_ip}</p>
-                            )}
-                            {stepData.user_agent && (
-                              <div className="flex items-center gap-1 text-muted-foreground">
+                            {stepData.signed_ip &&
+                          <p className="text-muted-foreground">IP: {stepData.signed_ip}</p>
+                          }
+                            {stepData.user_agent &&
+                          <div className="flex items-center gap-1 text-muted-foreground">
                                 <DeviceIcon className="h-3 w-3" />
                                 <span>{device.type}</span>
                                 <span className="truncate max-w-[200px]">— {stepData.user_agent.substring(0, 80)}…</span>
                               </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                          }
+                          </div>);
+
+                    })}
                     </div>
-                  </div>
-                );
-              })()}
+                  </div>);
+
+            })()}
             </div>
-          )}
+          }
         </DialogContent>
       </Dialog>
-    </div>
-  );
+    </div>);
+
 };
 
 export default SignatureWorkflow;
