@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 
 interface SignatureBlockStyle {
   version: 'v1' | 'v2';
-  type: 'electronica' | 'pades';
+  type: 'digital' | 'electronic' | 'both';
   alignment: 'left' | 'center' | 'right';
   size: 'small' | 'normal' | 'large';
   showDateTime: boolean;
@@ -21,7 +21,7 @@ interface SignatureBlockStyle {
 
 const DEFAULT_STYLE: SignatureBlockStyle = {
   version: 'v2',
-  type: 'electronica',
+  type: 'electronic',
   alignment: 'left',
   size: 'normal',
   showDateTime: true,
