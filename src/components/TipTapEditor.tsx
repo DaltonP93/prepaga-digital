@@ -410,7 +410,17 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
                     onImageClick={() => setShowImageManager(true)}
                     onSignatureClick={() => insertSignature('normal')}
                     onQuestionClick={() => insertDynamicQuestion('text', 'Nueva pregunta')}
-                    onAttachmentClick={templateId ? () => setShowAnnexesManager(true) : undefined}
+                    onAttachmentClick={() => {
+                      if (templateId) {
+                        setShowAnnexesManager(true);
+                      } else {
+                        toast({
+                          title: "Guarda el template primero",
+                          description: "Debes guardar el template antes de adjuntar documentos.",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
                   />
                   
                   <div className="flex items-center gap-1 p-1.5 border-b bg-muted/30">
