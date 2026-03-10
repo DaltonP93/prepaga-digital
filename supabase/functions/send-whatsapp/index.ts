@@ -214,7 +214,7 @@ serve(async (req) => {
     if (provider === 'waha' || provider === 'qr_session') {
       // WAHA (WhatsApp HTTP API) self-hosted gateway
       const gatewayUrl = companySettings?.whatsapp_gateway_url
-      const apiToken = companySettings?.whatsapp_api_key
+      const apiToken = companySettings?.whatsapp_api_key || Deno.env.get('WAHA_API_KEY') || ''
 
       if (!gatewayUrl) {
         await supabase.from('whatsapp_messages').insert({
