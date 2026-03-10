@@ -27,7 +27,7 @@ import { DraggablePlaceholdersSidebar } from './DraggablePlaceholdersSidebar';
 import { ImageManager } from './ImageManager';
 import { useBranding } from './CompanyBrandingProvider';
 import { useToast } from '@/hooks/use-toast';
-import { SignatureFieldExtension } from './editor/SignatureFieldExtension';
+import { SignatureFieldExtension, SignatureInsertDialog } from './editor/SignatureFieldExtension';
 import { DynamicPlaceholderExtension } from './editor/DynamicPlaceholderExtension';
 import { TemplateAnnexesManager } from './templates/TemplateAnnexesManager';
 
