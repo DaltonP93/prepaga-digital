@@ -145,16 +145,73 @@ const SignatureWorkflow = () => {
     }
   };
 
-  const handleSendWhatsApp = (phone: string | null, linkToken: string, recipientName: string) => {
+  const handleSendWhatsApp = async (phone: string | null, linkToken: string, recipientName: string) => {
     const url = getSignatureUrl(linkToken);
-    const message = encodeURIComponent(
-      `Hola ${recipientName}, le enviamos el enlace para firmar los documentos de su contrato:\n\n${url}\n\nPor favor ingrese al enlace para revisar y firmar los documentos. Gracias.`
-    );
     const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
-    const waUrl = cleanPhone
-      ? `https://wa.me/${cleanPhone}?text=${message}`
-      : `https://wa.me/?text=${message}`;
-    window.open(waUrl, '_blank');
+
+    if (!cleanPhone) {
+      toast.error('No hay número de teléfono disponible');
+      return;
+    }
+
+    if (!selectedSaleCompanyId) {
+      // Fallback wa.me if no company context
+      const message = encodeURIComponent(
+        `Hola ${recipientName}, le enviamos el enlace para firmar los documentos de su contrato:\n\n${url}\n\nPor favor ingrese al enlace para revisar y firmar los documentos. Gracias.`
+      );
+      window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
+      return;
+    }
+
+    try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const session = (await supabase.auth.getSession()).data.session;
+
+      const response = await fetch(
+        `${SUPABASE_URL}/functions/v1/send-whatsapp`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${session?.access_token || SUPABASE_KEY}`,
+          },
+          body: JSON.stringify({
+            to: cleanPhone,
+            templateName: 'signature_link',
+            templateKey: 'signature_link',
+            templateData: {
+              clientName: recipientName,
+              signatureUrl: url,
+              companyName: selectedSale?.companies?.name || '',
+              expirationDate: '',
+            },
+            saleId: saleId,
+            companyId: selectedSaleCompanyId,
+            messageType: 'signature_link',
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.fallback && result.wameUrl) {
+        window.open(result.wameUrl, '_blank');
+        toast.success('WhatsApp Web abierto. Presiona "Enviar" en la pestaña.');
+      } else if (result.success) {
+        toast.success('Mensaje WhatsApp enviado correctamente');
+      } else {
+        toast.error(result.error || 'Error al enviar WhatsApp');
+      }
+    } catch (err: any) {
+      console.error('Error sending WhatsApp:', err);
+      // Fallback to wa.me
+      const message = encodeURIComponent(
+        `Hola ${recipientName}, le enviamos el enlace para firmar los documentos de su contrato:\n\n${url}\n\nPor favor ingrese al enlace para revisar y firmar los documentos. Gracias.`
+      );
+      window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
+    }
   };
 
   const handleResendLink = (link: any) => {
@@ -840,42 +897,6 @@ const SignatureWorkflow = () => {
                           >
                             <Download className="h-3 w-3 mr-1" />
                             Descargar
-                          </Button>
-                        )}
-                        {doc.signed_pdf_url && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={async () => {
-                              try {
-                                const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-                                const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-                                const session = (await supabase.auth.getSession()).data.session;
-                                const response = await fetch(
-                                  `${SUPABASE_URL}/functions/v1/get-document-download-url`,
-                                  {
-                                    method: 'POST',
-                                    headers: {
-                                      'Content-Type': 'application/json',
-                                      'apikey': SUPABASE_KEY,
-                                      'Authorization': `Bearer ${session?.access_token || SUPABASE_KEY}`,
-                                    },
-                                    body: JSON.stringify({ document_id: doc.id, kind: 'signed' }),
-                                  }
-                                );
-                                const result = await response.json();
-                                if (result.url) {
-                                  window.open(result.url, '_blank');
-                                } else {
-                                  toast.error('PDF firmado no disponible');
-                                }
-                              } catch {
-                                toast.error('Error al descargar PDF firmado');
-                              }
-                            }}
-                          >
-                            <ShieldCheck className="h-3 w-3 mr-1" />
-                            PDF Firmado
                           </Button>
                         )}
                         {doc.evidence_certificate_url && (

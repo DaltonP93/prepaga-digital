@@ -71,24 +71,48 @@ serve(async (req) => {
       })
     }
 
-    // Get company WhatsApp settings including provider
+    // Get company WhatsApp settings including provider + WAHA fields
     const { data: companySettings, error: settingsError } = await supabase
       .from('company_settings')
-      .select('whatsapp_api_key, whatsapp_phone_id, whatsapp_provider, twilio_account_sid, twilio_auth_token, twilio_whatsapp_number')
+      .select('whatsapp_api_key, whatsapp_phone_id, whatsapp_provider, whatsapp_gateway_url, whatsapp_linked_phone, twilio_account_sid, twilio_auth_token, twilio_whatsapp_number')
       .eq('company_id', companyId)
       .single()
 
     const provider = companySettings?.whatsapp_provider || 'wame_fallback'
 
-    // Build message: prefer custom DB template (templateKey), fallback to built-in templateName
+    // Build message: prefer whatsapp_templates table, then email_templates with channel=whatsapp, then built-in
     let message: string
-    if (templateKey) {
+    const resolvedKey = templateKey || templateName
+    let templateFound = false
+
+    // 1. Check whatsapp_templates table first
+    if (resolvedKey) {
+      try {
+        const { data: waTpl } = await supabase
+          .from('whatsapp_templates')
+          .select('message_body')
+          .eq('company_id', companyId)
+          .eq('template_key', resolvedKey)
+          .eq('is_active', true)
+          .single()
+        if (waTpl?.message_body) {
+          message = waTpl.message_body
+          Object.entries(templateData).forEach(([key, value]) => {
+            message = message.replace(new RegExp(`{{${key}}}`, 'g'), value)
+          })
+          templateFound = true
+        }
+      } catch { /* not found, continue */ }
+    }
+
+    // 2. Fallback to email_templates with channel=whatsapp
+    if (!templateFound && resolvedKey) {
       try {
         const { data: customTpl } = await supabase
           .from('email_templates')
           .select('body')
           .eq('company_id', companyId)
-          .eq('template_key', templateKey)
+          .eq('template_key', resolvedKey)
           .eq('channel', 'whatsapp')
           .eq('is_active', true)
           .single()
@@ -97,13 +121,13 @@ serve(async (req) => {
           Object.entries(templateData).forEach(([key, value]) => {
             message = message.replace(new RegExp(`{{${key}}}`, 'g'), value)
           })
-        } else {
-          message = buildMessageFromTemplate(templateName, templateData)
+          templateFound = true
         }
-      } catch {
-        message = buildMessageFromTemplate(templateName, templateData)
-      }
-    } else {
+      } catch { /* not found, continue */ }
+    }
+
+    // 3. Fallback to built-in template
+    if (!templateFound) {
       message = buildMessageFromTemplate(templateName, templateData)
     }
 
@@ -184,6 +208,56 @@ serve(async (req) => {
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: twilioResult.success ? 200 : 500,
+      })
+    }
+
+    if (provider === 'waha' || provider === 'qr_session') {
+      // WAHA (WhatsApp HTTP API) self-hosted gateway
+      const gatewayUrl = companySettings?.whatsapp_gateway_url
+      const apiToken = companySettings?.whatsapp_api_key
+
+      if (!gatewayUrl) {
+        await supabase.from('whatsapp_messages').insert({
+          sale_id: saleId,
+          phone_number: to,
+          message_type: messageType,
+          message_body: message,
+          status: 'failed',
+          error_message: 'WAHA gateway URL not configured',
+          company_id: companyId,
+        })
+
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'WAHA gateway not configured for this company'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        })
+      }
+
+      const wahaResult = await sendViaWAHA(gatewayUrl, apiToken || '', to, message)
+
+      await supabase.from('whatsapp_messages').insert({
+        sale_id: saleId,
+        phone_number: to,
+        message_type: messageType,
+        message_body: message,
+        status: wahaResult.success ? 'sent' : 'failed',
+        error_message: wahaResult.error || null,
+        whatsapp_message_id: wahaResult.messageId || null,
+        company_id: companyId,
+        sent_at: wahaResult.success ? new Date().toISOString() : null,
+      })
+
+      return new Response(JSON.stringify({
+        success: wahaResult.success,
+        provider: 'waha',
+        messageId: wahaResult.messageId,
+        error: wahaResult.error,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: wahaResult.success ? 200 : 500,
       })
     }
 
@@ -383,6 +457,62 @@ async function sendViaTwilio(
     return {
       success: false,
       error: error?.message || 'Network error sending via Twilio'
+    }
+  }
+}
+
+// Send message via WAHA (WhatsApp HTTP API) self-hosted gateway
+async function sendViaWAHA(
+  gatewayUrl: string,
+  apiToken: string,
+  to: string,
+  message: string
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  try {
+    const formattedPhone = to.replace(/[\s+\-()]/g, '')
+    const chatId = formattedPhone.includes('@') ? formattedPhone : `${formattedPhone}@c.us`
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+    if (apiToken) {
+      headers['Authorization'] = `Bearer ${apiToken}`
+    }
+
+    const baseUrl = gatewayUrl.replace(/\/+$/, '')
+
+    const response = await fetch(
+      `${baseUrl}/api/sendText`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          chatId,
+          text: message,
+          session: 'default',
+        }),
+      }
+    )
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      console.error('WAHA API error:', result)
+      return {
+        success: false,
+        error: result.message || result.error || 'Failed to send via WAHA'
+      }
+    }
+
+    return {
+      success: true,
+      messageId: result.id || result.key?.id || undefined,
+    }
+  } catch (error: any) {
+    console.error('Error calling WAHA API:', error)
+    return {
+      success: false,
+      error: error?.message || 'Network error sending via WAHA'
     }
   }
 }
