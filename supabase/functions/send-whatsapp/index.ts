@@ -476,8 +476,9 @@ async function sendViaWAHA(
       'Content-Type': 'application/json',
     }
     if (apiToken) {
-      headers['Authorization'] = `Bearer ${apiToken}`
+      headers['X-Api-Key'] = apiToken
     }
+    console.log('WAHA request:', { baseUrl: gatewayUrl, hasToken: !!apiToken, tokenLength: apiToken?.length, chatId })
 
     const baseUrl = gatewayUrl.replace(/\/+$/, '')
 
