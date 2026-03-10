@@ -461,7 +461,7 @@ async function sendViaTwilio(
   }
 }
 
-// Send message via WAHA (WhatsApp HTTP API) self-hosted gateway
+// Send message via WAHA (WhatsApp HTTP API) self-hosted gateway — auth via X-Api-Key
 async function sendViaWAHA(
   gatewayUrl: string,
   apiToken: string,
