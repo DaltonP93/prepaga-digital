@@ -46,7 +46,7 @@ serve(async (req) => {
       case "list":
         return await handleFileList(supabase, req, userData.user.id);
       case "delete":
-        return await handleFileDelete(supabase, req);
+        return await handleFileDelete(supabase, req, userData.user.id);
       case "get-url":
         return await handleGetSignedUrl(supabase, req, userData.user.id);
       default:
@@ -198,18 +198,19 @@ async function handleFileList(supabase: any, req: Request, userId: string) {
   });
 }
 
-async function handleFileDelete(supabase: any, req: Request) {
+async function handleFileDelete(supabase: any, req: Request, userId: string) {
   const { fileId } = await req.json();
   
   if (!fileId) {
     throw new Error("File ID required");
   }
 
-  // Get file info from database
+  // Get file info from database with ownership check
   const { data: fileInfo, error: fetchError } = await supabase
     .from("file_uploads")
     .select("*")
     .eq("id", fileId)
+    .eq("uploaded_by", userId)
     .single();
 
   if (fetchError || !fileInfo) {
