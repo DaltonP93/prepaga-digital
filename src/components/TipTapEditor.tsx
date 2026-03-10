@@ -78,7 +78,8 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
     templateId,
     showToolbar = true,
     showSidebar = true,
-    onReady
+    onReady,
+    onAttachmentClick: externalAttachmentClick,
   } = props;
   
   const [showAnnexesManager, setShowAnnexesManager] = useState(false);
