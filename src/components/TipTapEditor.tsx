@@ -411,7 +411,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
                     onImageClick={() => setShowImageManager(true)}
                     onSignatureClick={() => insertSignature('normal')}
                     onQuestionClick={() => insertDynamicQuestion('text', 'Nueva pregunta')}
-                    onAttachmentClick={() => {
+                    onAttachmentClick={externalAttachmentClick || (() => {
                       if (templateId) {
                         setShowAnnexesManager(true);
                       } else {
@@ -421,7 +421,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
                           variant: "destructive",
                         });
                       }
-                    }}
+                    })}
                   />
                   
                   <div className="flex items-center gap-1 p-1.5 border-b bg-muted/30">
