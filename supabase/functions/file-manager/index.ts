@@ -46,7 +46,7 @@ serve(async (req) => {
       case "list":
         return await handleFileList(supabase, req, userData.user.id);
       case "delete":
-        return await handleFileDelete(supabase, req);
+        return await handleFileDelete(supabase, req, userData.user.id);
       case "get-url":
         return await handleGetSignedUrl(supabase, req, userData.user.id);
       default:
