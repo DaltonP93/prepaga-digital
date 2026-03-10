@@ -27,7 +27,7 @@ import { DraggablePlaceholdersSidebar } from './DraggablePlaceholdersSidebar';
 import { ImageManager } from './ImageManager';
 import { useBranding } from './CompanyBrandingProvider';
 import { useToast } from '@/hooks/use-toast';
-import { SignatureFieldExtension } from './editor/SignatureFieldExtension';
+import { SignatureFieldExtension, SignatureInsertDialog } from './editor/SignatureFieldExtension';
 import { DynamicPlaceholderExtension } from './editor/DynamicPlaceholderExtension';
 import { TemplateAnnexesManager } from './templates/TemplateAnnexesManager';
 
@@ -82,6 +82,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
   } = props;
   
   const [showAnnexesManager, setShowAnnexesManager] = useState(false);
+  const [showSignatureDialog, setShowSignatureDialog] = useState(false);
   
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -169,13 +170,18 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
   }, []);
 
   const insertSignature = useCallback((size: 'normal' | 'small' = 'normal') => {
-    if (!editor) return;
+    setShowSignatureDialog(true);
+  }, []);
 
+  const doInsertSignature = useCallback((label: string, signerRole: string) => {
+    if (!editor) return;
     editor.chain().focus().insertContent({
       type: 'signatureField',
       attrs: {
-        size: size,
-        id: `signature_${Date.now()}`
+        size: 'normal',
+        id: `signature_${Date.now()}`,
+        label,
+        signerRole,
       }
     }).run();
   }, [editor]);
@@ -498,6 +504,12 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
           </div>
         </div>
       )}
+
+      <SignatureInsertDialog
+        open={showSignatureDialog}
+        onOpenChange={setShowSignatureDialog}
+        onInsert={doInsertSignature}
+      />
     </div>
   );
 });

@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 
 interface SignatureBlockStyle {
   version: 'v1' | 'v2';
-  type: 'electronica' | 'pades';
+  type: 'digital' | 'electronic' | 'both';
   alignment: 'left' | 'center' | 'right';
   size: 'small' | 'normal' | 'large';
   showDateTime: boolean;
@@ -21,7 +21,7 @@ interface SignatureBlockStyle {
 
 const DEFAULT_STYLE: SignatureBlockStyle = {
   version: 'v2',
-  type: 'electronica',
+  type: 'electronic',
   alignment: 'left',
   size: 'normal',
   showDateTime: true,
@@ -104,12 +104,18 @@ export const SignatureBlockStyleCard: React.FC = () => {
           <div className="space-y-2">
             <Label>Tipo</Label>
             <Select value={style.type} onValueChange={(v) => setStyle(s => ({ ...s, type: v as any }))}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="electronica">Electrónica</SelectItem>
-                <SelectItem value="pades">Digital PAdES</SelectItem>
+                <SelectItem value="digital">Agregar firma (canvas manuscrita)</SelectItem>
+                <SelectItem value="electronic">Firma electrónica (OTP + consentimiento)</SelectItem>
+                <SelectItem value="both">Ambas (canvas + electrónica)</SelectItem>
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground">
+              {style.type === 'digital' && 'El firmante dibuja su firma sobre el documento (estilo Adobe Sign)'}
+              {style.type === 'electronic' && 'El firmante recibe un link, completa OTP y da consentimiento digital'}
+              {style.type === 'both' && 'Combina la firma manuscrita en canvas con la validación electrónica'}
+            </p>
           </div>
           <div className="space-y-2">
             <Label>Alineación</Label>

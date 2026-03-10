@@ -36,7 +36,7 @@ import { AdminConfigPanel } from '@/components/AdminConfigPanel';
 import { MenuConfigPanel } from '@/components/MenuConfigPanel';
 
 import { useRolePermissions } from '@/hooks/useRolePermissions';
-import { WhatsAppTemplatesPanel } from '@/components/WhatsAppTemplatesPanel';
+
 
 export default function Settings() {
   const { profile } = useSimpleAuthContext();
@@ -204,8 +204,6 @@ export default function Settings() {
           {canManageWorkflow ? (
             <>
               <AdminConfigPanel />
-
-              <WhatsAppTemplatesPanel />
             </>
           ) : (
             <Card>
