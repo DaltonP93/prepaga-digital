@@ -198,18 +198,19 @@ async function handleFileList(supabase: any, req: Request, userId: string) {
   });
 }
 
-async function handleFileDelete(supabase: any, req: Request) {
+async function handleFileDelete(supabase: any, req: Request, userId: string) {
   const { fileId } = await req.json();
   
   if (!fileId) {
     throw new Error("File ID required");
   }
 
-  // Get file info from database
+  // Get file info from database with ownership check
   const { data: fileInfo, error: fetchError } = await supabase
     .from("file_uploads")
     .select("*")
     .eq("id", fileId)
+    .eq("uploaded_by", userId)
     .single();
 
   if (fetchError || !fileInfo) {
