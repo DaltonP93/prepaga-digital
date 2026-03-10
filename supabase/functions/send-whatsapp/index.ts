@@ -484,7 +484,7 @@ async function sendViaWAHA(
     if (apiToken) {
       headers['X-Api-Key'] = apiToken
     }
-    console.log('WAHA request:', { baseUrl: gatewayUrl, hasToken: !!apiToken, tokenLength: apiToken?.length, chatId })
+    console.log('WAHA request:', { baseUrl: gatewayUrl, hasToken: !!apiToken, tokenLength: apiToken?.length, chatId, originalPhone: to })
 
     const baseUrl = gatewayUrl.replace(/\/+$/, '')
 
