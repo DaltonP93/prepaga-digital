@@ -71,24 +71,48 @@ serve(async (req) => {
       })
     }
 
-    // Get company WhatsApp settings including provider
+    // Get company WhatsApp settings including provider + WAHA fields
     const { data: companySettings, error: settingsError } = await supabase
       .from('company_settings')
-      .select('whatsapp_api_key, whatsapp_phone_id, whatsapp_provider, twilio_account_sid, twilio_auth_token, twilio_whatsapp_number')
+      .select('whatsapp_api_key, whatsapp_phone_id, whatsapp_provider, whatsapp_gateway_url, whatsapp_linked_phone, twilio_account_sid, twilio_auth_token, twilio_whatsapp_number')
       .eq('company_id', companyId)
       .single()
 
     const provider = companySettings?.whatsapp_provider || 'wame_fallback'
 
-    // Build message: prefer custom DB template (templateKey), fallback to built-in templateName
+    // Build message: prefer whatsapp_templates table, then email_templates with channel=whatsapp, then built-in
     let message: string
-    if (templateKey) {
+    const resolvedKey = templateKey || templateName
+    let templateFound = false
+
+    // 1. Check whatsapp_templates table first
+    if (resolvedKey) {
+      try {
+        const { data: waTpl } = await supabase
+          .from('whatsapp_templates')
+          .select('message_body')
+          .eq('company_id', companyId)
+          .eq('template_key', resolvedKey)
+          .eq('is_active', true)
+          .single()
+        if (waTpl?.message_body) {
+          message = waTpl.message_body
+          Object.entries(templateData).forEach(([key, value]) => {
+            message = message.replace(new RegExp(`{{${key}}}`, 'g'), value)
+          })
+          templateFound = true
+        }
+      } catch { /* not found, continue */ }
+    }
+
+    // 2. Fallback to email_templates with channel=whatsapp
+    if (!templateFound && resolvedKey) {
       try {
         const { data: customTpl } = await supabase
           .from('email_templates')
           .select('body')
           .eq('company_id', companyId)
-          .eq('template_key', templateKey)
+          .eq('template_key', resolvedKey)
           .eq('channel', 'whatsapp')
           .eq('is_active', true)
           .single()
@@ -97,13 +121,13 @@ serve(async (req) => {
           Object.entries(templateData).forEach(([key, value]) => {
             message = message.replace(new RegExp(`{{${key}}}`, 'g'), value)
           })
-        } else {
-          message = buildMessageFromTemplate(templateName, templateData)
+          templateFound = true
         }
-      } catch {
-        message = buildMessageFromTemplate(templateName, templateData)
-      }
-    } else {
+      } catch { /* not found, continue */ }
+    }
+
+    // 3. Fallback to built-in template
+    if (!templateFound) {
       message = buildMessageFromTemplate(templateName, templateData)
     }
 
