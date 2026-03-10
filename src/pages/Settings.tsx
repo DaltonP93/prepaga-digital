@@ -204,8 +204,6 @@ export default function Settings() {
           {canManageWorkflow ? (
             <>
               <AdminConfigPanel />
-
-              <WhatsAppTemplatesPanel />
             </>
           ) : (
             <Card>

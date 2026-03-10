@@ -5,10 +5,11 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Settings, PenTool, ShieldCheck, RotateCcw, User, Hash, GripVertical, AlignLeft, AlignRight, AlignCenter, Trash2, Pen, Type } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { PenTool, ShieldCheck, RotateCcw, User, Hash, GripVertical, AlignLeft, AlignRight, AlignCenter, Trash2, Pen, Type, Info } from 'lucide-react';
 
 // ── TipTap Node Extension ──────────────────────────────────────────────
 
@@ -264,49 +265,66 @@ const useResizable = (
   return { onMouseDown };
 };
 
-// ── Signature Action Button (Adobe-style) ──────────────────────────────
+// ── Insert Signature Dialog ────────────────────────────────────────────
 
-const SignatureActionButton: React.FC<{
-  icon: React.ReactNode;
-  label: string;
-  description?: string;
-  active?: boolean;
-  onClick: () => void;
-}> = ({ icon, label, description, active, onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={`w-full flex items-center gap-3 rounded-lg border p-3 text-left transition-all hover:shadow-sm ${
-      active
-        ? 'border-primary bg-primary/10 shadow-sm'
-        : 'border-border hover:border-primary/40 hover:bg-muted/50'
-    }`}
-  >
-    <div className={`flex items-center justify-center w-8 h-8 rounded-md ${
-      active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-    }`}>
-      {icon}
-    </div>
-    <div className="flex-1 min-w-0">
-      <p className="text-xs font-semibold truncate">{label}</p>
-      {description && <p className="text-[10px] text-muted-foreground truncate">{description}</p>}
-    </div>
-    {active && <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />}
-  </button>
-);
+export const SignatureInsertDialog: React.FC<{
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onInsert: (label: string, signerRole: string) => void;
+}> = ({ open, onOpenChange, onInsert }) => {
+  const [label, setLabel] = useState('Firma del Cliente');
+  const [signerRole, setSignerRole] = useState('cliente');
+
+  const handleInsert = () => {
+    onInsert(label, signerRole);
+    onOpenChange(false);
+    setLabel('Firma del Cliente');
+    setSignerRole('cliente');
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <PenTool className="h-5 w-5" />
+            Insertar Bloque de Firma
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label>Etiqueta</Label>
+            <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ej: Firma del Cliente" />
+          </div>
+          <div className="space-y-2">
+            <Label>Rol del Firmante</Label>
+            <Select value={signerRole} onValueChange={setSignerRole}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cliente">Cliente / Titular</SelectItem>
+                <SelectItem value="empresa">Representante de Empresa</SelectItem>
+                <SelectItem value="testigo">Testigo</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button onClick={handleInsert}>Insertar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 // ── Main Component ─────────────────────────────────────────────────────
 
 const SignatureFieldComponent = ({ node, updateAttributes, selected, deleteNode }: any) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [label, setLabel] = useState(node.attrs.label);
-  const [signatureType, setSignatureType] = useState(node.attrs.signatureType);
-  const [signerRole, setSignerRole] = useState(node.attrs.signerRole);
-  const [required, setRequired] = useState(node.attrs.required);
-  const [showSignerInfo, setShowSignerInfo] = useState(node.attrs.showSignerInfo);
-  const [showDate, setShowDate] = useState(node.attrs.showDate);
-  const [showToken, setShowToken] = useState(node.attrs.showToken);
-  const [signatureStyle, setSignatureStyle] = useState(node.attrs.signatureStyle || 'v2');
+  const [label] = useState(node.attrs.label);
+  const [signatureType] = useState(node.attrs.signatureType);
+  const [signerRole] = useState(node.attrs.signerRole);
+  const [required] = useState(node.attrs.required);
+  const [signatureStyle] = useState(node.attrs.signatureStyle || 'v2');
   const [width, setWidth] = useState(node.attrs.width || 100);
   const [height, setHeight] = useState(node.attrs.height || 200);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -321,13 +339,6 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected, deleteNode 
   }, [updateAttributes]);
 
   const { onMouseDown } = useResizable(width, height, handleResize, containerRef as React.RefObject<HTMLDivElement>);
-
-  const handleSave = (e?: React.MouseEvent) => {
-    e?.preventDefault();
-    e?.stopPropagation();
-    updateAttributes({ label, signatureType, signerRole, required, showSignerInfo, showDate, showToken, signatureStyle, width, height, float: floatDir });
-    setIsEditing(false);
-  };
 
   const toggleFloat = (dir: 'none' | 'left' | 'right') => {
     const newDir = floatDir === dir ? 'none' : dir;
@@ -353,10 +364,7 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected, deleteNode 
       marginRight: floatDir === 'left' ? '16px' : undefined,
       marginLeft: floatDir === 'right' ? '16px' : undefined,
       width: `${width}%`,
-    }}
-      onMouseDown={(e: React.MouseEvent) => { if (isEditing) e.stopPropagation(); }}
-      onClick={(e: React.MouseEvent) => { if (isEditing) e.stopPropagation(); }}
-    >
+    }}>
       <div
         ref={containerRef}
         style={{ width: '100%', minHeight: `${height}px` }}
@@ -419,192 +427,100 @@ const SignatureFieldComponent = ({ node, updateAttributes, selected, deleteNode 
               <AlignRight className="h-3 w-3" />
             </Button>
             <span className="text-[10px] text-muted-foreground mx-1">{width}%</span>
-            <Button type="button" variant="ghost" size="sm" onClick={() => setIsEditing(!isEditing)} className="h-7 w-7 p-0">
-              <Settings className="h-4 w-4" />
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0">
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p className="text-xs">Configurar en Ajustes → Integraciones → Firma Digital</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <Button type="button" variant="ghost" size="sm" onClick={() => deleteNode()} className="h-7 w-7 p-0 text-destructive hover:text-destructive" title="Eliminar campo de firma">
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
-        {isEditing ? (
-          <div className="space-y-4 bg-background rounded-lg p-3 border"
-            onPointerDown={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => e.stopPropagation()}
-          >
-            {/* Adobe-style action buttons */}
-            <div>
-              <Label className="text-xs font-medium mb-2 block">Tipo de campo</Label>
-              <div className="grid grid-cols-1 gap-2">
-                <SignatureActionButton
-                  icon={<Pen className="h-4 w-4" />}
-                  label="Agregar firma"
-                  description="Firma manuscrita digital en canvas"
-                  active={signatureType === 'digital'}
-                  onClick={() => setSignatureType('digital')}
-                />
-                <SignatureActionButton
-                  icon={<ShieldCheck className="h-4 w-4" />}
-                  label="Firma electrónica"
-                  description="Invitar a firmar electrónicamente"
-                  active={signatureType === 'electronic'}
-                  onClick={() => setSignatureType('electronic')}
-                />
-                <SignatureActionButton
-                  icon={<Type className="h-4 w-4" />}
-                  label="Ambas (Digital + Electrónica)"
-                  description="Combina firma manuscrita y electrónica"
-                  active={signatureType === 'both'}
-                  onClick={() => setSignatureType('both')}
-                />
+        {/* Preview only — no editing form */}
+        <div className="space-y-2 overflow-auto" style={{ maxHeight: `${height - 60}px` }}>
+          <div className="text-sm font-medium text-center">
+            {label} {required && <span className="text-destructive">*</span>}
+          </div>
+          <div className="text-xs text-muted-foreground text-center">
+            Rol: {signerRoleLabels[signerRole] || signerRole}
+          </div>
+
+          {(signatureType === 'digital' || signatureType === 'both') && (
+            <div className="bg-background rounded-lg border p-2">
+              <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                <PenTool className="h-3 w-3" /> Firma Digital (manuscrita)
               </div>
+              <MiniSignatureCanvas
+                onSign={() => setPreviewSigned(true)}
+                onClear={() => setPreviewSigned(false)}
+                signed={previewSigned}
+                canvasHeight={Math.min(height - 120, 160)}
+              />
             </div>
+          )}
 
-            <div>
-              <Label className="text-xs font-medium">Etiqueta</Label>
-              <Input value={label} onChange={(e) => setLabel(e.target.value)} className="text-sm mt-1" placeholder="Ej: Firma del Cliente" />
+          {/* Aclaración y C.I. N.º */}
+          <div className="border-t border-border pt-2 space-y-1">
+            <div className="flex items-center gap-2 text-xs">
+              <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+              <span className="text-muted-foreground whitespace-nowrap">Aclaración:</span>
+              <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px] truncate">{getVarName()}</span>
             </div>
-
-            <div>
-              <Label className="text-xs font-medium">Estilo de Firma Electrónica</Label>
-              <Select value={signatureStyle} onValueChange={(val) => setSignatureStyle(val)}>
-                <SelectTrigger type="button" className="mt-1" onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}><SelectValue /></SelectTrigger>
-                <SelectContent
-                  className="z-[9999]"
-                  onPointerDownOutside={(e) => e.preventDefault()}
-                  onEscapeKeyDown={(e) => e.preventDefault()}
-                  onCloseAutoFocus={(e) => e.preventDefault()}
-                >
-                  <SelectItem value="v2">v2.0 — Compacto profesional</SelectItem>
-                  <SelectItem value="v1">v1.0 — Detallado con metadatos</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex items-center gap-2 text-xs">
+              <Hash className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+              <span className="text-muted-foreground whitespace-nowrap">C.I. N.º:</span>
+              <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px] truncate">{getVarDni()}</span>
             </div>
+          </div>
 
-            <div>
-              <Label className="text-xs font-medium">Rol del Firmante</Label>
-              <Select value={signerRole} onValueChange={(val) => { setSignerRole(val); }}>
-                <SelectTrigger type="button" className="mt-1" onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}><SelectValue /></SelectTrigger>
-                 <SelectContent
-                   className="z-[9999]"
-                   onPointerDownOutside={(e) => e.preventDefault()}
-                   onEscapeKeyDown={(e) => e.preventDefault()}
-                   onCloseAutoFocus={(e) => e.preventDefault()}
-                 >
-                   <SelectItem value="cliente">Cliente / Titular</SelectItem>
-                   <SelectItem value="empresa">Representante de Empresa</SelectItem>
-                   <SelectItem value="testigo">Testigo</SelectItem>
-                 </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-3">
-              <Label className="text-xs font-medium">Opciones adicionales</Label>
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Mostrar datos del firmante</Label>
-                <Switch checked={showSignerInfo} onCheckedChange={setShowSignerInfo} />
+          {(signatureType === 'electronic' || signatureType === 'both') && (
+            <div className="bg-background rounded-lg border p-2 space-y-1">
+              <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                <ShieldCheck className="h-3 w-3" /> Firma Electrónica {signatureStyle === 'v2' ? 'v2.0' : 'v1.0'}
               </div>
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Mostrar fecha/hora de firma</Label>
-                <Switch checked={showDate} onCheckedChange={setShowDate} />
-              </div>
-              {signatureStyle === 'v1' && (
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs">Token digital (UUID RFC 4122)</Label>
-                  <Switch checked={showToken} onCheckedChange={setShowToken} />
+
+              {signatureStyle === 'v2' ? (
+                <div className="text-[10px] space-y-0.5">
+                  <p className="m-0">Firmado electrónicamente por: <strong className="font-mono">{getVarName()}</strong></p>
+                  <p className="m-0">Fecha: DD.MM.YYYY HH:MM:SS</p>
+                  <div className="border-t border-border mt-1 pt-1">
+                    <p className="m-0 text-center font-bold text-[10px]">{getRoleLabel()}</p>
+                    <p className="m-0 text-[10px]">C.I.Nº: {getVarDni()}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-[10px] space-y-1 border rounded p-2 bg-muted/30">
+                  <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
+                    <span className="text-muted-foreground">Firmante:</span>
+                    <span className="font-mono">{getVarName()}</span>
+                    <span className="text-muted-foreground">Fecha:</span>
+                    <span>DD.MM.YYYY HH:MM:SS</span>
+                    <span className="text-muted-foreground">Ref. Doc.:</span>
+                    <span className="font-mono text-[9px]">a1b2c3d4-e5f6-...</span>
+                    <span className="text-muted-foreground">IP:</span>
+                    <span className="font-mono">xxx.xxx.xxx.xxx</span>
+                    <span className="text-muted-foreground">Dispositivo:</span>
+                    <span className="truncate">Mozilla/5.0...</span>
+                    <span className="text-muted-foreground">Hash SHA-256:</span>
+                    <span className="font-mono text-[9px] truncate">0A1B2C3D...</span>
+                  </div>
+                  <p className="m-0 text-[9px] text-muted-foreground italic mt-1">
+                    Firma válida conforme a Ley 4017/2010
+                  </p>
                 </div>
               )}
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Campo obligatorio</Label>
-                <Switch checked={required} onCheckedChange={setRequired} />
-              </div>
             </div>
-
-            <Button type="button" onClick={(e) => handleSave(e)} size="sm" className="w-full">Aplicar Cambios</Button>
-            <p className="text-[10px] text-muted-foreground text-center mt-1">Los cambios se aplican al editor. Recuerda guardar el template con el botón "Guardar" principal.</p>
-          </div>
-        ) : (
-          <div className="space-y-2 overflow-auto" style={{ maxHeight: `${height - 60}px` }}>
-            <div className="text-sm font-medium text-center">
-              {label} {required && <span className="text-destructive">*</span>}
-            </div>
-            <div className="text-xs text-muted-foreground text-center">
-              Rol: {signerRoleLabels[signerRole] || signerRole}
-            </div>
-
-            {(signatureType === 'digital' || signatureType === 'both') && (
-              <div className="bg-background rounded-lg border p-2">
-                <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                  <PenTool className="h-3 w-3" /> Firma Digital (manuscrita)
-                </div>
-                <MiniSignatureCanvas
-                  onSign={() => setPreviewSigned(true)}
-                  onClear={() => setPreviewSigned(false)}
-                  signed={previewSigned}
-                  canvasHeight={Math.min(height - 120, 160)}
-                />
-              </div>
-            )}
-
-            {/* Aclaración y C.I. N.º */}
-            <div className="border-t border-border pt-2 space-y-1">
-              <div className="flex items-center gap-2 text-xs">
-                <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                <span className="text-muted-foreground whitespace-nowrap">Aclaración:</span>
-                <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px] truncate">{getVarName()}</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs">
-                <Hash className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                <span className="text-muted-foreground whitespace-nowrap">C.I. N.º:</span>
-                <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-[10px] truncate">{getVarDni()}</span>
-              </div>
-            </div>
-
-            {(signatureType === 'electronic' || signatureType === 'both') && (
-              <div className="bg-background rounded-lg border p-2 space-y-1">
-                <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                  <ShieldCheck className="h-3 w-3" /> Firma Electrónica {signatureStyle === 'v2' ? 'v2.0' : 'v1.0'}
-                </div>
-
-                {signatureStyle === 'v2' ? (
-                  /* v2 — Compact professional block */
-                  <div className="text-[10px] space-y-0.5">
-                    <p className="m-0">Firmado electrónicamente por: <strong className="font-mono">{getVarName()}</strong></p>
-                    <p className="m-0">Fecha: DD.MM.YYYY HH:MM:SS</p>
-                    <div className="border-t border-border mt-1 pt-1">
-                      <p className="m-0 text-center font-bold text-[10px]">{getRoleLabel()}</p>
-                      <p className="m-0 text-[10px]">C.I.Nº: {getVarDni()}</p>
-                    </div>
-                  </div>
-                ) : (
-                  /* v1 — Detailed block with metadata */
-                  <div className="text-[10px] space-y-1 border rounded p-2 bg-muted/30">
-                    <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
-                      <span className="text-muted-foreground">Firmante:</span>
-                      <span className="font-mono">{getVarName()}</span>
-                      <span className="text-muted-foreground">Fecha:</span>
-                      <span>DD.MM.YYYY HH:MM:SS</span>
-                      <span className="text-muted-foreground">Ref. Doc.:</span>
-                      <span className="font-mono text-[9px]">a1b2c3d4-e5f6-...</span>
-                      <span className="text-muted-foreground">IP:</span>
-                      <span className="font-mono">xxx.xxx.xxx.xxx</span>
-                      <span className="text-muted-foreground">Dispositivo:</span>
-                      <span className="truncate">Mozilla/5.0...</span>
-                      <span className="text-muted-foreground">Hash SHA-256:</span>
-                      <span className="font-mono text-[9px] truncate">0A1B2C3D...</span>
-                    </div>
-                    <p className="m-0 text-[9px] text-muted-foreground italic mt-1">
-                      Firma válida conforme a Ley 4017/2010
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </NodeViewWrapper>
   );
