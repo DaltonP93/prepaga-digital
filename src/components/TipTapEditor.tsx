@@ -170,13 +170,18 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
   }, []);
 
   const insertSignature = useCallback((size: 'normal' | 'small' = 'normal') => {
-    if (!editor) return;
+    setShowSignatureDialog(true);
+  }, []);
 
+  const doInsertSignature = useCallback((label: string, signerRole: string) => {
+    if (!editor) return;
     editor.chain().focus().insertContent({
       type: 'signatureField',
       attrs: {
-        size: size,
-        id: `signature_${Date.now()}`
+        size: 'normal',
+        id: `signature_${Date.now()}`,
+        label,
+        signerRole,
       }
     }).run();
   }, [editor]);
