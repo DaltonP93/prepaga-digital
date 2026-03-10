@@ -82,6 +82,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
   } = props;
   
   const [showAnnexesManager, setShowAnnexesManager] = useState(false);
+  const [showSignatureDialog, setShowSignatureDialog] = useState(false);
   
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
