@@ -246,7 +246,14 @@ const SignatureView = () => {
       const signatureClient = createClient(
         SUPABASE_URL_CONSENT,
         SUPABASE_KEY_CONSENT,
-        { global: { headers: { 'x-signature-token': token } } }
+        {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+          },
+          global: { headers: { 'x-signature-token': token } },
+        }
       );
 
       const { data, error } = await signatureClient.from('signature_consent_records').insert({

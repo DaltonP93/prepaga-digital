@@ -5,8 +5,22 @@ import { useToast } from '@/hooks/use-toast';
 const SUPABASE_URL = "https://ykducvvcjzdpoojxlsig.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrZHVjdnZjanpkcG9vanhsc2lnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwNzgwNzQsImV4cCI6MjA4NTY1NDA3NH0.SpX3e1GgENTB3kpQPPedPds0E13vxDeOmnmFYSJhfPM";
 
+const createPublicClient = () =>
+  createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+
 const createSignatureClient = (token: string) => {
   return createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
     global: {
       headers: {
         'x-signature-token': token,
@@ -903,7 +917,7 @@ export const useSignatureLinkDocuments = (
       // Use token-authenticated client so RLS policies work
       const client = token 
         ? createSignatureClient(token)
-        : createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+        : createPublicClient();
 
       let query = client
         .from('documents')
@@ -997,7 +1011,7 @@ export const useAllSignatureLinksPublic = (saleId: string | undefined, token?: s
       if (!saleId) return [];
       const client = token
         ? createSignatureClient(token)
-        : createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+        : createPublicClient();
       const { data, error } = await client
         .from('signature_links')
         .select('id,sale_id,recipient_type,recipient_id,status,completed_at,created_at')

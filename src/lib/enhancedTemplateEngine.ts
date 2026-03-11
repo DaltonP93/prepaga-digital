@@ -266,7 +266,7 @@ export function createEnhancedTemplateContext(
         gender: '',
         relationship: 'Titular',
         is_primary: true,
-        amount: sale?.total_amount || plan?.price || 0,
+        amount: plan?.price || 0,
         signature_required: true,
       }
     : null;

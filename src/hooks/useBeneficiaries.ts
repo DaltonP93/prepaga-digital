@@ -8,6 +8,24 @@ type Beneficiary = Database['public']['Tables']['beneficiaries']['Row'];
 type BeneficiaryInsert = Database['public']['Tables']['beneficiaries']['Insert'];
 type BeneficiaryUpdate = Database['public']['Tables']['beneficiaries']['Update'];
 
+// Recalculates sales.total_amount = plan.price + sum of adherent amounts
+async function recalculateSaleTotalAmount(saleId: string) {
+  // Fetch all beneficiaries for this sale
+  const { data: beneficiaries } = await supabase
+    .from('beneficiaries')
+    .select('amount, relationship, is_primary')
+    .eq('sale_id', saleId);
+
+  // Sum ALL beneficiaries (titular amount = plan.price, adherents = their own amount)
+  const totalAmount = (beneficiaries || [])
+    .reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
+
+  await supabase
+    .from('sales')
+    .update({ total_amount: totalAmount })
+    .eq('id', saleId);
+}
+
 export const useBeneficiaries = (saleId: string) => {
   return useQuery({
     queryKey: ['beneficiaries', saleId],
@@ -42,6 +60,11 @@ export const useCreateBeneficiary = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['beneficiaries', data.sale_id] });
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      recalculateSaleTotalAmount(data.sale_id).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['sales'] });
+        queryClient.invalidateQueries({ queryKey: ['sale', data.sale_id] });
+      });
       toast({
         title: "Beneficiario creado",
         description: "El beneficiario ha sido agregado exitosamente.",
@@ -75,6 +98,10 @@ export const useUpdateBeneficiary = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['beneficiaries', data.sale_id] });
+      recalculateSaleTotalAmount(data.sale_id).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['sales'] });
+        queryClient.invalidateQueries({ queryKey: ['sale', data.sale_id] });
+      });
       toast({
         title: "Beneficiario actualizado",
         description: "Los cambios han sido guardados exitosamente.",
@@ -113,6 +140,10 @@ export const useDeleteBeneficiary = () => {
     onSuccess: (saleId) => {
       if (saleId) {
         queryClient.invalidateQueries({ queryKey: ['beneficiaries', saleId] });
+        recalculateSaleTotalAmount(saleId).then(() => {
+          queryClient.invalidateQueries({ queryKey: ['sales'] });
+          queryClient.invalidateQueries({ queryKey: ['sale', saleId] });
+        });
       }
       toast({
         title: "Beneficiario eliminado",

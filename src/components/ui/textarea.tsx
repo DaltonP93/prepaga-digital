@@ -7,8 +7,12 @@ export interface TextareaProps
 
 const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ className, ...props }, ref) => {
+    const generatedId = React.useId()
+
     return (
       <textarea
+        id={props.id ?? generatedId}
+        name={props.name ?? props.id ?? generatedId}
         className={cn(
           "flex min-h-[100px] w-full rounded-xl border border-input bg-background/90 px-3.5 py-2.5 text-sm ring-offset-background transition-colors placeholder:text-muted-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
           className

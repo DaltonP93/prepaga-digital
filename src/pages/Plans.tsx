@@ -8,13 +8,11 @@ import { Badge } from '@/components/ui/badge';
 import { PlanForm } from '@/components/PlanForm';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useCurrencySettings } from '@/hooks/useCurrencySettings';
 import { useRolePermissions } from '@/hooks/useRolePermissions';
 
 const Plans = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingPlan, setEditingPlan] = useState(null);
-  const { formatCurrency } = useCurrencySettings();
   const { can } = useRolePermissions();
   const queryClient = useQueryClient();
 
@@ -135,12 +133,6 @@ const Plans = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="text-center">
-                  <div className="text-3xl font-bold">
-                    {formatCurrency(plan.price)}
-                  </div>
-                </div>
-                
                 <div className="flex flex-wrap gap-2">
                   <Badge variant={plan.is_active ? 'default' : 'secondary'}>
                     {plan.is_active ? 'Activo' : 'Inactivo'}

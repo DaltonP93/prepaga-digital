@@ -2,19 +2,17 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useSales } from "@/hooks/useSales";
 import { Layout } from "@/components/Layout";
 import SaleTabbedForm from "@/components/sale-form/SaleTabbedForm";
 import { useStateTransition } from "@/hooks/useStateTransition";
 import type { SaleStatus } from "@/types/workflow";
+import { useSale } from "@/hooks/useSale";
 
 export default function SaleEdit() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: sales, isLoading, error } = useSales();
+  const { data: sale, isLoading, error } = useSale(id || "");
   const { canEditState } = useStateTransition();
-
-  const sale = sales?.find(s => s.id === id);
 
   if (isLoading) {
     return (

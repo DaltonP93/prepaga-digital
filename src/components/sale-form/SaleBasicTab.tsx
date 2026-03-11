@@ -9,8 +9,7 @@ import { Plus } from 'lucide-react';
 import { useClients } from '@/hooks/useClients';
 import { usePlans } from '@/hooks/usePlans';
 import { ClientForm } from '@/components/ClientForm';
-import { formatCurrency } from '@/lib/utils';
-
+import { useCurrencySettings } from '@/hooks/useCurrencySettings';
 interface SaleBasicTabProps {
   formData: {
     client_id: string;
@@ -37,12 +36,15 @@ interface SaleBasicTabProps {
 const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, companyId }) => {
   const { data: clients } = useClients();
   const { data: plans } = usePlans();
+  const { settings } = useCurrencySettings();
   const [searchClient, setSearchClient] = useState('');
   const [searchPlan, setSearchPlan] = useState('');
   const [showClientModal, setShowClientModal] = useState(false);
   const [prevClientCount, setPrevClientCount] = useState<number | null>(null);
 
-  const selectedPlan = plans?.find(p => p.id === formData.plan_id);
+  const thousandSeparator = settings?.thousand_separator || '.';
+  const decimalSeparator = settings?.decimal_separator || ',';
+  const decimalPlaces = settings?.decimal_places ?? 0;
 
   // Auto-set company from logged-in user (always)
   useEffect(() => {
@@ -50,13 +52,6 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
       onChange('company_id', companyId);
     }
   }, [companyId]);
-
-  // Auto-calculate total from plan price (readonly)
-  useEffect(() => {
-    if (selectedPlan) {
-      onChange('total_amount', Number(selectedPlan.price) || 0);
-    }
-  }, [selectedPlan]);
 
   // Auto-select newly created client when modal closes
   useEffect(() => {
@@ -77,6 +72,32 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
   const filteredPlans = plans?.filter(plan =>
     plan.name.toLowerCase().includes(searchPlan.toLowerCase())
   ) || [];
+
+  const formatAmountInput = (value: number) => {
+    if (!Number.isFinite(value) || value === 0) return '';
+
+    const fixed = value.toFixed(decimalPlaces);
+    const [integerPart, decimalPart] = fixed.split('.');
+    const integerWithSeparators = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, thousandSeparator);
+
+    if (decimalPlaces > 0 && decimalPart) {
+      return `${integerWithSeparators}${decimalSeparator}${decimalPart}`;
+    }
+
+    return integerWithSeparators;
+  };
+
+  const parseAmountInput = (rawValue: string) => {
+    if (!rawValue.trim()) return 0;
+
+    const normalized = rawValue
+      .split(thousandSeparator).join('')
+      .replace(decimalSeparator, '.')
+      .replace(/[^\d.-]/g, '');
+
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
 
   return (
     <div className="space-y-6">
@@ -137,7 +158,7 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
             </div>
             {filteredPlans.map((plan) => (
               <SelectItem key={plan.id} value={plan.id}>
-                {plan.name} - {formatCurrency(Number(plan.price) || 0)}
+                {plan.name}
               </SelectItem>
             ))}
           </SelectContent>
@@ -184,23 +205,15 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
         </div>
       </div>
 
-      {/* Total Amount - READONLY, auto-calculated */}
+      {/* Total Amount */}
       <div className="space-y-2">
         <Label>Monto Total (Gs.) *</Label>
         <Input
-          type="number"
-          step="1"
-          value={formData.total_amount}
-          readOnly
-          disabled
-          className="bg-muted cursor-not-allowed"
+          inputMode="decimal"
+          value={formatAmountInput(Number(formData.total_amount) || 0)}
+          onChange={(e) => onChange('total_amount', parseAmountInput(e.target.value))}
           placeholder="0"
         />
-        {selectedPlan && (
-          <p className="text-xs text-muted-foreground">
-            Calculado automáticamente del plan: {formatCurrency(Number(selectedPlan.price) || 0)}
-          </p>
-        )}
       </div>
 
       {/* Signer Selection */}

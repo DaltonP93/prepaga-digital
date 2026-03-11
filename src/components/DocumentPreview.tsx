@@ -103,7 +103,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
           <div className="bg-white border rounded-lg p-6 min-h-[400px] max-h-[600px] overflow-y-auto">
             {/* SECURITY: Content is sanitized with DOMPurify to prevent XSS attacks */}
             <div 
-              className="prose prose-sm max-w-none"
+              className="prose prose-sm max-w-none text-slate-900 prose-headings:text-slate-900 prose-p:text-slate-800 prose-strong:text-slate-900 prose-li:text-slate-800 prose-table:text-slate-900 prose-th:text-slate-900 prose-td:text-slate-800 [&_*]:border-slate-300"
               dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewContent) }}
             />
           </div>

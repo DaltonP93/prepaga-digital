@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -138,11 +139,14 @@ export const DocumentPreviewDialog: React.FC<DocumentPreviewDialogProps> = ({
               </Badge>
             )}
           </DialogTitle>
+          <DialogDescription>
+            Vista previa del documento {document.name}. Puede revisar su contenido o descargar el archivo asociado.
+          </DialogDescription>
         </DialogHeader>
         <ScrollArea className="flex-1 max-h-[70vh]">
           {hasContent ? (
             <div
-              className="prose prose-sm max-w-none p-4 bg-white rounded border"
+              className="prose prose-sm max-w-none p-4 bg-white rounded border text-slate-900 prose-headings:text-slate-900 prose-p:text-slate-800 prose-strong:text-slate-900 prose-li:text-slate-800 prose-table:text-slate-900 prose-th:text-slate-900 prose-td:text-slate-800 [&_*]:border-slate-300"
               dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(document.content || '') }}
             />
           ) : hasFileUrl ? (
