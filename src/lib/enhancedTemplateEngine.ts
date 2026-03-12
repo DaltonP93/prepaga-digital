@@ -275,7 +275,13 @@ export function createEnhancedTemplateContext(
     ? [titularFallback, ...normalizedBeneficiaries]
     : normalizedBeneficiaries;
 
-  const beneficiaryContexts = mergedBeneficiaries.map((b) => createBeneficiaryContext(b));
+  const beneficiaryContexts = mergedBeneficiaries.map((b) => {
+    // Titular with amount=0: use plan price as fallback
+    if ((b.is_primary || b.relationship?.toLowerCase() === 'titular') && !b.amount) {
+      return createBeneficiaryContext({ ...b, amount: plan?.price || 0 });
+    }
+    return createBeneficiaryContext(b);
+  });
   const sortedBeneficiaryContexts = [...beneficiaryContexts].sort((a, b) => {
     const aIsPrimary = (a.parentesco || '').toLowerCase() === 'titular';
     const bIsPrimary = (b.parentesco || '').toLowerCase() === 'titular';
