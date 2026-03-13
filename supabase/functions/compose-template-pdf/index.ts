@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
 
           const { data: fileData } = await supabase.storage
             .from("documents")
-            .download(pdfAsset.storage_path);
+            .download(pdfAsset.file_url);
 
           if (!fileData) break;
 
