@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
           }
 
           // Download the original PDF from storage
-          const storagePath = asset.storage_path;
+          const storagePath = asset.file_url;
           const { data: fileData, error: dlErr } = await supabase.storage
             .from("documents")
             .download(storagePath);
@@ -137,11 +137,11 @@ Deno.serve(async (req) => {
             .eq("id", pdfAssetId)
             .single();
 
-          if (!pdfAsset || !pdfAsset.storage_path) break;
+          if (!pdfAsset || !pdfAsset.file_url) break;
 
           const { data: fileData } = await supabase.storage
             .from("documents")
-            .download(pdfAsset.storage_path);
+            .download(pdfAsset.file_url);
 
           if (!fileData) break;
 

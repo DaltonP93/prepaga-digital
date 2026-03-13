@@ -1,0 +1,1 @@
+COMMENT ON TABLE public.templates IS 'Company document templates - cache refresh';
