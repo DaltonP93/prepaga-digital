@@ -1,104 +1,89 @@
 
 
-## Plan: Fase 5 — PAdES con document_type exactos y doble safeguard
+# Phase 3 -- Template Designer 2.0 Premium: Build Fix + Foundation
 
-### Archivo único
-`src/hooks/useSignatureLinkPublic.ts` — líneas 598-682
+## Priority 1: Fix Build Errors (blocking everything)
 
-### Cambio
-Reemplazar el bloque PAdES actual por la versión con valores exactos de `document_type` (`contrato`, `ddjj_salud`, `anexo`) en lugar de comparaciones genéricas con `.toLowerCase()`. Agrega doble safeguard para contratada pendiente.
+### 1A. `send-whatsapp/index.ts` -- uninitialized variable
+Line 84: `let message: string` must become `let message: string = ""`. This is unrelated to Designer 2.0 but blocks the build.
 
-### Diferencias clave vs. código actual (Fase 4)
+### 1B. Supabase types mismatch
+The new tables (`template_assets`, `template_blocks`, `template_fields`, `template_asset_pages`, `incidents`, `incident_comments`, `incident_attachments`) exist in the database but are NOT in `src/integrations/supabase/types.ts`. This auto-generated file doesn't include them, causing TS errors when hooks try `.from('template_blocks')`.
 
-1. **document_type exacto**: usa `dt === 'contrato'` directo (sin `.toLowerCase()` ni check de `'contract'`)
-2. **ddjj_salud explícito**: filtra por `dt === 'ddjj_salud'` en vez de "todo lo que no sea contrato"
-3. **Anexos excluidos**: `dt === 'anexo'` retorna `false` explícitamente
-4. **Doble safeguard**: `safeDocsToSign` filtra contrato si `hasPendingContratada` como segunda capa
-5. **Error handling mejorado**: `pendingErr` se maneja separadamente del catch
+**Fix**: All hooks already cast results with `as unknown as ...` and inserts with `as any`. The remaining issue is that the **table name string** isn't in the `Tables` union. Solution: add a type augmentation file `src/integrations/supabase/types-extension.d.ts` that extends the `Database` interface with the missing tables. This avoids editing the auto-generated file.
 
-### Código resultante (reemplaza líneas 598-682)
+---
 
-```typescript
-// Post-signature: generate base PDF + PAdES only when it corresponds to this signer + step
-try {
-  const supabaseUrl = SUPABASE_URL;
-  const anonKey = SUPABASE_PUBLISHABLE_KEY;
+## Priority 2: Database Migration -- Extend `template_assets`
 
-  const { data: docs, error: docsErr } = await signatureClient
-    .from('documents')
-    .select('id, document_type, beneficiary_id, is_final, signed_pdf_url')
-    .eq('sale_id', data.sale_id)
-    .eq('is_final', true)
-    .neq('document_type', 'firma');
-
-  if (docsErr) {
-    console.warn('Could not fetch final documents:', docsErr);
-  } else if (docs && docs.length > 0) {
-    const recipientType = data.recipient_type;
-
-    let hasPendingContratada = false;
-    try {
-      const { data: pendingCL, error: pendingErr } = await signatureClient
-        .from('signature_links').select('id')
-        .eq('sale_id', data.sale_id)
-        .eq('recipient_type', 'contratada')
-        .eq('status', 'pendiente');
-      if (pendingErr) {
-        console.warn('Could not check pending contratada links:', pendingErr);
-        hasPendingContratada = true;
-      } else {
-        hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
-      }
-    } catch (e) {
-      console.warn('Could not check pending contratada links (exception):', e);
-      hasPendingContratada = true;
-    }
-
-    const docsToSign = docs.filter((d: any) => {
-      if (d.signed_pdf_url) return false;
-      const dt = d.document_type;
-
-      if (dt === 'contrato') {
-        return recipientType === 'contratada';
-      }
-      if (dt === 'ddjj_salud') {
-        if (recipientType === 'titular') return d.beneficiary_id == null;
-        if (recipientType === 'adherente') return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
-        return false;
-      }
-      if (dt === 'anexo') return false;
-      return false;
-    });
-
-    const safeDocsToSign = docsToSign.filter((d: any) => {
-      if (d.document_type === 'contrato' && hasPendingContratada) return false;
-      return true;
-    });
-
-    for (const doc of safeDocsToSign) {
-      try {
-        await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-        await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-      } catch (pdfErr) {
-        console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
-      }
-    }
-  }
-} catch (pdfGenErr) {
-  console.warn('Post-signature PDF generation error:', pdfGenErr);
-}
+```sql
+ALTER TABLE public.template_assets
+  ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'uploaded',
+  ADD COLUMN IF NOT EXISTS converted_asset_id uuid REFERENCES public.template_assets(id),
+  ADD COLUMN IF NOT EXISTS processing_error text;
 ```
 
-### Impacto
-- 1 archivo, 1 bloque (~85 líneas reemplaza ~85 líneas)
-- No afecta bloque de activación contratada (Fase 3)
-- No requiere migraciones
+---
+
+## Priority 3: Edge Function -- `compose-template-pdf`
+
+This is the core backend piece. A single Edge Function that:
+1. Loads `template_blocks` for a given template, ordered by page + sort_order
+2. For HTML blocks (text, heading, signature_block, table): renders to HTML string
+3. For `pdf_embed` blocks: fetches the original PDF from storage, extracts selected pages using `pdf-lib`
+4. Merges everything in order into a single PDF
+5. Loads `template_fields` and stamps them as annotations/form fields
+6. Returns the final PDF
+
+Uses `npm:pdf-lib` (works in Deno). Called by the existing `finalize-signature-link` when `template_designer_version === '2.0'`.
+
+---
+
+## Priority 4: Edge Function -- `publish-template-version`
+
+Simple function:
+- Unpublish all versions for template
+- Set `is_published = true` on target version
+- Update `templates.published_version_id`
+
+---
+
+## Priority 5: Frontend Polish (in same session)
+
+### 5A. Disable `docx_embed` in BlockPalette
+Add `disabled` flag + "Próximamente" badge. No fake feature.
+
+### 5B. Fix PageFieldOverlay container sizing
+Currently `containerWidth`/`containerHeight` are passed as 0 from CanvasBlock. Use `useRef` + `ResizeObserver` to get actual dimensions.
+
+### 5C. BlockPalette DOCX disabled state
+Gray out + tooltip "Requiere pipeline backend".
+
+---
+
+## What is deferred (future sessions)
+
+- `upload-template-asset` and `process-template-asset` Edge Functions (current client-side pdf.js flow works for PDFs; backend needed only for DOCX conversion)
+- DOCX-to-PDF conversion backend
+- `render-template-preview` function
+- Preview by role UI
+- Placeholder integration with `template_placeholders`/`template_questions`
+- Canvas resize handles, snap guides, multi-select
+- Full version comparison/diff
+
+---
+
+## Files to create
+- `src/integrations/supabase/types-extension.d.ts` -- type augmentation for missing tables
+- `supabase/functions/compose-template-pdf/index.ts` -- PDF composition engine
+- `supabase/functions/publish-template-version/index.ts` -- version publishing
+
+## Files to modify
+- `supabase/functions/send-whatsapp/index.ts` -- line 84: initialize `message`
+- `src/components/designer2/BlockPalette.tsx` -- disable docx_embed
+- `src/components/designer2/CanvasBlock.tsx` -- fix PageFieldOverlay container sizing
+- `supabase/config.toml` -- register new edge functions
+
+## Database migration
+- Add `status`, `converted_asset_id`, `processing_error` to `template_assets`
 
