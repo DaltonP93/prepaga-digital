@@ -44,7 +44,7 @@ const BLOCK_GROUPS = [
     label: "Documentos",
     items: [
       { type: "pdf_embed" as BlockType, label: "PDF Embed", icon: FileText, desc: "Páginas reales de PDF" },
-      { type: "docx_embed" as BlockType, label: "DOCX Embed", icon: FileCode, desc: "Documento Word" },
+      { type: "docx_embed" as BlockType, label: "DOCX Embed", icon: FileCode, desc: "Próximamente", disabled: true },
     ],
   },
   {
