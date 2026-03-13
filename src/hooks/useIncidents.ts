@@ -452,8 +452,7 @@ export const useUpdateIncident = () => {
         throw new Error('No hay cambios válidos para actualizar.');
       }
 
-      const { data, error } = await supabase
-        .from('incidents')
+      const { data, error } = await fromAnyTable('incidents')
         .update(updates)
         .eq('id', id)
         .select()
