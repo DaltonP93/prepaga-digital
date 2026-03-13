@@ -534,8 +534,7 @@ export const useUploadAttachment = () => {
         data: { publicUrl },
       } = supabase.storage.from('incidents').getPublicUrl(path);
 
-      const { data, error } = await supabase
-        .from('incident_attachments')
+      const { data, error } = await fromAnyTable('incident_attachments')
         .insert({
           incident_id: incidentId,
           file_name: file.name,
