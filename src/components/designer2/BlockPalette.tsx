@@ -56,7 +56,7 @@ const BLOCK_GROUPS = [
   {
     label: "Diseño",
     items: [
-      { type: "page_break" as BlockType, label: "Salto de Página", icon: Minus, desc: "Nueva página" },
+      { type: "page_break" as BlockType, label: "Salto de Página", icon: Minus, desc: "Nueva página", disabled: false },
     ],
   },
 ];
