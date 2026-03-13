@@ -491,8 +491,7 @@ export const useAddComment = () => {
         throw new Error('El comentario no puede estar vacío.');
       }
 
-      const { data, error } = await supabase
-        .from('incident_comments')
+      const { data, error } = await fromAnyTable('incident_comments')
         .insert({
           incident_id: incidentId,
           content: trimmedContent,
