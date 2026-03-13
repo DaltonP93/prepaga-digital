@@ -167,20 +167,21 @@ export const useAdvancedAnalytics = (dateRange: DateRange, filters: AnalyticsFil
       ];
 
       // Performance by user with real names
-      const userPerformance = salesData?.reduce((acc, sale) => {
-        const userId = sale.salesperson_id;
-        if (userId) {
-          if (!acc[userId]) {
-            acc[userId] = { totalSales: 0, completedSales: 0, revenue: 0 };
+      const userPerformance: Record<string, { totalSales: number; completedSales: number; revenue: number }> =
+        salesData?.reduce((acc, sale) => {
+          const userId = sale.salesperson_id;
+          if (userId) {
+            if (!acc[userId]) {
+              acc[userId] = { totalSales: 0, completedSales: 0, revenue: 0 };
+            }
+            acc[userId].totalSales++;
+            if (sale.status === 'completado') {
+              acc[userId].completedSales++;
+              acc[userId].revenue += sale.total_amount || 0;
+            }
           }
-          acc[userId].totalSales++;
-          if (sale.status === 'completado') {
-            acc[userId].completedSales++;
-            acc[userId].revenue += sale.total_amount || 0;
-          }
-        }
-        return acc;
-      }, {} as Record<string, { totalSales: number; completedSales: number; revenue: number }>) || {};
+          return acc;
+        }, {} as Record<string, { totalSales: number; completedSales: number; revenue: number }>) ?? {};
 
       const performanceByUser = Object.entries(userPerformance)
         .map(([userId, data]) => ({
