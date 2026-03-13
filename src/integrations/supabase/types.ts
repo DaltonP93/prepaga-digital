@@ -2896,6 +2896,7 @@ export type Database = {
       template_assets: {
         Row: {
           asset_type: string
+          converted_asset_id: string | null
           created_at: string
           file_name: string
           file_size: number | null
@@ -2904,10 +2905,13 @@ export type Database = {
           metadata: Json
           mime_type: string | null
           page_count: number | null
+          processing_error: string | null
+          status: string
           template_id: string
         }
         Insert: {
           asset_type: string
+          converted_asset_id?: string | null
           created_at?: string
           file_name: string
           file_size?: number | null
@@ -2916,10 +2920,13 @@ export type Database = {
           metadata?: Json
           mime_type?: string | null
           page_count?: number | null
+          processing_error?: string | null
+          status?: string
           template_id: string
         }
         Update: {
           asset_type?: string
+          converted_asset_id?: string | null
           created_at?: string
           file_name?: string
           file_size?: number | null
@@ -2928,9 +2935,18 @@ export type Database = {
           metadata?: Json
           mime_type?: string | null
           page_count?: number | null
+          processing_error?: string | null
+          status?: string
           template_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "template_assets_converted_asset_id_fkey"
+            columns: ["converted_asset_id"]
+            isOneToOne: false
+            referencedRelation: "template_assets"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "template_assets_template_id_fkey"
             columns: ["template_id"]
