@@ -50,7 +50,7 @@ const BLOCK_GROUPS = [
   {
     label: "Firma",
     items: [
-      { type: "signature_block" as BlockType, label: "Firma", icon: PenTool, desc: "Bloque de firma legal" },
+      { type: "signature_block" as BlockType, label: "Firma", icon: PenTool, desc: "Bloque de firma legal", disabled: false },
     ],
   },
   {
