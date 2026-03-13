@@ -137,7 +137,7 @@ Deno.serve(async (req) => {
             .eq("id", pdfAssetId)
             .single();
 
-          if (!pdfAsset || !pdfAsset.storage_path) break;
+          if (!pdfAsset || !pdfAsset.file_url) break;
 
           const { data: fileData } = await supabase.storage
             .from("documents")
