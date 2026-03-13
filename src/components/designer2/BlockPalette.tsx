@@ -36,8 +36,8 @@ const BLOCK_GROUPS = [
   {
     label: "Media",
     items: [
-      { type: "image" as BlockType, label: "Imagen", icon: Image, desc: "Logo, sello, imagen" },
-      { type: "attachment_card" as BlockType, label: "Adjunto", icon: Paperclip, desc: "Tarjeta de documento" },
+      { type: "image" as BlockType, label: "Imagen", icon: Image, desc: "Logo, sello, imagen", disabled: false },
+      { type: "attachment_card" as BlockType, label: "Adjunto", icon: Paperclip, desc: "Tarjeta de documento", disabled: false },
     ],
   },
   {
