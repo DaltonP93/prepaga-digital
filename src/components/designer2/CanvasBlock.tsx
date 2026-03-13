@@ -113,7 +113,7 @@ export const CanvasBlock: React.FC<CanvasBlockProps> = ({
             {content.page_previews?.length > 0 ? (
               <div className="grid grid-cols-3 gap-2">
                 {content.page_previews.slice(0, 9).map((p: any, i: number) => (
-                  <div key={i} className="relative">
+                  <div key={i} className="relative" ref={i === 0 ? pageContainerRef : undefined}>
                     {p.preview_image_url ? (
                       <div className="relative">
                         <img
@@ -129,8 +129,8 @@ export const CanvasBlock: React.FC<CanvasBlockProps> = ({
                             pageNumber={p.page_number}
                             signerRole={fieldPlacementRole}
                             fieldType={fieldPlacementType}
-                            containerWidth={0}
-                            containerHeight={0}
+                            containerWidth={containerDims.w}
+                            containerHeight={containerDims.h}
                           />
                         )}
                         <span className="absolute bottom-1 right-1 text-[8px] font-medium bg-background/80 rounded px-1">
