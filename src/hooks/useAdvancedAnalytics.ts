@@ -215,17 +215,18 @@ export const useAdvancedAnalytics = (dateRange: DateRange, filters: AnalyticsFil
         .slice(0, 8);
 
       // Company comparison
-      const companyPerformance = salesData?.reduce((acc, sale) => {
-        if (sale.companies) {
-          const companyName = (sale.companies as any).name;
-          if (!acc[companyName]) {
-            acc[companyName] = { ventas: 0, ingresos: 0 };
+      const companyPerformance: Record<string, { ventas: number; ingresos: number }> =
+        salesData?.reduce((acc, sale) => {
+          if (sale.companies) {
+            const companyName = (sale.companies as any).name;
+            if (!acc[companyName]) {
+              acc[companyName] = { ventas: 0, ingresos: 0 };
+            }
+            acc[companyName].ventas++;
+            acc[companyName].ingresos += sale.total_amount || 0;
           }
-          acc[companyName].ventas++;
-          acc[companyName].ingresos += sale.total_amount || 0;
-        }
-        return acc;
-      }, {} as Record<string, { ventas: number; ingresos: number }>) || {};
+          return acc;
+        }, {} as Record<string, { ventas: number; ingresos: number }>) ?? {};
 
       const companyComparison = Object.entries(companyPerformance)
         .map(([name, data]) => ({ name, ventas: data.ventas, ingresos: data.ingresos }))
