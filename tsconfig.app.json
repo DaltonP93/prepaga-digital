@@ -1,7 +1,5 @@
 {
   "compilerOptions": {
-    "composite": false,
-    "incremental": false,
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
