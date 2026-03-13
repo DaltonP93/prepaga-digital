@@ -167,20 +167,21 @@ export const useAdvancedAnalytics = (dateRange: DateRange, filters: AnalyticsFil
       ];
 
       // Performance by user with real names
-      const userPerformance = salesData?.reduce((acc, sale) => {
-        const userId = sale.salesperson_id;
-        if (userId) {
-          if (!acc[userId]) {
-            acc[userId] = { totalSales: 0, completedSales: 0, revenue: 0 };
+      const userPerformance: Record<string, { totalSales: number; completedSales: number; revenue: number }> =
+        salesData?.reduce((acc, sale) => {
+          const userId = sale.salesperson_id;
+          if (userId) {
+            if (!acc[userId]) {
+              acc[userId] = { totalSales: 0, completedSales: 0, revenue: 0 };
+            }
+            acc[userId].totalSales++;
+            if (sale.status === 'completado') {
+              acc[userId].completedSales++;
+              acc[userId].revenue += sale.total_amount || 0;
+            }
           }
-          acc[userId].totalSales++;
-          if (sale.status === 'completado') {
-            acc[userId].completedSales++;
-            acc[userId].revenue += sale.total_amount || 0;
-          }
-        }
-        return acc;
-      }, {} as Record<string, { totalSales: number; completedSales: number; revenue: number }>) || {};
+          return acc;
+        }, {} as Record<string, { totalSales: number; completedSales: number; revenue: number }>) ?? {};
 
       const performanceByUser = Object.entries(userPerformance)
         .map(([userId, data]) => ({
@@ -195,17 +196,18 @@ export const useAdvancedAnalytics = (dateRange: DateRange, filters: AnalyticsFil
         .slice(0, 10);
 
       // Top plans
-      const planPerformance = salesData?.reduce((acc, sale) => {
-        if (sale.plans) {
-          const planName = (sale.plans as any).name;
-          if (!acc[planName]) {
-            acc[planName] = { count: 0, revenue: 0 };
+      const planPerformance: Record<string, { count: number; revenue: number }> =
+        salesData?.reduce((acc, sale) => {
+          if (sale.plans) {
+            const planName = (sale.plans as any).name;
+            if (!acc[planName]) {
+              acc[planName] = { count: 0, revenue: 0 };
+            }
+            acc[planName].count++;
+            acc[planName].revenue += sale.total_amount || 0;
           }
-          acc[planName].count++;
-          acc[planName].revenue += sale.total_amount || 0;
-        }
-        return acc;
-      }, {} as Record<string, { count: number; revenue: number }>) || {};
+          return acc;
+        }, {} as Record<string, { count: number; revenue: number }>) ?? {};
 
       const topPlans = Object.entries(planPerformance)
         .map(([name, data]) => ({ name, count: data.count, revenue: data.revenue }))
@@ -213,17 +215,18 @@ export const useAdvancedAnalytics = (dateRange: DateRange, filters: AnalyticsFil
         .slice(0, 8);
 
       // Company comparison
-      const companyPerformance = salesData?.reduce((acc, sale) => {
-        if (sale.companies) {
-          const companyName = (sale.companies as any).name;
-          if (!acc[companyName]) {
-            acc[companyName] = { ventas: 0, ingresos: 0 };
+      const companyPerformance: Record<string, { ventas: number; ingresos: number }> =
+        salesData?.reduce((acc, sale) => {
+          if (sale.companies) {
+            const companyName = (sale.companies as any).name;
+            if (!acc[companyName]) {
+              acc[companyName] = { ventas: 0, ingresos: 0 };
+            }
+            acc[companyName].ventas++;
+            acc[companyName].ingresos += sale.total_amount || 0;
           }
-          acc[companyName].ventas++;
-          acc[companyName].ingresos += sale.total_amount || 0;
-        }
-        return acc;
-      }, {} as Record<string, { ventas: number; ingresos: number }>) || {};
+          return acc;
+        }, {} as Record<string, { ventas: number; ingresos: number }>) ?? {};
 
       const companyComparison = Object.entries(companyPerformance)
         .map(([name, data]) => ({ name, ventas: data.ventas, ingresos: data.ingresos }))

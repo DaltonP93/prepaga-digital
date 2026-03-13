@@ -17,6 +17,9 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "paths": {
+      "@/integrations/supabase/types": [
+        "./src/integrations/supabase/types-shim.ts"
+      ],
       "@/*": [
         "./src/*"
       ]
@@ -28,5 +31,8 @@
   },
   "include": [
     "src"
+  ],
+  "exclude": [
+    "src/integrations/supabase/types.ts"
   ]
 }
