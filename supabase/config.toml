@@ -60,3 +60,9 @@ verify_jwt = false
 
 [functions.generate-evidence-certificate]
 verify_jwt = false
+
+[functions.compose-template-pdf]
+verify_jwt = false
+
+[functions.publish-template-version]
+verify_jwt = false
