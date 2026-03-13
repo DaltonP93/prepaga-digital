@@ -93,10 +93,19 @@ export const BlockPalette: React.FC<BlockPaletteProps> = ({ onAddBlock, onInsert
                   <button
                     key={item.type}
                     type="button"
-                    onClick={() => onAddBlock(item.type)}
-                    className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-accent transition-colors group"
+                    onClick={() => !item.disabled && onAddBlock(item.type)}
+                    disabled={item.disabled}
+                    className={`w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors group ${
+                      item.disabled
+                        ? "opacity-50 cursor-not-allowed"
+                        : "hover:bg-accent"
+                    }`}
                   >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors ${
+                      item.disabled
+                        ? "bg-muted text-muted-foreground"
+                        : "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground"
+                    }`}>
                       <item.icon className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
