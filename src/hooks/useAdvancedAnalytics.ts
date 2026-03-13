@@ -196,17 +196,18 @@ export const useAdvancedAnalytics = (dateRange: DateRange, filters: AnalyticsFil
         .slice(0, 10);
 
       // Top plans
-      const planPerformance = salesData?.reduce((acc, sale) => {
-        if (sale.plans) {
-          const planName = (sale.plans as any).name;
-          if (!acc[planName]) {
-            acc[planName] = { count: 0, revenue: 0 };
+      const planPerformance: Record<string, { count: number; revenue: number }> =
+        salesData?.reduce((acc, sale) => {
+          if (sale.plans) {
+            const planName = (sale.plans as any).name;
+            if (!acc[planName]) {
+              acc[planName] = { count: 0, revenue: 0 };
+            }
+            acc[planName].count++;
+            acc[planName].revenue += sale.total_amount || 0;
           }
-          acc[planName].count++;
-          acc[planName].revenue += sale.total_amount || 0;
-        }
-        return acc;
-      }, {} as Record<string, { count: number; revenue: number }>) || {};
+          return acc;
+        }, {} as Record<string, { count: number; revenue: number }>) ?? {};
 
       const topPlans = Object.entries(planPerformance)
         .map(([name, data]) => ({ name, count: data.count, revenue: data.revenue }))
