@@ -50,6 +50,22 @@ export const CanvasBlock: React.FC<CanvasBlockProps> = ({
   const [resolvedImageUrl, setResolvedImageUrl] = useState("");
   const content = block.content as any;
 
+  // Track real container dimensions for PageFieldOverlay
+  const pageContainerRef = useRef<HTMLDivElement>(null);
+  const [containerDims, setContainerDims] = useState({ w: 0, h: 0 });
+
+  useEffect(() => {
+    const el = pageContainerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerDims({ w: entry.contentRect.width, h: entry.contentRect.height });
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     if (block.block_type === "image" && content.asset_id && !content.src?.startsWith("http")) {
       // Content src might be a storage path, resolve it
