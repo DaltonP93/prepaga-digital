@@ -1205,6 +1205,8 @@ export type Database = {
           signed_pdf_hash: string | null
           signed_pdf_url: string | null
           status: Database["public"]["Enums"]["document_status"] | null
+          template_designer_version: string | null
+          template_version_id: string | null
           updated_at: string | null
           version: number | null
         }
@@ -1231,6 +1233,8 @@ export type Database = {
           signed_pdf_hash?: string | null
           signed_pdf_url?: string | null
           status?: Database["public"]["Enums"]["document_status"] | null
+          template_designer_version?: string | null
+          template_version_id?: string | null
           updated_at?: string | null
           version?: number | null
         }
@@ -1257,6 +1261,8 @@ export type Database = {
           signed_pdf_hash?: string | null
           signed_pdf_url?: string | null
           status?: Database["public"]["Enums"]["document_status"] | null
+          template_designer_version?: string | null
+          template_version_id?: string | null
           updated_at?: string | null
           version?: number | null
         }
@@ -1469,6 +1475,150 @@ export type Database = {
             columns: ["evidence_bundle_id"]
             isOneToOne: false
             referencedRelation: "signature_evidence_bundles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      incident_attachments: {
+        Row: {
+          created_at: string | null
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          incident_id: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          incident_id: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          incident_id?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incident_attachments_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      incident_comments: {
+        Row: {
+          author_id: string | null
+          content: string
+          created_at: string | null
+          id: string
+          incident_id: string
+          is_internal: boolean | null
+        }
+        Insert: {
+          author_id?: string | null
+          content: string
+          created_at?: string | null
+          id?: string
+          incident_id: string
+          is_internal?: boolean | null
+        }
+        Update: {
+          author_id?: string | null
+          content?: string
+          created_at?: string | null
+          id?: string
+          incident_id?: string
+          is_internal?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incident_comments_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      incidents: {
+        Row: {
+          analysis_notes: string | null
+          assigned_to: string | null
+          company_id: string | null
+          created_at: string | null
+          description: string
+          development_ended_at: string | null
+          development_started_at: string | null
+          estimated_hours: number | null
+          id: string
+          module: string
+          priority: string
+          reported_by: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          status: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          analysis_notes?: string | null
+          assigned_to?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          description: string
+          development_ended_at?: string | null
+          development_started_at?: string | null
+          estimated_hours?: number | null
+          id?: string
+          module: string
+          priority?: string
+          reported_by?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          status?: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          analysis_notes?: string | null
+          assigned_to?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          description?: string
+          development_ended_at?: string | null
+          development_started_at?: string | null
+          estimated_hours?: number | null
+          id?: string
+          module?: string
+          priority?: string
+          reported_by?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          status?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incidents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -2705,6 +2855,107 @@ export type Database = {
           },
         ]
       }
+      template_asset_pages: {
+        Row: {
+          asset_id: string
+          created_at: string
+          height: number | null
+          id: string
+          page_number: number
+          preview_image_url: string | null
+          width: number | null
+        }
+        Insert: {
+          asset_id: string
+          created_at?: string
+          height?: number | null
+          id?: string
+          page_number: number
+          preview_image_url?: string | null
+          width?: number | null
+        }
+        Update: {
+          asset_id?: string
+          created_at?: string
+          height?: number | null
+          id?: string
+          page_number?: number
+          preview_image_url?: string | null
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_asset_pages_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "template_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      template_assets: {
+        Row: {
+          asset_type: string
+          converted_asset_id: string | null
+          created_at: string
+          file_name: string
+          file_size: number | null
+          file_url: string
+          id: string
+          metadata: Json
+          mime_type: string | null
+          page_count: number | null
+          processing_error: string | null
+          status: string
+          template_id: string
+        }
+        Insert: {
+          asset_type: string
+          converted_asset_id?: string | null
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          file_url: string
+          id?: string
+          metadata?: Json
+          mime_type?: string | null
+          page_count?: number | null
+          processing_error?: string | null
+          status?: string
+          template_id: string
+        }
+        Update: {
+          asset_type?: string
+          converted_asset_id?: string | null
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          metadata?: Json
+          mime_type?: string | null
+          page_count?: number | null
+          processing_error?: string | null
+          status?: string
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_assets_converted_asset_id_fkey"
+            columns: ["converted_asset_id"]
+            isOneToOne: false
+            referencedRelation: "template_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_assets_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       template_attachments: {
         Row: {
           created_at: string
@@ -2746,6 +2997,77 @@ export type Database = {
           },
         ]
       }
+      template_blocks: {
+        Row: {
+          block_type: string
+          content: Json
+          created_at: string
+          h: number
+          id: string
+          is_locked: boolean
+          is_visible: boolean
+          page: number
+          rotation: number
+          sort_order: number
+          style: Json
+          template_id: string
+          updated_at: string
+          visibility_rules: Json
+          w: number
+          x: number
+          y: number
+          z_index: number
+        }
+        Insert: {
+          block_type: string
+          content?: Json
+          created_at?: string
+          h?: number
+          id?: string
+          is_locked?: boolean
+          is_visible?: boolean
+          page?: number
+          rotation?: number
+          sort_order?: number
+          style?: Json
+          template_id: string
+          updated_at?: string
+          visibility_rules?: Json
+          w?: number
+          x?: number
+          y?: number
+          z_index?: number
+        }
+        Update: {
+          block_type?: string
+          content?: Json
+          created_at?: string
+          h?: number
+          id?: string
+          is_locked?: boolean
+          is_visible?: boolean
+          page?: number
+          rotation?: number
+          sort_order?: number
+          style?: Json
+          template_id?: string
+          updated_at?: string
+          visibility_rules?: Json
+          w?: number
+          x?: number
+          y?: number
+          z_index?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_blocks_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       template_comments: {
         Row: {
           comment_text: string
@@ -2771,6 +3093,72 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "template_comments_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      template_fields: {
+        Row: {
+          block_id: string | null
+          created_at: string
+          field_type: string
+          h: number
+          id: string
+          label: string | null
+          meta: Json
+          page: number
+          required: boolean
+          signer_role: string
+          template_id: string
+          w: number
+          x: number
+          y: number
+        }
+        Insert: {
+          block_id?: string | null
+          created_at?: string
+          field_type: string
+          h?: number
+          id?: string
+          label?: string | null
+          meta?: Json
+          page?: number
+          required?: boolean
+          signer_role: string
+          template_id: string
+          w?: number
+          x?: number
+          y?: number
+        }
+        Update: {
+          block_id?: string | null
+          created_at?: string
+          field_type?: string
+          h?: number
+          id?: string
+          label?: string | null
+          meta?: Json
+          page?: number
+          required?: boolean
+          signer_role?: string
+          template_id?: string
+          w?: number
+          x?: number
+          y?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_fields_block_id_fkey"
+            columns: ["block_id"]
+            isOneToOne: false
+            referencedRelation: "template_blocks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_fields_template_id_fkey"
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "templates"
@@ -2947,24 +3335,36 @@ export type Database = {
           content: string | null
           created_at: string | null
           created_by: string | null
+          designer_version: string
           id: string
+          is_published: boolean
+          layout_snapshot: Json
           template_id: string
+          version_label: string | null
           version_number: number
         }
         Insert: {
           content?: string | null
           created_at?: string | null
           created_by?: string | null
+          designer_version?: string
           id?: string
+          is_published?: boolean
+          layout_snapshot?: Json
           template_id: string
+          version_label?: string | null
           version_number: number
         }
         Update: {
           content?: string | null
           created_at?: string | null
           created_by?: string | null
+          designer_version?: string
           id?: string
+          is_published?: boolean
+          layout_snapshot?: Json
           template_id?: string
+          version_label?: string | null
           version_number?: number
         }
         Relationships: [
@@ -3019,10 +3419,13 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           description: string | null
+          designer_version: string
           id: string
           is_active: boolean | null
           name: string
           pdf_layout: Json | null
+          published_version_id: string | null
+          render_engine: string
           requires_signature: boolean | null
           template_type: string | null
           updated_at: string | null
@@ -3035,10 +3438,13 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          designer_version?: string
           id?: string
           is_active?: boolean | null
           name: string
           pdf_layout?: Json | null
+          published_version_id?: string | null
+          render_engine?: string
           requires_signature?: boolean | null
           template_type?: string | null
           updated_at?: string | null
@@ -3051,10 +3457,13 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          designer_version?: string
           id?: string
           is_active?: boolean | null
           name?: string
           pdf_layout?: Json | null
+          published_version_id?: string | null
+          render_engine?: string
           requires_signature?: boolean | null
           template_type?: string | null
           updated_at?: string | null

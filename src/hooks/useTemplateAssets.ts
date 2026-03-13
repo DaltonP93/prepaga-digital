@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { fromAnyTable } from '@/integrations/supabase/untyped-client';
 import { useToast } from '@/hooks/use-toast';
 import type { TemplateAsset, TemplateAssetInsert, TemplateAssetPage } from '@/types/templateDesigner';
 
@@ -8,8 +8,7 @@ export const useTemplateAssets = (templateId?: string) => {
     queryKey: ['template-assets', templateId],
     queryFn: async () => {
       if (!templateId) return [];
-      const { data, error } = await supabase
-        .from('template_assets')
+      const { data, error } = await fromAnyTable('template_assets')
         .select('*')
         .eq('template_id', templateId)
         .order('created_at', { ascending: false });
@@ -25,8 +24,7 @@ export const useTemplateAssetPages = (assetId?: string) => {
     queryKey: ['template-asset-pages', assetId],
     queryFn: async () => {
       if (!assetId) return [];
-      const { data, error } = await supabase
-        .from('template_asset_pages')
+      const { data, error } = await fromAnyTable('template_asset_pages')
         .select('*')
         .eq('asset_id', assetId)
         .order('page_number', { ascending: true });
@@ -43,8 +41,7 @@ export const useCreateTemplateAsset = () => {
 
   return useMutation({
     mutationFn: async (asset: TemplateAssetInsert) => {
-      const { data, error } = await supabase
-        .from('template_assets')
+      const { data, error } = await fromAnyTable('template_assets')
         .insert(asset as any)
         .select()
         .single();
@@ -66,8 +63,7 @@ export const useCreateTemplateAssetPage = () => {
 
   return useMutation({
     mutationFn: async (page: Omit<TemplateAssetPage, 'id' | 'created_at'>) => {
-      const { data, error } = await supabase
-        .from('template_asset_pages')
+      const { data, error } = await fromAnyTable('template_asset_pages')
         .insert(page as any)
         .select()
         .single();
@@ -86,8 +82,7 @@ export const useBulkCreateAssetPages = () => {
   return useMutation({
     mutationFn: async (pages: Omit<TemplateAssetPage, 'id' | 'created_at'>[]) => {
       if (pages.length === 0) return [];
-      const { data, error } = await supabase
-        .from('template_asset_pages')
+      const { data, error } = await fromAnyTable('template_asset_pages')
         .insert(pages as any)
         .select();
       if (error) throw error;
@@ -107,7 +102,7 @@ export const useDeleteTemplateAsset = () => {
 
   return useMutation({
     mutationFn: async ({ id, templateId }: { id: string; templateId: string }) => {
-      const { error } = await supabase.from('template_assets').delete().eq('id', id);
+      const { error } = await fromAnyTable('template_assets').delete().eq('id', id);
       if (error) throw error;
       return templateId;
     },

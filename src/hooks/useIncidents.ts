@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { supabase } from '@/integrations/supabase/client';
+import { fromAnyTable } from '@/integrations/supabase/untyped-client';
 import { generateUUID } from '@/lib/utils';
 
 export type IncidentStatus =
@@ -361,8 +362,7 @@ export const useIncidents = (filters?: IncidentFilters) => {
   return useQuery({
     queryKey: ['incidents', filters, user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('incidents')
+      const { data, error } = await fromAnyTable('incidents')
         .select(`
           *,
           incident_attachments(id, file_name, file_url, file_type, file_size, created_at),
@@ -385,8 +385,7 @@ export const useIncident = (id: string) => {
   return useQuery({
     queryKey: ['incident', id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('incidents')
+      const { data, error } = await fromAnyTable('incidents')
         .select(`
           *,
           incident_attachments(id, file_name, file_url, file_type, file_size, created_at),
@@ -424,8 +423,7 @@ export const useCreateIncident = () => {
         status: 'nuevo' as IncidentStatus,
       };
 
-      const { data: incident, error } = await supabase
-        .from('incidents')
+      const { data: incident, error } = await fromAnyTable('incidents')
         .insert(payload)
         .select()
         .single();
@@ -454,8 +452,7 @@ export const useUpdateIncident = () => {
         throw new Error('No hay cambios válidos para actualizar.');
       }
 
-      const { data, error } = await supabase
-        .from('incidents')
+      const { data, error } = await fromAnyTable('incidents')
         .update(updates)
         .eq('id', id)
         .select()
@@ -494,8 +491,7 @@ export const useAddComment = () => {
         throw new Error('El comentario no puede estar vacío.');
       }
 
-      const { data, error } = await supabase
-        .from('incident_comments')
+      const { data, error } = await fromAnyTable('incident_comments')
         .insert({
           incident_id: incidentId,
           content: trimmedContent,
@@ -538,8 +534,7 @@ export const useUploadAttachment = () => {
         data: { publicUrl },
       } = supabase.storage.from('incidents').getPublicUrl(path);
 
-      const { data, error } = await supabase
-        .from('incident_attachments')
+      const { data, error } = await fromAnyTable('incident_attachments')
         .insert({
           incident_id: incidentId,
           file_name: file.name,

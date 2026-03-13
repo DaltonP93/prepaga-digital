@@ -81,7 +81,7 @@ serve(async (req) => {
     const provider = companySettings?.whatsapp_provider || 'wame_fallback'
 
     // Build message: prefer whatsapp_templates table, then email_templates with channel=whatsapp, then built-in
-    let message: string
+    let message: string = ""
     const resolvedKey = templateKey || templateName
     let templateFound = false
 

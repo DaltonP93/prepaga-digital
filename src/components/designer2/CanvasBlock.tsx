@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,22 @@ export const CanvasBlock: React.FC<CanvasBlockProps> = ({
   const [resolvedImageUrl, setResolvedImageUrl] = useState("");
   const content = block.content as any;
 
+  // Track real container dimensions for PageFieldOverlay
+  const pageContainerRef = useRef<HTMLDivElement>(null);
+  const [containerDims, setContainerDims] = useState({ w: 0, h: 0 });
+
+  useEffect(() => {
+    const el = pageContainerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerDims({ w: entry.contentRect.width, h: entry.contentRect.height });
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     if (block.block_type === "image" && content.asset_id && !content.src?.startsWith("http")) {
       // Content src might be a storage path, resolve it
@@ -97,7 +113,7 @@ export const CanvasBlock: React.FC<CanvasBlockProps> = ({
             {content.page_previews?.length > 0 ? (
               <div className="grid grid-cols-3 gap-2">
                 {content.page_previews.slice(0, 9).map((p: any, i: number) => (
-                  <div key={i} className="relative">
+                  <div key={i} className="relative" ref={i === 0 ? pageContainerRef : undefined}>
                     {p.preview_image_url ? (
                       <div className="relative">
                         <img
@@ -113,8 +129,8 @@ export const CanvasBlock: React.FC<CanvasBlockProps> = ({
                             pageNumber={p.page_number}
                             signerRole={fieldPlacementRole}
                             fieldType={fieldPlacementType}
-                            containerWidth={0}
-                            containerHeight={0}
+                            containerWidth={containerDims.w}
+                            containerHeight={containerDims.h}
                           />
                         )}
                         <span className="absolute bottom-1 right-1 text-[8px] font-medium bg-background/80 rounded px-1">
