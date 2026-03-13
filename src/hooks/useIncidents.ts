@@ -423,8 +423,7 @@ export const useCreateIncident = () => {
         status: 'nuevo' as IncidentStatus,
       };
 
-      const { data: incident, error } = await supabase
-        .from('incidents')
+      const { data: incident, error } = await fromAnyTable('incidents')
         .insert(payload)
         .select()
         .single();
