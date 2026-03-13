@@ -27,10 +27,10 @@ const BLOCK_GROUPS = [
   {
     label: "Contenido",
     items: [
-      { type: "text" as BlockType, label: "Texto", icon: Type, desc: "Párrafo o cláusula" },
-      { type: "heading" as BlockType, label: "Título", icon: Heading, desc: "Encabezado H1-H3" },
-      { type: "table" as BlockType, label: "Tabla", icon: Table, desc: "Tabla dinámica" },
-      { type: "placeholder_chip" as BlockType, label: "Variable", icon: Tag, desc: "Placeholder visual" },
+      { type: "text" as BlockType, label: "Texto", icon: Type, desc: "Párrafo o cláusula", disabled: false },
+      { type: "heading" as BlockType, label: "Título", icon: Heading, desc: "Encabezado H1-H3", disabled: false },
+      { type: "table" as BlockType, label: "Tabla", icon: Table, desc: "Tabla dinámica", disabled: false },
+      { type: "placeholder_chip" as BlockType, label: "Variable", icon: Tag, desc: "Placeholder visual", disabled: false },
     ],
   },
   {
