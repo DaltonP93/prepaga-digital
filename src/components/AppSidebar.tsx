@@ -14,6 +14,7 @@ import {
   Workflow,
   BarChart3,
   Settings,
+  AlertCircle,
 } from "lucide-react";
 
 import {
@@ -117,6 +118,13 @@ export function AppSidebar() {
       icon: BarChart3,
       visible: permissions.canViewAnalytics,
       routeKey: 'analytics',
+    },
+    {
+      title: "Incidencias",
+      url: "/incidents",
+      icon: AlertCircle,
+      visible: true,
+      routeKey: 'incidents',
     },
     {
       title: "Mi Perfil",

@@ -44,6 +44,8 @@ const TemplateDetail = lazyRetry(() => import("@/pages/TemplateDetail"));
 const TemplateEdit = lazyRetry(() => import("@/pages/TemplateEdit"));
 const SignatureWorkflow = lazyRetry(() => import("@/pages/SignatureWorkflow"));
 const Analytics = lazyRetry(() => import("@/pages/Analytics"));
+const Incidents = lazyRetry(() => import("@/pages/Incidents"));
+const IncidentDetail = lazyRetry(() => import("@/pages/IncidentDetail"));
 const Profile = lazyRetry(() => import("@/pages/Profile"));
 const Users = lazyRetry(() => import("@/pages/Users"));
 const Companies = lazyRetry(() => import("@/pages/Companies"));
@@ -109,6 +111,8 @@ const App = () => {
                   <Route path="signature-workflow" element={<SignatureWorkflow />} />
                   <Route path="signature-workflow/:saleId" element={<SignatureWorkflow />} />
                   <Route path="analytics" element={<Analytics />} />
+                  <Route path="incidents" element={<Incidents />} />
+                  <Route path="incidents/:id" element={<IncidentDetail />} />
                   <Route path="profile" element={<Profile />} />
                   <Route
                     path="users"
