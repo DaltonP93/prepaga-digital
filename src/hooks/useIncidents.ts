@@ -385,8 +385,7 @@ export const useIncident = (id: string) => {
   return useQuery({
     queryKey: ['incident', id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('incidents')
+      const { data, error } = await fromAnyTable('incidents')
         .select(`
           *,
           incident_attachments(id, file_name, file_url, file_type, file_size, created_at),
