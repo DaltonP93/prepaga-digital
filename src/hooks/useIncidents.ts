@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { supabase } from '@/integrations/supabase/client';
-import { fromAnyTable } from '@/integrations/supabase/untyped-client';
 import { generateUUID } from '@/lib/utils';
 
 export type IncidentStatus =
@@ -362,7 +361,8 @@ export const useIncidents = (filters?: IncidentFilters) => {
   return useQuery({
     queryKey: ['incidents', filters, user?.id],
     queryFn: async () => {
-      const { data, error } = await fromAnyTable('incidents')
+      const { data, error } = await supabase
+        .from('incidents')
         .select(`
           *,
           incident_attachments(id, file_name, file_url, file_type, file_size, created_at),
@@ -372,7 +372,7 @@ export const useIncidents = (filters?: IncidentFilters) => {
 
       if (error) throw error;
 
-      const enriched = await enrichIncidents((data as IncidentRecord[] | null) || []);
+      const enriched = await enrichIncidents((data as unknown as IncidentRecord[]) || []);
       return sortIncidents(applyIncidentFilters(enriched, filters, user?.id));
     },
     enabled: !!user,
@@ -385,7 +385,8 @@ export const useIncident = (id: string) => {
   return useQuery({
     queryKey: ['incident', id],
     queryFn: async () => {
-      const { data, error } = await fromAnyTable('incidents')
+      const { data, error } = await supabase
+        .from('incidents')
         .select(`
           *,
           incident_attachments(id, file_name, file_url, file_type, file_size, created_at),
@@ -396,7 +397,7 @@ export const useIncident = (id: string) => {
 
       if (error) throw error;
 
-      const [enriched] = await enrichIncidents([(data as IncidentRecord)]);
+      const [enriched] = await enrichIncidents([(data as unknown as IncidentRecord)]);
       return enriched;
     },
     enabled: !!id,
@@ -423,13 +424,14 @@ export const useCreateIncident = () => {
         status: 'nuevo' as IncidentStatus,
       };
 
-      const { data: incident, error } = await fromAnyTable('incidents')
-        .insert(payload)
+      const { data: incident, error } = await supabase
+        .from('incidents')
+        .insert(payload as any)
         .select()
         .single();
 
       if (error) throw error;
-      return incident as IncidentRecord;
+      return incident as unknown as IncidentRecord;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['incidents'] });
@@ -452,14 +454,15 @@ export const useUpdateIncident = () => {
         throw new Error('No hay cambios válidos para actualizar.');
       }
 
-      const { data, error } = await fromAnyTable('incidents')
-        .update(updates)
+      const { data, error } = await supabase
+        .from('incidents')
+        .update(updates as any)
         .eq('id', id)
         .select()
         .single();
 
       if (error) throw error;
-      return data as IncidentRecord;
+      return data as unknown as IncidentRecord;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['incidents'] });
@@ -491,7 +494,8 @@ export const useAddComment = () => {
         throw new Error('El comentario no puede estar vacío.');
       }
 
-      const { data, error } = await fromAnyTable('incident_comments')
+      const { data, error } = await supabase
+        .from('incident_comments')
         .insert({
           incident_id: incidentId,
           content: trimmedContent,
@@ -534,7 +538,8 @@ export const useUploadAttachment = () => {
         data: { publicUrl },
       } = supabase.storage.from('incidents').getPublicUrl(path);
 
-      const { data, error } = await fromAnyTable('incident_attachments')
+      const { data, error } = await supabase
+        .from('incident_attachments')
         .insert({
           incident_id: incidentId,
           file_name: file.name,
@@ -547,7 +552,7 @@ export const useUploadAttachment = () => {
         .single();
 
       if (error) throw error;
-      return data as IncidentAttachment;
+      return data as unknown as IncidentAttachment;
     },
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['incident', vars.incidentId] });

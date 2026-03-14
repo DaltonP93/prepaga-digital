@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fromAnyTable } from '@/integrations/supabase/untyped-client';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import type { Json } from '@/integrations/supabase/types';
 import type { TemplateField, TemplateFieldInsert, TemplateFieldUpdate } from '@/types/templateDesigner';
 
 export const useTemplateFields = (templateId?: string) => {
@@ -8,7 +9,8 @@ export const useTemplateFields = (templateId?: string) => {
     queryKey: ['template-fields', templateId],
     queryFn: async () => {
       if (!templateId) return [];
-      const { data, error } = await fromAnyTable('template_fields')
+      const { data, error } = await supabase
+        .from('template_fields')
         .select('*')
         .eq('template_id', templateId)
         .order('page', { ascending: true });
@@ -25,8 +27,12 @@ export const useCreateTemplateField = () => {
 
   return useMutation({
     mutationFn: async (field: TemplateFieldInsert) => {
-      const { data, error } = await fromAnyTable('template_fields')
-        .insert(field as any)
+      const { data, error } = await supabase
+        .from('template_fields')
+        .insert({
+          ...field,
+          meta: field.meta as unknown as Json,
+        })
         .select()
         .single();
       if (error) throw error;
@@ -47,8 +53,12 @@ export const useUpdateTemplateField = () => {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: TemplateFieldUpdate) => {
-      const { data, error } = await fromAnyTable('template_fields')
-        .update(updates as any)
+      const payload: Record<string, unknown> = { ...updates };
+      if ('meta' in payload) payload.meta = payload.meta as unknown as Json;
+
+      const { data, error } = await supabase
+        .from('template_fields')
+        .update(payload as any)
         .eq('id', id)
         .select()
         .single();
@@ -67,7 +77,7 @@ export const useDeleteTemplateField = () => {
 
   return useMutation({
     mutationFn: async ({ id, templateId }: { id: string; templateId: string }) => {
-      const { error } = await fromAnyTable('template_fields').delete().eq('id', id);
+      const { error } = await supabase.from('template_fields').delete().eq('id', id);
       if (error) throw error;
       return templateId;
     },
