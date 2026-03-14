@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fromAnyTable } from '@/integrations/supabase/untyped-client';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import type { Json } from '@/integrations/supabase/types';
 import type { TemplateBlock, TemplateBlockInsert, TemplateBlockUpdate } from '@/types/templateDesigner';
 
 export const useTemplateBlocks = (templateId?: string) => {
@@ -8,7 +9,8 @@ export const useTemplateBlocks = (templateId?: string) => {
     queryKey: ['template-blocks', templateId],
     queryFn: async () => {
       if (!templateId) return [];
-      const { data, error } = await fromAnyTable('template_blocks')
+      const { data, error } = await supabase
+        .from('template_blocks')
         .select('*')
         .eq('template_id', templateId)
         .order('page', { ascending: true })
@@ -26,8 +28,14 @@ export const useCreateTemplateBlock = () => {
 
   return useMutation({
     mutationFn: async (block: TemplateBlockInsert) => {
-      const { data, error } = await fromAnyTable('template_blocks')
-        .insert(block as any)
+      const { data, error } = await supabase
+        .from('template_blocks')
+        .insert({
+          ...block,
+          content: block.content as unknown as Json,
+          style: block.style as unknown as Json,
+          visibility_rules: block.visibility_rules as unknown as Json,
+        })
         .select()
         .single();
       if (error) throw error;
@@ -47,8 +55,14 @@ export const useUpdateTemplateBlock = () => {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: TemplateBlockUpdate) => {
-      const { data, error } = await fromAnyTable('template_blocks')
-        .update(updates as any)
+      const payload: Record<string, unknown> = { ...updates };
+      if ('content' in payload) payload.content = payload.content as unknown as Json;
+      if ('style' in payload) payload.style = payload.style as unknown as Json;
+      if ('visibility_rules' in payload) payload.visibility_rules = payload.visibility_rules as unknown as Json;
+
+      const { data, error } = await supabase
+        .from('template_blocks')
+        .update(payload as any)
         .eq('id', id)
         .select()
         .single();
@@ -67,7 +81,7 @@ export const useDeleteTemplateBlock = () => {
 
   return useMutation({
     mutationFn: async ({ id, templateId }: { id: string; templateId: string }) => {
-      const { error } = await fromAnyTable('template_blocks').delete().eq('id', id);
+      const { error } = await supabase.from('template_blocks').delete().eq('id', id);
       if (error) throw error;
       return templateId;
     },
@@ -87,10 +101,10 @@ export const useReorderTemplateBlocks = () => {
   return useMutation({
     mutationFn: async ({ blocks, templateId }: { blocks: { id: string; sort_order: number }[]; templateId: string }) => {
       const promises = blocks.map(({ id, sort_order }) =>
-        fromAnyTable('template_blocks').update({ sort_order } as any).eq('id', id)
+        supabase.from('template_blocks').update({ sort_order }).eq('id', id)
       );
       const results = await Promise.all(promises);
-      const error = results.find((r: any) => r.error)?.error;
+      const error = results.find((r) => r.error)?.error;
       if (error) throw error;
       return templateId;
     },

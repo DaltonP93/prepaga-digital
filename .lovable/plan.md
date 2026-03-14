@@ -1,46 +1,104 @@
 
 
-# Migrate from `fromAnyTable()` to typed `supabase.from()` in 4 hooks
+## Plan: Fase 5 — PAdES con document_type exactos y doble safeguard
 
-## Context
+### Archivo único
+`src/hooks/useSignatureLinkPublic.ts` — líneas 598-682
 
-All 7 tables are now in `types.ts`. The `fromAnyTable()` untyped bridge is no longer needed for these hooks. This cleanup gives proper type safety and IDE autocomplete.
+### Cambio
+Reemplazar el bloque PAdES actual por la versión con valores exactos de `document_type` (`contrato`, `ddjj_salud`, `anexo`) en lugar de comparaciones genéricas con `.toLowerCase()`. Agrega doble safeguard para contratada pendiente.
 
-## Key Technical Detail
+### Diferencias clave vs. código actual (Fase 4)
 
-The DB types use `Json` for complex columns (`content`, `style`, `visibility_rules`, `meta`), while the custom types in `src/types/templateDesigner.ts` use rich interfaces. Each hook will cast row results to the custom types at the boundary (same as today, but now the query itself is typed).
+1. **document_type exacto**: usa `dt === 'contrato'` directo (sin `.toLowerCase()` ni check de `'contract'`)
+2. **ddjj_salud explícito**: filtra por `dt === 'ddjj_salud'` en vez de "todo lo que no sea contrato"
+3. **Anexos excluidos**: `dt === 'anexo'` retorna `false` explícitamente
+4. **Doble safeguard**: `safeDocsToSign` filtra contrato si `hasPendingContratada` como segunda capa
+5. **Error handling mejorado**: `pendingErr` se maneja separadamente del catch
 
-## Changes
+### Código resultante (reemplaza líneas 598-682)
 
-### 1. `src/hooks/useTemplateBlocks.ts`
-- Replace `import { fromAnyTable }` with `import { supabase } from '@/integrations/supabase/client'`
-- Change all `fromAnyTable('template_blocks')` → `supabase.from('template_blocks')`
-- Remove `as any` on insert/update payloads (cast `content`/`style`/`visibility_rules` to `Json` where needed)
-- Keep `as unknown as TemplateBlock[]` cast on results (Json → rich types)
+```typescript
+// Post-signature: generate base PDF + PAdES only when it corresponds to this signer + step
+try {
+  const supabaseUrl = SUPABASE_URL;
+  const anonKey = SUPABASE_PUBLISHABLE_KEY;
 
-### 2. `src/hooks/useTemplateFields.ts`
-- Same pattern: `fromAnyTable('template_fields')` → `supabase.from('template_fields')`
-- Cast `meta` field to `Json` on insert/update
-- Keep result casts
+  const { data: docs, error: docsErr } = await signatureClient
+    .from('documents')
+    .select('id, document_type, beneficiary_id, is_final, signed_pdf_url')
+    .eq('sale_id', data.sale_id)
+    .eq('is_final', true)
+    .neq('document_type', 'firma');
 
-### 3. `src/hooks/useTemplateAssets.ts`
-- `fromAnyTable('template_assets')` → `supabase.from('template_assets')`
-- `fromAnyTable('template_asset_pages')` → `supabase.from('template_asset_pages')`
-- Cast `metadata` to `Json` on insert
-- Keep result casts
+  if (docsErr) {
+    console.warn('Could not fetch final documents:', docsErr);
+  } else if (docs && docs.length > 0) {
+    const recipientType = data.recipient_type;
 
-### 4. `src/hooks/useIncidents.ts`
-- `fromAnyTable('incidents')` → `supabase.from('incidents')`
-- `fromAnyTable('incident_comments')` → `supabase.from('incident_comments')`
-- `fromAnyTable('incident_attachments')` → `supabase.from('incident_attachments')`
-- Keep existing result casts to `IncidentRecord` etc.
+    let hasPendingContratada = false;
+    try {
+      const { data: pendingCL, error: pendingErr } = await signatureClient
+        .from('signature_links').select('id')
+        .eq('sale_id', data.sale_id)
+        .eq('recipient_type', 'contratada')
+        .eq('status', 'pendiente');
+      if (pendingErr) {
+        console.warn('Could not check pending contratada links:', pendingErr);
+        hasPendingContratada = true;
+      } else {
+        hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
+      }
+    } catch (e) {
+      console.warn('Could not check pending contratada links (exception):', e);
+      hasPendingContratada = true;
+    }
 
-### 5. `src/integrations/supabase/untyped-client.ts`
-- Keep the file (may be useful for future untyped tables), but it will have zero imports after this change.
-- Optionally add a comment noting it's available for future tables not yet in types.
+    const docsToSign = docs.filter((d: any) => {
+      if (d.signed_pdf_url) return false;
+      const dt = d.document_type;
 
-## No other files change
-- `src/types/templateDesigner.ts` stays as-is
-- No migrations needed
-- No edge function changes
+      if (dt === 'contrato') {
+        return recipientType === 'contratada';
+      }
+      if (dt === 'ddjj_salud') {
+        if (recipientType === 'titular') return d.beneficiary_id == null;
+        if (recipientType === 'adherente') return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
+        return false;
+      }
+      if (dt === 'anexo') return false;
+      return false;
+    });
+
+    const safeDocsToSign = docsToSign.filter((d: any) => {
+      if (d.document_type === 'contrato' && hasPendingContratada) return false;
+      return true;
+    });
+
+    for (const doc of safeDocsToSign) {
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
+          body: JSON.stringify({ document_id: doc.id }),
+        });
+        await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
+          body: JSON.stringify({ document_id: doc.id }),
+        });
+      } catch (pdfErr) {
+        console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
+      }
+    }
+  }
+} catch (pdfGenErr) {
+  console.warn('Post-signature PDF generation error:', pdfGenErr);
+}
+```
+
+### Impacto
+- 1 archivo, 1 bloque (~85 líneas reemplaza ~85 líneas)
+- No afecta bloque de activación contratada (Fase 3)
+- No requiere migraciones
 
