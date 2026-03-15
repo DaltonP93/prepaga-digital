@@ -269,6 +269,9 @@ export interface TemplateAsset {
   file_size: number | null;
   page_count: number | null;
   metadata: Record<string, unknown>;
+  status: 'uploaded' | 'processing' | 'ready' | 'failed' | null;
+  processing_error: string | null;
+  converted_asset_id: string | null;
   created_at: string;
 }
 
