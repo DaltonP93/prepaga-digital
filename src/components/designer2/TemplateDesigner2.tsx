@@ -10,6 +10,7 @@ import { CanvasBlock, POSITIONED_TYPES } from "./CanvasBlock";
 import { BlockPropertyPanel } from "./BlockPropertyPanel";
 import { AssetUploadModal } from "./AssetUploadModal";
 import { FieldOverlay } from "./FieldOverlay";
+import { CanvasFieldOverlay } from "./CanvasFieldOverlay";
 import { VersionPanel } from "./VersionPanel";
 import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
 import {
@@ -22,7 +23,7 @@ import {
 import { parseLegacyHtmlToBlocks } from "@/lib/legacyToBlocks";
 import {
   ZoomIn, ZoomOut, Maximize, AlertTriangle,
-  Layers, Settings2, GitBranch, FileText, Crosshair, X,
+  Layers, Settings2, GitBranch, FileText, Crosshair, X, MousePointer,
 } from "lucide-react";
 import type {
   BlockType, TemplateBlock, TemplateBlockInsert,
@@ -96,6 +97,7 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
   const [rightTab, setRightTab] = useState("properties");
   const [insertMode, setInsertMode] = useState<BlockType | null>(null);
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
+  const [fieldPlacementActive, setFieldPlacementActive] = useState(false);
 
   const canvasPageRef = useRef<HTMLDivElement>(null);
 
@@ -343,26 +345,12 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <Select value={fieldPlacementType} onValueChange={(v) => setFieldPlacementType(v as FieldType)}>
-              <SelectTrigger className="h-6 text-[10px] w-[72px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="signature">Firma</SelectItem>
-                <SelectItem value="date">Fecha</SelectItem>
-                <SelectItem value="text">Texto</SelectItem>
-                <SelectItem value="initials">Iniciales</SelectItem>
-                <SelectItem value="checkbox">Check</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={fieldPlacementRole} onValueChange={(v) => setFieldPlacementRole(v as SignerRole)}>
-              <SelectTrigger className="h-6 text-[10px] w-[72px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="titular">Titular</SelectItem>
-                <SelectItem value="adherente">Adherente</SelectItem>
-                <SelectItem value="contratada">Contratada</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {fieldPlacementActive && (
+            <Badge variant="outline" className="text-[10px] gap-1 animate-pulse">
+              <MousePointer className="h-3 w-3" />
+              Colocando campos
+            </Badge>
+          )}
         </div>
 
         {/* Migration banner */}
@@ -470,6 +458,14 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
                 </div>
               ))}
 
+              {/* Page-level field overlays */}
+              <CanvasFieldOverlay
+                templateId={templateId}
+                activeFieldType={fieldPlacementType}
+                activeSignerRole={fieldPlacementRole}
+                placementActive={fieldPlacementActive && !insertMode}
+              />
+
               {/* Ghost preview during insert mode */}
               {insertMode && ghostPos && (
                 <div
@@ -527,7 +523,16 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
 
           <TabsContent value="fields" className="flex-1 min-h-0 m-0 p-0">
             <div className="p-2">
-              <FieldOverlay templateId={templateId} selectedBlockId={selectedBlockId || undefined} />
+              <FieldOverlay
+                templateId={templateId}
+                selectedBlockId={selectedBlockId || undefined}
+                onTogglePlacement={setFieldPlacementActive}
+                placementActive={fieldPlacementActive}
+                activeFieldType={fieldPlacementType}
+                activeSignerRole={fieldPlacementRole}
+                onFieldTypeChange={(t) => setFieldPlacementType(t)}
+                onSignerRoleChange={(r) => setFieldPlacementRole(r)}
+              />
             </div>
           </TabsContent>
 
