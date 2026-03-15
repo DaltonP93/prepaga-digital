@@ -125,6 +125,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
       content: "",
       active: true,
       is_global: false,
+      designer_version: "1.0",
     },
   });
 
