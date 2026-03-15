@@ -275,6 +275,46 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
                   </div>
                   <Switch checked={watch("active")} onCheckedChange={(checked) => setValue("active", checked)} />
                 </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <Label className="text-base">Motor del Template</Label>
+                  <p className="text-sm text-muted-foreground">Seleccioná el motor de diseño para este template.</p>
+                  <RadioGroup
+                    value={watch("designer_version")}
+                    onValueChange={(value) => setValue("designer_version", value)}
+                    className="grid grid-cols-1 gap-3"
+                  >
+                    <label
+                      htmlFor="engine-1"
+                      className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${watch("designer_version") === "1.0" ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`}
+                    >
+                      <RadioGroupItem value="1.0" id="engine-1" className="mt-0.5" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <PenTool className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">Legacy 1.0</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Editor HTML clásico con TipTap</p>
+                      </div>
+                    </label>
+                    <label
+                      htmlFor="engine-2"
+                      className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${watch("designer_version") === "2.0" ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`}
+                    >
+                      <RadioGroupItem value="2.0" id="engine-2" className="mt-0.5" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <Blocks className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">Designer 2.0 Premium</span>
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Nuevo</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Canvas A4 con bloques, assets PDF, overlay de campos</p>
+                      </div>
+                    </label>
+                  </RadioGroup>
+                </div>
               </CardContent>
             </Card>
 
