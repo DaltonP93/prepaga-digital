@@ -21,7 +21,7 @@ export function parseLegacyHtmlToBlocks(
     x: 0, y: 0, w: 100, h: 0,
     z_index: 0, rotation: 0,
     is_locked: false, is_visible: true,
-    visibility_rules: { roles: ["titular", "adherente", "contratada"], conditions: [] },
+    visibility_rules: { roles: ["titular", "adherente", "contratada"] as SignerRole[], conditions: [] },
   };
 
   const walk = (nodes: NodeListOf<ChildNode>) => {
