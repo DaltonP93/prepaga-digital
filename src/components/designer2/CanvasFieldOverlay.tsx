@@ -240,7 +240,8 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
               borderStyle: "dashed",
               borderRadius: 3,
               cursor: "move",
-              ringColor: borderColor,
+              // @ts-expect-error ring color via CSS variable
+              "--tw-ring-color": borderColor,
             }}
             onMouseDown={(e) => handleFieldMouseDown(e, field)}
             onClick={(e) => {
