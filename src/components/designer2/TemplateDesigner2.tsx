@@ -271,8 +271,8 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
 
         {/* Migration banner */}
         {showMigrationBanner && (
-          <Alert className="mb-2 border-amber-300 bg-amber-50 dark:bg-amber-950/20">
-            <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <Alert className="mb-2 border-destructive/30 bg-destructive/5">
+            <AlertTriangle className="h-4 w-4 text-destructive" />
             <AlertDescription className="flex items-center justify-between">
               <span className="text-[11px]">
                 Este template tiene contenido Legacy. El canvas V2 está vacío hasta migrarlo.

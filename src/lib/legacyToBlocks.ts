@@ -1,4 +1,4 @@
-import type { BlockType, TemplateBlockInsert, BlockContent } from "@/types/templateDesigner";
+import type { BlockType, TemplateBlockInsert, BlockContent, SignerRole } from "@/types/templateDesigner";
 
 /**
  * Parse legacy HTML content into an array of Designer 2.0 block inserts.
