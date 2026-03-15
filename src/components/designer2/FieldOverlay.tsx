@@ -1,14 +1,14 @@
-import React, { useState } from "react";
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, PenTool, Calendar, Type, CheckSquare, User, CreditCard, Mail, Hash, MousePointer } from "lucide-react";
+import { Trash2, PenTool, Calendar, Type, CheckSquare, User, CreditCard, Mail, Hash, MousePointer } from "lucide-react";
 import { useTemplateFields, useCreateTemplateField, useDeleteTemplateField } from "@/hooks/useTemplateFields";
 import type { FieldType, SignerRole } from "@/types/templateDesigner";
+import { cn } from "@/lib/utils";
 
 interface FieldOverlayProps {
   templateId: string;
@@ -33,9 +33,9 @@ const FIELD_TYPES: { value: FieldType; label: string; icon: React.ElementType }[
 ];
 
 const SIGNER_ROLES: { value: SignerRole; label: string; color: string }[] = [
-  { value: "titular", label: "Titular / Contratante", color: "bg-blue-500" },
+  { value: "titular", label: "Titular", color: "bg-blue-500" },
   { value: "adherente", label: "Adherente", color: "bg-green-500" },
-  { value: "contratada", label: "Contratada / Empresa", color: "bg-purple-500" },
+  { value: "contratada", label: "Contratada", color: "bg-purple-500" },
 ];
 
 export const FieldOverlay: React.FC<FieldOverlayProps> = ({
@@ -54,31 +54,26 @@ export const FieldOverlay: React.FC<FieldOverlayProps> = ({
 
   const allFields = fields || [];
 
-  // Group fields by signer role
-  const fieldsByRole = SIGNER_ROLES.map((role) => ({
-    ...role,
-    fields: allFields.filter((f) => f.signer_role === role.value),
-  }));
-
-  const handleAddField = () => {
+  const handleInsertField = (fieldType: FieldType) => {
+    onFieldTypeChange?.(fieldType);
     createField.mutate({
       template_id: templateId,
       block_id: selectedBlockId || null,
       signer_role: activeSignerRole,
-      field_type: activeFieldType,
+      field_type: fieldType,
       page: 1,
       x: 0.3 + Math.random() * 0.2,
       y: 0.7 + Math.random() * 0.1,
       w: 0.18,
       h: 0.05,
       required: true,
-      label: FIELD_TYPES.find((f) => f.value === activeFieldType)?.label || "",
+      label: FIELD_TYPES.find((f) => f.value === fieldType)?.label || "",
       meta: {
         relativeTo: selectedBlockId ? "block" : "page",
         blockId: selectedBlockId || undefined,
         normalized: { x: 0.4, y: 0.75, w: 0.18, h: 0.05 },
         appearance: {
-          placeholderText: FIELD_TYPES.find((f) => f.value === activeFieldType)?.label || "",
+          placeholderText: FIELD_TYPES.find((f) => f.value === fieldType)?.label || "",
           borderStyle: "dashed",
           color: "#2563eb",
         },
@@ -90,11 +85,13 @@ export const FieldOverlay: React.FC<FieldOverlayProps> = ({
     deleteField.mutate({ id: fieldId, templateId });
   };
 
-  const getRoleColor = (role: string) =>
-    SIGNER_ROLES.find((r) => r.value === role)?.color || "bg-muted";
+  const fieldsByRole = SIGNER_ROLES.map((role) => ({
+    ...role,
+    fields: allFields.filter((f) => f.signer_role === role.value),
+  }));
 
   return (
-    <div className="space-y-3 p-1">
+    <div className="space-y-3">
       {/* Placement mode toggle */}
       <div className="flex items-center justify-between p-2 rounded-lg border bg-muted/30">
         <div className="flex items-center gap-2">
@@ -107,66 +104,40 @@ export const FieldOverlay: React.FC<FieldOverlayProps> = ({
         />
       </div>
 
-      {/* Field type + role selectors */}
-      <div className="grid grid-cols-2 gap-2">
-        <div className="space-y-1">
-          <span className="text-[10px] text-muted-foreground">Tipo</span>
-          <Select value={activeFieldType} onValueChange={(v) => onFieldTypeChange?.(v as FieldType)}>
-            <SelectTrigger className="h-7 text-[11px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {FIELD_TYPES.map((ft) => (
-                <SelectItem key={ft.value} value={ft.value}>
-                  <div className="flex items-center gap-2">
-                    <ft.icon className="h-3 w-3" />
-                    {ft.label}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <span className="text-[10px] text-muted-foreground">Firmante</span>
-          <Select value={activeSignerRole} onValueChange={(v) => onSignerRoleChange?.(v as SignerRole)}>
-            <SelectTrigger className="h-7 text-[11px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SIGNER_ROLES.map((sr) => (
-                <SelectItem key={sr.value} value={sr.value}>
-                  <div className="flex items-center gap-2">
-                    <div className={`h-2 w-2 rounded-full ${sr.color}`} />
-                    {sr.label}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      {/* Widget grid — 2 columns */}
+      <div className="grid grid-cols-2 gap-1.5">
+        {FIELD_TYPES.map((ft) => {
+          const Icon = ft.icon;
+          const isActive = activeFieldType === ft.value;
+          return (
+            <button
+              key={ft.value}
+              type="button"
+              disabled={createField.isPending}
+              onClick={() => handleInsertField(ft.value)}
+              className={cn(
+                "flex items-center gap-2 rounded-md border px-2.5 py-2 text-left transition-all text-[11px] font-medium",
+                isActive
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-background hover:bg-muted/50 text-foreground"
+              )}
+            >
+              <span className="flex-1 truncate">{ft.label}</span>
+              <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            </button>
+          );
+        })}
       </div>
-
-      <Button
-        type="button"
-        size="sm"
-        className="w-full gap-1 h-7 text-[11px]"
-        onClick={handleAddField}
-        disabled={createField.isPending}
-      >
-        <Plus className="h-3 w-3" />
-        Agregar campo
-      </Button>
 
       <Separator />
 
-      {/* Fields grouped by signer role */}
-      <ScrollArea className="max-h-[280px]">
+      {/* Existing fields grouped by role */}
+      <ScrollArea className="max-h-[260px]">
         <div className="space-y-3">
           {fieldsByRole.map((group) => (
             <div key={group.value}>
               <div className="flex items-center gap-2 mb-1.5">
-                <div className={`h-2.5 w-2.5 rounded-full ${group.color}`} />
+                <div className={cn("h-2.5 w-2.5 rounded-full", group.color)} />
                 <span className="text-[11px] font-semibold">{group.label}</span>
                 <Badge variant="secondary" className="text-[9px] px-1 ml-auto">
                   {group.fields.length}
