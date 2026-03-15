@@ -136,6 +136,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
       setValue("content", typeof template.content === "string" ? template.content : template.content ? JSON.stringify(template.content) : "");
       setValue("active", template.is_active ?? true);
       setValue("is_global", false);
+      setValue("designer_version", (template as any).designer_version || "1.0");
       setDynamicFields([]);
       setActiveTab("setup");
     } else if (!template && open) {
@@ -145,6 +146,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
         content: "",
         active: true,
         is_global: false,
+        designer_version: "1.0",
       });
       setDynamicFields([]);
       setActiveTab("setup");
