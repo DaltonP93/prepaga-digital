@@ -155,8 +155,9 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
       const defaults: Record<string, any> = {
         text: { content: { kind: "rich_text", html: "<p>Nuevo texto</p>", plain_text: "Nuevo texto", semantic_role: "paragraph", placeholder_refs: [] }, style: { fontSize: 12, fontWeight: 400, textAlign: "left" } },
         heading: { content: { kind: "heading", level: 2, text: "Título", placeholder_refs: [] }, style: { fontSize: 18, fontWeight: 700, textAlign: "center" } },
-        signature_block: { content: { kind: "signature_block", signer_role: activeRole, signature_mode: "electronic", show_name: true, show_dni: true, show_timestamp: true, show_ip: false, show_method: false, label: "Firma", preset: "legal_v2" }, style: { align: "center", size: "normal", borderTop: true } },
       };
+      // signature_block is NOT allowed in V2 — signatures are template_fields only
+      if (type === "signature_block") return;
       const d = defaults[type] || { content: {}, style: {} };
       createBlock.mutate({
         template_id: templateId,
