@@ -464,6 +464,7 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
                 activeFieldType={fieldPlacementType}
                 activeSignerRole={fieldPlacementRole}
                 placementActive={fieldPlacementActive && !insertMode}
+                currentPage={currentPage}
               />
 
               {/* Ghost preview during insert mode */}
