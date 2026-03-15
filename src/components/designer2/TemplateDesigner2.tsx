@@ -345,26 +345,12 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <Select value={fieldPlacementType} onValueChange={(v) => setFieldPlacementType(v as FieldType)}>
-              <SelectTrigger className="h-6 text-[10px] w-[72px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="signature">Firma</SelectItem>
-                <SelectItem value="date">Fecha</SelectItem>
-                <SelectItem value="text">Texto</SelectItem>
-                <SelectItem value="initials">Iniciales</SelectItem>
-                <SelectItem value="checkbox">Check</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={fieldPlacementRole} onValueChange={(v) => setFieldPlacementRole(v as SignerRole)}>
-              <SelectTrigger className="h-6 text-[10px] w-[72px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="titular">Titular</SelectItem>
-                <SelectItem value="adherente">Adherente</SelectItem>
-                <SelectItem value="contratada">Contratada</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {fieldPlacementActive && (
+            <Badge variant="outline" className="text-[10px] gap-1 animate-pulse">
+              <MousePointer className="h-3 w-3" />
+              Colocando campos
+            </Badge>
+          )}
         </div>
 
         {/* Migration banner */}
