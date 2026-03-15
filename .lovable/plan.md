@@ -1,104 +1,65 @@
 
 
-## Plan: Fase 5 — PAdES con document_type exactos y doble safeguard
+# Mejorar UX visual del editor V2 estilo OpenSign
 
-### Archivo único
-`src/hooks/useSignatureLinkPublic.ts` — líneas 598-682
+## Diagnóstico
 
-### Cambio
-Reemplazar el bloque PAdES actual por la versión con valores exactos de `document_type` (`contrato`, `ddjj_salud`, `anexo`) en lugar de comparaciones genéricas con `.toLowerCase()`. Agrega doble safeguard para contratada pendiente.
+El editor ya tiene la estructura de 3 columnas, roles como cards, grid de widgets, y 8 handles de resize. Lo que falta:
 
-### Diferencias clave vs. código actual (Fase 4)
+1. **`selectedFieldId` no sube al editor** — vive solo dentro de `CanvasFieldOverlay`, el panel Props no puede mostrar propiedades del field seleccionado
+2. **Toolbar sin fit-width / fit-page** — solo tiene zoom +/-
+3. **Canvas con fondo poco profesional** — necesita fondo más oscuro/neutro tipo OpenSign
+4. **Props tab ignora fields** — solo muestra propiedades de bloques, nunca de fields
+5. **Sidebar sin indicador de fields por página**
 
-1. **document_type exacto**: usa `dt === 'contrato'` directo (sin `.toLowerCase()` ni check de `'contract'`)
-2. **ddjj_salud explícito**: filtra por `dt === 'ddjj_salud'` en vez de "todo lo que no sea contrato"
-3. **Anexos excluidos**: `dt === 'anexo'` retorna `false` explícitamente
-4. **Doble safeguard**: `safeDocsToSign` filtra contrato si `hasPendingContratada` como segunda capa
-5. **Error handling mejorado**: `pendingErr` se maneja separadamente del catch
+## Cambios
 
-### Código resultante (reemplaza líneas 598-682)
+### 1. `OpenSignTemplateEditor.tsx` — Levantar `selectedFieldId`
 
-```typescript
-// Post-signature: generate base PDF + PAdES only when it corresponds to this signer + step
-try {
-  const supabaseUrl = SUPABASE_URL;
-  const anonKey = SUPABASE_PUBLISHABLE_KEY;
+- Nuevo state `selectedFieldId: string | null`
+- Pasarlo a `OpenSignCanvas` → `CanvasFieldOverlay` como prop controlada
+- Pasarlo a `OpenSignRightPanel` para que Props muestre field properties
+- Cuando se selecciona un field, deseleccionar block y viceversa
 
-  const { data: docs, error: docsErr } = await signatureClient
-    .from('documents')
-    .select('id, document_type, beneficiary_id, is_final, signed_pdf_url')
-    .eq('sale_id', data.sale_id)
-    .eq('is_final', true)
-    .neq('document_type', 'firma');
+### 2. `OpenSignCanvas.tsx` — Toolbar mejorada + fondo profesional
 
-  if (docsErr) {
-    console.warn('Could not fetch final documents:', docsErr);
-  } else if (docs && docs.length > 0) {
-    const recipientType = data.recipient_type;
+- Agregar botones **Fit Width** (calcula zoom para que A4_W quepa en el container) y **Fit Page** (A4_H quepa)
+- Fondo del área de scroll: `bg-neutral-200 dark:bg-neutral-900` (tipo OpenSign)
+- Sombra más pronunciada en la página A4
+- Pasar `selectedFieldId` y `onFieldSelect` al overlay como props controladas
+- Agregar separador visual entre zoom y página en toolbar
 
-    let hasPendingContratada = false;
-    try {
-      const { data: pendingCL, error: pendingErr } = await signatureClient
-        .from('signature_links').select('id')
-        .eq('sale_id', data.sale_id)
-        .eq('recipient_type', 'contratada')
-        .eq('status', 'pendiente');
-      if (pendingErr) {
-        console.warn('Could not check pending contratada links:', pendingErr);
-        hasPendingContratada = true;
-      } else {
-        hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
-      }
-    } catch (e) {
-      console.warn('Could not check pending contratada links (exception):', e);
-      hasPendingContratada = true;
-    }
+### 3. `CanvasFieldOverlay.tsx` — Selección controlada desde padre
 
-    const docsToSign = docs.filter((d: any) => {
-      if (d.signed_pdf_url) return false;
-      const dt = d.document_type;
+- Cambiar `selectedFieldId` interno a prop controlada (`selectedFieldId` + `onFieldSelect`)
+- Mantener toda la lógica de drag/resize/keyboard intacta
+- Mejorar visual: borde más grueso (2.5px) cuando seleccionado, sombra `ring` del color del rol
 
-      if (dt === 'contrato') {
-        return recipientType === 'contratada';
-      }
-      if (dt === 'ddjj_salud') {
-        if (recipientType === 'titular') return d.beneficiary_id == null;
-        if (recipientType === 'adherente') return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
-        return false;
-      }
-      if (dt === 'anexo') return false;
-      return false;
-    });
+### 4. `OpenSignRightPanel.tsx` — Props tab con soporte de fields
 
-    const safeDocsToSign = docsToSign.filter((d: any) => {
-      if (d.document_type === 'contrato' && hasPendingContratada) return false;
-      return true;
-    });
+- Recibir nuevas props: `selectedFieldId`, `fields`, callbacks de update/delete field
+- En tab Props: si hay `selectedFieldId` → mostrar panel de propiedades del field (label, required, field_type, signer_role, coordenadas)
+- Si no hay field seleccionado pero hay block → mostrar `BlockPropertyPanel` como ahora
+- Si no hay nada → estado vacío con tip
 
-    for (const doc of safeDocsToSign) {
-      try {
-        await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-        await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-      } catch (pdfErr) {
-        console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
-      }
-    }
-  }
-} catch (pdfGenErr) {
-  console.warn('Post-signature PDF generation error:', pdfGenErr);
-}
-```
+### 5. `OpenSignPagesSidebar.tsx` — Badge de fields por página
 
-### Impacto
-- 1 archivo, 1 bloque (~85 líneas reemplaza ~85 líneas)
-- No afecta bloque de activación contratada (Fase 3)
-- No requiere migraciones
+- Recibir `fields` como prop
+- Mostrar badge con cantidad de fields en cada miniatura de página
+
+## Archivos
+
+| Archivo | Cambio |
+|---------|--------|
+| `OpenSignTemplateEditor.tsx` | Levantar `selectedFieldId`, pasar a canvas y right panel |
+| `OpenSignCanvas.tsx` | Fit width/page, fondo neutro, forward `selectedFieldId` |
+| `CanvasFieldOverlay.tsx` | Selección controlada por prop |
+| `OpenSignRightPanel.tsx` | Props tab muestra field properties o block properties |
+| `OpenSignPagesSidebar.tsx` | Badge de fields por página |
+
+## No se toca
+- Backend / edge functions
+- `FieldOverlay.tsx` (tab Campos)
+- `BlockPropertyPanel.tsx`
+- Hooks de `useTemplateFields`
 
