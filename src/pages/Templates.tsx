@@ -254,6 +254,12 @@ const Templates = () => {
               <CardContent>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Motor:</span>
+                    <Badge variant={(template as any).designer_version === "2.0" ? "default" : "outline"}>
+                      {(template as any).designer_version === "2.0" ? "v2.0 Premium" : "v1.0 Legacy"}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Versión:</span>
                     <Badge variant="outline">v{template.version}</Badge>
                   </div>
