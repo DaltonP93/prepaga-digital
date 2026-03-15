@@ -537,7 +537,16 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
 
           <TabsContent value="fields" className="flex-1 min-h-0 m-0 p-0">
             <div className="p-2">
-              <FieldOverlay templateId={templateId} selectedBlockId={selectedBlockId || undefined} />
+              <FieldOverlay
+                templateId={templateId}
+                selectedBlockId={selectedBlockId || undefined}
+                onTogglePlacement={setFieldPlacementActive}
+                placementActive={fieldPlacementActive}
+                activeFieldType={fieldPlacementType}
+                activeSignerRole={fieldPlacementRole}
+                onFieldTypeChange={(t) => setFieldPlacementType(t)}
+                onSignerRoleChange={(r) => setFieldPlacementRole(r)}
+              />
             </div>
           </TabsContent>
 
