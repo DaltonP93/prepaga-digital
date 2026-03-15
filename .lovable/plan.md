@@ -1,104 +1,57 @@
 
 
-## Plan: Fase 5 — PAdES con document_type exactos y doble safeguard
+# Connect Designer 2.0 to the Template Editor UI
 
-### Archivo único
-`src/hooks/useSignatureLinkPublic.ts` — líneas 598-682
+## Current Problem
 
-### Cambio
-Reemplazar el bloque PAdES actual por la versión con valores exactos de `document_type` (`contrato`, `ddjj_salud`, `anexo`) en lugar de comparaciones genéricas con `.toLowerCase()`. Agrega doble safeguard para contratada pendiente.
+The `TemplateDesigner2` component and all its backend infrastructure (blocks, fields, assets, edge functions) exist but are **completely disconnected from the UI**. Nothing imports or renders `TemplateDesigner2`. The `TemplateForm.tsx` only uses the legacy `TemplateDesigner` (1.0) and has no `designer_version` selector.
 
-### Diferencias clave vs. código actual (Fase 4)
+## What This Plan Does
 
-1. **document_type exacto**: usa `dt === 'contrato'` directo (sin `.toLowerCase()` ni check de `'contract'`)
-2. **ddjj_salud explícito**: filtra por `dt === 'ddjj_salud'` en vez de "todo lo que no sea contrato"
-3. **Anexos excluidos**: `dt === 'anexo'` retorna `false` explícitamente
-4. **Doble safeguard**: `safeDocsToSign` filtra contrato si `hasPendingContratada` como segunda capa
-5. **Error handling mejorado**: `pendingErr` se maneja separadamente del catch
+Wire up the Designer 2.0 into `TemplateForm.tsx` so users can choose between Legacy 1.0 and Designer 2.0 Premium when editing a template.
 
-### Código resultante (reemplaza líneas 598-682)
+## Changes
 
-```typescript
-// Post-signature: generate base PDF + PAdES only when it corresponds to this signer + step
-try {
-  const supabaseUrl = SUPABASE_URL;
-  const anonKey = SUPABASE_PUBLISHABLE_KEY;
+### 1. `src/components/TemplateForm.tsx`
 
-  const { data: docs, error: docsErr } = await signatureClient
-    .from('documents')
-    .select('id, document_type, beneficiary_id, is_final, signed_pdf_url')
-    .eq('sale_id', data.sale_id)
-    .eq('is_final', true)
-    .neq('document_type', 'firma');
+**Add `designer_version` to the form:**
+- Add `designer_version: string` to `TemplateFormData` (values: `"1.0"` or `"2.0"`)
+- Initialize from `template?.designer_version || "1.0"` on edit
+- Save `designer_version` in `onSubmit` alongside other template data
 
-  if (docsErr) {
-    console.warn('Could not fetch final documents:', docsErr);
-  } else if (docs && docs.length > 0) {
-    const recipientType = data.recipient_type;
+**Add engine selector to the Setup tab:**
+- After the "Template Activo" switch, add a "Motor del Template" section with two radio-style cards:
+  - **Legacy 1.0** — Editor HTML clásico con TipTap
+  - **Designer 2.0 Premium** — Canvas A4 con bloques, assets PDF, overlay de campos
 
-    let hasPendingContratada = false;
-    try {
-      const { data: pendingCL, error: pendingErr } = await signatureClient
-        .from('signature_links').select('id')
-        .eq('sale_id', data.sale_id)
-        .eq('recipient_type', 'contratada')
-        .eq('status', 'pendiente');
-      if (pendingErr) {
-        console.warn('Could not check pending contratada links:', pendingErr);
-        hasPendingContratada = true;
-      } else {
-        hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
-      }
-    } catch (e) {
-      console.warn('Could not check pending contratada links (exception):', e);
-      hasPendingContratada = true;
-    }
+**Conditionally render the Content tab:**
+- If `designer_version === "1.0"`: render the existing `TemplateDesigner` (legacy)
+- If `designer_version === "2.0"`:
+  - If template is not yet saved (`!template?.id`): show message "Guardá el template primero para acceder al canvas de bloques"
+  - If template is saved: render `<TemplateDesigner2 templateId={template.id} />`
 
-    const docsToSign = docs.filter((d: any) => {
-      if (d.signed_pdf_url) return false;
-      const dt = d.document_type;
+**Import `TemplateDesigner2`:**
+- Add lazy import to keep bundle split: `const TemplateDesigner2 = React.lazy(() => import(...))`
 
-      if (dt === 'contrato') {
-        return recipientType === 'contratada';
-      }
-      if (dt === 'ddjj_salud') {
-        if (recipientType === 'titular') return d.beneficiary_id == null;
-        if (recipientType === 'adherente') return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
-        return false;
-      }
-      if (dt === 'anexo') return false;
-      return false;
-    });
+### 2. `src/hooks/useTemplates.ts`
 
-    const safeDocsToSign = docsToSign.filter((d: any) => {
-      if (d.document_type === 'contrato' && hasPendingContratada) return false;
-      return true;
-    });
+Verify that `useCreateTemplate` and `useUpdateTemplate` pass through the `designer_version` field. If the mutations currently hardcode or ignore it, update them to include `designer_version` in the insert/update payload.
 
-    for (const doc of safeDocsToSign) {
-      try {
-        await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-        await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-      } catch (pdfErr) {
-        console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
-      }
-    }
-  }
-} catch (pdfGenErr) {
-  console.warn('Post-signature PDF generation error:', pdfGenErr);
-}
-```
+### 3. Template list badge (optional but useful)
 
-### Impacto
-- 1 archivo, 1 bloque (~85 líneas reemplaza ~85 líneas)
-- No afecta bloque de activación contratada (Fase 3)
-- No requiere migraciones
+In `src/pages/Templates.tsx`, show a small badge on each template card indicating "v1.0" or "v2.0 Premium" based on `template.designer_version`, so users can see at a glance which engine each template uses.
+
+## What does NOT change
+
+- No new tables or migrations (the `designer_version` column already exists in `templates`)
+- No edge function changes
+- No changes to `TemplateDesigner2` internals
+- Legacy 1.0 remains the default for all existing templates
+- The asset pipeline, blocks, fields — all untouched
+
+## Technical Notes
+
+- `designer_version` defaults to `"1.0"` in the DB schema, so all existing templates keep working as-is
+- The `TemplateDesigner2` component only needs `templateId: string` — it loads its own blocks/fields via hooks
+- The content tab for 2.0 does NOT use the `content` form field (blocks are stored separately in `template_blocks`), so the two engines don't conflict
 
