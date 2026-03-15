@@ -1,7 +1,6 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BlockPalette } from "./BlockPalette";
 import { CanvasBlock } from "./CanvasBlock";
@@ -17,12 +16,10 @@ import {
   useDeleteTemplateBlock,
   useReorderTemplateBlocks,
 } from "@/hooks/useTemplateBlocks";
-import { getAssetSignedUrl } from "@/lib/assetUrlHelper";
 import type {
   BlockType,
   TemplateBlock,
   TemplateBlockInsert,
-  TemplateAsset,
   BlockContent,
   SignerRole,
   FieldType,
@@ -115,100 +112,11 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
   );
 
   const handleAssetInserted = useCallback(
-    async (asset: TemplateAsset, selectedPages?: number[], pagePreviews?: Array<{ page_number: number; preview_url: string; width: number; height: number }>) => {
-      const maxSort = blocks.reduce((max, b) => Math.max(max, b.sort_order), -1);
-
-      if (asset.asset_type === "pdf") {
-        const pages = selectedPages || Array.from({ length: asset.page_count || 0 }, (_, i) => i + 1);
-        createBlock.mutate(
-          {
-            template_id: templateId,
-            block_type: "pdf_embed",
-            page: 1,
-            x: 0, y: 0, w: 100, h: 0,
-            z_index: 0, rotation: 0,
-            is_locked: false, is_visible: true,
-            content: {
-              kind: "pdf_embed",
-              asset_id: asset.id,
-              source_type: "pdf",
-              display_mode: "embedded_pages",
-              page_selection: { mode: selectedPages ? "specific" : "all", pages },
-              render_mode: "preview_image",
-              final_output_mode: "merge_original_pdf_pages",
-              page_previews: (pagePreviews || [])
-                .filter((p) => pages.includes(p.page_number))
-                .map((p) => ({
-                  page_number: p.page_number,
-                  preview_image_url: p.preview_url,
-                  width: p.width,
-                  height: p.height,
-                })),
-              allow_overlay_fields: true,
-              replaceable: true,
-            } as any,
-            style: {},
-            visibility_rules: { roles: ["titular", "adherente", "contratada"], conditions: [] },
-            sort_order: maxSort + 1,
-          },
-          { onSuccess: (b) => setSelectedBlockId(b.id) }
-        );
-      } else if (asset.asset_type === "image") {
-        // Use signed URL for private bucket
-        const signedUrl = await getAssetSignedUrl(asset.file_url);
-        createBlock.mutate(
-          {
-            template_id: templateId,
-            block_type: "image",
-            page: 1,
-            x: 0, y: 0, w: 100, h: 0,
-            z_index: 0, rotation: 0,
-            is_locked: false, is_visible: true,
-            content: {
-              kind: "image",
-              asset_id: asset.id,
-              src: signedUrl,
-              alt: asset.file_name,
-              caption: "",
-              fit: "contain",
-              is_background: false,
-            } as any,
-            style: {},
-            visibility_rules: { roles: ["titular", "adherente", "contratada"], conditions: [] },
-            sort_order: maxSort + 1,
-          },
-          { onSuccess: (b) => setSelectedBlockId(b.id) }
-        );
-      } else {
-        createBlock.mutate(
-          {
-            template_id: templateId,
-            block_type: "attachment_card",
-            page: 1,
-            x: 0, y: 0, w: 100, h: 0,
-            z_index: 0, rotation: 0,
-            is_locked: false, is_visible: true,
-            content: {
-              kind: "attachment_card",
-              asset_id: asset.id,
-              title: asset.file_name,
-              description: "",
-              display_mode: "card",
-              show_file_icon: true,
-              show_meta: true,
-              include_in_final_pdf: true,
-              requires_acknowledgement: false,
-              file_ref: { mime_type: asset.mime_type || "", page_count: asset.page_count || 0 },
-            } as any,
-            style: {},
-            visibility_rules: { roles: ["titular", "adherente", "contratada"], conditions: [] },
-            sort_order: maxSort + 1,
-          },
-          { onSuccess: (b) => setSelectedBlockId(b.id) }
-        );
-      }
+    (blockId: string) => {
+      // Block was created by edge function; just refresh and select it
+      setSelectedBlockId(blockId);
     },
-    [blocks, templateId, createBlock]
+    []
   );
 
   const handleUpdateBlock = useCallback(

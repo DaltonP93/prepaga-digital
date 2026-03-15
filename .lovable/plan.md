@@ -1,171 +1,104 @@
 
 
-# Subfase 3A — Backend Real de Assets PDF
+## Plan: Fase 5 — PAdES con document_type exactos y doble safeguard
 
-## Current State Analysis
+### Archivo único
+`src/hooks/useSignatureLinkPublic.ts` — líneas 598-682
 
-**What exists:**
-- `template_assets` table with `status`, `processing_error`, `converted_asset_id` columns
-- `template_asset_pages` table with `asset_id`, `page_number`, `preview_image_url`, `width`, `height`
-- `template_blocks` table with JSON `content` column
-- RLS policies on all three tables (company-scoped via template→profiles join)
-- `documents` bucket (private) with RLS requiring `{company_id}/` prefix on paths
-- Frontend `AssetUploadModal` doing everything: direct storage upload, pdf.js rendering, direct DB inserts, block creation via `onAssetInserted` callback
-- `compose-template-pdf` already reads `file_url` from `template_assets`
+### Cambio
+Reemplazar el bloque PAdES actual por la versión con valores exactos de `document_type` (`contrato`, `ddjj_salud`, `anexo`) en lugar de comparaciones genéricas con `.toLowerCase()`. Agrega doble safeguard para contratada pendiente.
 
-**Problems to fix:**
-1. Frontend uploads directly to storage with path `template-assets/{templateId}/...` — violates `documents` bucket RLS (requires `{company_id}/` prefix)
-2. Frontend creates asset rows, asset page rows, AND blocks — triple frontend-driven creation
-3. `page_previews` in `pdf_embed` blocks can have `preview_image_url: ""` (fake)
-4. No `status` lifecycle (`uploaded` → `processing` → `ready`)
-5. Block creation duplicated: `AssetUploadModal` passes data to `TemplateDesigner2.handleAssetInserted` which creates the block
+### Diferencias clave vs. código actual (Fase 4)
 
-## Key Technical Constraint
+1. **document_type exacto**: usa `dt === 'contrato'` directo (sin `.toLowerCase()` ni check de `'contract'`)
+2. **ddjj_salud explícito**: filtra por `dt === 'ddjj_salud'` en vez de "todo lo que no sea contrato"
+3. **Anexos excluidos**: `dt === 'anexo'` retorna `false` explícitamente
+4. **Doble safeguard**: `safeDocsToSign` filtra contrato si `hasPendingContratada` como segunda capa
+5. **Error handling mejorado**: `pendingErr` se maneja separadamente del catch
 
-Deno edge functions **cannot render PDF pages to images** (no Canvas API, no pdf.js rendering). The thumbnail rendering must remain client-side (pdf.js + canvas). However, all other operations (upload, metadata extraction, page row persistence, block creation) move to edge functions.
+### Código resultante (reemplaza líneas 598-682)
 
-**Hybrid flow:**
-1. Edge function: upload file + create asset row
-2. Edge function: extract page count/dimensions via pdf-lib, create `template_asset_pages` rows
-3. Frontend: render thumbnails via pdf.js, upload PNGs to standardized paths, update page rows
-4. Edge function: create block with real `page_previews` from DB
+```typescript
+// Post-signature: generate base PDF + PAdES only when it corresponds to this signer + step
+try {
+  const supabaseUrl = SUPABASE_URL;
+  const anonKey = SUPABASE_PUBLISHABLE_KEY;
 
-## Storage Convention
+  const { data: docs, error: docsErr } = await signatureClient
+    .from('documents')
+    .select('id, document_type, beneficiary_id, is_final, signed_pdf_url')
+    .eq('sale_id', data.sale_id)
+    .eq('is_final', true)
+    .neq('document_type', 'firma');
 
-Use existing `documents` bucket. Paths follow the existing RLS convention:
+  if (docsErr) {
+    console.warn('Could not fetch final documents:', docsErr);
+  } else if (docs && docs.length > 0) {
+    const recipientType = data.recipient_type;
 
-```text
-{company_id}/template-assets/{assetId}/original.pdf
-{company_id}/template-assets/{assetId}/previews/page-1.png
-{company_id}/template-assets/{assetId}/previews/page-2.png
-```
+    let hasPendingContratada = false;
+    try {
+      const { data: pendingCL, error: pendingErr } = await signatureClient
+        .from('signature_links').select('id')
+        .eq('sale_id', data.sale_id)
+        .eq('recipient_type', 'contratada')
+        .eq('status', 'pendiente');
+      if (pendingErr) {
+        console.warn('Could not check pending contratada links:', pendingErr);
+        hasPendingContratada = true;
+      } else {
+        hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
+      }
+    } catch (e) {
+      console.warn('Could not check pending contratada links (exception):', e);
+      hasPendingContratada = true;
+    }
 
-`template_assets.file_url` stores the internal storage path. No `getPublicUrl()`. Signed URLs only for frontend preview.
+    const docsToSign = docs.filter((d: any) => {
+      if (d.signed_pdf_url) return false;
+      const dt = d.document_type;
 
-## Implementation
+      if (dt === 'contrato') {
+        return recipientType === 'contratada';
+      }
+      if (dt === 'ddjj_salud') {
+        if (recipientType === 'titular') return d.beneficiary_id == null;
+        if (recipientType === 'adherente') return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
+        return false;
+      }
+      if (dt === 'anexo') return false;
+      return false;
+    });
 
-### 1. Edge Function: `upload-template-asset`
+    const safeDocsToSign = docsToSign.filter((d: any) => {
+      if (d.document_type === 'contrato' && hasPendingContratada) return false;
+      return true;
+    });
 
-**Input:** `{ template_id, file_name, mime_type, file_base64 }`
-
-**Flow:**
-- Validate auth via `getClaims()`
-- Load template, verify user belongs to same company
-- Validate MIME (`application/pdf`, `image/png`, `image/jpeg`, `image/webp`)
-- Reject DOCX with clear message: "DOCX no soportado en esta subfase"
-- Generate `asset_id` (uuid)
-- Decode base64, upload to `{company_id}/template-assets/{assetId}/original.{ext}`
-- Insert `template_assets` row with `status='uploaded'`
-- Return created asset
-
-### 2. Edge Function: `process-template-asset`
-
-**Input:** `{ asset_id }`
-
-**Flow:**
-- Validate auth + company access
-- Set `status='processing'`
-- Download original PDF from storage
-- Use pdf-lib to get `pageCount` and per-page dimensions
-- Insert `template_asset_pages` rows with `width`, `height`, `preview_image_url = null` (to be filled by frontend thumbnail upload)
-- Update asset: `page_count`, `status='ready'`
-- On error: `status='failed'`, `processing_error = message`
-- For images: set `status='ready'` immediately (no page processing needed)
-- For DOCX: return error "not supported in this phase"
-
-### 3. Frontend Thumbnail Upload (in `AssetUploadModal`)
-
-After `process-template-asset` returns `status='ready'`:
-- Frontend renders thumbnails via pdf.js (existing working code)
-- Uploads PNGs to `{company_id}/template-assets/{assetId}/previews/page-{n}.png` via storage SDK
-- Updates each `template_asset_pages` row with `preview_image_url` = storage path
-- Shows page selector with real thumbnails
-
-This is the only step that stays client-side (due to canvas requirement).
-
-### 4. Edge Function: `insert-template-asset-block`
-
-**Input:** `{ template_id, asset_id, selected_pages }`
-
-**Flow:**
-- Validate auth + company access
-- Load asset, verify `status='ready'` for PDFs
-- Load `template_asset_pages` for this asset
-- Build real `page_previews` array from DB rows (with signed URLs for preview_image_url)
-- Determine `block_type`: pdf → `pdf_embed`, image → `image`, other → `attachment_card`
-- Calculate `sort_order` (max existing + 1)
-- Insert single `template_blocks` row with real content
-- Return created block
-
-**pdf_embed content:**
-```json
-{
-  "kind": "pdf_embed",
-  "asset_id": "...",
-  "source_type": "pdf",
-  "display_mode": "embedded_pages",
-  "page_selection": { "mode": "specific", "pages": [1, 2, 3] },
-  "render_mode": "preview_image",
-  "final_output_mode": "merge_original_pdf_pages",
-  "page_previews": [
-    { "page_number": 1, "preview_image_url": "{company_id}/template-assets/...", "width": 595, "height": 842 }
-  ],
-  "allow_overlay_fields": true,
-  "replaceable": true
+    for (const doc of safeDocsToSign) {
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
+          body: JSON.stringify({ document_id: doc.id }),
+        });
+        await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
+          body: JSON.stringify({ document_id: doc.id }),
+        });
+      } catch (pdfErr) {
+        console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
+      }
+    }
+  }
+} catch (pdfGenErr) {
+  console.warn('Post-signature PDF generation error:', pdfGenErr);
 }
 ```
 
-### 5. Frontend: Rewrite `AssetUploadModal`
-
-Replace current flow with:
-1. File drop → convert to base64 → call `upload-template-asset`
-2. Call `process-template-asset`
-3. Render thumbnails client-side (pdf.js), upload PNGs to storage, update `template_asset_pages`
-4. Load `template_asset_pages` → show page selector with real thumbnails
-5. User selects pages → call `insert-template-asset-block`
-6. `onAssetInserted` callback now only receives the created block (no more triple creation)
-
-**Remove from frontend:**
-- Direct `createAsset.mutateAsync()` call
-- Direct `bulkCreatePages.mutateAsync()` call
-- `generatePdfPreviews` building asset page inserts
-- Block creation in `TemplateDesigner2.handleAssetInserted`
-
-### 6. Update `TemplateDesigner2`
-
-Simplify `handleAssetInserted`: the block is already created by the edge function, so this callback just needs to refresh the blocks query and select the new block. No more client-side `createBlock.mutate()` for assets.
-
-### 7. Config
-
-Add to `supabase/config.toml`:
-```toml
-[functions.upload-template-asset]
-verify_jwt = false
-
-[functions.process-template-asset]
-verify_jwt = false
-
-[functions.insert-template-asset-block]
-verify_jwt = false
-```
-
-All three validate JWT in code via `getClaims()`.
-
-### 8. DOCX
-
-Keep `docx_embed` in type definitions but show "Próximamente" in UI. Edge functions reject DOCX MIME with clear error.
-
-## Files Created/Modified
-
-| File | Action |
-|------|--------|
-| `supabase/functions/upload-template-asset/index.ts` | Create |
-| `supabase/functions/process-template-asset/index.ts` | Create |
-| `supabase/functions/insert-template-asset-block/index.ts` | Create |
-| `supabase/config.toml` | Add 3 function configs |
-| `src/components/designer2/AssetUploadModal.tsx` | Rewrite to backend-driven flow |
-| `src/components/designer2/TemplateDesigner2.tsx` | Simplify `handleAssetInserted` |
-| `src/types/templateDesigner.ts` | Add `status` to `TemplateAsset` interface |
-
-No new migrations needed — tables and columns already exist.
+### Impacto
+- 1 archivo, 1 bloque (~85 líneas reemplaza ~85 líneas)
+- No afecta bloque de activación contratada (Fase 3)
+- No requiere migraciones
 
