@@ -24,6 +24,7 @@ interface OpenSignCanvasProps {
   placementActive: boolean;
   activeFieldType: FieldType;
   activeSignerRole: SignerRole;
+  pageBackgroundUrl?: string;
 }
 
 const A4_W = 794;
@@ -46,6 +47,7 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
   placementActive,
   activeFieldType,
   activeSignerRole,
+  pageBackgroundUrl,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -122,6 +124,14 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
             height: A4_H,
             transform: `scale(${zoom / 100})`,
             transformOrigin: "top center",
+            ...(pageBackgroundUrl
+              ? {
+                  backgroundImage: `url(${pageBackgroundUrl})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  backgroundRepeat: "no-repeat",
+                }
+              : {}),
           }}
           data-canvas="true"
         >

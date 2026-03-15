@@ -23,7 +23,7 @@ import { useEnhancedPDFGeneration } from "@/hooks/useEnhancedPDFGeneration";
 import { Database } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 
-const TemplateDesigner2 = lazy(() => import("@/components/designer2/TemplateDesigner2"));
+const OpenSignTemplateEditor = lazy(() => import("@/components/designer2/opensign/OpenSignTemplateEditor").then(m => ({ default: m.OpenSignTemplateEditor })));
 
 type Template = Database["public"]["Tables"]["templates"]["Row"];
 
@@ -344,7 +344,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
           {watch("designer_version") === "2.0" ? (
             isEditing && template?.id ? (
               <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-                <TemplateDesigner2 templateId={template.id} legacyContent={watch("content")} />
+                <OpenSignTemplateEditor templateId={template.id} />
               </Suspense>
             ) : (
               <Card>
