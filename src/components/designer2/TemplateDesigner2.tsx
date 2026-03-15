@@ -10,6 +10,7 @@ import { CanvasBlock, POSITIONED_TYPES } from "./CanvasBlock";
 import { BlockPropertyPanel } from "./BlockPropertyPanel";
 import { AssetUploadModal } from "./AssetUploadModal";
 import { FieldOverlay } from "./FieldOverlay";
+import { CanvasFieldOverlay } from "./CanvasFieldOverlay";
 import { VersionPanel } from "./VersionPanel";
 import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
 import {
