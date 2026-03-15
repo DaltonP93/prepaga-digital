@@ -1,19 +1,38 @@
-import type { BlockType, TemplateBlockInsert, BlockContent, SignerRole } from "@/types/templateDesigner";
+import type { BlockType, TemplateBlockInsert, BlockContent, SignerRole, FieldType, TemplateFieldInsert, TemplateFieldMeta } from "@/types/templateDesigner";
 
 /**
- * Parse legacy HTML content into an array of Designer 2.0 block inserts.
- * Uses DOMParser to walk the HTML and produce heading, text, table,
- * signature_block and placeholder_chip blocks.
+ * Result of parsing legacy HTML: blocks for content + fields for signatures.
+ */
+export interface LegacyParseResult {
+  blocks: Omit<TemplateBlockInsert, "sort_order">[];
+  /** Signature fields to insert into template_fields (not blocks) */
+  signatureFields: Omit<TemplateFieldInsert, "id">[];
+}
+
+/**
+ * Parse legacy HTML content into Designer 2.0 blocks + signature fields.
+ * Signatures are emitted as template_fields, NOT as signature_block blocks.
  */
 export function parseLegacyHtmlToBlocks(
   templateId: string,
   html: string
 ): Omit<TemplateBlockInsert, "sort_order">[] {
-  if (!html?.trim()) return [];
+  const result = parseLegacyHtml(templateId, html);
+  return result.blocks;
+}
+
+/**
+ * Full parse returning both blocks and signature fields.
+ */
+export function parseLegacyHtml(
+  templateId: string,
+  html: string
+): LegacyParseResult {
+  if (!html?.trim()) return { blocks: [], signatureFields: [] };
 
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, "text/html");
-  const results: Omit<TemplateBlockInsert, "sort_order">[] = [];
+  const blocks: Omit<TemplateBlockInsert, "sort_order">[] = [];
 
   const base = {
     template_id: templateId,
@@ -36,11 +55,8 @@ export function parseLegacyHtmlToBlocks(
   const isSignatureCompanion = (el: HTMLElement): boolean => {
     const text = (el.textContent || "").trim();
     if (!text) return false;
-    // Short lines that are labels for the signature area
     if (/^(aclaraci[oó]n|nombre|c\.?\s*i\.?|dni|documento|fecha)[:\s]*$/i.test(text)) return true;
-    // Lines that are ONLY a placeholder like {{titular_nombre}} or {{titular_dni}}
     if (/^\{\{(titular|contratada|adherente)_(nombre|dni|firma|fecha|ci)\}\}$/.test(text.replace(/\s/g, ""))) return true;
-    // Bare underscores used as signature lines
     if (/^_{4,}$/.test(text)) return true;
     return false;
   };
@@ -53,28 +69,25 @@ export function parseLegacyHtmlToBlocks(
       const el = node as HTMLElement;
       const tag = el.tagName.toLowerCase();
 
-      // Once we hit a signature element, mark the zone — everything after is companion content
       if (isSignatureElement(el)) {
         inSignatureZone = true;
         signatureHits.push((el.textContent || "").trim());
         return;
       }
 
-      // Skip companion content that belongs to the signature zone
       if (inSignatureZone && isSignatureCompanion(el)) {
         return;
       }
 
-      // If we're in signature zone but hit real content, exit the zone
       if (inSignatureZone && el.textContent && el.textContent.trim().length > 80) {
         inSignatureZone = false;
       }
 
       // Headings
       if (["h1", "h2", "h3"].includes(tag)) {
-        inSignatureZone = false; // A heading always resets
+        inSignatureZone = false;
         const level = parseInt(tag[1]) as 1 | 2 | 3;
-        results.push({
+        blocks.push({
           ...base,
           block_type: "heading" as BlockType,
           content: {
@@ -97,7 +110,7 @@ export function parseLegacyHtmlToBlocks(
 
       // Tables
       if (tag === "table") {
-        results.push({
+        blocks.push({
           ...base,
           block_type: "table" as BlockType,
           content: {
@@ -113,13 +126,12 @@ export function parseLegacyHtmlToBlocks(
         return;
       }
 
-      // Text blocks (p, div, ul, ol, li, span with content)
+      // Text blocks
       if (["p", "div", "ul", "ol", "li", "span", "strong", "em", "blockquote"].includes(tag)) {
         const outerHtml = el.outerHTML;
         if (!el.textContent?.trim()) return;
-        // Skip short signature-zone leftovers
         if (inSignatureZone) return;
-        results.push({
+        blocks.push({
           ...base,
           block_type: "text" as BlockType,
           content: {
@@ -138,36 +150,54 @@ export function parseLegacyHtmlToBlocks(
         return;
       }
 
-      // Recurse for wrappers
       walk(el.childNodes);
     });
   };
 
   walk(doc.body.childNodes);
 
-  // Pass 2: If any signature patterns were found, emit exactly 2 signature blocks
+  // Pass 2: If signature patterns found, emit template_fields (NOT blocks)
+  const signatureFields: Omit<TemplateFieldInsert, "id">[] = [];
+
   if (signatureHits.length > 0) {
-    const makeSignatureBlock = (role: "titular" | "contratada", label: string) => ({
-      ...base,
-      h: 15,
-      block_type: "signature_block" as BlockType,
-      content: {
-        kind: "signature_block",
-        signer_role: role,
-        signature_mode: "electronic",
-        show_name: true, show_dni: true, show_timestamp: true,
-        show_ip: false, show_method: true,
-        label,
-        preset: "legal_v2",
-      } as any,
-      style: { align: "left", size: "normal", borderTop: true, paddingTop: 12, fontSize: 11 },
+    const makeField = (
+      role: SignerRole,
+      fieldType: FieldType,
+      label: string,
+      fx: number,
+      fy: number,
+      fw: number,
+      fh: number
+    ): Omit<TemplateFieldInsert, "id"> => ({
+      template_id: templateId,
+      block_id: null,
+      signer_role: role,
+      field_type: fieldType,
+      label,
+      page: 1,
+      x: fx, y: fy, w: fw, h: fh,
+      required: true,
+      meta: {
+        relativeTo: "page",
+        normalized: { x: fx, y: fy, w: fw, h: fh },
+        appearance: { placeholderText: label },
+      } as TemplateFieldMeta,
     });
 
-    results.push(makeSignatureBlock("titular", "Firma del Contratante"));
-    results.push(makeSignatureBlock("contratada", "Firma de la Contratada"));
+    // Titular signature — left side
+    signatureFields.push(makeField("titular", "signature", "Firma del Contratante", 5, 80, 40, 8));
+    signatureFields.push(makeField("titular", "name", "Nombre del Contratante", 5, 88, 40, 3));
+    signatureFields.push(makeField("titular", "dni", "DNI del Contratante", 5, 91, 20, 3));
+    signatureFields.push(makeField("titular", "date", "Fecha", 25, 91, 20, 3));
+
+    // Contratada signature — right side
+    signatureFields.push(makeField("contratada", "signature", "Firma de la Contratada", 55, 80, 40, 8));
+    signatureFields.push(makeField("contratada", "name", "Nombre Representante", 55, 88, 40, 3));
+    signatureFields.push(makeField("contratada", "dni", "DNI Representante", 55, 91, 20, 3));
+    signatureFields.push(makeField("contratada", "date", "Fecha", 75, 91, 20, 3));
   }
 
-  return results;
+  return { blocks, signatureFields };
 }
 
 function extractPlaceholders(text: string): string[] {

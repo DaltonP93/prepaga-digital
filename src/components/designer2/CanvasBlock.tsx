@@ -14,7 +14,7 @@ import type { DraggableProvidedDragHandleProps } from "react-beautiful-dnd";
 /* ─── Constants ─── */
 
 export const POSITIONED_TYPES = new Set<BlockType>([
-  "image", "signature_block", "placeholder_chip",
+  "image", "placeholder_chip",
   "attachment_card", "pdf_embed", "docx_embed",
 ]);
 

@@ -41,12 +41,6 @@ const BLOCK_GROUPS = [
     ],
   },
   {
-    label: "Firma",
-    items: [
-      { type: "signature_block" as BlockType, label: "Firma", icon: PenTool, disabled: false },
-    ],
-  },
-  {
     label: "Diseño",
     items: [
       { type: "page_break" as BlockType, label: "Salto Página", icon: Minus, disabled: false },
