@@ -26,7 +26,7 @@ interface BlockPropertyPanelProps {
 }
 
 const SIGNER_ROLES: { value: SignerRole; label: string }[] = [
-  { value: "titular", label: "Titular" },
+  { value: "titular", label: "Titular / Contratante" },
   { value: "adherente", label: "Adherente" },
   { value: "contratada", label: "Contratada" },
 ];

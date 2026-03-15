@@ -24,11 +24,24 @@ export function parseLegacyHtmlToBlocks(
     visibility_rules: { roles: ["titular", "adherente", "contratada"] as SignerRole[], conditions: [] },
   };
 
+  const signatureHits: string[] = [];
+
+  const isSignatureElement = (el: HTMLElement): boolean => {
+    const text = el.textContent || "";
+    return /firma[:\s]*_{3,}/i.test(text) || /firma del/i.test(text);
+  };
+
   const walk = (nodes: NodeListOf<ChildNode>) => {
     nodes.forEach((node) => {
       if (node.nodeType !== Node.ELEMENT_NODE) return;
       const el = node as HTMLElement;
       const tag = el.tagName.toLowerCase();
+
+      // Collect signature hits instead of emitting inline
+      if (isSignatureElement(el)) {
+        signatureHits.push((el.textContent || "").trim());
+        return;
+      }
 
       // Headings
       if (["h1", "h2", "h3"].includes(tag)) {
@@ -72,31 +85,6 @@ export function parseLegacyHtmlToBlocks(
         return;
       }
 
-      // Signature patterns
-      const text = el.textContent || "";
-      if (/firma[:\s]*_{3,}/i.test(text) || /firma del/i.test(text)) {
-        const role = /empresa|contratada/i.test(text)
-          ? "contratada"
-          : /adherente/i.test(text)
-            ? "adherente"
-            : "titular";
-        results.push({
-          ...base,
-          block_type: "signature_block" as BlockType,
-          content: {
-            kind: "signature_block",
-            signer_role: role,
-            signature_mode: "electronic",
-            show_name: true, show_dni: true, show_timestamp: true,
-            show_ip: false, show_method: true,
-            label: el.textContent?.trim().replace(/_{3,}/g, "").trim() || "Firma",
-            preset: "legal_v2",
-          } as any,
-          style: { align: "left", size: "normal", borderTop: true, paddingTop: 12, fontSize: 11 },
-        });
-        return;
-      }
-
       // Text blocks (p, div, ul, ol, li, span with content)
       if (["p", "div", "ul", "ol", "li", "span", "strong", "em", "blockquote"].includes(tag)) {
         const outerHtml = el.outerHTML;
@@ -117,7 +105,6 @@ export function parseLegacyHtmlToBlocks(
             padding: 0, marginTop: 0, marginBottom: 8,
           },
         });
-        // Don't recurse into children since we captured the whole outer HTML
         return;
       }
 
@@ -128,16 +115,27 @@ export function parseLegacyHtmlToBlocks(
 
   walk(doc.body.childNodes);
 
-  // Extract standalone placeholders that weren't captured
-  const placeholderRegex = /\{\{([^}]+)\}\}/g;
-  let match: RegExpExecArray | null;
-  const foundKeys = new Set<string>();
-  results.forEach((b) => {
-    const c = b.content as any;
-    if (c?.placeholder_refs) {
-      c.placeholder_refs.forEach((k: string) => foundKeys.add(k));
-    }
-  });
+  // Pass 2: If any signature patterns were found, emit exactly 2 signature blocks
+  if (signatureHits.length > 0) {
+    const makeSignatureBlock = (role: "titular" | "contratada", label: string) => ({
+      ...base,
+      h: 15,
+      block_type: "signature_block" as BlockType,
+      content: {
+        kind: "signature_block",
+        signer_role: role,
+        signature_mode: "electronic",
+        show_name: true, show_dni: true, show_timestamp: true,
+        show_ip: false, show_method: true,
+        label,
+        preset: "legal_v2",
+      } as any,
+      style: { align: "left", size: "normal", borderTop: true, paddingTop: 12, fontSize: 11 },
+    });
+
+    results.push(makeSignatureBlock("titular", "Firma del Contratante"));
+    results.push(makeSignatureBlock("contratada", "Firma de la Contratada"));
+  }
 
   return results;
 }
