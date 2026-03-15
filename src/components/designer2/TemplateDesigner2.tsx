@@ -224,7 +224,7 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
             <Badge variant="secondary" className="text-[10px]">Designer 2.0</Badge>
             <span className="text-[10px] text-muted-foreground">{blocks.length} bloques</span>
             {showMigrationBanner && (
-              <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 gap-1">
+              <Badge variant="destructive" className="text-[10px] gap-1">
                 <AlertTriangle className="h-3 w-3" />
                 Legacy no migrado
               </Badge>
