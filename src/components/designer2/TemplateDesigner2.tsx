@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { BlockPalette } from "./BlockPalette";
-import { CanvasBlock } from "./CanvasBlock";
+import { CanvasBlock, POSITIONED_TYPES } from "./CanvasBlock";
 import { BlockPropertyPanel } from "./BlockPropertyPanel";
 import { AssetUploadModal } from "./AssetUploadModal";
 import { FieldOverlay } from "./FieldOverlay";
@@ -22,7 +22,7 @@ import {
 import { parseLegacyHtmlToBlocks } from "@/lib/legacyToBlocks";
 import {
   ZoomIn, ZoomOut, Maximize, AlertTriangle,
-  Layers, Settings2, GitBranch, FileText,
+  Layers, Settings2, GitBranch, FileText, Crosshair, X,
 } from "lucide-react";
 import type {
   BlockType, TemplateBlock, TemplateBlockInsert,
@@ -94,11 +94,20 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
   const [zoom, setZoom] = useState(1);
   const [migrating, setMigrating] = useState(false);
   const [rightTab, setRightTab] = useState("properties");
+  const [insertMode, setInsertMode] = useState<BlockType | null>(null);
+  const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
+
+  const canvasPageRef = useRef<HTMLDivElement>(null);
 
   const selectedBlock = blocks.find((b) => b.id === selectedBlockId) || null;
   const hasLegacyContent = !!legacyContent?.trim();
   const hasNoBlocks = blocks.length === 0 && !isLoading;
   const showMigrationBanner = hasLegacyContent && hasNoBlocks;
+
+  /* ───── Split blocks into flow + positioned ───── */
+  const sortedBlocks = [...blocks].sort((a, b) => a.sort_order - b.sort_order);
+  const flowBlocks = sortedBlocks.filter((b) => !POSITIONED_TYPES.has(b.block_type));
+  const positionedBlocks = sortedBlocks.filter((b) => POSITIONED_TYPES.has(b.block_type));
 
   /* ───── Legacy migration ───── */
 
@@ -122,7 +131,7 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
 
   /* ───── Block handlers ───── */
 
-  const handleAddBlock = useCallback(
+  const handleAddFlowBlock = useCallback(
     (type: BlockType) => {
       const maxSort = blocks.reduce((max, b) => Math.max(max, b.sort_order), -1);
       const insert: TemplateBlockInsert = {
@@ -144,6 +153,65 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
     [blocks, templateId, createBlock]
   );
 
+  const handleStartInsertMode = useCallback((type: BlockType) => {
+    setInsertMode((prev) => (prev === type ? null : type));
+    setGhostPos(null);
+  }, []);
+
+  const handleCanvasClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (!insertMode || !canvasPageRef.current) return;
+      const rect = canvasPageRef.current.getBoundingClientRect();
+      const xPct = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+      const yPct = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+
+      const maxSort = blocks.reduce((max, b) => Math.max(max, b.sort_order), -1);
+
+      // Default sizes depending on type
+      let w = 25, h = 8;
+      if (insertMode === "image") { w = 30; h = 15; }
+      if (insertMode === "pdf_embed") { w = 40; h = 30; }
+      if (insertMode === "signature_block") { w = 30; h = 10; }
+
+      // Clamp to page
+      const cx = Math.min(xPct, 100 - w);
+      const cy = Math.min(yPct, 100 - h);
+
+      const insert: TemplateBlockInsert = {
+        template_id: templateId,
+        block_type: insertMode,
+        page: 1,
+        x: cx, y: cy, w, h,
+        z_index: 10, rotation: 0,
+        is_locked: false, is_visible: true,
+        content: defaultContent(insertMode) as any,
+        style: defaultStyle(insertMode),
+        visibility_rules: { roles: ["titular", "adherente", "contratada"], conditions: [] },
+        sort_order: maxSort + 1,
+      };
+
+      createBlock.mutate(insert, {
+        onSuccess: (created) => setSelectedBlockId(created.id),
+      });
+
+      setInsertMode(null);
+      setGhostPos(null);
+    },
+    [insertMode, blocks, templateId, createBlock]
+  );
+
+  const handleCanvasMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!insertMode || !canvasPageRef.current) return;
+      const rect = canvasPageRef.current.getBoundingClientRect();
+      setGhostPos({
+        x: ((e.clientX - rect.left) / rect.width) * 100,
+        y: ((e.clientY - rect.top) / rect.height) * 100,
+      });
+    },
+    [insertMode]
+  );
+
   const handleAssetInserted = useCallback((blockId: string) => setSelectedBlockId(blockId), []);
 
   const handleUpdateBlock = useCallback(
@@ -152,6 +220,13 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
       updateBlock.mutate({ id: selectedBlockId, ...updates } as any);
     },
     [selectedBlockId, updateBlock]
+  );
+
+  const handleUpdatePosition = useCallback(
+    (blockId: string, x: number, y: number, w: number, h: number) => {
+      updateBlock.mutate({ id: blockId, x, y, w, h } as any);
+    },
+    [updateBlock]
   );
 
   const handleDeleteBlock = useCallback(
@@ -165,10 +240,12 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
   const handleDuplicateBlock = useCallback(
     (block: TemplateBlock) => {
       const maxSort = blocks.reduce((max, b) => Math.max(max, b.sort_order), -1);
+      const offsetX = POSITIONED_TYPES.has(block.block_type) ? Math.min(block.x + 3, 100 - block.w) : block.x;
+      const offsetY = POSITIONED_TYPES.has(block.block_type) ? Math.min(block.y + 3, 100 - block.h) : block.y;
       createBlock.mutate({
         template_id: templateId,
         block_type: block.block_type, page: block.page,
-        x: block.x, y: block.y, w: block.w, h: block.h,
+        x: offsetX, y: offsetY, w: block.w, h: block.h,
         z_index: block.z_index, rotation: block.rotation,
         is_locked: false, is_visible: block.is_visible,
         content: block.content as any, style: block.style,
@@ -189,8 +266,7 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
     [updateBlock]
   );
 
-  /* ───── Drag & drop ───── */
-  const sortedBlocks = [...blocks].sort((a, b) => a.sort_order - b.sort_order);
+  /* ───── Flow DnD ───── */
 
   const handleDragEnd = useCallback(
     (result: DropResult) => {
@@ -198,22 +274,33 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
       const from = result.source.index;
       const to = result.destination.index;
       if (from === to) return;
-      const reordered = [...sortedBlocks];
+      const reordered = [...flowBlocks];
       const [moved] = reordered.splice(from, 1);
       reordered.splice(to, 0, moved);
       reorder.mutate({ templateId, blocks: reordered.map((b, i) => ({ id: b.id, sort_order: i })) });
     },
-    [sortedBlocks, reorder, templateId]
+    [flowBlocks, reorder, templateId]
   );
 
   const pageNumbers = [...new Set(sortedBlocks.map((b) => b.page || 1))].sort((a, b) => a - b);
   if (pageNumbers.length === 0) pageNumbers.push(1);
 
+  /* ───── Ghost preview for insert mode ───── */
+  const ghostSize = insertMode === "image" ? { w: 30, h: 15 }
+    : insertMode === "pdf_embed" ? { w: 40, h: 30 }
+    : insertMode === "signature_block" ? { w: 30, h: 10 }
+    : { w: 25, h: 8 };
+
   return (
     <div className="grid grid-cols-[180px_1fr_260px] gap-3 min-h-[600px]">
       {/* ─── Left: Compact Block Palette ─── */}
       <div className="rounded-lg border bg-card">
-        <BlockPalette onAddBlock={handleAddBlock} onInsertAsset={() => setShowAssetModal(true)} />
+        <BlockPalette
+          onAddBlock={handleAddFlowBlock}
+          onInsertAsset={() => setShowAssetModal(true)}
+          onStartInsertMode={handleStartInsertMode}
+          activeInsertMode={insertMode}
+        />
       </div>
 
       {/* ─── Center: Canvas ─── */}
@@ -227,6 +314,15 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
               <Badge variant="destructive" className="text-[10px] gap-1">
                 <AlertTriangle className="h-3 w-3" />
                 Legacy no migrado
+              </Badge>
+            )}
+            {insertMode && (
+              <Badge className="text-[10px] gap-1 bg-primary text-primary-foreground animate-pulse">
+                <Crosshair className="h-3 w-3" />
+                Insertando: {insertMode}
+                <button onClick={() => { setInsertMode(null); setGhostPos(null); }} className="ml-1 hover:opacity-70">
+                  <X className="h-2.5 w-2.5" />
+                </button>
               </Badge>
             )}
           </div>
@@ -292,18 +388,29 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
 
         {/* Canvas */}
         <ScrollArea className="flex-1 rounded-lg border bg-muted/20 p-4" style={{ backgroundImage: "radial-gradient(circle, hsl(var(--border)) 1px, transparent 1px)", backgroundSize: "20px 20px" }}>
-          <DragDropContext onDragEnd={handleDragEnd}>
-            <Droppable droppableId="canvas-blocks">
-              {(provided) => (
-                <div
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  className="mx-auto transition-transform origin-top"
-                  style={{ maxWidth: "794px", transform: `scale(${zoom})` }}
-                >
-                  <div className="bg-card shadow-lg rounded-sm border" style={{ width: "100%", minHeight: "1122px", padding: "40px" }}>
-                    <div className="space-y-2">
-                      {sortedBlocks.map((block, index) => (
+          <div
+            className="mx-auto transition-transform origin-top"
+            style={{ maxWidth: "794px", transform: `scale(${zoom})` }}
+          >
+            {/* A4 Page */}
+            <div
+              ref={canvasPageRef}
+              className={`bg-card shadow-lg rounded-sm border relative ${insertMode ? "cursor-crosshair" : ""}`}
+              style={{ width: "100%", minHeight: "1122px", padding: "40px" }}
+              onClick={insertMode ? handleCanvasClick : undefined}
+              onMouseMove={insertMode ? handleCanvasMouseMove : undefined}
+              onMouseLeave={() => setGhostPos(null)}
+            >
+              {/* Flow blocks — vertical DnD list */}
+              <DragDropContext onDragEnd={handleDragEnd}>
+                <Droppable droppableId="canvas-blocks">
+                  {(provided) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className="space-y-2 relative z-0"
+                    >
+                      {flowBlocks.map((block, index) => (
                         <Draggable key={block.id} draggableId={block.id} index={index} isDragDisabled={block.is_locked}>
                           {(dragProvided, snapshot) => (
                             <div
@@ -329,19 +436,65 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
                         </Draggable>
                       ))}
                       {provided.placeholder}
-                      {hasNoBlocks && !showMigrationBanner && (
-                        <div className="flex flex-col items-center justify-center h-40 border-2 border-dashed rounded-lg text-muted-foreground">
-                          <FileText className="h-8 w-8 mb-2 opacity-40" />
-                          <p className="text-sm font-medium">Canvas vacío</p>
-                          <p className="text-[11px]">Agregá bloques desde el panel izquierdo</p>
-                        </div>
-                      )}
                     </div>
-                  </div>
+                  )}
+                </Droppable>
+              </DragDropContext>
+
+              {/* Positioned blocks — absolute on the page */}
+              {positionedBlocks.map((block) => (
+                <div
+                  key={block.id}
+                  className="absolute"
+                  style={{
+                    left: `${block.x}%`,
+                    top: `${block.y}%`,
+                    width: `${block.w}%`,
+                    height: block.h > 0 ? `${block.h}%` : "auto",
+                    zIndex: block.z_index + 10,
+                  }}
+                >
+                  <CanvasBlock
+                    block={block}
+                    isSelected={selectedBlockId === block.id}
+                    onSelect={() => setSelectedBlockId(block.id)}
+                    onDelete={() => handleDeleteBlock(block.id)}
+                    onDuplicate={() => handleDuplicateBlock(block)}
+                    onToggleLock={() => handleToggleLock(block)}
+                    onToggleVisibility={() => handleToggleVisibility(block)}
+                    onUpdatePosition={(x, y, w, h) => handleUpdatePosition(block.id, x, y, w, h)}
+                    templateId={templateId}
+                    fieldPlacementRole={fieldPlacementRole}
+                    fieldPlacementType={fieldPlacementType}
+                  />
+                </div>
+              ))}
+
+              {/* Ghost preview during insert mode */}
+              {insertMode && ghostPos && (
+                <div
+                  className="absolute pointer-events-none border-2 border-dashed border-primary/50 bg-primary/10 rounded-md z-50 transition-none"
+                  style={{
+                    left: `${Math.min(ghostPos.x, 100 - ghostSize.w)}%`,
+                    top: `${Math.min(ghostPos.y, 100 - ghostSize.h)}%`,
+                    width: `${ghostSize.w}%`,
+                    height: `${ghostSize.h}%`,
+                  }}
+                >
+                  <span className="absolute top-1 left-1 text-[8px] text-primary font-medium">{insertMode}</span>
                 </div>
               )}
-            </Droppable>
-          </DragDropContext>
+
+              {/* Empty state */}
+              {hasNoBlocks && !showMigrationBanner && (
+                <div className="flex flex-col items-center justify-center h-40 border-2 border-dashed rounded-lg text-muted-foreground">
+                  <FileText className="h-8 w-8 mb-2 opacity-40" />
+                  <p className="text-sm font-medium">Canvas vacío</p>
+                  <p className="text-[11px]">Agregá bloques desde el panel izquierdo</p>
+                </div>
+              )}
+            </div>
+          </div>
         </ScrollArea>
       </div>
 
@@ -367,7 +520,7 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
             <BlockPropertyPanel
               block={selectedBlock}
               onUpdate={handleUpdateBlock}
-              onAddBlock={handleAddBlock}
+              onAddBlock={handleAddFlowBlock}
               templateId={templateId}
             />
           </TabsContent>
