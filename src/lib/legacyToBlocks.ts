@@ -1,4 +1,4 @@
-import type { BlockType, TemplateBlockInsert, BlockContent, SignerRole, FieldType, TemplateFieldInsert } from "@/types/templateDesigner";
+import type { BlockType, TemplateBlockInsert, BlockContent, SignerRole, FieldType, TemplateFieldInsert, TemplateFieldMeta } from "@/types/templateDesigner";
 
 /**
  * Result of parsing legacy HTML: blocks for content + fields for signatures.
