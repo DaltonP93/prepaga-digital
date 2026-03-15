@@ -1,11 +1,11 @@
-import React, { useCallback, useMemo, useRef } from "react";
+import React, { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ZoomIn, ZoomOut, MousePointer } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { ZoomIn, ZoomOut, MousePointer, Maximize, Columns } from "lucide-react";
 import { CanvasBlock, POSITIONED_TYPES } from "@/components/designer2/CanvasBlock";
 import { CanvasFieldOverlay } from "@/components/designer2/CanvasFieldOverlay";
 import type { TemplateBlock, FieldType, SignerRole } from "@/types/templateDesigner";
-import DOMPurify from "dompurify";
 
 interface OpenSignCanvasProps {
   templateId: string;
@@ -25,6 +25,8 @@ interface OpenSignCanvasProps {
   activeFieldType: FieldType;
   activeSignerRole: SignerRole;
   pageBackgroundUrl?: string;
+  selectedFieldId: string | null;
+  onFieldSelect: (id: string | null) => void;
 }
 
 const A4_W = 794;
@@ -48,8 +50,35 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
   activeFieldType,
   activeSignerRole,
   pageBackgroundUrl,
+  selectedFieldId,
+  onFieldSelect,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
+
+  // Observe container size for fit calculations
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      setContainerSize({ w: entry.contentRect.width, h: entry.contentRect.height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const fitWidth = useCallback(() => {
+    if (containerSize.w <= 0) return;
+    const z = Math.floor(((containerSize.w - 48) / A4_W) * 100);
+    onZoomChange(Math.max(30, Math.min(200, z)));
+  }, [containerSize.w, onZoomChange]);
+
+  const fitPage = useCallback(() => {
+    if (containerSize.w <= 0 || containerSize.h <= 0) return;
+    const zw = ((containerSize.w - 48) / A4_W) * 100;
+    const zh = ((containerSize.h - 48) / A4_H) * 100;
+    onZoomChange(Math.max(30, Math.min(200, Math.floor(Math.min(zw, zh)))));
+  }, [containerSize, onZoomChange]);
 
   const pageBlocks = useMemo(
     () => blocks.filter((b) => b.page === currentPage && b.is_visible),
@@ -63,42 +92,38 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
     (e: React.MouseEvent) => {
       if (e.target === e.currentTarget || (e.target as HTMLElement).dataset.canvas) {
         onSelectBlock(null);
+        onFieldSelect(null);
       }
     },
-    [onSelectBlock]
+    [onSelectBlock, onFieldSelect]
   );
 
   return (
-    <div className="flex flex-col h-full bg-muted/20">
+    <div className="flex flex-col h-full bg-neutral-200 dark:bg-neutral-900">
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b bg-background/80 backdrop-blur-sm shrink-0">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b bg-background/90 backdrop-blur-sm shrink-0">
         <div className="flex items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => onZoomChange(Math.max(50, zoom - 10))}
-            disabled={zoom <= 50}
-          >
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7"
+            onClick={() => onZoomChange(Math.max(30, zoom - 10))} disabled={zoom <= 30}>
             <ZoomOut className="h-3.5 w-3.5" />
           </Button>
-          <span className="text-[11px] font-medium w-10 text-center tabular-nums">
-            {zoom}%
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => onZoomChange(Math.min(200, zoom + 10))}
-            disabled={zoom >= 200}
-          >
+          <span className="text-[11px] font-medium w-10 text-center tabular-nums">{zoom}%</span>
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7"
+            onClick={() => onZoomChange(Math.min(200, zoom + 10))} disabled={zoom >= 200}>
             <ZoomIn className="h-3.5 w-3.5" />
+          </Button>
+
+          <Separator orientation="vertical" className="h-5 mx-1" />
+
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={fitWidth} title="Ajustar al ancho">
+            <Columns className="h-3.5 w-3.5" />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={fitPage} title="Ajustar a la página">
+            <Maximize className="h-3.5 w-3.5" />
           </Button>
         </div>
 
-        <span className="text-[11px] text-muted-foreground">
+        <span className="text-[11px] text-muted-foreground font-medium">
           Pág {currentPage} / {totalPages}
         </span>
 
@@ -113,12 +138,12 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
       {/* Canvas area */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-auto flex justify-center py-6"
+        className="flex-1 overflow-auto flex justify-center items-start py-6"
         onClick={handleCanvasClick}
         data-canvas="true"
       >
         <div
-          className="relative bg-background border shadow-lg"
+          className="relative bg-background shadow-2xl ring-1 ring-border/40"
           style={{
             width: A4_W,
             height: A4_H,
@@ -160,10 +185,8 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
               key={block.id}
               className="absolute"
               style={{
-                left: `${block.x}%`,
-                top: `${block.y}%`,
-                width: `${block.w}%`,
-                height: `${block.h}%`,
+                left: `${block.x}%`, top: `${block.y}%`,
+                width: `${block.w}%`, height: `${block.h}%`,
                 zIndex: block.z_index,
               }}
             >
@@ -183,14 +206,15 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
             </div>
           ))}
 
-          {/* Field overlays */}
+          {/* Field overlays — controlled selection */}
           <CanvasFieldOverlay
             templateId={templateId}
             activeFieldType={activeFieldType}
             activeSignerRole={activeSignerRole}
             placementActive={placementActive}
             currentPage={currentPage}
-            onFieldSelect={(id) => { if (!id) onSelectBlock(null); }}
+            selectedFieldId={selectedFieldId}
+            onFieldSelect={onFieldSelect}
           />
         </div>
       </div>

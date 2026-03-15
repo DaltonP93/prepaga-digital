@@ -13,6 +13,8 @@ interface CanvasFieldOverlayProps {
   activeSignerRole: SignerRole;
   placementActive: boolean;
   currentPage: number;
+  /** Controlled selection — if provided, internal state is bypassed */
+  selectedFieldId?: string | null;
   onFieldSelect?: (fieldId: string | null) => void;
 }
 
@@ -30,37 +32,27 @@ const ROLE_BORDER: Record<SignerRole, string> = {
   contratada: "#9333ea",
 };
 
+const ROLE_RING: Record<SignerRole, string> = {
+  titular: "rgba(37,99,235,0.35)",
+  adherente: "rgba(22,163,74,0.35)",
+  contratada: "rgba(147,51,234,0.35)",
+};
+
 const FIELD_ICONS: Record<string, React.ElementType> = {
-  signature: PenTool,
-  initials: Hash,
-  date: Calendar,
-  text: Type,
-  checkbox: CheckSquare,
-  name: User,
-  dni: CreditCard,
-  email: Mail,
+  signature: PenTool, initials: Hash, date: Calendar, text: Type,
+  checkbox: CheckSquare, name: User, dni: CreditCard, email: Mail,
 };
 
 const FIELD_DEFAULT_SIZE: Record<string, { w: number; h: number }> = {
-  signature: { w: 0.2, h: 0.06 },
-  initials: { w: 0.08, h: 0.04 },
-  date: { w: 0.15, h: 0.03 },
-  text: { w: 0.2, h: 0.03 },
-  checkbox: { w: 0.03, h: 0.03 },
-  name: { w: 0.2, h: 0.03 },
-  dni: { w: 0.15, h: 0.03 },
-  email: { w: 0.2, h: 0.03 },
+  signature: { w: 0.2, h: 0.06 }, initials: { w: 0.08, h: 0.04 },
+  date: { w: 0.15, h: 0.03 }, text: { w: 0.2, h: 0.03 },
+  checkbox: { w: 0.03, h: 0.03 }, name: { w: 0.2, h: 0.03 },
+  dni: { w: 0.15, h: 0.03 }, email: { w: 0.2, h: 0.03 },
 };
 
 const FIELD_LABELS: Record<string, string> = {
-  signature: "Firma",
-  initials: "Iniciales",
-  date: "Fecha",
-  text: "Texto",
-  checkbox: "Check",
-  name: "Nombre",
-  dni: "C.I.",
-  email: "Email",
+  signature: "Firma", initials: "Iniciales", date: "Fecha", text: "Texto",
+  checkbox: "Check", name: "Nombre", dni: "C.I.", email: "Email",
 };
 
 const HANDLE_SIZE = 8;
@@ -91,12 +83,10 @@ function applyResize(
   dx: number, dy: number
 ): { x: number; y: number; w: number; h: number } {
   let x = ox, y = oy, w = ow, h = oh;
-
   if (handle.includes("e")) { w = clamp(ow + dx, MIN_W, 1 - ox); }
   if (handle.includes("w")) { const nw = clamp(ow - dx, MIN_W, ox + ow); x = ox + ow - nw; w = nw; }
   if (handle.includes("s")) { h = clamp(oh + dy, MIN_H, 1 - oy); }
   if (handle.includes("n")) { const nh = clamp(oh - dy, MIN_H, oy + oh); y = oy + oh - nh; h = nh; }
-
   return { x, y, w, h };
 }
 
@@ -108,6 +98,7 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
   activeSignerRole,
   placementActive,
   currentPage,
+  selectedFieldId: controlledSelectedId,
   onFieldSelect,
 }) => {
   const { data: fields = [] } = useTemplateFields(templateId);
@@ -116,16 +107,18 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
   const deleteField = useDeleteTemplateField();
 
   const overlayRef = useRef<HTMLDivElement>(null);
-  const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
+
+  // Support both controlled and uncontrolled
+  const [internalSelectedId, setInternalSelectedId] = useState<string | null>(null);
+  const isControlled = controlledSelectedId !== undefined;
+  const selectedFieldId = isControlled ? controlledSelectedId : internalSelectedId;
+
   const [interactionState, setInteractionState] = useState<{
-    type: "drag" | "resize";
-    fieldId: string;
-    handle?: ResizeHandle;
+    type: "drag" | "resize"; fieldId: string; handle?: ResizeHandle;
   } | null>(null);
   const startRef = useRef({ mx: 0, my: 0, ox: 0, oy: 0, ow: 0, oh: 0 });
   const [livePos, setLivePos] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 
-  // Filter fields for current page, page-level only
   const pageFields = useMemo(
     () => fields.filter((f) => !f.block_id && f.page === currentPage),
     [fields, currentPage]
@@ -133,20 +126,16 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
 
   /* ─── Select / deselect ─── */
   const selectField = useCallback((id: string | null) => {
-    setSelectedFieldId(id);
+    if (!isControlled) setInternalSelectedId(id);
     onFieldSelect?.(id);
-  }, [onFieldSelect]);
+  }, [isControlled, onFieldSelect]);
 
   /* ─── Click to place ─── */
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (interactionState) return;
-      // If clicking on empty area, deselect
       if ((e.target as HTMLElement) === overlayRef.current) {
-        if (!placementActive) {
-          selectField(null);
-          return;
-        }
+        if (!placementActive) { selectField(null); return; }
       }
       if (!placementActive) return;
 
@@ -155,27 +144,18 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
       const nx = (e.clientX - rect.left) / rect.width;
       const ny = (e.clientY - rect.top) / rect.height;
       const defaults = FIELD_DEFAULT_SIZE[activeFieldType] || { w: 0.18, h: 0.04 };
-
       const fx = clamp(nx - defaults.w / 2, 0, 1 - defaults.w);
       const fy = clamp(ny - defaults.h / 2, 0, 1 - defaults.h);
 
       createField.mutate({
-        template_id: templateId,
-        block_id: null,
-        signer_role: activeSignerRole,
-        field_type: activeFieldType,
-        page: currentPage,
-        x: fx, y: fy, w: defaults.w, h: defaults.h,
-        required: true,
-        label: FIELD_LABELS[activeFieldType] || activeFieldType,
+        template_id: templateId, block_id: null,
+        signer_role: activeSignerRole, field_type: activeFieldType,
+        page: currentPage, x: fx, y: fy, w: defaults.w, h: defaults.h,
+        required: true, label: FIELD_LABELS[activeFieldType] || activeFieldType,
         meta: {
           relativeTo: "page",
           normalized: { x: fx, y: fy, w: defaults.w, h: defaults.h },
-          appearance: {
-            placeholderText: FIELD_LABELS[activeFieldType] || activeFieldType,
-            borderStyle: "dashed",
-            color: ROLE_BORDER[activeSignerRole],
-          },
+          appearance: { placeholderText: FIELD_LABELS[activeFieldType] || activeFieldType, borderStyle: "dashed", color: ROLE_BORDER[activeSignerRole] },
         } as any,
       });
     },
@@ -184,8 +164,7 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
 
   /* ─── Drag start ─── */
   const handleFieldMouseDown = useCallback((e: React.MouseEvent, field: TemplateField) => {
-    e.stopPropagation();
-    e.preventDefault();
+    e.stopPropagation(); e.preventDefault();
     selectField(field.id);
     setInteractionState({ type: "drag", fieldId: field.id });
     const rect = overlayRef.current?.getBoundingClientRect();
@@ -196,8 +175,7 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
 
   /* ─── Resize start ─── */
   const handleResizeMouseDown = useCallback((e: React.MouseEvent, field: TemplateField, handle: ResizeHandle) => {
-    e.stopPropagation();
-    e.preventDefault();
+    e.stopPropagation(); e.preventDefault();
     selectField(field.id);
     setInteractionState({ type: "resize", fieldId: field.id, handle });
     startRef.current = { mx: e.clientX, my: e.clientY, ox: field.x, oy: field.y, ow: field.w, oh: field.h };
@@ -207,48 +185,33 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
   /* ─── Mouse move / up ─── */
   useEffect(() => {
     if (!interactionState) return;
-
     const handleMove = (e: MouseEvent) => {
       const rect = overlayRef.current?.getBoundingClientRect();
       if (!rect) return;
       const dx = (e.clientX - startRef.current.mx) / rect.width;
       const dy = (e.clientY - startRef.current.my) / rect.height;
       const s = startRef.current;
-
       if (interactionState.type === "drag") {
-        const nx = clamp(s.ox + dx, 0, 1 - s.ow);
-        const ny = clamp(s.oy + dy, 0, 1 - s.oh);
-        setLivePos({ x: nx, y: ny, w: s.ow, h: s.oh });
-      } else if (interactionState.type === "resize" && interactionState.handle) {
+        setLivePos({ x: clamp(s.ox + dx, 0, 1 - s.ow), y: clamp(s.oy + dy, 0, 1 - s.oh), w: s.ow, h: s.oh });
+      } else if (interactionState.handle) {
         setLivePos(applyResize(interactionState.handle, s.ox, s.oy, s.ow, s.oh, dx, dy));
       }
     };
-
     const handleUp = () => {
       if (livePos && interactionState.fieldId) {
         const field = pageFields.find((f) => f.id === interactionState.fieldId);
         updateField.mutate({
           id: interactionState.fieldId,
-          x: livePos.x,
-          y: livePos.y,
-          w: livePos.w,
-          h: livePos.h,
-          meta: {
-            ...(field?.meta as any),
-            normalized: { x: livePos.x, y: livePos.y, w: livePos.w, h: livePos.h },
-          },
+          x: livePos.x, y: livePos.y, w: livePos.w, h: livePos.h,
+          meta: { ...(field?.meta as any), normalized: { x: livePos.x, y: livePos.y, w: livePos.w, h: livePos.h } },
         });
       }
       setInteractionState(null);
       setLivePos(null);
     };
-
     window.addEventListener("mousemove", handleMove);
     window.addEventListener("mouseup", handleUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleUp);
-    };
+    return () => { window.removeEventListener("mousemove", handleMove); window.removeEventListener("mouseup", handleUp); };
   }, [interactionState, livePos, pageFields, updateField]);
 
   /* ─── Keyboard shortcuts ─── */
@@ -256,15 +219,12 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
     const handler = (e: KeyboardEvent) => {
       if (!selectedFieldId) return;
       if (e.key === "Delete" || e.key === "Backspace") {
-        // Don't delete if user is typing in an input
         if ((e.target as HTMLElement).tagName === "INPUT" || (e.target as HTMLElement).tagName === "TEXTAREA") return;
         e.preventDefault();
         deleteField.mutate({ id: selectedFieldId, templateId });
         selectField(null);
       }
-      if (e.key === "Escape") {
-        selectField(null);
-      }
+      if (e.key === "Escape") selectField(null);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -283,8 +243,8 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
         const isInteracting = interactionState?.fieldId === field.id;
         const borderColor = ROLE_BORDER[field.signer_role];
         const bgColor = ROLE_COLORS[field.signer_role];
+        const ringColor = ROLE_RING[field.signer_role];
 
-        // Use live position during interaction, otherwise DB values
         const pos = isInteracting && livePos
           ? livePos
           : { x: field.x, y: field.y, w: field.w, h: field.h };
@@ -293,34 +253,25 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
           <div
             key={field.id}
             data-field-id={field.id}
-            className={`absolute flex items-center justify-center select-none group pointer-events-auto transition-shadow ${
-              isSelected ? "shadow-lg" : ""
-            }`}
+            className="absolute flex items-center justify-center select-none group pointer-events-auto"
             style={{
-              left: `${pos.x * 100}%`,
-              top: `${pos.y * 100}%`,
-              width: `${pos.w * 100}%`,
-              height: `${pos.h * 100}%`,
+              left: `${pos.x * 100}%`, top: `${pos.y * 100}%`,
+              width: `${pos.w * 100}%`, height: `${pos.h * 100}%`,
               backgroundColor: bgColor,
               borderColor,
-              borderWidth: isSelected ? 2 : 1.5,
+              borderWidth: isSelected ? 2.5 : 1.5,
               borderStyle: isSelected ? "solid" : "dashed",
               borderRadius: 4,
               cursor: "move",
               zIndex: isSelected ? 30 : 25,
+              boxShadow: isSelected ? `0 0 0 3px ${ringColor}, 0 4px 12px rgba(0,0,0,0.15)` : "none",
+              transition: "box-shadow 0.15s ease, border-width 0.1s ease",
             }}
             onMouseDown={(e) => handleFieldMouseDown(e, field)}
-            onClick={(e) => {
-              e.stopPropagation();
-              selectField(field.id);
-            }}
+            onClick={(e) => { e.stopPropagation(); selectField(field.id); }}
           >
-            {/* Content */}
             <Icon className="h-3 w-3 shrink-0" style={{ color: borderColor }} />
-            <span
-              className="text-[8px] font-medium ml-0.5 truncate"
-              style={{ color: borderColor }}
-            >
+            <span className="text-[8px] font-medium ml-0.5 truncate" style={{ color: borderColor }}>
               {field.label || field.field_type} — {field.signer_role}
             </span>
 
@@ -336,18 +287,16 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
               ×
             </button>
 
-            {/* 8 resize handles — only when selected */}
+            {/* 8 resize handles */}
             {isSelected && (Object.entries(HANDLE_POSITIONS) as [ResizeHandle, typeof HANDLE_POSITIONS[ResizeHandle]][]).map(
               ([handle, { cursor, style }]) => (
                 <div
                   key={handle}
                   className="absolute z-30 rounded-sm"
                   style={{
-                    width: HANDLE_SIZE,
-                    height: HANDLE_SIZE,
-                    cursor,
+                    width: HANDLE_SIZE, height: HANDLE_SIZE, cursor,
                     backgroundColor: borderColor,
-                    border: "1px solid hsl(var(--background))",
+                    border: "1.5px solid hsl(var(--background))",
                     ...style,
                   }}
                   onMouseDown={(e) => handleResizeMouseDown(e, field, handle)}
@@ -355,14 +304,11 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
               )
             )}
 
-            {/* Tooltip during interaction */}
+            {/* Position tooltip during interaction */}
             {isInteracting && livePos && (
               <div
                 className="absolute -top-7 left-0 px-1.5 py-0.5 rounded text-[9px] font-mono whitespace-nowrap shadow-md pointer-events-none"
-                style={{
-                  backgroundColor: borderColor,
-                  color: "#fff",
-                }}
+                style={{ backgroundColor: borderColor, color: "#fff" }}
               >
                 {interactionState.type === "drag"
                   ? `x: ${(livePos.x * 100).toFixed(1)}% y: ${(livePos.y * 100).toFixed(1)}%`
