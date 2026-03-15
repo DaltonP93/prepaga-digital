@@ -1,41 +1,104 @@
 
 
-# Migración Legacy → V2 completa en OpenSignTemplateEditor
+## Plan: Fase 5 — PAdES con document_type exactos y doble safeguard
 
-## Resumen
+### Archivo único
+`src/hooks/useSignatureLinkPublic.ts` — líneas 598-682
 
-Agregar soporte de `legacyContent` al editor V2 con banner de migración, ejecución de `parseLegacyHtml`, y persistencia de blocks + fields en una sola operación idempotente.
+### Cambio
+Reemplazar el bloque PAdES actual por la versión con valores exactos de `document_type` (`contrato`, `ddjj_salud`, `anexo`) en lugar de comparaciones genéricas con `.toLowerCase()`. Agrega doble safeguard para contratada pendiente.
 
-## Cambios
+### Diferencias clave vs. código actual (Fase 4)
 
-### 1. `OpenSignTemplateEditor.tsx` — Recibir `legacyContent` + banner + migración
+1. **document_type exacto**: usa `dt === 'contrato'` directo (sin `.toLowerCase()` ni check de `'contract'`)
+2. **ddjj_salud explícito**: filtra por `dt === 'ddjj_salud'` en vez de "todo lo que no sea contrato"
+3. **Anexos excluidos**: `dt === 'anexo'` retorna `false` explícitamente
+4. **Doble safeguard**: `safeDocsToSign` filtra contrato si `hasPendingContratada` como segunda capa
+5. **Error handling mejorado**: `pendingErr` se maneja separadamente del catch
 
-- Agregar prop `legacyContent?: string`
-- Detectar necesidad de migración: `legacyContent` presente AND `blocks.length === 0` AND `fields.length === 0` (después de que las queries carguen)
-- Mostrar banner con AlertTriangle + texto + botón "Migrar a V2"
-- Estado `migrating: boolean` para loading
-- Al click:
-  1. `parseLegacyHtml(templateId, legacyContent)` → `{ blocks, signatureFields }`
-  2. Insertar blocks en `template_blocks` vía supabase batch insert (con `sort_order` asignado por índice)
-  3. Insertar signatureFields en `template_fields` vía supabase batch insert
-  4. Invalidar queries `['template-blocks', templateId]` y `['template-fields', templateId]`
-  5. Toast de éxito
-- Usar `supabase.from('template_blocks').insert(...)` y `supabase.from('template_fields').insert(...)` directo para batch (los hooks mutation son single-record)
+### Código resultante (reemplaza líneas 598-682)
 
-### 2. `TemplateForm.tsx` — Pasar `legacyContent`
+```typescript
+// Post-signature: generate base PDF + PAdES only when it corresponds to this signer + step
+try {
+  const supabaseUrl = SUPABASE_URL;
+  const anonKey = SUPABASE_PUBLISHABLE_KEY;
 
-- En la línea donde renderiza `<OpenSignTemplateEditor templateId={template.id} />`, agregar `legacyContent={template?.content || watch("content")}`
+  const { data: docs, error: docsErr } = await signatureClient
+    .from('documents')
+    .select('id, document_type, beneficiary_id, is_final, signed_pdf_url')
+    .eq('sale_id', data.sale_id)
+    .eq('is_final', true)
+    .neq('document_type', 'firma');
 
-## Archivos
+  if (docsErr) {
+    console.warn('Could not fetch final documents:', docsErr);
+  } else if (docs && docs.length > 0) {
+    const recipientType = data.recipient_type;
 
-| Archivo | Cambio |
-|---------|--------|
-| `src/components/designer2/opensign/OpenSignTemplateEditor.tsx` | Props + banner + migración |
-| `src/components/TemplateForm.tsx` | Pasar `legacyContent` |
+    let hasPendingContratada = false;
+    try {
+      const { data: pendingCL, error: pendingErr } = await signatureClient
+        .from('signature_links').select('id')
+        .eq('sale_id', data.sale_id)
+        .eq('recipient_type', 'contratada')
+        .eq('status', 'pendiente');
+      if (pendingErr) {
+        console.warn('Could not check pending contratada links:', pendingErr);
+        hasPendingContratada = true;
+      } else {
+        hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
+      }
+    } catch (e) {
+      console.warn('Could not check pending contratada links (exception):', e);
+      hasPendingContratada = true;
+    }
 
-## No se toca
-- `legacyToBlocks.ts` (ya devuelve blocks + signatureFields correctamente)
-- Hooks de fields/blocks (se usa supabase directo para batch)
-- Backend / edge functions
-- Legacy 1.0
+    const docsToSign = docs.filter((d: any) => {
+      if (d.signed_pdf_url) return false;
+      const dt = d.document_type;
+
+      if (dt === 'contrato') {
+        return recipientType === 'contratada';
+      }
+      if (dt === 'ddjj_salud') {
+        if (recipientType === 'titular') return d.beneficiary_id == null;
+        if (recipientType === 'adherente') return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
+        return false;
+      }
+      if (dt === 'anexo') return false;
+      return false;
+    });
+
+    const safeDocsToSign = docsToSign.filter((d: any) => {
+      if (d.document_type === 'contrato' && hasPendingContratada) return false;
+      return true;
+    });
+
+    for (const doc of safeDocsToSign) {
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
+          body: JSON.stringify({ document_id: doc.id }),
+        });
+        await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
+          body: JSON.stringify({ document_id: doc.id }),
+        });
+      } catch (pdfErr) {
+        console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
+      }
+    }
+  }
+} catch (pdfGenErr) {
+  console.warn('Post-signature PDF generation error:', pdfGenErr);
+}
+```
+
+### Impacto
+- 1 archivo, 1 bloque (~85 líneas reemplaza ~85 líneas)
+- No afecta bloque de activación contratada (Fase 3)
+- No requiere migraciones
 

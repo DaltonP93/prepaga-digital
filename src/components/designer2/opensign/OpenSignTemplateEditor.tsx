@@ -1,20 +1,32 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTemplateBlocks, useUpdateTemplateBlock, useDeleteTemplateBlock, useCreateTemplateBlock } from "@/hooks/useTemplateBlocks";
 import { useTemplateFields, useUpdateTemplateField, useDeleteTemplateField } from "@/hooks/useTemplateFields";
 import { useTemplateAssets, useTemplateAssetPages } from "@/hooks/useTemplateAssets";
 import { getAssetSignedUrl } from "@/lib/assetUrlHelper";
+import { parseLegacyHtml } from "@/lib/legacyToBlocks";
+import { supabase } from "@/integrations/supabase/client";
 import type { TemplateBlock, TemplateField, FieldType, SignerRole, BlockType } from "@/types/templateDesigner";
+import type { Json } from "@/integrations/supabase/types";
 import { OpenSignPagesSidebar, type PageEntry } from "./OpenSignPagesSidebar";
 import { OpenSignCanvas } from "./OpenSignCanvas";
 import { OpenSignRightPanel } from "./OpenSignRightPanel";
+import { AlertTriangle, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 interface OpenSignTemplateEditorProps {
   templateId: string;
+  legacyContent?: string;
 }
 
 export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   templateId,
+  legacyContent,
 }) => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   /* ─── State ─── */
   const [currentPage, setCurrentPage] = useState(1);
   const [zoom, setZoom] = useState(80);
@@ -24,10 +36,11 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   const [activeRole, setActiveRole] = useState<SignerRole>("titular");
   const [activeFieldType, setActiveFieldType] = useState<FieldType>("signature");
   const [resolvedPages, setResolvedPages] = useState<PageEntry[]>([]);
+  const [migrating, setMigrating] = useState(false);
 
   /* ─── Data ─── */
-  const { data: blocks = [] } = useTemplateBlocks(templateId);
-  const { data: fields = [] } = useTemplateFields(templateId);
+  const { data: blocks = [], isLoading: blocksLoading } = useTemplateBlocks(templateId);
+  const { data: fields = [], isLoading: fieldsLoading } = useTemplateFields(templateId);
   const { data: assets = [] } = useTemplateAssets(templateId);
 
   const pdfAsset = assets.find((a) => a.asset_type === "pdf" && a.status === "ready");
@@ -38,6 +51,54 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   const createBlock = useCreateTemplateBlock();
   const updateField = useUpdateTemplateField();
   const deleteField = useDeleteTemplateField();
+
+  /* ─── Migration detection ─── */
+  const dataLoaded = !blocksLoading && !fieldsLoading;
+  const needsMigration = dataLoaded && !!legacyContent?.trim() && blocks.length === 0 && fields.length === 0;
+
+  const handleMigrate = useCallback(async () => {
+    if (!legacyContent?.trim()) return;
+    setMigrating(true);
+    try {
+      const { blocks: parsedBlocks, signatureFields } = parseLegacyHtml(templateId, legacyContent);
+
+      // Insert blocks with sort_order
+      if (parsedBlocks.length > 0) {
+        const rows = parsedBlocks.map((b, i) => ({
+          ...b,
+          sort_order: i,
+          content: b.content as unknown as Json,
+          style: b.style as unknown as Json,
+          visibility_rules: b.visibility_rules as unknown as Json,
+        }));
+        const { error: bErr } = await supabase.from("template_blocks").insert(rows as any);
+        if (bErr) throw bErr;
+      }
+
+      // Insert signature fields
+      if (signatureFields.length > 0) {
+        const fieldRows = signatureFields.map((f) => ({
+          ...f,
+          meta: f.meta as unknown as Json,
+        }));
+        const { error: fErr } = await supabase.from("template_fields").insert(fieldRows as any);
+        if (fErr) throw fErr;
+      }
+
+      // Refresh data
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["template-blocks", templateId] }),
+        queryClient.invalidateQueries({ queryKey: ["template-fields", templateId] }),
+      ]);
+
+      toast({ title: "Migración completada", description: `${parsedBlocks.length} bloques y ${signatureFields.length} campos creados.` });
+    } catch (err: any) {
+      console.error("Migration error:", err);
+      toast({ title: "Error en migración", description: err.message, variant: "destructive" });
+    } finally {
+      setMigrating(false);
+    }
+  }, [legacyContent, templateId, queryClient, toast]);
 
   /* ─── Selection coordination: field ↔ block ─── */
   const handleSelectBlock = useCallback((id: string | null) => {
@@ -199,50 +260,76 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
 
   /* ─── Render ─── */
   return (
-    <div className="grid grid-cols-[180px_1fr_280px] h-[calc(100vh-4rem)] overflow-hidden">
-      <OpenSignPagesSidebar
-        pages={pages}
-        currentPage={currentPage}
-        onPageChange={setCurrentPage}
-        fields={fields}
-      />
-      <OpenSignCanvas
-        templateId={templateId}
-        blocks={blocks}
-        currentPage={currentPage}
-        zoom={zoom}
-        onZoomChange={setZoom}
-        totalPages={pages.length}
-        selectedBlockId={selectedBlockId}
-        onSelectBlock={handleSelectBlock}
-        onDeleteBlock={handleDeleteBlock}
-        onDuplicateBlock={handleDuplicateBlock}
-        onToggleLock={handleToggleLock}
-        onToggleVisibility={handleToggleVisibility}
-        onUpdatePosition={handleUpdatePosition}
-        placementActive={placementActive}
-        activeFieldType={activeFieldType}
-        activeSignerRole={activeRole}
-        pageBackgroundUrl={currentPageBackground}
-        selectedFieldId={selectedFieldId}
-        onFieldSelect={handleSelectField}
-      />
-      <OpenSignRightPanel
-        templateId={templateId}
-        selectedBlock={selectedBlock}
-        onUpdateBlock={handleUpdateBlock}
-        onAddBlock={handleAddBlock}
-        fields={fields}
-        activeRole={activeRole}
-        onRoleChange={setActiveRole}
-        activeFieldType={activeFieldType}
-        onFieldTypeChange={setActiveFieldType}
-        placementActive={placementActive}
-        onTogglePlacement={setPlacementActive}
-        selectedField={selectedField}
-        onUpdateField={handleUpdateField}
-        onDeleteField={handleDeleteField}
-      />
+    <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
+      {/* Migration banner */}
+      {needsMigration && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800">
+          <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+          <p className="text-sm text-amber-800 dark:text-amber-200 flex-1">
+            Este template tiene contenido Legacy y todavía no fue migrado a V2.
+          </p>
+          <Button
+            size="sm"
+            onClick={handleMigrate}
+            disabled={migrating}
+          >
+            {migrating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Migrando…
+              </>
+            ) : (
+              "Migrar a V2"
+            )}
+          </Button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-[180px_1fr_280px] flex-1 overflow-hidden">
+        <OpenSignPagesSidebar
+          pages={pages}
+          currentPage={currentPage}
+          onPageChange={setCurrentPage}
+          fields={fields}
+        />
+        <OpenSignCanvas
+          templateId={templateId}
+          blocks={blocks}
+          currentPage={currentPage}
+          zoom={zoom}
+          onZoomChange={setZoom}
+          totalPages={pages.length}
+          selectedBlockId={selectedBlockId}
+          onSelectBlock={handleSelectBlock}
+          onDeleteBlock={handleDeleteBlock}
+          onDuplicateBlock={handleDuplicateBlock}
+          onToggleLock={handleToggleLock}
+          onToggleVisibility={handleToggleVisibility}
+          onUpdatePosition={handleUpdatePosition}
+          placementActive={placementActive}
+          activeFieldType={activeFieldType}
+          activeSignerRole={activeRole}
+          pageBackgroundUrl={currentPageBackground}
+          selectedFieldId={selectedFieldId}
+          onFieldSelect={handleSelectField}
+        />
+        <OpenSignRightPanel
+          templateId={templateId}
+          selectedBlock={selectedBlock}
+          onUpdateBlock={handleUpdateBlock}
+          onAddBlock={handleAddBlock}
+          fields={fields}
+          activeRole={activeRole}
+          onRoleChange={setActiveRole}
+          activeFieldType={activeFieldType}
+          onFieldTypeChange={setActiveFieldType}
+          placementActive={placementActive}
+          onTogglePlacement={setPlacementActive}
+          selectedField={selectedField}
+          onUpdateField={handleUpdateField}
+          onDeleteField={handleDeleteField}
+        />
+      </div>
     </div>
   );
 };
