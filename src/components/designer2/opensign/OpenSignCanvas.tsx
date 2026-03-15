@@ -47,6 +47,7 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
   placementActive,
   activeFieldType,
   activeSignerRole,
+  pageBackgroundUrl,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
