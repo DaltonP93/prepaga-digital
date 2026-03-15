@@ -26,10 +26,26 @@ export function parseLegacyHtmlToBlocks(
 
   const signatureHits: string[] = [];
 
+  /** Detect signature-zone elements (firma lines, underscores) */
   const isSignatureElement = (el: HTMLElement): boolean => {
     const text = el.textContent || "";
-    return /firma[:\s]*_{3,}/i.test(text) || /firma del/i.test(text);
+    return /firma[:\s]*_{3,}/i.test(text) || /firma\s+del\s+(contratante|cliente|titular|contratada|representante|empresa)/i.test(text);
   };
+
+  /** Detect signature-zone companion elements (Aclaración, C.I., placeholders like {{titular_nombre}}) */
+  const isSignatureCompanion = (el: HTMLElement): boolean => {
+    const text = (el.textContent || "").trim();
+    if (!text) return false;
+    // Short lines that are labels for the signature area
+    if (/^(aclaraci[oó]n|nombre|c\.?\s*i\.?|dni|documento|fecha)[:\s]*$/i.test(text)) return true;
+    // Lines that are ONLY a placeholder like {{titular_nombre}} or {{titular_dni}}
+    if (/^\{\{(titular|contratada|adherente)_(nombre|dni|firma|fecha|ci)\}\}$/.test(text.replace(/\s/g, ""))) return true;
+    // Bare underscores used as signature lines
+    if (/^_{4,}$/.test(text)) return true;
+    return false;
+  };
+
+  let inSignatureZone = false;
 
   const walk = (nodes: NodeListOf<ChildNode>) => {
     nodes.forEach((node) => {
@@ -37,14 +53,26 @@ export function parseLegacyHtmlToBlocks(
       const el = node as HTMLElement;
       const tag = el.tagName.toLowerCase();
 
-      // Collect signature hits instead of emitting inline
+      // Once we hit a signature element, mark the zone — everything after is companion content
       if (isSignatureElement(el)) {
+        inSignatureZone = true;
         signatureHits.push((el.textContent || "").trim());
         return;
       }
 
+      // Skip companion content that belongs to the signature zone
+      if (inSignatureZone && isSignatureCompanion(el)) {
+        return;
+      }
+
+      // If we're in signature zone but hit real content, exit the zone
+      if (inSignatureZone && el.textContent && el.textContent.trim().length > 80) {
+        inSignatureZone = false;
+      }
+
       // Headings
       if (["h1", "h2", "h3"].includes(tag)) {
+        inSignatureZone = false; // A heading always resets
         const level = parseInt(tag[1]) as 1 | 2 | 3;
         results.push({
           ...base,
@@ -89,6 +117,8 @@ export function parseLegacyHtmlToBlocks(
       if (["p", "div", "ul", "ol", "li", "span", "strong", "em", "blockquote"].includes(tag)) {
         const outerHtml = el.outerHTML;
         if (!el.textContent?.trim()) return;
+        // Skip short signature-zone leftovers
+        if (inSignatureZone) return;
         results.push({
           ...base,
           block_type: "text" as BlockType,
