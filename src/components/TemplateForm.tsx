@@ -23,7 +23,7 @@ import { useEnhancedPDFGeneration } from "@/hooks/useEnhancedPDFGeneration";
 import { Database } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 
-const TemplateDesigner2 = lazy(() => import("@/components/designer2/TemplateDesigner2"));
+const OpenSignTemplateEditor = lazy(() => import("@/components/designer2/opensign/OpenSignTemplateEditor").then(m => ({ default: m.OpenSignTemplateEditor })));
 
 type Template = Database["public"]["Tables"]["templates"]["Row"];
 
