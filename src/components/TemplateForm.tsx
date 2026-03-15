@@ -40,6 +40,7 @@ interface TemplateFormData {
   content: string;
   active: boolean;
   is_global: boolean;
+  designer_version: string;
 }
 
 const TAB_ORDER = ["setup", "content", "variables", "questions", "preview"] as const;
