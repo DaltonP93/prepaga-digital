@@ -179,6 +179,8 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
             activeFieldType={activeFieldType}
             activeSignerRole={activeSignerRole}
             placementActive={placementActive}
+            currentPage={currentPage}
+            onFieldSelect={(id) => { if (!id) onSelectBlock(null); }}
           />
         </div>
       </div>
