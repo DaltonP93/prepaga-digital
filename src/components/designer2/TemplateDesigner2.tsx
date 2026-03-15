@@ -23,7 +23,7 @@ import {
 import { parseLegacyHtmlToBlocks } from "@/lib/legacyToBlocks";
 import {
   ZoomIn, ZoomOut, Maximize, AlertTriangle,
-  Layers, Settings2, GitBranch, FileText, Crosshair, X,
+  Layers, Settings2, GitBranch, FileText, Crosshair, X, MousePointer,
 } from "lucide-react";
 import type {
   BlockType, TemplateBlock, TemplateBlockInsert,
