@@ -472,6 +472,14 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
                 </div>
               ))}
 
+              {/* Page-level field overlays */}
+              <CanvasFieldOverlay
+                templateId={templateId}
+                activeFieldType={fieldPlacementType}
+                activeSignerRole={fieldPlacementRole}
+                placementActive={fieldPlacementActive && !insertMode}
+              />
+
               {/* Ghost preview during insert mode */}
               {insertMode && ghostPos && (
                 <div
