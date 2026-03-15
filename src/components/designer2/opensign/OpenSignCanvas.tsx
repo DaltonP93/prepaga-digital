@@ -124,6 +124,14 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
             height: A4_H,
             transform: `scale(${zoom / 100})`,
             transformOrigin: "top center",
+            ...(pageBackgroundUrl
+              ? {
+                  backgroundImage: `url(${pageBackgroundUrl})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  backgroundRepeat: "no-repeat",
+                }
+              : {}),
           }}
           data-canvas="true"
         >
