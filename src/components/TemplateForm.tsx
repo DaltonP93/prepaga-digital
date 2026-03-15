@@ -168,6 +168,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
         content: data.content,
         is_active: data.active,
         company_id: profile?.company_id || "",
+        designer_version: data.designer_version,
       };
 
       if (isEditing && template) {
