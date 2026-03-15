@@ -97,6 +97,7 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
   const [rightTab, setRightTab] = useState("properties");
   const [insertMode, setInsertMode] = useState<BlockType | null>(null);
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
+  const [fieldPlacementActive, setFieldPlacementActive] = useState(false);
 
   const canvasPageRef = useRef<HTMLDivElement>(null);
 
