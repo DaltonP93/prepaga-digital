@@ -1,7 +1,6 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BlockPalette } from "./BlockPalette";
 import { CanvasBlock } from "./CanvasBlock";
@@ -17,12 +16,10 @@ import {
   useDeleteTemplateBlock,
   useReorderTemplateBlocks,
 } from "@/hooks/useTemplateBlocks";
-import { getAssetSignedUrl } from "@/lib/assetUrlHelper";
 import type {
   BlockType,
   TemplateBlock,
   TemplateBlockInsert,
-  TemplateAsset,
   BlockContent,
   SignerRole,
   FieldType,
