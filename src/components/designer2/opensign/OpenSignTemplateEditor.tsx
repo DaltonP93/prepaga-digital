@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useTemplateBlocks, useUpdateTemplateBlock, useDeleteTemplateBlock, useCreateTemplateBlock } from "@/hooks/useTemplateBlocks";
 import { useTemplateFields } from "@/hooks/useTemplateFields";
 import { useTemplateAssets, useTemplateAssetPages } from "@/hooks/useTemplateAssets";
+import { getAssetSignedUrl } from "@/lib/assetUrlHelper";
 import type { TemplateBlock, FieldType, SignerRole, BlockType } from "@/types/templateDesigner";
 import { OpenSignPagesSidebar, type PageEntry } from "./OpenSignPagesSidebar";
 import { OpenSignCanvas } from "./OpenSignCanvas";
@@ -21,13 +22,13 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   const [placementActive, setPlacementActive] = useState(false);
   const [activeRole, setActiveRole] = useState<SignerRole>("titular");
   const [activeFieldType, setActiveFieldType] = useState<FieldType>("signature");
+  const [resolvedPages, setResolvedPages] = useState<PageEntry[]>([]);
 
   /* ─── Data ─── */
   const { data: blocks = [] } = useTemplateBlocks(templateId);
   const { data: fields = [] } = useTemplateFields(templateId);
   const { data: assets = [] } = useTemplateAssets(templateId);
 
-  // Find first PDF asset for page thumbnails
   const pdfAsset = assets.find((a) => a.asset_type === "pdf" && a.status === "ready");
   const { data: assetPages = [] } = useTemplateAssetPages(pdfAsset?.id);
 
@@ -35,22 +36,49 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   const deleteBlock = useDeleteTemplateBlock();
   const createBlock = useCreateTemplateBlock();
 
-  /* ─── Computed pages ─── */
-  const pages: PageEntry[] = useMemo(() => {
-    // If we have PDF asset pages, use those
+  /* ─── Resolve signed URLs for page thumbnails ─── */
+  const rawPages: PageEntry[] = useMemo(() => {
     if (assetPages.length > 0) {
       return assetPages.map((ap) => ({
         page: ap.page_number,
         previewUrl: ap.preview_image_url,
       }));
     }
-    // Otherwise, derive from blocks
     const maxPage = blocks.reduce((max, b) => Math.max(max, b.page), 1);
     return Array.from({ length: maxPage }, (_, i) => ({
       page: i + 1,
       previewUrl: null,
     }));
   }, [assetPages, blocks]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const resolve = async () => {
+      const results: PageEntry[] = await Promise.all(
+        rawPages.map(async (p) => {
+          if (!p.previewUrl) return p;
+          // Already an absolute URL — use as-is
+          if (p.previewUrl.startsWith("http") || p.previewUrl.startsWith("data:") || p.previewUrl.startsWith("blob:")) {
+            return p;
+          }
+          // Storage path — get signed URL
+          const signed = await getAssetSignedUrl(p.previewUrl);
+          return { ...p, previewUrl: signed || null };
+        })
+      );
+      if (!cancelled) setResolvedPages(results);
+    };
+
+    resolve();
+    return () => { cancelled = true; };
+  }, [rawPages]);
+
+  /* ─── Current page background ─── */
+  const currentPageBackground = useMemo(() => {
+    const entry = resolvedPages.find((p) => p.page === currentPage);
+    return entry?.previewUrl || undefined;
+  }, [resolvedPages, currentPage]);
 
   const selectedBlock = useMemo(
     () => blocks.find((b) => b.id === selectedBlockId) || null,
@@ -155,7 +183,7 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   return (
     <div className="grid grid-cols-[180px_1fr_280px] h-[calc(100vh-4rem)] overflow-hidden">
       <OpenSignPagesSidebar
-        pages={pages}
+        pages={resolvedPages.length > 0 ? resolvedPages : rawPages}
         currentPage={currentPage}
         onPageChange={setCurrentPage}
       />
@@ -165,7 +193,7 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
         currentPage={currentPage}
         zoom={zoom}
         onZoomChange={setZoom}
-        totalPages={pages.length}
+        totalPages={(resolvedPages.length > 0 ? resolvedPages : rawPages).length}
         selectedBlockId={selectedBlockId}
         onSelectBlock={setSelectedBlockId}
         onDeleteBlock={handleDeleteBlock}
@@ -176,6 +204,7 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
         placementActive={placementActive}
         activeFieldType={activeFieldType}
         activeSignerRole={activeRole}
+        pageBackgroundUrl={currentPageBackground}
       />
       <OpenSignRightPanel
         templateId={templateId}
@@ -193,3 +222,5 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
     </div>
   );
 };
+
+export default OpenSignTemplateEditor;

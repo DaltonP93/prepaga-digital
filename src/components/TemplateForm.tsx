@@ -344,7 +344,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
           {watch("designer_version") === "2.0" ? (
             isEditing && template?.id ? (
               <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-                <TemplateDesigner2 templateId={template.id} legacyContent={watch("content")} />
+                <OpenSignTemplateEditor templateId={template.id} />
               </Suspense>
             ) : (
               <Card>

@@ -24,6 +24,7 @@ interface OpenSignCanvasProps {
   placementActive: boolean;
   activeFieldType: FieldType;
   activeSignerRole: SignerRole;
+  pageBackgroundUrl?: string;
 }
 
 const A4_W = 794;
