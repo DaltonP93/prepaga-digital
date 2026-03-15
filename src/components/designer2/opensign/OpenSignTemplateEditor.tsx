@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useTemplateBlocks, useUpdateTemplateBlock, useDeleteTemplateBlock, useCreateTemplateBlock } from "@/hooks/useTemplateBlocks";
-import { useTemplateFields } from "@/hooks/useTemplateFields";
+import { useTemplateFields, useUpdateTemplateField, useDeleteTemplateField } from "@/hooks/useTemplateFields";
 import { useTemplateAssets, useTemplateAssetPages } from "@/hooks/useTemplateAssets";
 import { getAssetSignedUrl } from "@/lib/assetUrlHelper";
-import type { TemplateBlock, FieldType, SignerRole, BlockType } from "@/types/templateDesigner";
+import type { TemplateBlock, TemplateField, FieldType, SignerRole, BlockType } from "@/types/templateDesigner";
 import { OpenSignPagesSidebar, type PageEntry } from "./OpenSignPagesSidebar";
 import { OpenSignCanvas } from "./OpenSignCanvas";
 import { OpenSignRightPanel } from "./OpenSignRightPanel";
@@ -19,6 +19,7 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [zoom, setZoom] = useState(80);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [placementActive, setPlacementActive] = useState(false);
   const [activeRole, setActiveRole] = useState<SignerRole>("titular");
   const [activeFieldType, setActiveFieldType] = useState<FieldType>("signature");
@@ -35,6 +36,19 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   const updateBlock = useUpdateTemplateBlock();
   const deleteBlock = useDeleteTemplateBlock();
   const createBlock = useCreateTemplateBlock();
+  const updateField = useUpdateTemplateField();
+  const deleteField = useDeleteTemplateField();
+
+  /* ─── Selection coordination: field ↔ block ─── */
+  const handleSelectBlock = useCallback((id: string | null) => {
+    setSelectedBlockId(id);
+    if (id) setSelectedFieldId(null);
+  }, []);
+
+  const handleSelectField = useCallback((id: string | null) => {
+    setSelectedFieldId(id);
+    if (id) setSelectedBlockId(null);
+  }, []);
 
   /* ─── Resolve signed URLs for page thumbnails ─── */
   const rawPages: PageEntry[] = useMemo(() => {
@@ -53,23 +67,17 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
 
   useEffect(() => {
     let cancelled = false;
-
     const resolve = async () => {
       const results: PageEntry[] = await Promise.all(
         rawPages.map(async (p) => {
           if (!p.previewUrl) return p;
-          // Already an absolute URL — use as-is
-          if (p.previewUrl.startsWith("http") || p.previewUrl.startsWith("data:") || p.previewUrl.startsWith("blob:")) {
-            return p;
-          }
-          // Storage path — get signed URL
+          if (p.previewUrl.startsWith("http") || p.previewUrl.startsWith("data:") || p.previewUrl.startsWith("blob:")) return p;
           const signed = await getAssetSignedUrl(p.previewUrl);
           return { ...p, previewUrl: signed || null };
         })
       );
       if (!cancelled) setResolvedPages(results);
     };
-
     resolve();
     return () => { cancelled = true; };
   }, [rawPages]);
@@ -83,6 +91,11 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   const selectedBlock = useMemo(
     () => blocks.find((b) => b.id === selectedBlockId) || null,
     [blocks, selectedBlockId]
+  );
+
+  const selectedField = useMemo(
+    () => fields.find((f) => f.id === selectedFieldId) || null,
+    [fields, selectedFieldId]
   );
 
   /* ─── Block handlers ─── */
@@ -110,16 +123,11 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
         template_id: templateId,
         block_type: block.block_type,
         page: block.page,
-        x: block.x + 2,
-        y: block.y + 2,
-        w: block.w,
-        h: block.h,
-        z_index: block.z_index,
-        rotation: block.rotation,
-        is_locked: false,
-        is_visible: true,
-        content: block.content,
-        style: block.style,
+        x: block.x + 2, y: block.y + 2,
+        w: block.w, h: block.h,
+        z_index: block.z_index, rotation: block.rotation,
+        is_locked: false, is_visible: true,
+        content: block.content, style: block.style,
         visibility_rules: block.visibility_rules,
         sort_order: block.sort_order + 1,
       });
@@ -152,41 +160,51 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
 
   const handleAddBlock = useCallback(
     (type: BlockType) => {
+      if (type === "signature_block") return;
       const defaults: Record<string, any> = {
         text: { content: { kind: "rich_text", html: "<p>Nuevo texto</p>", plain_text: "Nuevo texto", semantic_role: "paragraph", placeholder_refs: [] }, style: { fontSize: 12, fontWeight: 400, textAlign: "left" } },
         heading: { content: { kind: "heading", level: 2, text: "Título", placeholder_refs: [] }, style: { fontSize: 18, fontWeight: 700, textAlign: "center" } },
       };
-      // signature_block is NOT allowed in V2 — signatures are template_fields only
-      if (type === "signature_block") return;
       const d = defaults[type] || { content: {}, style: {} };
       createBlock.mutate({
-        template_id: templateId,
-        block_type: type,
-        page: currentPage,
-        x: 0,
-        y: 0,
-        w: 100,
-        h: 10,
-        z_index: 0,
-        rotation: 0,
-        is_locked: false,
-        is_visible: true,
-        content: d.content,
-        style: d.style,
+        template_id: templateId, block_type: type, page: currentPage,
+        x: 0, y: 0, w: 100, h: 10, z_index: 0, rotation: 0,
+        is_locked: false, is_visible: true,
+        content: d.content, style: d.style,
         visibility_rules: { roles: ["titular", "adherente", "contratada"], conditions: [] },
         sort_order: blocks.length,
       });
     },
-    [createBlock, templateId, currentPage, blocks.length, activeRole]
+    [createBlock, templateId, currentPage, blocks.length]
   );
+
+  /* ─── Field handlers for right panel ─── */
+  const handleUpdateField = useCallback(
+    (updates: Partial<TemplateField>) => {
+      if (!selectedFieldId) return;
+      updateField.mutate({ id: selectedFieldId, ...updates } as any);
+    },
+    [selectedFieldId, updateField]
+  );
+
+  const handleDeleteField = useCallback(
+    (id: string) => {
+      deleteField.mutate({ id, templateId });
+      if (selectedFieldId === id) setSelectedFieldId(null);
+    },
+    [deleteField, templateId, selectedFieldId]
+  );
+
+  const pages = resolvedPages.length > 0 ? resolvedPages : rawPages;
 
   /* ─── Render ─── */
   return (
     <div className="grid grid-cols-[180px_1fr_280px] h-[calc(100vh-4rem)] overflow-hidden">
       <OpenSignPagesSidebar
-        pages={resolvedPages.length > 0 ? resolvedPages : rawPages}
+        pages={pages}
         currentPage={currentPage}
         onPageChange={setCurrentPage}
+        fields={fields}
       />
       <OpenSignCanvas
         templateId={templateId}
@@ -194,9 +212,9 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
         currentPage={currentPage}
         zoom={zoom}
         onZoomChange={setZoom}
-        totalPages={(resolvedPages.length > 0 ? resolvedPages : rawPages).length}
+        totalPages={pages.length}
         selectedBlockId={selectedBlockId}
-        onSelectBlock={setSelectedBlockId}
+        onSelectBlock={handleSelectBlock}
         onDeleteBlock={handleDeleteBlock}
         onDuplicateBlock={handleDuplicateBlock}
         onToggleLock={handleToggleLock}
@@ -206,6 +224,8 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
         activeFieldType={activeFieldType}
         activeSignerRole={activeRole}
         pageBackgroundUrl={currentPageBackground}
+        selectedFieldId={selectedFieldId}
+        onFieldSelect={handleSelectField}
       />
       <OpenSignRightPanel
         templateId={templateId}
@@ -219,6 +239,9 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
         onFieldTypeChange={setActiveFieldType}
         placementActive={placementActive}
         onTogglePlacement={setPlacementActive}
+        selectedField={selectedField}
+        onUpdateField={handleUpdateField}
+        onDeleteField={handleDeleteField}
       />
     </div>
   );
