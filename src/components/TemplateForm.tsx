@@ -341,15 +341,30 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
         </TabsContent>
 
         <TabsContent value="content" className="space-y-4">
-          <TemplateDesigner
-            template={template}
-            content={watch("content")}
-            onContentChange={handleContentChange}
-            dynamicFields={dynamicFields}
-            onDynamicFieldsChange={handleDynamicFieldsChange}
-            templateQuestions={questions || []}
-            templateId={template?.id}
-          />
+          {watch("designer_version") === "2.0" ? (
+            isEditing && template?.id ? (
+              <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+                <TemplateDesigner2 templateId={template.id} />
+              </Suspense>
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Blocks className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                  <p className="text-muted-foreground">Guardá el template primero para acceder al canvas de bloques.</p>
+                </CardContent>
+              </Card>
+            )
+          ) : (
+            <TemplateDesigner
+              template={template}
+              content={watch("content")}
+              onContentChange={handleContentChange}
+              dynamicFields={dynamicFields}
+              onDynamicFieldsChange={handleDynamicFieldsChange}
+              templateQuestions={questions || []}
+              templateId={template?.id}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="variables" className="space-y-4">
