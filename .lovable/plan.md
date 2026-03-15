@@ -1,104 +1,51 @@
 
 
-## Plan: Fase 5 — PAdES con document_type exactos y doble safeguard
+# Mejorar overlay drag/resize/select en CanvasFieldOverlay
 
-### Archivo único
-`src/hooks/useSignatureLinkPublic.ts` — líneas 598-682
+## Estado actual
 
-### Cambio
-Reemplazar el bloque PAdES actual por la versión con valores exactos de `document_type` (`contrato`, `ddjj_salud`, `anexo`) en lugar de comparaciones genéricas con `.toLowerCase()`. Agrega doble safeguard para contratada pendiente.
+`CanvasFieldOverlay.tsx` ya tiene drag, resize y selección básicos. Pero comparado con OpenSign (Placeholder.jsx + BorderResize.jsx) le faltan:
 
-### Diferencias clave vs. código actual (Fase 4)
+1. **Resize multi-handle** — Solo tiene handle bottom-right. OpenSign usa 4 esquinas + 4 bordes
+2. **Tooltip de coordenadas** — No muestra posición/tamaño durante drag/resize
+3. **Keyboard shortcuts** — No hay Delete/Backspace para eliminar campo seleccionado, ni Escape para deseleccionar
+4. **Deselect on canvas click** — El overlay no propaga deselección al canvas padre
+5. **Snap visual** — Sin guías de alineación durante drag
+6. **currentPage filter** — No filtra campos por página actual
 
-1. **document_type exacto**: usa `dt === 'contrato'` directo (sin `.toLowerCase()` ni check de `'contract'`)
-2. **ddjj_salud explícito**: filtra por `dt === 'ddjj_salud'` en vez de "todo lo que no sea contrato"
-3. **Anexos excluidos**: `dt === 'anexo'` retorna `false` explícitamente
-4. **Doble safeguard**: `safeDocsToSign` filtra contrato si `hasPendingContratada` como segunda capa
-5. **Error handling mejorado**: `pendingErr` se maneja separadamente del catch
+## Cambios
 
-### Código resultante (reemplaza líneas 598-682)
+### 1. `CanvasFieldOverlay.tsx` — Reescribir
 
-```typescript
-// Post-signature: generate base PDF + PAdES only when it corresponds to this signer + step
-try {
-  const supabaseUrl = SUPABASE_URL;
-  const anonKey = SUPABASE_PUBLISHABLE_KEY;
+- **8 handles de resize**: 4 esquinas (nwse, nesw, nwse, nesw) + 4 bordes (ns, ew, ns, ew), cada uno con cursor correcto
+- **Tooltip durante drag/resize**: Muestra `x: 45% y: 72%` o `w: 20% h: 6%` como badge flotante
+- **Filtro por `currentPage`**: Solo muestra campos donde `field.page === currentPage`
+- **Keyboard**: `Delete`/`Backspace` = eliminar campo seleccionado, `Escape` = deseleccionar
+- **Click en vacío** = deseleccionar (callback `onDeselectAll`)
+- **meta.normalized** se actualiza en cada persistencia (ya existe, se mantiene)
 
-  const { data: docs, error: docsErr } = await signatureClient
-    .from('documents')
-    .select('id, document_type, beneficiary_id, is_final, signed_pdf_url')
-    .eq('sale_id', data.sale_id)
-    .eq('is_final', true)
-    .neq('document_type', 'firma');
+### 2. `OpenSignCanvas.tsx` — Pasar `currentPage` al overlay
 
-  if (docsErr) {
-    console.warn('Could not fetch final documents:', docsErr);
-  } else if (docs && docs.length > 0) {
-    const recipientType = data.recipient_type;
+- Agregar prop `currentPage` a `CanvasFieldOverlay`
+- Pasar callback `onDeselectAll` para limpiar selección de bloques también
 
-    let hasPendingContratada = false;
-    try {
-      const { data: pendingCL, error: pendingErr } = await signatureClient
-        .from('signature_links').select('id')
-        .eq('sale_id', data.sale_id)
-        .eq('recipient_type', 'contratada')
-        .eq('status', 'pendiente');
-      if (pendingErr) {
-        console.warn('Could not check pending contratada links:', pendingErr);
-        hasPendingContratada = true;
-      } else {
-        hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
-      }
-    } catch (e) {
-      console.warn('Could not check pending contratada links (exception):', e);
-      hasPendingContratada = true;
-    }
+### 3. Props nuevas de `CanvasFieldOverlay`
 
-    const docsToSign = docs.filter((d: any) => {
-      if (d.signed_pdf_url) return false;
-      const dt = d.document_type;
-
-      if (dt === 'contrato') {
-        return recipientType === 'contratada';
-      }
-      if (dt === 'ddjj_salud') {
-        if (recipientType === 'titular') return d.beneficiary_id == null;
-        if (recipientType === 'adherente') return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
-        return false;
-      }
-      if (dt === 'anexo') return false;
-      return false;
-    });
-
-    const safeDocsToSign = docsToSign.filter((d: any) => {
-      if (d.document_type === 'contrato' && hasPendingContratada) return false;
-      return true;
-    });
-
-    for (const doc of safeDocsToSign) {
-      try {
-        await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-        await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-      } catch (pdfErr) {
-        console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
-      }
-    }
-  }
-} catch (pdfGenErr) {
-  console.warn('Post-signature PDF generation error:', pdfGenErr);
-}
+```text
++ currentPage: number
++ onFieldSelect?: (fieldId: string | null) => void
 ```
 
-### Impacto
-- 1 archivo, 1 bloque (~85 líneas reemplaza ~85 líneas)
-- No afecta bloque de activación contratada (Fase 3)
-- No requiere migraciones
+## Archivos
+
+| Archivo | Cambio |
+|---------|--------|
+| `src/components/designer2/CanvasFieldOverlay.tsx` | Reescribir con multi-handle resize, tooltip, keyboard, page filter |
+| `src/components/designer2/opensign/OpenSignCanvas.tsx` | Pasar `currentPage` y `onFieldSelect` al overlay |
+
+## No se toca
+- `useTemplateFields` hooks
+- `template_fields` schema
+- `OpenSignRightPanel.tsx`
+- `FieldOverlay.tsx`
 
