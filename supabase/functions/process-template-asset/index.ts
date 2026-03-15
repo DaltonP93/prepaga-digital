@@ -114,6 +114,28 @@ Deno.serve(async (req) => {
       .eq("id", asset_id);
 
     try {
+      // Idempotent: clean up previous pages and preview files before re-inserting
+      const { data: oldPages } = await adminClient
+        .from("template_asset_pages")
+        .select("id, preview_image_url")
+        .eq("asset_id", asset_id);
+
+      if (oldPages && oldPages.length > 0) {
+        // Delete old preview PNGs from storage
+        const previewPaths = oldPages
+          .map((p: any) => p.preview_image_url)
+          .filter((url: string | null) => url && url.length > 0);
+
+        if (previewPaths.length > 0) {
+          await adminClient.storage.from("documents").remove(previewPaths);
+        }
+
+        // Delete old page rows
+        await adminClient
+          .from("template_asset_pages")
+          .delete()
+          .eq("asset_id", asset_id);
+      }
       // Download PDF from storage
       const { data: fileData, error: dlErr } = await adminClient.storage
         .from("documents")

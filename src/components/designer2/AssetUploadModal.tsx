@@ -286,11 +286,53 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
     );
   };
 
-  const handleSelectExistingAsset = (asset: TemplateAsset) => {
+  const handleSelectExistingAsset = async (asset: TemplateAsset) => {
     if (asset.asset_type === "pdf" && asset.status === "ready" && asset.page_count) {
-      // For existing ready PDF, go straight to insert
-      insertBlock(asset.id, []);
+      // For existing ready PDFs: load pages from DB and show page selector
+      setErrorText("");
+      setStep("processing");
+      setStatusText("Cargando páginas...");
+      setPendingAsset(asset);
+
+      try {
+        const { data: dbPages, error: pagesErr } = await supabase
+          .from("template_asset_pages")
+          .select("*")
+          .eq("asset_id", asset.id)
+          .order("page_number", { ascending: true });
+
+        if (pagesErr) throw new Error(pagesErr.message);
+
+        const pages = dbPages || [];
+        const pageInfos: PdfPageInfo[] = [];
+
+        for (const p of pages) {
+          let thumbnailUrl: string | undefined;
+          if (p.preview_image_url) {
+            const { data: signedData } = await supabase.storage
+              .from("documents")
+              .createSignedUrl(p.preview_image_url, 3000);
+            thumbnailUrl = signedData?.signedUrl || undefined;
+          }
+          pageInfos.push({
+            pageNumber: p.page_number,
+            selected: true,
+            thumbnailUrl,
+            width: p.width || 595,
+            height: p.height || 842,
+          });
+        }
+
+        setPdfPages(pageInfos);
+        setStep("select_pages");
+        setStatusText("");
+      } catch (err: any) {
+        console.error("Error loading existing asset pages:", err);
+        setErrorText(err.message || "Error al cargar páginas");
+        setStep("upload");
+      }
     } else if (asset.status === "ready") {
+      // Images and other types: insert directly
       insertBlock(asset.id, []);
     }
   };

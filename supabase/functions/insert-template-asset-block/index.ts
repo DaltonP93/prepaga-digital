@@ -88,6 +88,33 @@ Deno.serve(async (req) => {
       );
     }
 
+    // For PDFs, verify all selected pages have previews
+    if (asset.asset_type === "pdf") {
+      const { data: checkPages } = await adminClient
+        .from("template_asset_pages")
+        .select("page_number, preview_image_url")
+        .eq("asset_id", asset_id);
+
+      const pages = checkPages || [];
+      const selectedPageNumbers = selected_pages && selected_pages.length > 0
+        ? selected_pages
+        : pages.map((p: any) => p.page_number);
+
+      const missingPreviews = pages
+        .filter((p: any) => selectedPageNumbers.includes(p.page_number))
+        .filter((p: any) => !p.preview_image_url);
+
+      if (missingPreviews.length > 0) {
+        return new Response(
+          JSON.stringify({
+            error: "Previews not ready yet. Please wait for thumbnail generation to complete.",
+            missing_pages: missingPreviews.map((p: any) => p.page_number),
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // Get max sort_order
     const { data: existingBlocks } = await adminClient
       .from("template_blocks")
