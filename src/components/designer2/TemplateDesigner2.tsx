@@ -323,3 +323,5 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
     </div>
   );
 };
+
+export default TemplateDesigner2;

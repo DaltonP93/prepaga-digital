@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,17 +10,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { TemplateDesigner } from "@/components/TemplateDesigner";
 import { QuestionBuilder } from "@/components/QuestionBuilder";
 import { QuestionCopyDialog } from "@/components/QuestionCopyDialog";
 import { EnhancedPlaceholdersPanel } from "@/components/templates/EnhancedPlaceholdersPanel";
 import { LiveTemplatePreview } from "@/components/templates/LiveTemplatePreview";
-import { FileText, Settings, Eye, HelpCircle, Copy, Code, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
+import { FileText, Settings, Eye, HelpCircle, Copy, Code, Sparkles, ChevronLeft, ChevronRight, Blocks, PenTool } from "lucide-react";
 import { useCreateTemplate, useUpdateTemplate } from "@/hooks/useTemplates";
 import { useTemplateQuestions } from "@/hooks/useTemplateQuestions";
 import { useEnhancedPDFGeneration } from "@/hooks/useEnhancedPDFGeneration";
 import { Database } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
+
+const TemplateDesigner2 = lazy(() => import("@/components/designer2/TemplateDesigner2"));
 
 type Template = Database["public"]["Tables"]["templates"]["Row"];
 
@@ -37,6 +40,7 @@ interface TemplateFormData {
   content: string;
   active: boolean;
   is_global: boolean;
+  designer_version: string;
 }
 
 const TAB_ORDER = ["setup", "content", "variables", "questions", "preview"] as const;
@@ -121,6 +125,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
       content: "",
       active: true,
       is_global: false,
+      designer_version: "1.0",
     },
   });
 
@@ -131,6 +136,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
       setValue("content", typeof template.content === "string" ? template.content : template.content ? JSON.stringify(template.content) : "");
       setValue("active", template.is_active ?? true);
       setValue("is_global", false);
+      setValue("designer_version", (template as any).designer_version || "1.0");
       setDynamicFields([]);
       setActiveTab("setup");
     } else if (!template && open) {
@@ -140,6 +146,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
         content: "",
         active: true,
         is_global: false,
+        designer_version: "1.0",
       });
       setDynamicFields([]);
       setActiveTab("setup");
@@ -161,6 +168,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
         content: data.content,
         is_active: data.active,
         company_id: profile?.company_id || "",
+        designer_version: data.designer_version,
       };
 
       if (isEditing && template) {
@@ -267,6 +275,46 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
                   </div>
                   <Switch checked={watch("active")} onCheckedChange={(checked) => setValue("active", checked)} />
                 </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <Label className="text-base">Motor del Template</Label>
+                  <p className="text-sm text-muted-foreground">Seleccioná el motor de diseño para este template.</p>
+                  <RadioGroup
+                    value={watch("designer_version")}
+                    onValueChange={(value) => setValue("designer_version", value)}
+                    className="grid grid-cols-1 gap-3"
+                  >
+                    <label
+                      htmlFor="engine-1"
+                      className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${watch("designer_version") === "1.0" ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`}
+                    >
+                      <RadioGroupItem value="1.0" id="engine-1" className="mt-0.5" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <PenTool className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">Legacy 1.0</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Editor HTML clásico con TipTap</p>
+                      </div>
+                    </label>
+                    <label
+                      htmlFor="engine-2"
+                      className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${watch("designer_version") === "2.0" ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`}
+                    >
+                      <RadioGroupItem value="2.0" id="engine-2" className="mt-0.5" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <Blocks className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">Designer 2.0 Premium</span>
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Nuevo</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Canvas A4 con bloques, assets PDF, overlay de campos</p>
+                      </div>
+                    </label>
+                  </RadioGroup>
+                </div>
               </CardContent>
             </Card>
 
@@ -293,15 +341,30 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
         </TabsContent>
 
         <TabsContent value="content" className="space-y-4">
-          <TemplateDesigner
-            template={template}
-            content={watch("content")}
-            onContentChange={handleContentChange}
-            dynamicFields={dynamicFields}
-            onDynamicFieldsChange={handleDynamicFieldsChange}
-            templateQuestions={questions || []}
-            templateId={template?.id}
-          />
+          {watch("designer_version") === "2.0" ? (
+            isEditing && template?.id ? (
+              <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+                <TemplateDesigner2 templateId={template.id} />
+              </Suspense>
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Blocks className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                  <p className="text-muted-foreground">Guardá el template primero para acceder al canvas de bloques.</p>
+                </CardContent>
+              </Card>
+            )
+          ) : (
+            <TemplateDesigner
+              template={template}
+              content={watch("content")}
+              onContentChange={handleContentChange}
+              dynamicFields={dynamicFields}
+              onDynamicFieldsChange={handleDynamicFieldsChange}
+              templateQuestions={questions || []}
+              templateId={template?.id}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="variables" className="space-y-4">
