@@ -164,20 +164,24 @@ export function parseLegacyHtml(
       role: SignerRole,
       fieldType: FieldType,
       label: string,
-      x: number,
-      y: number,
-      w: number,
-      h: number
+      fx: number,
+      fy: number,
+      fw: number,
+      fh: number
     ): Omit<TemplateFieldInsert, "id"> => ({
       template_id: templateId,
-      document_id: templateId, // placeholder — will be resolved at document generation
-      field_type: fieldType,
+      block_id: null,
       signer_role: role,
+      field_type: fieldType,
       label,
       page: 1,
-      x, y, w, h,
+      x: fx, y: fy, w: fw, h: fh,
       required: true,
-      meta: { normalized: true, source: "legacy_migration" },
+      meta: {
+        relativeTo: "page",
+        normalized: { x: fx, y: fy, w: fw, h: fh },
+        appearance: { placeholderText: label },
+      } as TemplateFieldMeta,
     });
 
     // Titular signature — left side
