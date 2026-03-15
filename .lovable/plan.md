@@ -1,104 +1,88 @@
 
 
-## Plan: Fase 5 — PAdES con document_type exactos y doble safeguard
+# Subfase 3B — Free Positioning & Drag/Resize for Designer 2.0
 
-### Archivo único
-`src/hooks/useSignatureLinkPublic.ts` — líneas 598-682
+## Problem
+The canvas currently uses `react-beautiful-dnd` for vertical list reordering only. All blocks stack sequentially. There's no click-to-place, free drag, or resize — the core interaction needed for a premium editor.
 
-### Cambio
-Reemplazar el bloque PAdES actual por la versión con valores exactos de `document_type` (`contrato`, `ddjj_salud`, `anexo`) en lugar de comparaciones genéricas con `.toLowerCase()`. Agrega doble safeguard para contratada pendiente.
+## Design Decision: Hybrid Layout
+Two layout modes coexist on the same canvas:
 
-### Diferencias clave vs. código actual (Fase 4)
+- **Flow blocks** (vertical stack, keep current DnD reorder): `text`, `heading`, `table`, `page_break`
+- **Positioned blocks** (absolute positioning, free drag + resize): `image`, `signature_block`, `placeholder_chip`, `attachment_card`, `pdf_embed`, `docx_embed`
 
-1. **document_type exacto**: usa `dt === 'contrato'` directo (sin `.toLowerCase()` ni check de `'contract'`)
-2. **ddjj_salud explícito**: filtra por `dt === 'ddjj_salud'` en vez de "todo lo que no sea contrato"
-3. **Anexos excluidos**: `dt === 'anexo'` retorna `false` explícitamente
-4. **Doble safeguard**: `safeDocsToSign` filtra contrato si `hasPendingContratada` como segunda capa
-5. **Error handling mejorado**: `pendingErr` se maneja separadamente del catch
+Flow blocks render first in document order. Positioned blocks float above them using `position: absolute` with their `x/y/w/h` values (stored as percentages of the A4 page).
 
-### Código resultante (reemplaza líneas 598-682)
+## Changes
 
+### 1. `CanvasBlock.tsx` — Add drag & resize for positioned blocks
+
+For positioned block types:
+- Wrap in `position: absolute` container using `x/y/w/h` as percentage coordinates
+- Implement mouse-based drag: `onMouseDown` captures offset → `onMouseMove` updates position → `onMouseUp` persists via `onUpdatePosition(x, y, w, h)`
+- Add resize handles (bottom-right corner + right edge + bottom edge) that update `w/h`
+- New prop: `onUpdatePosition: (x: number, y: number, w: number, h: number) => void`
+- New prop: `isPositioned: boolean`
+- Keep the existing flow rendering for non-positioned blocks unchanged
+
+### 2. `TemplateDesigner2.tsx` — Split flow vs positioned blocks on canvas
+
+Restructure the canvas area:
+- The A4 page div gets `position: relative`
+- Flow blocks render inside the existing `<DragDropContext>` vertical list (unchanged)
+- Positioned blocks render as absolute-positioned `<CanvasBlock>` elements outside the DnD context, directly on the page
+- `handleAddBlock` changes: for positioned types, set default `x: 10, y: 10, w: 30, h: 20` (percentages) instead of `0,0,100,0`
+
+**Click-to-place mode:**
+- New state: `insertMode: BlockType | null`
+- When user clicks a positioned block type in the palette, instead of immediately creating it, set `insertMode`
+- Canvas shows crosshair cursor + ghost preview following mouse
+- On click inside the A4 page, create block at that position (converting mouse coords to percentage of page)
+- Clear `insertMode` after placement
+- For flow blocks, keep instant append behavior
+
+**Position persistence:**
+- On drag end or resize end, call `updateBlock.mutate({ id, x, y, w, h })`
+- Coordinates stored as percentages (0-100) of A4 page dimensions
+
+### 3. `BlockPalette.tsx` — Support insert mode
+
+- New prop: `onStartInsertMode: (type: BlockType) => void`
+- For positioned block types, clicking calls `onStartInsertMode(type)` instead of `onAddBlock(type)`
+- For flow block types, keep calling `onAddBlock(type)` directly
+- Visual indicator when insert mode is active (highlight the selected block type)
+
+### 4. Positioned block types constant
+
+Add to `TemplateDesigner2.tsx`:
 ```typescript
-// Post-signature: generate base PDF + PAdES only when it corresponds to this signer + step
-try {
-  const supabaseUrl = SUPABASE_URL;
-  const anonKey = SUPABASE_PUBLISHABLE_KEY;
-
-  const { data: docs, error: docsErr } = await signatureClient
-    .from('documents')
-    .select('id, document_type, beneficiary_id, is_final, signed_pdf_url')
-    .eq('sale_id', data.sale_id)
-    .eq('is_final', true)
-    .neq('document_type', 'firma');
-
-  if (docsErr) {
-    console.warn('Could not fetch final documents:', docsErr);
-  } else if (docs && docs.length > 0) {
-    const recipientType = data.recipient_type;
-
-    let hasPendingContratada = false;
-    try {
-      const { data: pendingCL, error: pendingErr } = await signatureClient
-        .from('signature_links').select('id')
-        .eq('sale_id', data.sale_id)
-        .eq('recipient_type', 'contratada')
-        .eq('status', 'pendiente');
-      if (pendingErr) {
-        console.warn('Could not check pending contratada links:', pendingErr);
-        hasPendingContratada = true;
-      } else {
-        hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
-      }
-    } catch (e) {
-      console.warn('Could not check pending contratada links (exception):', e);
-      hasPendingContratada = true;
-    }
-
-    const docsToSign = docs.filter((d: any) => {
-      if (d.signed_pdf_url) return false;
-      const dt = d.document_type;
-
-      if (dt === 'contrato') {
-        return recipientType === 'contratada';
-      }
-      if (dt === 'ddjj_salud') {
-        if (recipientType === 'titular') return d.beneficiary_id == null;
-        if (recipientType === 'adherente') return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
-        return false;
-      }
-      if (dt === 'anexo') return false;
-      return false;
-    });
-
-    const safeDocsToSign = docsToSign.filter((d: any) => {
-      if (d.document_type === 'contrato' && hasPendingContratada) return false;
-      return true;
-    });
-
-    for (const doc of safeDocsToSign) {
-      try {
-        await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-        await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-      } catch (pdfErr) {
-        console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
-      }
-    }
-  }
-} catch (pdfGenErr) {
-  console.warn('Post-signature PDF generation error:', pdfGenErr);
-}
+const POSITIONED_TYPES: Set<BlockType> = new Set([
+  'image', 'signature_block', 'placeholder_chip', 
+  'attachment_card', 'pdf_embed', 'docx_embed'
+]);
 ```
 
-### Impacto
-- 1 archivo, 1 bloque (~85 líneas reemplaza ~85 líneas)
-- No afecta bloque de activación contratada (Fase 3)
-- No requiere migraciones
+### 5. Visual polish for positioned blocks
+
+- Selection ring with drag cursor
+- Resize handles: small squares at corners/edges, visible on hover/select
+- Snap-to-grid: optional, round to nearest 1% increment
+- Z-index controls via existing `z_index` field
+- Ghost preview during insert mode: semi-transparent rectangle following cursor
+
+## Files Modified
+
+| File | Change |
+|------|--------|
+| `src/components/designer2/TemplateDesigner2.tsx` | Split flow/positioned rendering, insert mode, click-to-place, position update handler |
+| `src/components/designer2/CanvasBlock.tsx` | Add drag/resize for positioned blocks, resize handles, new props |
+| `src/components/designer2/BlockPalette.tsx` | Add `onStartInsertMode` prop, visual active state |
+
+## What stays unchanged
+- Legacy 1.0 engine
+- Flow block DnD reordering
+- `template_blocks` table schema (already has x/y/w/h columns)
+- Field overlay system (`PageFieldOverlay`)
+- Right panel tabs, version panel, property panel
+- Migration banner
 
