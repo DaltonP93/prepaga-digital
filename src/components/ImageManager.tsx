@@ -171,6 +171,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
                 <p className="text-xs text-muted-foreground">o haz clic para seleccionar</p>
               </div>
               <Button
+                type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => inputRef.current?.click()}
