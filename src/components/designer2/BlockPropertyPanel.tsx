@@ -455,7 +455,7 @@ function TypeProperties({
       );
 
     case "image":
-      return <ImageProperties content={content} updateContent={updateContent} templateId={templateId} onUpdate={onUpdate} block={block} />;
+      return <ImageProperties content={content} updateContent={updateContent} templateId={templateId} onUpdate={onUpdate} block={block} onRequestPickImage={onRequestPickImage} />;
 
     case "placeholder_chip":
       return (
