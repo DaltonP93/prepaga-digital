@@ -96,11 +96,8 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
     const file = e.target.files?.[0];
     if (!file || !pendingImageBlockId) return;
     try {
-      const path = `template-assets/${templateId}/${Date.now()}-${file.name}`;
-      const { error: upErr } = await supabase.storage.from("documents").upload(path, file);
-      if (upErr) throw upErr;
-      const { data: urlData } = supabase.storage.from("documents").getPublicUrl(path);
-      updateBlock.mutate({ id: pendingImageBlockId, content: { ...((blocks.find(b => b.id === pendingImageBlockId)?.content as any) || {}), src: urlData.publicUrl, alt: file.name } } as any);
+      const result = await uploadTemplateImage(file, templateId);
+      updateBlock.mutate({ id: pendingImageBlockId, content: { ...((blocks.find(b => b.id === pendingImageBlockId)?.content as any) || {}), src: result.signedUrl, storage_path: result.storagePath, alt: file.name } } as any);
       toast({ title: "Imagen subida" });
     } catch (err: any) {
       toast({ title: "Error al subir imagen", description: err.message, variant: "destructive" });
