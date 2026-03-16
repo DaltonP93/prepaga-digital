@@ -85,6 +85,30 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   const updateField = useUpdateTemplateField();
   const deleteField = useDeleteTemplateField();
 
+  /* ─── Stable image picker callbacks ─── */
+  const openImageFilePicker = useCallback(() => {
+    setPendingImageBlockId(selectedBlockId);
+    if (imageFileInputRef.current) imageFileInputRef.current.value = "";
+    imageFileInputRef.current?.click();
+  }, [selectedBlockId]);
+
+  const handleImageFileSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !pendingImageBlockId) return;
+    try {
+      const path = `template-assets/${templateId}/${Date.now()}-${file.name}`;
+      const { error: upErr } = await supabase.storage.from("documents").upload(path, file);
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from("documents").getPublicUrl(path);
+      updateBlock.mutate({ id: pendingImageBlockId, content: { ...((blocks.find(b => b.id === pendingImageBlockId)?.content as any) || {}), src: urlData.publicUrl, alt: file.name } } as any);
+      toast({ title: "Imagen subida" });
+    } catch (err: any) {
+      toast({ title: "Error al subir imagen", description: err.message, variant: "destructive" });
+    } finally {
+      setPendingImageBlockId(null);
+    }
+  }, [pendingImageBlockId, templateId, updateBlock, blocks, toast]);
+
   /* ─── Drag-and-drop hook (consolidated logic) ─── */
   const { handleDragStart: onDragStart, handleDragEnd: onDragEnd } = useWidgetDrag({
     templateId,
