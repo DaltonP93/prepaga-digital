@@ -261,7 +261,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
   const addImage = useCallback((url: string = '') => {
     if (!editor) return;
 
-    editor.chain().focus().setImage({ src: url }).run();
+    (editor.chain().focus() as any).setImage({ src: url }).run();
     setShowImageManager(false);
   }, [editor, setShowImageManager]);
 
