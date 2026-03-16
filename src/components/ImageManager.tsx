@@ -257,6 +257,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
               }}
             />
             <Button
+              type="button"
               size="sm"
               onClick={(e) => {
                 const input = (e.currentTarget.parentElement?.querySelector('input') as HTMLInputElement);
