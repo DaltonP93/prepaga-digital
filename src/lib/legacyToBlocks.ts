@@ -126,11 +126,16 @@ export function parseLegacyHtml(
         return;
       }
 
-      // Text blocks
-      if (["p", "div", "ul", "ol", "li", "span", "strong", "em", "blockquote"].includes(tag)) {
+      // Text blocks — only block-level elements; skip large wrapper divs
+      if (["p", "div", "ul", "ol", "blockquote"].includes(tag)) {
         const outerHtml = el.outerHTML;
         if (!el.textContent?.trim()) return;
         if (inSignatureZone) return;
+        // Skip wrapper divs that contain the entire document (>50KB)
+        if (outerHtml.length > 50_000) {
+          walk(el.childNodes);
+          return;
+        }
         blocks.push({
           ...base,
           block_type: "text" as BlockType,
