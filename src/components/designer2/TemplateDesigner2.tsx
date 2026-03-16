@@ -1,4 +1,6 @@
 import React, { useState, useCallback, useRef } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -100,6 +102,32 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
   const [fieldPlacementActive, setFieldPlacementActive] = useState(false);
 
   const canvasPageRef = useRef<HTMLDivElement>(null);
+  const [pendingImageBlockId, setPendingImageBlockId] = useState<string | null>(null);
+  const imageFileInputRef = useRef<HTMLInputElement>(null);
+  const { toast: toast2 } = useToast();
+
+  const openImageFilePicker = useCallback(() => {
+    setPendingImageBlockId(selectedBlockId);
+    if (imageFileInputRef.current) imageFileInputRef.current.value = "";
+    imageFileInputRef.current?.click();
+  }, [selectedBlockId]);
+
+  const handleImageFileSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !pendingImageBlockId) return;
+    try {
+      const path = `template-assets/${templateId}/${Date.now()}-${file.name}`;
+      const { error: upErr } = await supabase.storage.from("documents").upload(path, file);
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from("documents").getPublicUrl(path);
+      updateBlock.mutate({ id: pendingImageBlockId, content: { ...((blocks.find(b => b.id === pendingImageBlockId)?.content as any) || {}), src: urlData.publicUrl, alt: file.name } } as any);
+      toast2({ title: "Imagen subida" });
+    } catch (err: any) {
+      toast2({ title: "Error al subir imagen", description: err.message, variant: "destructive" });
+    } finally {
+      setPendingImageBlockId(null);
+    }
+  }, [pendingImageBlockId, templateId, updateBlock, blocks, toast2]);
 
   const selectedBlock = blocks.find((b) => b.id === selectedBlockId) || null;
   const hasLegacyContent = !!legacyContent?.trim();
@@ -295,6 +323,14 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
 
   return (
     <div className="grid grid-cols-[180px_1fr_260px] gap-3 min-h-[600px]">
+      {/* Stable hidden file input — never unmounts */}
+      <input
+        ref={imageFileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={handleImageFileSelected}
+      />
       {/* ─── Left: Compact Block Palette ─── */}
       <div className="rounded-lg border bg-card">
         <BlockPalette
@@ -519,6 +555,7 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
               onUpdate={handleUpdateBlock}
               onAddBlock={handleAddFlowBlock}
               templateId={templateId}
+              onRequestPickImage={openImageFilePicker}
             />
           </TabsContent>
 

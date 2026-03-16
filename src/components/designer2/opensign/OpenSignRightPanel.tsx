@@ -31,6 +31,7 @@ interface OpenSignRightPanelProps {
   onUpdateField: (updates: Partial<TemplateField>) => void;
   onDeleteField: (id: string) => void;
   onInsertDocument?: () => void;
+  onRequestPickImage?: () => void;
 }
 
 const ROLES: {
@@ -158,6 +159,7 @@ export const OpenSignRightPanel: React.FC<OpenSignRightPanelProps> = ({
   onUpdateField,
   onDeleteField,
   onInsertDocument,
+  onRequestPickImage,
 }) => {
   return (
     <aside className="flex flex-col border-l bg-background h-full">
@@ -281,6 +283,7 @@ export const OpenSignRightPanel: React.FC<OpenSignRightPanelProps> = ({
               onUpdate={onUpdateBlock}
               onAddBlock={onAddBlock}
               templateId={templateId}
+              onRequestPickImage={onRequestPickImage}
             />
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center p-6 gap-3">

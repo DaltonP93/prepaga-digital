@@ -51,6 +51,10 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   const [migrating, setMigrating] = useState(false);
   const [activeDragData, setActiveDragData] = useState<WidgetDragData | null>(null);
   const [showAssetModal, setShowAssetModal] = useState(false);
+  const [pendingImageBlockId, setPendingImageBlockId] = useState<string | null>(null);
+
+  /* ─── Stable image file input ref (lives at editor root, never unmounts) ─── */
+  const imageFileInputRef = useRef<HTMLInputElement>(null);
 
   /* ─── Progressive mount: defer DnD to avoid freeze ─── */
   const [dndReady, setDndReady] = useState(false);
@@ -80,6 +84,30 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   const createBlock = useCreateTemplateBlock();
   const updateField = useUpdateTemplateField();
   const deleteField = useDeleteTemplateField();
+
+  /* ─── Stable image picker callbacks ─── */
+  const openImageFilePicker = useCallback(() => {
+    setPendingImageBlockId(selectedBlockId);
+    if (imageFileInputRef.current) imageFileInputRef.current.value = "";
+    imageFileInputRef.current?.click();
+  }, [selectedBlockId]);
+
+  const handleImageFileSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !pendingImageBlockId) return;
+    try {
+      const path = `template-assets/${templateId}/${Date.now()}-${file.name}`;
+      const { error: upErr } = await supabase.storage.from("documents").upload(path, file);
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from("documents").getPublicUrl(path);
+      updateBlock.mutate({ id: pendingImageBlockId, content: { ...((blocks.find(b => b.id === pendingImageBlockId)?.content as any) || {}), src: urlData.publicUrl, alt: file.name } } as any);
+      toast({ title: "Imagen subida" });
+    } catch (err: any) {
+      toast({ title: "Error al subir imagen", description: err.message, variant: "destructive" });
+    } finally {
+      setPendingImageBlockId(null);
+    }
+  }, [pendingImageBlockId, templateId, updateBlock, blocks, toast]);
 
   /* ─── Drag-and-drop hook (consolidated logic) ─── */
   const { handleDragStart: onDragStart, handleDragEnd: onDragEnd } = useWidgetDrag({
@@ -279,6 +307,14 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   /* ─── Editor content ─── */
   const editorContent = (
     <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
+      {/* Stable hidden file input — never unmounts */}
+      <input
+        ref={imageFileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={handleImageFileSelected}
+      />
       {/* Migration banner */}
       {needsMigration && (
         <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800">
@@ -337,6 +373,7 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
           onUpdateField={handleUpdateField}
           onDeleteField={handleDeleteField}
           onInsertDocument={() => setShowAssetModal(true)}
+          onRequestPickImage={openImageFilePicker}
         />
       </div>
 

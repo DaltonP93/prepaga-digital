@@ -23,6 +23,7 @@ interface BlockPropertyPanelProps {
   onUpdate: (updates: Partial<TemplateBlock>) => void;
   onAddBlock?: (type: BlockType) => void;
   templateId?: string;
+  onRequestPickImage?: () => void;
 }
 
 const SIGNER_ROLES: { value: SignerRole; label: string }[] = [
@@ -49,7 +50,7 @@ const TIPS = [
 ];
 
 export const BlockPropertyPanel: React.FC<BlockPropertyPanelProps> = ({
-  block, onUpdate, onAddBlock, templateId,
+  block, onUpdate, onAddBlock, templateId, onRequestPickImage,
 }) => {
   if (!block) {
     return (
@@ -163,6 +164,7 @@ export const BlockPropertyPanel: React.FC<BlockPropertyPanelProps> = ({
           updateStyle={updateStyle}
           templateId={templateId}
           onUpdate={onUpdate}
+          onRequestPickImage={onRequestPickImage}
         />
 
         <Separator />
@@ -217,7 +219,7 @@ export const BlockPropertyPanel: React.FC<BlockPropertyPanelProps> = ({
 /* ─── Type-specific properties ─── */
 
 function TypeProperties({
-  block, content, style, updateContent, updateStyle, templateId, onUpdate,
+  block, content, style, updateContent, updateStyle, templateId, onUpdate, onRequestPickImage,
 }: {
   block: TemplateBlock;
   content: any;
@@ -226,6 +228,7 @@ function TypeProperties({
   updateStyle: (k: string, v: any) => void;
   templateId?: string;
   onUpdate: (u: Partial<TemplateBlock>) => void;
+  onRequestPickImage?: () => void;
 }) {
   switch (block.block_type) {
     case "text":
@@ -454,7 +457,7 @@ function TypeProperties({
       );
 
     case "image":
-      return <ImageProperties content={content} updateContent={updateContent} templateId={templateId} onUpdate={onUpdate} block={block} />;
+      return <ImageProperties content={content} updateContent={updateContent} templateId={templateId} onUpdate={onUpdate} block={block} onRequestPickImage={onRequestPickImage} />;
 
     case "placeholder_chip":
       return (
@@ -482,13 +485,14 @@ function TypeProperties({
 /* ─── Image properties with upload/library/URL ─── */
 
 function ImageProperties({
-  content, updateContent, templateId, onUpdate, block,
+  content, updateContent, templateId, onUpdate, block, onRequestPickImage,
 }: {
   content: any;
   updateContent: (k: string, v: any) => void;
   templateId?: string;
   onUpdate: (u: Partial<TemplateBlock>) => void;
   block: TemplateBlock;
+  onRequestPickImage?: () => void;
 }) {
   const { toast } = useToast();
   const [imageTab, setImageTab] = useState<"upload" | "url">("upload");
@@ -540,11 +544,14 @@ function ImageProperties({
 
       {imageTab === "upload" ? (
         <div className="space-y-2">
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
+          {/* Only render local input when no stable picker is provided */}
+          {!onRequestPickImage && (
+            <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleFileUpload} />
+          )}
           <Button
             type="button" variant="outline" size="sm"
             className="w-full h-8 text-[11px] gap-1.5 border-dashed"
-            onClick={() => fileRef.current?.click()}
+            onClick={() => onRequestPickImage ? onRequestPickImage() : fileRef.current?.click()}
             disabled={uploading}
           >
             <ImageIcon className="h-3.5 w-3.5" />
@@ -570,7 +577,7 @@ function ImageProperties({
             />
           </div>
           <div className="flex gap-1">
-            <Button type="button" variant="outline" size="sm" className="flex-1 h-6 text-[10px] gap-1" onClick={() => fileRef?.current?.click()}>
+            <Button type="button" variant="outline" size="sm" className="flex-1 h-6 text-[10px] gap-1" onClick={() => onRequestPickImage ? onRequestPickImage() : fileRef?.current?.click()}>
               <Replace className="h-3 w-3" />
               Reemplazar
             </Button>
