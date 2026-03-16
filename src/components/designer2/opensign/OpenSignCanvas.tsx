@@ -170,8 +170,6 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
             disabled={!pageBackgroundUrl}>
             <Download className="h-3.5 w-3.5" />
           </Button>
-            <Maximize className="h-3.5 w-3.5" />
-          </Button>
         </div>
 
         <span className="text-[11px] text-muted-foreground font-medium">
