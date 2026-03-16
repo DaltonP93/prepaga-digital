@@ -52,18 +52,23 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   const updateField = useUpdateTemplateField();
   const deleteField = useDeleteTemplateField();
 
-  /* ─── Migration detection ─── */
+  /* ─── Migration detection (partial-aware) ─── */
   const dataLoaded = !blocksLoading && !fieldsLoading;
-  const needsMigration = dataLoaded && !!legacyContent?.trim() && blocks.length === 0 && fields.length === 0;
+  const hasLegacy = !!legacyContent?.trim();
+  const canMigrateBlocks = dataLoaded && hasLegacy && blocks.length === 0;
+  const canMigrateFields = dataLoaded && hasLegacy && fields.length === 0;
+  const needsMigration = canMigrateBlocks || canMigrateFields;
 
   const handleMigrate = useCallback(async () => {
     if (!legacyContent?.trim()) return;
     setMigrating(true);
     try {
       const { blocks: parsedBlocks, signatureFields } = parseLegacyHtml(templateId, legacyContent);
+      let blocksCreated = 0;
+      let fieldsCreated = 0;
 
-      // Insert blocks with sort_order
-      if (parsedBlocks.length > 0) {
+      // Insert blocks only if none exist yet
+      if (canMigrateBlocks && parsedBlocks.length > 0) {
         const rows = parsedBlocks.map((b, i) => ({
           ...b,
           sort_order: i,
@@ -73,16 +78,18 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
         }));
         const { error: bErr } = await supabase.from("template_blocks").insert(rows as any);
         if (bErr) throw bErr;
+        blocksCreated = parsedBlocks.length;
       }
 
-      // Insert signature fields
-      if (signatureFields.length > 0) {
+      // Insert signature fields only if none exist yet
+      if (canMigrateFields && signatureFields.length > 0) {
         const fieldRows = signatureFields.map((f) => ({
           ...f,
           meta: f.meta as unknown as Json,
         }));
         const { error: fErr } = await supabase.from("template_fields").insert(fieldRows as any);
         if (fErr) throw fErr;
+        fieldsCreated = signatureFields.length;
       }
 
       // Refresh data
@@ -91,14 +98,20 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
         queryClient.invalidateQueries({ queryKey: ["template-fields", templateId] }),
       ]);
 
-      toast({ title: "Migración completada", description: `${parsedBlocks.length} bloques y ${signatureFields.length} campos creados.` });
+      // Post-migration UX: reset view state
+      setCurrentPage(1);
+      setSelectedBlockId(null);
+      setSelectedFieldId(null);
+      setPlacementActive(false);
+
+      toast({ title: "Migración completada", description: `${blocksCreated} bloques y ${fieldsCreated} campos creados.` });
     } catch (err: any) {
       console.error("Migration error:", err);
       toast({ title: "Error en migración", description: err.message, variant: "destructive" });
     } finally {
       setMigrating(false);
     }
-  }, [legacyContent, templateId, queryClient, toast]);
+  }, [legacyContent, templateId, queryClient, toast, canMigrateBlocks, canMigrateFields]);
 
   /* ─── Selection coordination: field ↔ block ─── */
   const handleSelectBlock = useCallback((id: string | null) => {

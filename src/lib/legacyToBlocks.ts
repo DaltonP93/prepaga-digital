@@ -184,17 +184,17 @@ export function parseLegacyHtml(
       } as TemplateFieldMeta,
     });
 
-    // Titular signature — left side
-    signatureFields.push(makeField("titular", "signature", "Firma del Contratante", 5, 80, 40, 8));
-    signatureFields.push(makeField("titular", "name", "Nombre del Contratante", 5, 88, 40, 3));
-    signatureFields.push(makeField("titular", "dni", "DNI del Contratante", 5, 91, 20, 3));
-    signatureFields.push(makeField("titular", "date", "Fecha", 25, 91, 20, 3));
+    // Titular signature — left side (coordinates in 0..1 range for CanvasFieldOverlay)
+    signatureFields.push(makeField("titular", "signature", "Firma del Contratante", 0.05, 0.80, 0.40, 0.08));
+    signatureFields.push(makeField("titular", "name", "Nombre del Contratante", 0.05, 0.88, 0.40, 0.03));
+    signatureFields.push(makeField("titular", "dni", "DNI del Contratante", 0.05, 0.91, 0.20, 0.03));
+    signatureFields.push(makeField("titular", "date", "Fecha", 0.25, 0.91, 0.20, 0.03));
 
     // Contratada signature — right side
-    signatureFields.push(makeField("contratada", "signature", "Firma de la Contratada", 55, 80, 40, 8));
-    signatureFields.push(makeField("contratada", "name", "Nombre Representante", 55, 88, 40, 3));
-    signatureFields.push(makeField("contratada", "dni", "DNI Representante", 55, 91, 20, 3));
-    signatureFields.push(makeField("contratada", "date", "Fecha", 75, 91, 20, 3));
+    signatureFields.push(makeField("contratada", "signature", "Firma de la Contratada", 0.55, 0.80, 0.40, 0.08));
+    signatureFields.push(makeField("contratada", "name", "Nombre Representante", 0.55, 0.88, 0.40, 0.03));
+    signatureFields.push(makeField("contratada", "dni", "DNI Representante", 0.55, 0.91, 0.20, 0.03));
+    signatureFields.push(makeField("contratada", "date", "Fecha", 0.75, 0.91, 0.20, 0.03));
   }
 
   return { blocks, signatureFields };
