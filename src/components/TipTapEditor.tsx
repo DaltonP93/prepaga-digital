@@ -109,30 +109,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
         },
       }),
       CharacterCount.configure(),
-      Image.extend({
-        addAttributes() {
-          return {
-            ...this.parent?.(),
-            width: {
-              default: 'auto',
-            },
-            height: {
-              default: 'auto',
-            },
-            borderRadius: {
-              default: 0,
-            },
-            borderWidth: {
-              default: 0,
-            },
-            borderColor: {
-              default: primaryColor,
-            },
-          };
-        },
-      }).configure({
-        allowBase64: true,
-      }),
+      ResizableImageExtension.configure({}),
       Link.configure({
         openOnClick: false,
       }),

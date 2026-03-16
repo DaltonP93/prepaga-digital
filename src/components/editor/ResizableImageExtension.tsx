@@ -169,7 +169,7 @@ export const ResizableImageExtension = Node.create({
     return ReactNodeViewRenderer(ResizableImageView);
   },
 
-  addCommands() {
+  addCommands(): any {
     return {
       setImage:
         (options: { src: string; alt?: string; title?: string }) =>
