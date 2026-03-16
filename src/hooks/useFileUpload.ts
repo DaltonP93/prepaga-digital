@@ -23,11 +23,32 @@ export const useFileUpload = () => {
     try {
       setUploadState({ progress: 0, isUploading: true, error: null });
 
-      const fileName = `${Date.now()}-${file.name}`;
-      const filePath = path ? `${path}/${fileName}` : fileName;
+      // 1. Get user and company_id
+      const { data: { user }, error: authErr } = await supabase.auth.getUser();
+      if (authErr || !user) throw new Error('No autenticado');
 
+      setUploadState(prev => ({ ...prev, progress: 10 }));
+
+      const { data: profile, error: profErr } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profErr || !profile?.company_id) {
+        throw new Error('No se pudo obtener la empresa del usuario');
+      }
+
+      const companyId = profile.company_id;
       setUploadState(prev => ({ ...prev, progress: 20 }));
 
+      // 2. Build company-scoped path (required by storage RLS)
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const fileName = `${Date.now()}-${safeName}`;
+      const subPath = path || 'general';
+      const filePath = `${companyId}/${subPath}/${fileName}`;
+
+      // 3. Upload
       const { data, error } = await supabase.storage
         .from(bucket)
         .upload(filePath, file, {
@@ -35,46 +56,39 @@ export const useFileUpload = () => {
           upsert: false,
         });
 
-      if (error) throw error;
+      if (error) throw new Error(`Error al subir archivo: ${error.message}`);
 
       setUploadState(prev => ({ ...prev, progress: 60 }));
 
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('id', user?.id || '')
-        .single();
-
-      setUploadState(prev => ({ ...prev, progress: 80 }));
-
-      // Track file upload in database using correct schema
+      // 4. Track file upload in database (best-effort)
       await supabase
         .from('file_uploads')
         .insert({
-          uploaded_by: user?.id,
+          uploaded_by: user.id,
           file_name: file.name,
           file_size: file.size,
           file_type: file.type,
           file_url: data.path,
-          company_id: profile?.company_id,
+          company_id: companyId,
+        })
+        .then(({ error: dbErr }) => {
+          if (dbErr) console.warn('file_uploads insert failed (non-critical):', dbErr.message);
         });
 
-      setUploadState(prev => ({ ...prev, progress: 100 }));
+      setUploadState(prev => ({ ...prev, progress: 80 }));
 
-      // SECURITY: Use signed URLs instead of public URLs for private buckets
+      // 5. Generate signed URL for private bucket
       const { data: signedUrlData, error: signedUrlError } = await supabase.storage
         .from(bucket)
-        .createSignedUrl(data.path, 3600); // 1 hour expiry
+        .createSignedUrl(data.path, 3600);
 
-      if (signedUrlError) {
-        console.warn('Could not create signed URL, falling back to path:', signedUrlError);
+      if (signedUrlError || !signedUrlData?.signedUrl) {
+        console.warn('Could not create signed URL, returning storage path:', signedUrlError);
         setUploadState({ progress: 100, isUploading: false, error: null });
-        return data.path; // Return path for later signed URL generation
+        return data.path;
       }
 
       setUploadState({ progress: 100, isUploading: false, error: null });
-
       return signedUrlData.signedUrl;
     } catch (error: any) {
       setUploadState({ progress: 0, isUploading: false, error: error.message });
