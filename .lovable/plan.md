@@ -1,104 +1,136 @@
 
+Problema real detectado: el error volvió porque el cuello de botella principal no es `file_uploads`, sino la subida al bucket privado `documents` con rutas incompatibles con la policy de storage.
 
-## Plan: Fase 5 — PAdES con document_type exactos y doble safeguard
+Qué confirmé
+- El bucket `documents` es privado y su policy exige que la ruta empiece con `company_id/`.
+- Legacy 1.0 hoy sube a `template-images/...` en `useFileUpload.ts`, sin prefijo de empresa.
+- V2/OpenSign hoy sube a `template-assets/{templateId}/...` en:
+  - `TemplateDesigner2.tsx`
+  - `OpenSignTemplateEditor.tsx`
+  - fallback local de `BlockPropertyPanel.tsx`
+- Además, V2 usa `getPublicUrl()` sobre un bucket privado, así que aunque subiera, la URL resultante no es la correcta para render estable.
 
-### Archivo único
-`src/hooks/useSignatureLinkPublic.ts` — líneas 598-682
+Señales que lo prueban
+- Console: `✅ File uploaded successfully: null` en Legacy. Eso cuadra con un upload fallido o URL no utilizable que el hook hoy no reporta bien.
+- DB: `file_uploads` está vacío, así que la inserción ni siquiera llega de forma consistente.
+- Policies:
+  - `file_uploads`: INSERT permitido si `auth.uid() = uploaded_by`
+  - `storage.objects` para `documents`: INSERT permitido solo si `storage.foldername(name)[1] = company_id del usuario`
 
-### Cambio
-Reemplazar el bloque PAdES actual por la versión con valores exactos de `document_type` (`contrato`, `ddjj_salud`, `anexo`) en lugar de comparaciones genéricas con `.toLowerCase()`. Agrega doble safeguard para contratada pendiente.
-
-### Diferencias clave vs. código actual (Fase 4)
-
-1. **document_type exacto**: usa `dt === 'contrato'` directo (sin `.toLowerCase()` ni check de `'contract'`)
-2. **ddjj_salud explícito**: filtra por `dt === 'ddjj_salud'` en vez de "todo lo que no sea contrato"
-3. **Anexos excluidos**: `dt === 'anexo'` retorna `false` explícitamente
-4. **Doble safeguard**: `safeDocsToSign` filtra contrato si `hasPendingContratada` como segunda capa
-5. **Error handling mejorado**: `pendingErr` se maneja separadamente del catch
-
-### Código resultante (reemplaza líneas 598-682)
-
-```typescript
-// Post-signature: generate base PDF + PAdES only when it corresponds to this signer + step
-try {
-  const supabaseUrl = SUPABASE_URL;
-  const anonKey = SUPABASE_PUBLISHABLE_KEY;
-
-  const { data: docs, error: docsErr } = await signatureClient
-    .from('documents')
-    .select('id, document_type, beneficiary_id, is_final, signed_pdf_url')
-    .eq('sale_id', data.sale_id)
-    .eq('is_final', true)
-    .neq('document_type', 'firma');
-
-  if (docsErr) {
-    console.warn('Could not fetch final documents:', docsErr);
-  } else if (docs && docs.length > 0) {
-    const recipientType = data.recipient_type;
-
-    let hasPendingContratada = false;
-    try {
-      const { data: pendingCL, error: pendingErr } = await signatureClient
-        .from('signature_links').select('id')
-        .eq('sale_id', data.sale_id)
-        .eq('recipient_type', 'contratada')
-        .eq('status', 'pendiente');
-      if (pendingErr) {
-        console.warn('Could not check pending contratada links:', pendingErr);
-        hasPendingContratada = true;
-      } else {
-        hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
-      }
-    } catch (e) {
-      console.warn('Could not check pending contratada links (exception):', e);
-      hasPendingContratada = true;
-    }
-
-    const docsToSign = docs.filter((d: any) => {
-      if (d.signed_pdf_url) return false;
-      const dt = d.document_type;
-
-      if (dt === 'contrato') {
-        return recipientType === 'contratada';
-      }
-      if (dt === 'ddjj_salud') {
-        if (recipientType === 'titular') return d.beneficiary_id == null;
-        if (recipientType === 'adherente') return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
-        return false;
-      }
-      if (dt === 'anexo') return false;
-      return false;
-    });
-
-    const safeDocsToSign = docsToSign.filter((d: any) => {
-      if (d.document_type === 'contrato' && hasPendingContratada) return false;
-      return true;
-    });
-
-    for (const doc of safeDocsToSign) {
-      try {
-        await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-        await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-      } catch (pdfErr) {
-        console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
-      }
-    }
-  }
-} catch (pdfGenErr) {
-  console.warn('Post-signature PDF generation error:', pdfGenErr);
-}
+Diagnóstico
+```text
+Error repetido = mismatch entre path de storage y policy del bucket
+NO = falta de abrir el picker
+NO = problema principal de file_uploads
 ```
 
-### Impacto
-- 1 archivo, 1 bloque (~85 líneas reemplaza ~85 líneas)
-- No afecta bloque de activación contratada (Fase 3)
-- No requiere migraciones
+Plan de corrección estructural
+1. Centralizar la subida de imágenes en una sola rutina
+- Crear una utilidad/hook compartido para imágenes de templates.
+- Flujo único:
+  - obtener usuario autenticado
+  - obtener `company_id` desde `profiles`
+  - validar MIME permitido
+  - construir path correcto:
+    `"{companyId}/template-images/{templateId-or-context}/{timestamp}-{file.name}"`
+  - subir a `documents`
+  - generar signed URL con `createSignedUrl`
+  - devolver:
+    - `storagePath`
+    - `signedUrl`
+    - `companyId`
+    - metadata útil
 
+2. Corregir Legacy 1.0
+- `useFileUpload.ts` no debe subir a `template-images/...` a secas.
+- Debe usar path con prefijo `company_id`.
+- Debe dejar de “comerse” errores parciales:
+  - si falla upload
+  - si falla insert en `file_uploads`
+  - si falla signed URL
+  debe reportarlo explícitamente en consola/toast.
+- `ImageManager.tsx` debe seguir usando `type="button"` como ya quedó, pero consumiendo la nueva rutina central.
+
+3. Corregir V2 / OpenSign
+- Reemplazar uploads directos en:
+  - `TemplateDesigner2.tsx`
+  - `OpenSignTemplateEditor.tsx`
+  - `BlockPropertyPanel.tsx` fallback local
+- Ninguno debe llamar más a:
+  - `supabase.storage.from("documents").upload(path, file)` con path sin empresa
+  - `getPublicUrl()` para imágenes privadas
+- Todos deben usar la rutina central y persistir:
+  - `content.src = signedUrl`
+  - opcionalmente `content.asset_id` / `content.storage_path` si conviene mantener trazabilidad
+
+4. Mantener el picker estable en V2
+- La parte del input estable ya existe en:
+  - `TemplateDesigner2.tsx`
+  - `OpenSignTemplateEditor.tsx`
+- No hay que retroceder eso.
+- Solo hay que cambiar la rutina de subida para que el picker no cierre y además la carga funcione.
+
+5. Eliminar lógica duplicada/conflictiva
+- `BlockPropertyPanel.tsx` todavía conserva un fallback local de upload en `ImageProperties`.
+- Lo dejaría solo para modo standalone si realmente se usa fuera del editor, pero apuntando a la rutina central.
+- Objetivo: una sola forma de subir imagen en Legacy y V2.
+
+6. Ajustar render de imágenes privadas
+- Como `documents` es privado, no conviene depender de `getPublicUrl()`.
+- Usar signed URL para render inmediato.
+- Si el template necesita persistencia duradera, guardar también `storagePath` para regenerar signed URL al reabrir.
+
+7. QA a ejecutar después del fix
+- Legacy 1.0:
+  - subir PNG/JPG/WebP
+  - cancelar picker
+  - archivo inválido
+- V2/OpenSign:
+  - elegir imagen desde props
+  - reemplazar imagen
+  - abrir picker varias veces
+  - cerrar/reabrir editor y validar que la imagen siga resolviendo
+- Verificación de storage:
+  - confirmar que los objetos quedan en rutas tipo:
+    `companyId/...`
+- Verificación de DB:
+  - confirmar si `file_uploads` se sigue usando; si sí, que inserte con datos consistentes
+
+Archivos a tocar
+- `src/hooks/useFileUpload.ts`
+- `src/components/ImageManager.tsx`
+- `src/components/designer2/TemplateDesigner2.tsx`
+- `src/components/designer2/opensign/OpenSignTemplateEditor.tsx`
+- `src/components/designer2/BlockPropertyPanel.tsx`
+- posiblemente nueva utilidad compartida, por ejemplo:
+  - `src/lib/templateImageUpload.ts`
+  o
+  - `src/hooks/useTemplateImageUpload.ts`
+
+Detalles técnicos
+```text
+Storage policy actual para documents:
+- requiere bucket_id = 'documents'
+- requiere foldername(name)[1] = company_id del usuario
+
+Rutas actuales incorrectas:
+- template-images/...
+- template-assets/{templateId}/...
+
+Rutas esperadas:
+- {companyId}/template-images/{templateId}/...
+- {companyId}/template-assets/{templateId}/...
+```
+
+Resultado esperado del próximo fix
+- Legacy: no cierra y además sube bien
+- V2: no cierra y además sube bien
+- desaparece el error repetido porque la ruta ya cumple RLS de storage
+- la imagen renderiza con signed URL válida en bucket privado
+
+<lov-actions>
+<lov-suggestion message="Test the image upload flow end-to-end in Legacy and V2, including cancel, invalid file, and reopening the editor.">Verify that it works</lov-suggestion>
+<lov-suggestion message="Implement a shared template image upload utility that uses company-scoped storage paths and signed URLs for all editors.">Unify image uploads</lov-suggestion>
+<lov-suggestion message="Persist private asset storage paths and regenerate signed URLs when reopening V2 templates so images always render correctly.">Fix private asset persistence</lov-suggestion>
+<lov-suggestion message="Update the V2 document insertion UI text to match backend support, for example PDF and images only if DOCX is not fully supported yet.">Align document UI text</lov-suggestion>
+</lov-actions>
