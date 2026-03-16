@@ -7,6 +7,7 @@ import { useTemplateAssets, useTemplateAssetPages } from "@/hooks/useTemplateAss
 import { getAssetSignedUrl } from "@/lib/assetUrlHelper";
 import { parseLegacyHtml } from "@/lib/legacyToBlocks";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadTemplateImage } from "@/lib/templateImageUpload";
 import { FIELD_LABELS } from "@/lib/widgetUtils";
 import { useWidgetDrag } from "@/hooks/useWidgetDrag";
 import type { TemplateBlock, TemplateField, FieldType, SignerRole, BlockType } from "@/types/templateDesigner";

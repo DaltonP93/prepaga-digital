@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { TemplateBlock, SignerRole, BlockType } from "@/types/templateDesigner";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadTemplateImage } from "@/lib/templateImageUpload";
 import { useToast } from "@/hooks/use-toast";
 
 interface BlockPropertyPanelProps {
