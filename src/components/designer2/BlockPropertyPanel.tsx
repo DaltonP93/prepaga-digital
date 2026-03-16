@@ -23,6 +23,7 @@ interface BlockPropertyPanelProps {
   onUpdate: (updates: Partial<TemplateBlock>) => void;
   onAddBlock?: (type: BlockType) => void;
   templateId?: string;
+  onRequestPickImage?: () => void;
 }
 
 const SIGNER_ROLES: { value: SignerRole; label: string }[] = [
