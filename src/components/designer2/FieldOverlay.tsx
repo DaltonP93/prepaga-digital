@@ -5,9 +5,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Trash2, PenTool, Calendar, Type, CheckSquare, User, CreditCard, Mail, Hash, MousePointer } from "lucide-react";
-import { useTemplateFields, useCreateTemplateField, useDeleteTemplateField } from "@/hooks/useTemplateFields";
+import { Trash2, PenTool, Calendar, Type, CheckSquare, User, CreditCard, Mail, Hash, MousePointer, Stamp, ListFilter, Circle, GripVertical } from "lucide-react";
+import { useDraggable } from "@dnd-kit/core";
+import { useTemplateFields, useDeleteTemplateField } from "@/hooks/useTemplateFields";
 import type { FieldType, SignerRole } from "@/types/templateDesigner";
+import type { WidgetDragData } from "@/lib/widgetUtils";
 import { cn } from "@/lib/utils";
 
 interface FieldOverlayProps {
@@ -21,7 +23,7 @@ interface FieldOverlayProps {
   onSignerRoleChange?: (role: SignerRole) => void;
 }
 
-const FIELD_TYPES: { value: FieldType; label: string; icon: React.ElementType }[] = [
+export const FIELD_TYPES: { value: FieldType; label: string; icon: React.ElementType }[] = [
   { value: "signature", label: "Firma", icon: PenTool },
   { value: "initials", label: "Iniciales", icon: Hash },
   { value: "name", label: "Nombre", icon: User },
@@ -30,6 +32,9 @@ const FIELD_TYPES: { value: FieldType; label: string; icon: React.ElementType }[
   { value: "text", label: "Texto", icon: Type },
   { value: "checkbox", label: "Checkbox", icon: CheckSquare },
   { value: "email", label: "Email", icon: Mail },
+  { value: "stamp", label: "Sello", icon: Stamp },
+  { value: "dropdown", label: "Desplegable", icon: ListFilter },
+  { value: "radio", label: "Radio", icon: Circle },
 ];
 
 const SIGNER_ROLES: { value: SignerRole; label: string; color: string }[] = [
@@ -37,6 +42,41 @@ const SIGNER_ROLES: { value: SignerRole; label: string; color: string }[] = [
   { value: "adherente", label: "Adherente", color: "bg-green-500" },
   { value: "contratada", label: "Contratada", color: "bg-purple-500" },
 ];
+
+/* ─── Draggable widget button ─── */
+const DraggableWidget: React.FC<{
+  fieldType: FieldType;
+  label: string;
+  icon: React.ElementType;
+  isActive: boolean;
+  onClick: () => void;
+}> = ({ fieldType, label, icon: Icon, isActive, onClick }) => {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `widget-${fieldType}`,
+    data: { type: "widget", fieldType } satisfies WidgetDragData,
+  });
+
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      onClick={onClick}
+      {...listeners}
+      {...attributes}
+      className={cn(
+        "flex items-center gap-1.5 rounded-md border px-2.5 py-2 text-left transition-all text-[11px] font-medium touch-none",
+        isDragging && "opacity-40",
+        isActive
+          ? "border-primary bg-primary/10 text-primary"
+          : "border-border bg-background hover:bg-muted/50 text-foreground"
+      )}
+    >
+      <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground/50" />
+      <span className="flex-1 truncate">{label}</span>
+      <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+    </button>
+  );
+};
 
 export const FieldOverlay: React.FC<FieldOverlayProps> = ({
   templateId,
@@ -49,37 +89,9 @@ export const FieldOverlay: React.FC<FieldOverlayProps> = ({
   onSignerRoleChange,
 }) => {
   const { data: fields } = useTemplateFields(templateId);
-  const createField = useCreateTemplateField();
   const deleteField = useDeleteTemplateField();
 
   const allFields = fields || [];
-
-  const handleInsertField = (fieldType: FieldType) => {
-    onFieldTypeChange?.(fieldType);
-    createField.mutate({
-      template_id: templateId,
-      block_id: selectedBlockId || null,
-      signer_role: activeSignerRole,
-      field_type: fieldType,
-      page: 1,
-      x: 0.3 + Math.random() * 0.2,
-      y: 0.7 + Math.random() * 0.1,
-      w: 0.18,
-      h: 0.05,
-      required: true,
-      label: FIELD_TYPES.find((f) => f.value === fieldType)?.label || "",
-      meta: {
-        relativeTo: selectedBlockId ? "block" : "page",
-        blockId: selectedBlockId || undefined,
-        normalized: { x: 0.4, y: 0.75, w: 0.18, h: 0.05 },
-        appearance: {
-          placeholderText: FIELD_TYPES.find((f) => f.value === fieldType)?.label || "",
-          borderStyle: "dashed",
-          color: "#2563eb",
-        },
-      } as any,
-    });
-  };
 
   const handleDeleteField = (fieldId: string) => {
     deleteField.mutate({ id: fieldId, templateId });
@@ -96,7 +108,7 @@ export const FieldOverlay: React.FC<FieldOverlayProps> = ({
       <div className="flex items-center justify-between p-2 rounded-lg border bg-muted/30">
         <div className="flex items-center gap-2">
           <MousePointer className="h-3.5 w-3.5 text-muted-foreground" />
-          <Label className="text-[11px] font-medium">Colocar en canvas</Label>
+          <Label className="text-[11px] font-medium">Click para colocar</Label>
         </div>
         <Switch
           checked={placementActive}
@@ -104,29 +116,22 @@ export const FieldOverlay: React.FC<FieldOverlayProps> = ({
         />
       </div>
 
-      {/* Widget grid — 2 columns */}
+      <p className="text-[10px] text-muted-foreground">
+        Arrastrá un widget al canvas o hacé click con el modo activo.
+      </p>
+
+      {/* Widget grid — 2 columns, draggable */}
       <div className="grid grid-cols-2 gap-1.5">
-        {FIELD_TYPES.map((ft) => {
-          const Icon = ft.icon;
-          const isActive = activeFieldType === ft.value;
-          return (
-            <button
-              key={ft.value}
-              type="button"
-              disabled={createField.isPending}
-              onClick={() => handleInsertField(ft.value)}
-              className={cn(
-                "flex items-center gap-2 rounded-md border px-2.5 py-2 text-left transition-all text-[11px] font-medium",
-                isActive
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border bg-background hover:bg-muted/50 text-foreground"
-              )}
-            >
-              <span className="flex-1 truncate">{ft.label}</span>
-              <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            </button>
-          );
-        })}
+        {FIELD_TYPES.map((ft) => (
+          <DraggableWidget
+            key={ft.value}
+            fieldType={ft.value}
+            label={ft.label}
+            icon={ft.icon}
+            isActive={activeFieldType === ft.value}
+            onClick={() => onFieldTypeChange?.(ft.value)}
+          />
+        ))}
       </div>
 
       <Separator />

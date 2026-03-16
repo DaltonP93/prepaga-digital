@@ -1,11 +1,10 @@
 import React, { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { useTemplateFields, useCreateTemplateField, useUpdateTemplateField, useDeleteTemplateField } from "@/hooks/useTemplateFields";
 import type { TemplateField, FieldType, SignerRole } from "@/types/templateDesigner";
-import { PenTool, Calendar, Type, CheckSquare, User, CreditCard, Mail, Hash } from "lucide-react";
+import { PenTool, Calendar, Type, CheckSquare, User, CreditCard, Mail, Hash, Stamp, ListFilter, Circle } from "lucide-react";
+import { FIELD_DEFAULT_SIZE, FIELD_LABELS, clamp, applyResize, type ResizeHandle } from "@/lib/widgetUtils";
 
 /* ───────── types ───────── */
-
-type ResizeHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 
 interface CanvasFieldOverlayProps {
   templateId: string;
@@ -13,7 +12,6 @@ interface CanvasFieldOverlayProps {
   activeSignerRole: SignerRole;
   placementActive: boolean;
   currentPage: number;
-  /** Controlled selection — if provided, internal state is bypassed */
   selectedFieldId?: string | null;
   onFieldSelect?: (fieldId: string | null) => void;
 }
@@ -41,18 +39,7 @@ const ROLE_RING: Record<SignerRole, string> = {
 const FIELD_ICONS: Record<string, React.ElementType> = {
   signature: PenTool, initials: Hash, date: Calendar, text: Type,
   checkbox: CheckSquare, name: User, dni: CreditCard, email: Mail,
-};
-
-const FIELD_DEFAULT_SIZE: Record<string, { w: number; h: number }> = {
-  signature: { w: 0.2, h: 0.06 }, initials: { w: 0.08, h: 0.04 },
-  date: { w: 0.15, h: 0.03 }, text: { w: 0.2, h: 0.03 },
-  checkbox: { w: 0.03, h: 0.03 }, name: { w: 0.2, h: 0.03 },
-  dni: { w: 0.15, h: 0.03 }, email: { w: 0.2, h: 0.03 },
-};
-
-const FIELD_LABELS: Record<string, string> = {
-  signature: "Firma", initials: "Iniciales", date: "Fecha", text: "Texto",
-  checkbox: "Check", name: "Nombre", dni: "C.I.", email: "Email",
+  stamp: Stamp, dropdown: ListFilter, radio: Circle,
 };
 
 const HANDLE_SIZE = 8;
@@ -67,28 +54,6 @@ const HANDLE_POSITIONS: Record<ResizeHandle, { cursor: string; style: React.CSSP
   sw: { cursor: "nesw-resize", style: { bottom: -HANDLE_SIZE / 2, left: -HANDLE_SIZE / 2 } },
   w:  { cursor: "ew-resize",   style: { top: "50%", left: -HANDLE_SIZE / 2, transform: "translateY(-50%)" } },
 };
-
-const MIN_W = 0.03;
-const MIN_H = 0.02;
-
-/* ───────── helpers ───────── */
-
-function clamp(v: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, v));
-}
-
-function applyResize(
-  handle: ResizeHandle,
-  ox: number, oy: number, ow: number, oh: number,
-  dx: number, dy: number
-): { x: number; y: number; w: number; h: number } {
-  let x = ox, y = oy, w = ow, h = oh;
-  if (handle.includes("e")) { w = clamp(ow + dx, MIN_W, 1 - ox); }
-  if (handle.includes("w")) { const nw = clamp(ow - dx, MIN_W, ox + ow); x = ox + ow - nw; w = nw; }
-  if (handle.includes("s")) { h = clamp(oh + dy, MIN_H, 1 - oy); }
-  if (handle.includes("n")) { const nh = clamp(oh - dy, MIN_H, oy + oh); y = oy + oh - nh; h = nh; }
-  return { x, y, w, h };
-}
 
 /* ───────── component ───────── */
 
@@ -108,7 +73,6 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
 
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  // Support both controlled and uncontrolled
   const [internalSelectedId, setInternalSelectedId] = useState<string | null>(null);
   const isControlled = controlledSelectedId !== undefined;
   const selectedFieldId = isControlled ? controlledSelectedId : internalSelectedId;
@@ -124,7 +88,6 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
     [fields, currentPage]
   );
 
-  /* ─── Select / deselect ─── */
   const selectField = useCallback((id: string | null) => {
     if (!isControlled) setInternalSelectedId(id);
     onFieldSelect?.(id);

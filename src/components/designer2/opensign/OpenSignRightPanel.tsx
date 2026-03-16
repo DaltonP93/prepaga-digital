@@ -44,6 +44,7 @@ const ROLES: {
 const FIELD_TYPE_LABELS: Record<string, string> = {
   signature: "Firma", initials: "Iniciales", date: "Fecha", text: "Texto",
   checkbox: "Checkbox", name: "Nombre", dni: "C.I.", email: "Email",
+  stamp: "Sello", dropdown: "Desplegable", radio: "Radio",
 };
 
 /* ───── Field Property Panel ───── */
