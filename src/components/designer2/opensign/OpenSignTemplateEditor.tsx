@@ -345,6 +345,9 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
         templateId={templateId}
         open={showAssetModal}
         onOpenChange={setShowAssetModal}
+        onAssetInserted={() => {
+          queryClient.invalidateQueries({ queryKey: ["template-assets", templateId] });
+        }}
       />
     </div>
   );
