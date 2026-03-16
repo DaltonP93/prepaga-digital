@@ -156,6 +156,22 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
           <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={fitPage} title="Ajustar a la página">
             <Maximize className="h-3.5 w-3.5" />
           </Button>
+
+          <Separator orientation="vertical" className="h-5 mx-1" />
+
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" title="Imprimir"
+            onClick={() => window.print()}>
+            <Printer className="h-3.5 w-3.5" />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" title="Descargar PDF"
+            onClick={() => {
+              if (pageBackgroundUrl) window.open(pageBackgroundUrl, "_blank");
+            }}
+            disabled={!pageBackgroundUrl}>
+            <Download className="h-3.5 w-3.5" />
+          </Button>
+            <Maximize className="h-3.5 w-3.5" />
+          </Button>
         </div>
 
         <span className="text-[11px] text-muted-foreground font-medium">
