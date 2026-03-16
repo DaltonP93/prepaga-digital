@@ -164,6 +164,7 @@ export const BlockPropertyPanel: React.FC<BlockPropertyPanelProps> = ({
           updateStyle={updateStyle}
           templateId={templateId}
           onUpdate={onUpdate}
+          onRequestPickImage={onRequestPickImage}
         />
 
         <Separator />
