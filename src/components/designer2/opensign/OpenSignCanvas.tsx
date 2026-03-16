@@ -3,7 +3,7 @@ import { useDroppable } from "@dnd-kit/core";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ZoomIn, ZoomOut, MousePointer, Maximize, Columns, ChevronUp, ChevronDown } from "lucide-react";
+import { ZoomIn, ZoomOut, MousePointer, Maximize, Columns, ChevronUp, ChevronDown, Download, Printer } from "lucide-react";
 import { CanvasBlock, POSITIONED_TYPES } from "@/components/designer2/CanvasBlock";
 import { CanvasFieldOverlay } from "@/components/designer2/CanvasFieldOverlay";
 import usePdfPinchZoom from "@/hooks/usePdfPinchZoom";
