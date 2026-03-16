@@ -178,6 +178,7 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
         data-canvas="true"
       >
         <div
+          data-a4-page="true"
           className="relative bg-background shadow-2xl ring-1 ring-border/40"
           style={{
             width: A4_W,
