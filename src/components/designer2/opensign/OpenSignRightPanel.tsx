@@ -283,6 +283,7 @@ export const OpenSignRightPanel: React.FC<OpenSignRightPanelProps> = ({
               onUpdate={onUpdateBlock}
               onAddBlock={onAddBlock}
               templateId={templateId}
+              onRequestPickImage={onRequestPickImage}
             />
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center p-6 gap-3">

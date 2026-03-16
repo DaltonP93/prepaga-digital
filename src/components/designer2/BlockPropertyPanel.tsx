@@ -574,7 +574,7 @@ function ImageProperties({
             />
           </div>
           <div className="flex gap-1">
-            <Button type="button" variant="outline" size="sm" className="flex-1 h-6 text-[10px] gap-1" onClick={() => fileRef?.current?.click()}>
+            <Button type="button" variant="outline" size="sm" className="flex-1 h-6 text-[10px] gap-1" onClick={() => onRequestPickImage ? onRequestPickImage() : fileRef?.current?.click()}>
               <Replace className="h-3 w-3" />
               Reemplazar
             </Button>
