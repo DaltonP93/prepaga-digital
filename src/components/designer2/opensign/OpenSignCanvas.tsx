@@ -3,7 +3,7 @@ import { useDroppable } from "@dnd-kit/core";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ZoomIn, ZoomOut, MousePointer, Maximize, Columns, ChevronUp, ChevronDown } from "lucide-react";
+import { ZoomIn, ZoomOut, MousePointer, Maximize, Columns, ChevronUp, ChevronDown, Download, Printer } from "lucide-react";
 import { CanvasBlock, POSITIONED_TYPES } from "@/components/designer2/CanvasBlock";
 import { CanvasFieldOverlay } from "@/components/designer2/CanvasFieldOverlay";
 import usePdfPinchZoom from "@/hooks/usePdfPinchZoom";
@@ -156,6 +156,20 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
           <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={fitPage} title="Ajustar a la página">
             <Maximize className="h-3.5 w-3.5" />
           </Button>
+
+          <Separator orientation="vertical" className="h-5 mx-1" />
+
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" title="Imprimir"
+            onClick={() => window.print()}>
+            <Printer className="h-3.5 w-3.5" />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" title="Descargar PDF"
+            onClick={() => {
+              if (pageBackgroundUrl) window.open(pageBackgroundUrl, "_blank");
+            }}
+            disabled={!pageBackgroundUrl}>
+            <Download className="h-3.5 w-3.5" />
+          </Button>
         </div>
 
         <span className="text-[11px] text-muted-foreground font-medium">
@@ -178,6 +192,7 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
         data-canvas="true"
       >
         <div
+          data-a4-page="true"
           className="relative bg-background shadow-2xl ring-1 ring-border/40"
           style={{
             width: A4_W,

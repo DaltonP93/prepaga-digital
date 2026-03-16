@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { DndContext, type DragEndEvent, type DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTemplateBlocks, useUpdateTemplateBlock, useDeleteTemplateBlock, useCreateTemplateBlock } from "@/hooks/useTemplateBlocks";
 import { useTemplateFields, useUpdateTemplateField, useDeleteTemplateField, useCreateTemplateField } from "@/hooks/useTemplateFields";
@@ -7,13 +7,15 @@ import { useTemplateAssets, useTemplateAssetPages } from "@/hooks/useTemplateAss
 import { getAssetSignedUrl } from "@/lib/assetUrlHelper";
 import { parseLegacyHtml } from "@/lib/legacyToBlocks";
 import { supabase } from "@/integrations/supabase/client";
-import { FIELD_DEFAULT_SIZE, FIELD_LABELS, clamp, type WidgetDragData } from "@/lib/widgetUtils";
+import { FIELD_LABELS } from "@/lib/widgetUtils";
+import { useWidgetDrag } from "@/hooks/useWidgetDrag";
 import type { TemplateBlock, TemplateField, FieldType, SignerRole, BlockType } from "@/types/templateDesigner";
 import type { Json } from "@/integrations/supabase/types";
 import { OpenSignPagesSidebar, type PageEntry } from "./OpenSignPagesSidebar";
 import { OpenSignCanvas } from "./OpenSignCanvas";
 import { OpenSignRightPanel } from "./OpenSignRightPanel";
 import { WidgetDragOverlay } from "@/components/designer2/WidgetDragOverlay";
+import type { WidgetDragData } from "@/lib/widgetUtils";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -68,6 +70,27 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   const updateField = useUpdateTemplateField();
   const deleteField = useDeleteTemplateField();
 
+  /* ─── Drag-and-drop hook (consolidated logic) ─── */
+  const { handleDragStart: onDragStart, handleDragEnd: onDragEnd } = useWidgetDrag({
+    templateId,
+    currentPage,
+    activeRole,
+    pageSelector: "[data-a4-page]",
+    zoom,
+    onCreateField: (params) => createField.mutate(params as any),
+  });
+
+  const handleDragStart = useCallback((event: any) => {
+    const data = event.active.data.current as WidgetDragData | undefined;
+    if (data?.type === "widget") setActiveDragData(data);
+    onDragStart(event);
+  }, [onDragStart]);
+
+  const handleDragEnd = useCallback((event: any) => {
+    setActiveDragData(null);
+    onDragEnd(event);
+  }, [onDragEnd]);
+
   /* ─── Migration detection ─── */
   const dataLoaded = !blocksLoading && !fieldsLoading;
   const hasLegacy = !!legacyContent?.trim();
@@ -120,40 +143,6 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
       setMigrating(false);
     }
   }, [legacyContent, templateId, queryClient, toast, canMigrateBlocks, canMigrateFields]);
-
-  /* ─── DnD handlers ─── */
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    const data = event.active.data.current as WidgetDragData | undefined;
-    if (data?.type === "widget") setActiveDragData(data);
-  }, []);
-
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    setActiveDragData(null);
-    const { active, over } = event;
-    if (!over || over.id !== "canvas-drop-zone") return;
-
-    const data = active.data.current as WidgetDragData | undefined;
-    if (data?.type !== "widget") return;
-
-    const fieldType = data.fieldType;
-    const defaults = FIELD_DEFAULT_SIZE[fieldType] || { w: 0.18, h: 0.04 };
-
-    // Place at center of canvas (user can drag to reposition after)
-    const fx = clamp(0.5 - defaults.w / 2, 0, 1 - defaults.w);
-    const fy = clamp(0.5 - defaults.h / 2, 0, 1 - defaults.h);
-
-    createField.mutate({
-      template_id: templateId, block_id: null,
-      signer_role: activeRole, field_type: fieldType,
-      page: currentPage, x: fx, y: fy, w: defaults.w, h: defaults.h,
-      required: true, label: FIELD_LABELS[fieldType] || fieldType,
-      meta: {
-        relativeTo: "page",
-        normalized: { x: fx, y: fy, w: defaults.w, h: defaults.h },
-        appearance: { placeholderText: FIELD_LABELS[fieldType] || fieldType, borderStyle: "dashed", color: ROLE_BORDER[activeRole] },
-      } as any,
-    });
-  }, [activeRole, createField, currentPage, templateId]);
 
   /* ─── Selection coordination ─── */
   const handleSelectBlock = useCallback((id: string | null) => {

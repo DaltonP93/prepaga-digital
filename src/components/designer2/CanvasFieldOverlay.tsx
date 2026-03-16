@@ -233,10 +233,49 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
             onMouseDown={(e) => handleFieldMouseDown(e, field)}
             onClick={(e) => { e.stopPropagation(); selectField(field.id); }}
           >
-            <Icon className="h-3 w-3 shrink-0" style={{ color: borderColor }} />
-            <span className="text-[8px] font-medium ml-0.5 truncate" style={{ color: borderColor }}>
-              {field.label || field.field_type} — {field.signer_role}
-            </span>
+            {/* Type-specific content */}
+            {field.field_type === "checkbox" ? (
+              <div className="flex items-center gap-1">
+                <div className="h-3 w-3 border-2 rounded-sm" style={{ borderColor: borderColor }} />
+                <span className="text-[8px] font-medium truncate" style={{ color: borderColor }}>
+                  {field.label || "Check"}
+                </span>
+              </div>
+            ) : field.field_type === "radio" ? (
+              <div className="flex items-center gap-1">
+                <div className="h-3 w-3 border-2 rounded-full" style={{ borderColor: borderColor }} />
+                <span className="text-[8px] font-medium truncate" style={{ color: borderColor }}>
+                  {field.label || "Radio"}
+                </span>
+              </div>
+            ) : field.field_type === "dropdown" ? (
+              <div className="flex items-center gap-1 w-full px-1">
+                <span className="text-[8px] font-medium truncate flex-1" style={{ color: borderColor }}>
+                  {field.label || "Desplegable"} ▾
+                </span>
+              </div>
+            ) : field.field_type === "stamp" ? (
+              <div className="flex flex-col items-center justify-center gap-0.5">
+                <Icon className="h-4 w-4 shrink-0" style={{ color: borderColor }} />
+                <span className="text-[7px] font-medium" style={{ color: borderColor }}>
+                  {field.label || "Sello"}
+                </span>
+              </div>
+            ) : field.field_type === "signature" ? (
+              <div className="flex flex-col items-center justify-center gap-0.5 w-full">
+                <Icon className="h-4 w-4 shrink-0" style={{ color: borderColor }} />
+                <span className="text-[7px] font-medium" style={{ color: borderColor }}>
+                  {field.label || "Firma"} — {field.signer_role}
+                </span>
+              </div>
+            ) : (
+              <>
+                <Icon className="h-3 w-3 shrink-0" style={{ color: borderColor }} />
+                <span className="text-[8px] font-medium ml-0.5 truncate" style={{ color: borderColor }}>
+                  {field.label || field.field_type} — {field.signer_role}
+                </span>
+              </>
+            )}
 
             {/* Delete button */}
             <button
