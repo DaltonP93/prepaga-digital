@@ -93,12 +93,39 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
     imageFileInputRef.current?.click();
   }, [selectedBlockId]);
 
+  /* ─── Insert image block: create block then open picker ─── */
+  const handleInsertImageBlock = useCallback(() => {
+    createBlock.mutate({
+      template_id: templateId, block_type: "image" as BlockType, page: currentPage,
+      x: 10, y: 10, w: 30, h: 20, z_index: 10, rotation: 0,
+      is_locked: false, is_visible: true,
+      content: { src: "", alt: "", storage_path: "" } as any,
+      style: {}, visibility_rules: { roles: ["titular", "adherente", "contratada"], conditions: [] },
+      sort_order: blocks.length,
+    }, {
+      onSuccess: (newBlock: any) => {
+        const blockId = newBlock?.id || newBlock?.[0]?.id;
+        if (blockId) {
+          setPendingImageBlockId(blockId);
+          setSelectedBlockId(blockId);
+        }
+        // Open file picker after short delay to ensure state is set
+        setTimeout(() => {
+          if (imageFileInputRef.current) imageFileInputRef.current.value = "";
+          imageFileInputRef.current?.click();
+        }, 100);
+      },
+    });
+  }, [createBlock, templateId, currentPage, blocks.length]);
+
   const handleImageFileSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !pendingImageBlockId) return;
+    if (!file) return;
+    const targetBlockId = pendingImageBlockId;
+    if (!targetBlockId) return;
     try {
       const result = await uploadTemplateImage(file, templateId);
-      updateBlock.mutate({ id: pendingImageBlockId, content: { ...((blocks.find(b => b.id === pendingImageBlockId)?.content as any) || {}), src: result.signedUrl, storage_path: result.storagePath, alt: file.name } } as any);
+      updateBlock.mutate({ id: targetBlockId, content: { ...((blocks.find(b => b.id === targetBlockId)?.content as any) || {}), src: result.signedUrl, storage_path: result.storagePath, alt: file.name } } as any);
       toast({ title: "Imagen subida" });
     } catch (err: any) {
       toast({ title: "Error al subir imagen", description: err.message, variant: "destructive" });
@@ -354,6 +381,7 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
           selectedFieldId={selectedFieldId}
           onFieldSelect={handleSelectField}
           onPageChange={setCurrentPage}
+          onUploadPdf={() => setShowAssetModal(true)}
         />
         <OpenSignRightPanel
           templateId={templateId}
@@ -371,6 +399,7 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
           onUpdateField={handleUpdateField}
           onDeleteField={handleDeleteField}
           onInsertDocument={() => setShowAssetModal(true)}
+          onInsertImage={handleInsertImageBlock}
           onRequestPickImage={openImageFilePicker}
         />
       </div>

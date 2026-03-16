@@ -12,7 +12,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import { CharacterCount } from '@tiptap/extension-character-count';
-import { Image } from '@tiptap/extension-image';
+import { ResizableImageExtension } from './editor/ResizableImageExtension';
 import { Link } from '@tiptap/extension-link';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
@@ -109,30 +109,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
         },
       }),
       CharacterCount.configure(),
-      Image.extend({
-        addAttributes() {
-          return {
-            ...this.parent?.(),
-            width: {
-              default: 'auto',
-            },
-            height: {
-              default: 'auto',
-            },
-            borderRadius: {
-              default: 0,
-            },
-            borderWidth: {
-              default: 0,
-            },
-            borderColor: {
-              default: primaryColor,
-            },
-          };
-        },
-      }).configure({
-        allowBase64: true,
-      }),
+      ResizableImageExtension.configure({}),
       Link.configure({
         openOnClick: false,
       }),
@@ -284,7 +261,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
   const addImage = useCallback((url: string = '') => {
     if (!editor) return;
 
-    editor.chain().focus().setImage({ src: url }).run();
+    (editor.chain().focus() as any).setImage({ src: url }).run();
     setShowImageManager(false);
   }, [editor, setShowImageManager]);
 

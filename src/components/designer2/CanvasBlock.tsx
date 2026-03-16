@@ -74,10 +74,21 @@ const BlockContentRenderer: React.FC<{
   }, []);
 
   useEffect(() => {
-    if (block.block_type === "image" && content.src) {
-      setResolvedImageUrl(content.src);
+    if (block.block_type === "image") {
+      const src = content.src;
+      const storagePath = content.storage_path;
+      if (src && (src.startsWith("http") || src.startsWith("data:") || src.startsWith("blob:"))) {
+        setResolvedImageUrl(src);
+      } else if (storagePath) {
+        // Regenerate signed URL from storage path
+        import("@/integrations/supabase/client").then(({ supabase }) => {
+          supabase.storage.from("documents").createSignedUrl(storagePath, 3600).then(({ data }) => {
+            if (data?.signedUrl) setResolvedImageUrl(data.signedUrl);
+          });
+        });
+      }
     }
-  }, [block.block_type, content.src]);
+  }, [block.block_type, content.src, content.storage_path]);
 
   switch (block.block_type) {
     case "text":
