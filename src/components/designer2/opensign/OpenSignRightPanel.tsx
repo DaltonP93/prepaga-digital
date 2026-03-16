@@ -159,6 +159,7 @@ export const OpenSignRightPanel: React.FC<OpenSignRightPanelProps> = ({
   onUpdateField,
   onDeleteField,
   onInsertDocument,
+  onRequestPickImage,
 }) => {
   return (
     <aside className="flex flex-col border-l bg-background h-full">
