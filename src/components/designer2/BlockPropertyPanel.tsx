@@ -219,7 +219,7 @@ export const BlockPropertyPanel: React.FC<BlockPropertyPanelProps> = ({
 /* ─── Type-specific properties ─── */
 
 function TypeProperties({
-  block, content, style, updateContent, updateStyle, templateId, onUpdate,
+  block, content, style, updateContent, updateStyle, templateId, onUpdate, onRequestPickImage,
 }: {
   block: TemplateBlock;
   content: any;
@@ -228,6 +228,7 @@ function TypeProperties({
   updateStyle: (k: string, v: any) => void;
   templateId?: string;
   onUpdate: (u: Partial<TemplateBlock>) => void;
+  onRequestPickImage?: () => void;
 }) {
   switch (block.block_type) {
     case "text":
