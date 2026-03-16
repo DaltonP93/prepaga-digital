@@ -2906,6 +2906,7 @@ export type Database = {
           mime_type: string | null
           page_count: number | null
           processing_error: string | null
+          processing_progress: number | null
           status: string
           template_id: string
         }
@@ -2921,6 +2922,7 @@ export type Database = {
           mime_type?: string | null
           page_count?: number | null
           processing_error?: string | null
+          processing_progress?: number | null
           status?: string
           template_id: string
         }
@@ -2936,6 +2938,7 @@ export type Database = {
           mime_type?: string | null
           page_count?: number | null
           processing_error?: string | null
+          processing_progress?: number | null
           status?: string
           template_id?: string
         }
