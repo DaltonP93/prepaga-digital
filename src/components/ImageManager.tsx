@@ -171,6 +171,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
                 <p className="text-xs text-muted-foreground">o haz clic para seleccionar</p>
               </div>
               <Button
+                type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => inputRef.current?.click()}
@@ -201,6 +202,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
                   />
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-1">
                     <Button
+                      type="button"
                       size="sm"
                       variant="secondary"
                       className="h-6 w-6 p-0"
@@ -209,6 +211,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
                       <Eye className="w-3 h-3" />
                     </Button>
                     <Button
+                      type="button"
                       size="sm"
                       variant="secondary"
                       className="h-6 w-6 p-0"
@@ -254,6 +257,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
               }}
             />
             <Button
+              type="button"
               size="sm"
               onClick={(e) => {
                 const input = (e.currentTarget.parentElement?.querySelector('input') as HTMLInputElement);

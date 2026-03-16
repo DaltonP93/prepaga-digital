@@ -1,32 +1,104 @@
 
 
-# Fix: Image Upload Buttons Submit the Form, Closing the Editor
+## Plan: Fase 5 — PAdES con document_type exactos y doble safeguard
 
-## Root Cause
+### Archivo único
+`src/hooks/useSignatureLinkPublic.ts` — líneas 598-682
 
-The bug is **not** about Radix Dialog focus handling (that's already fixed). The real cause is simpler:
+### Cambio
+Reemplazar el bloque PAdES actual por la versión con valores exactos de `document_type` (`contrato`, `ddjj_salud`, `anexo`) en lugar de comparaciones genéricas con `.toLowerCase()`. Agrega doble safeguard para contratada pendiente.
 
-**HTML `<button>` elements default to `type="submit"` when inside a `<form>`.**
+### Diferencias clave vs. código actual (Fase 4)
 
-The `ImageManager` component has buttons ("Seleccionar archivo" at line 173 and "Insertar" at line 256) that do **not** specify `type="button"`. These buttons are rendered inside the `<form onSubmit={...}>` in `TemplateForm.tsx`. When clicked:
+1. **document_type exacto**: usa `dt === 'contrato'` directo (sin `.toLowerCase()` ni check de `'contract'`)
+2. **ddjj_salud explícito**: filtra por `dt === 'ddjj_salud'` en vez de "todo lo que no sea contrato"
+3. **Anexos excluidos**: `dt === 'anexo'` retorna `false` explícitamente
+4. **Doble safeguard**: `safeDocsToSign` filtra contrato si `hasPendingContratada` como segunda capa
+5. **Error handling mejorado**: `pendingErr` se maneja separadamente del catch
 
-1. The button triggers `onClick` (opens file picker / inserts URL)
-2. **Simultaneously**, the default `type="submit"` behavior fires `onSubmit`
-3. `onSubmit` saves the template and calls `onOpenChange(false)` (line 184-185)
-4. The Dialog closes → user lands on the templates list
-5. The native file picker is still open but the handler component is gone
+### Código resultante (reemplaza líneas 598-682)
 
-The shadcn `Button` component does not set `type="button"` — it spreads `...props` directly onto the native `<button>`, inheriting the HTML default of `type="submit"`.
+```typescript
+// Post-signature: generate base PDF + PAdES only when it corresponds to this signer + step
+try {
+  const supabaseUrl = SUPABASE_URL;
+  const anonKey = SUPABASE_PUBLISHABLE_KEY;
 
-## Fix
+  const { data: docs, error: docsErr } = await signatureClient
+    .from('documents')
+    .select('id, document_type, beneficiary_id, is_final, signed_pdf_url')
+    .eq('sale_id', data.sale_id)
+    .eq('is_final', true)
+    .neq('document_type', 'firma');
 
-**File: `src/components/ImageManager.tsx`** — Add `type="button"` to all 3 buttons:
+  if (docsErr) {
+    console.warn('Could not fetch final documents:', docsErr);
+  } else if (docs && docs.length > 0) {
+    const recipientType = data.recipient_type;
 
-| Line | Button | Fix |
-|------|--------|-----|
-| 173 | "Seleccionar archivo" | Add `type="button"` |
-| 256 | "Insertar" | Add `type="button"` |
-| 213 (Eye) + 221 (Copy) | Image overlay buttons | Already `size="sm" variant="secondary"` — add `type="button"` for safety |
+    let hasPendingContratada = false;
+    try {
+      const { data: pendingCL, error: pendingErr } = await signatureClient
+        .from('signature_links').select('id')
+        .eq('sale_id', data.sale_id)
+        .eq('recipient_type', 'contratada')
+        .eq('status', 'pendiente');
+      if (pendingErr) {
+        console.warn('Could not check pending contratada links:', pendingErr);
+        hasPendingContratada = true;
+      } else {
+        hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
+      }
+    } catch (e) {
+      console.warn('Could not check pending contratada links (exception):', e);
+      hasPendingContratada = true;
+    }
 
-That's the complete fix. No architectural changes needed — the stable input ref and `onFocusOutside` prevention are already in place from previous work. This single attribute addition on 4 buttons stops the form submission that was closing the editor.
+    const docsToSign = docs.filter((d: any) => {
+      if (d.signed_pdf_url) return false;
+      const dt = d.document_type;
+
+      if (dt === 'contrato') {
+        return recipientType === 'contratada';
+      }
+      if (dt === 'ddjj_salud') {
+        if (recipientType === 'titular') return d.beneficiary_id == null;
+        if (recipientType === 'adherente') return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
+        return false;
+      }
+      if (dt === 'anexo') return false;
+      return false;
+    });
+
+    const safeDocsToSign = docsToSign.filter((d: any) => {
+      if (d.document_type === 'contrato' && hasPendingContratada) return false;
+      return true;
+    });
+
+    for (const doc of safeDocsToSign) {
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
+          body: JSON.stringify({ document_id: doc.id }),
+        });
+        await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
+          body: JSON.stringify({ document_id: doc.id }),
+        });
+      } catch (pdfErr) {
+        console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
+      }
+    }
+  }
+} catch (pdfGenErr) {
+  console.warn('Post-signature PDF generation error:', pdfGenErr);
+}
+```
+
+### Impacto
+- 1 archivo, 1 bloque (~85 líneas reemplaza ~85 líneas)
+- No afecta bloque de activación contratada (Fase 3)
+- No requiere migraciones
 
