@@ -50,7 +50,7 @@ const TIPS = [
 ];
 
 export const BlockPropertyPanel: React.FC<BlockPropertyPanelProps> = ({
-  block, onUpdate, onAddBlock, templateId,
+  block, onUpdate, onAddBlock, templateId, onRequestPickImage,
 }) => {
   if (!block) {
     return (
