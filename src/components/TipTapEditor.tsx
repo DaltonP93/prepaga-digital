@@ -12,7 +12,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import { CharacterCount } from '@tiptap/extension-character-count';
-import { Image } from '@tiptap/extension-image';
+import { ResizableImageExtension } from './editor/ResizableImageExtension';
 import { Link } from '@tiptap/extension-link';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
