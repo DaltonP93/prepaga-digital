@@ -322,7 +322,7 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
           <p className="text-sm text-amber-800 dark:text-amber-200 flex-1">
             Este template tiene contenido Legacy y todavía no fue migrado a V2.
           </p>
-          <Button size="sm" onClick={handleMigrate} disabled={migrating}>
+          <Button type="button" size="sm" onClick={handleMigrate} disabled={migrating}>
             {migrating ? <><Loader2 className="h-4 w-4 animate-spin" /> Migrando…</> : "Migrar a V2"}
           </Button>
         </div>
