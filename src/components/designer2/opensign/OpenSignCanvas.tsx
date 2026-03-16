@@ -1,10 +1,12 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from "react";
+import { useDroppable } from "@dnd-kit/core";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ZoomIn, ZoomOut, MousePointer, Maximize, Columns } from "lucide-react";
+import { ZoomIn, ZoomOut, MousePointer, Maximize, Columns, ChevronUp, ChevronDown } from "lucide-react";
 import { CanvasBlock, POSITIONED_TYPES } from "@/components/designer2/CanvasBlock";
 import { CanvasFieldOverlay } from "@/components/designer2/CanvasFieldOverlay";
+import usePdfPinchZoom from "@/hooks/usePdfPinchZoom";
 import type { TemplateBlock, FieldType, SignerRole } from "@/types/templateDesigner";
 
 interface OpenSignCanvasProps {
@@ -27,6 +29,7 @@ interface OpenSignCanvasProps {
   pageBackgroundUrl?: string;
   selectedFieldId: string | null;
   onFieldSelect: (id: string | null) => void;
+  onPageChange: (page: number) => void;
 }
 
 const A4_W = 794;
@@ -52,9 +55,16 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
   pageBackgroundUrl,
   selectedFieldId,
   onFieldSelect,
+  onPageChange,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
+
+  // Drop zone for @dnd-kit widgets
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: "canvas-drop-zone" });
+
+  // Pinch-to-zoom
+  usePdfPinchZoom(containerRef, zoom, onZoomChange);
 
   // Observe container size for fit calculations
   useEffect(() => {
@@ -66,6 +76,17 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // Keyboard: arrow up/down for page nav
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement).tagName === "INPUT" || (e.target as HTMLElement).tagName === "TEXTAREA") return;
+      if (e.key === "ArrowUp" && e.altKey) { e.preventDefault(); onPageChange(Math.max(1, currentPage - 1)); }
+      if (e.key === "ArrowDown" && e.altKey) { e.preventDefault(); onPageChange(Math.min(totalPages, currentPage + 1)); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [currentPage, totalPages, onPageChange]);
 
   const fitWidth = useCallback(() => {
     if (containerSize.w <= 0) return;
@@ -103,6 +124,20 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
       {/* Toolbar */}
       <div className="flex items-center justify-between px-3 py-1.5 border-b bg-background/90 backdrop-blur-sm shrink-0">
         <div className="flex items-center gap-1">
+          {/* Prev/Next page buttons */}
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7"
+            onClick={() => onPageChange(Math.max(1, currentPage - 1))} disabled={currentPage <= 1}
+            title="Página anterior (Alt+↑)">
+            <ChevronUp className="h-3.5 w-3.5" />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" className="h-7 w-7"
+            onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))} disabled={currentPage >= totalPages}
+            title="Página siguiente (Alt+↓)">
+            <ChevronDown className="h-3.5 w-3.5" />
+          </Button>
+
+          <Separator orientation="vertical" className="h-5 mx-1" />
+
           <Button type="button" variant="ghost" size="icon" className="h-7 w-7"
             onClick={() => onZoomChange(Math.max(30, zoom - 10))} disabled={zoom <= 30}>
             <ZoomOut className="h-3.5 w-3.5" />
@@ -137,8 +172,8 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
 
       {/* Canvas area */}
       <div
-        ref={containerRef}
-        className="flex-1 overflow-auto flex justify-center items-start py-6"
+        ref={(el) => { (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = el; setDropRef(el); }}
+        className={`flex-1 overflow-auto flex justify-center items-start py-6 transition-colors ${isOver ? "bg-primary/5 ring-2 ring-inset ring-primary/20" : ""}`}
         onClick={handleCanvasClick}
         data-canvas="true"
       >
@@ -206,7 +241,7 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
             </div>
           ))}
 
-          {/* Field overlays — controlled selection */}
+          {/* Field overlays */}
           <CanvasFieldOverlay
             templateId={templateId}
             activeFieldType={activeFieldType}
