@@ -323,6 +323,14 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
 
   return (
     <div className="grid grid-cols-[180px_1fr_260px] gap-3 min-h-[600px]">
+      {/* Stable hidden file input — never unmounts */}
+      <input
+        ref={imageFileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={handleImageFileSelected}
+      />
       {/* ─── Left: Compact Block Palette ─── */}
       <div className="rounded-lg border bg-card">
         <BlockPalette
