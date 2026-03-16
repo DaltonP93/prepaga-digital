@@ -1,104 +1,59 @@
 
 
-## Plan: Fase 5 — PAdES con document_type exactos y doble safeguard
+# Fix: Image File Picker Closes Editor in Both V1 Legacy and V2
 
-### Archivo único
-`src/hooks/useSignatureLinkPublic.ts` — líneas 598-682
+## Root Cause Analysis
 
-### Cambio
-Reemplazar el bloque PAdES actual por la versión con valores exactos de `document_type` (`contrato`, `ddjj_salud`, `anexo`) en lugar de comparaciones genéricas con `.toLowerCase()`. Agrega doble safeguard para contratada pendiente.
+There are **two separate bugs**, one per editor:
 
-### Diferencias clave vs. código actual (Fase 4)
+### Legacy V1 (TipTapEditor → ImageManager)
+The `ImageManager` component renders its own `<input type="file">` inside a custom modal overlay (lines 488-499 of TipTapEditor.tsx), which itself lives inside the `TemplateForm.tsx` Radix `Dialog`. Although we already added `onFocusOutside` prevention to the Dialog, the `ImageManager` overlay is a `fixed inset-0` div with `z-50`. When the native file picker opens, the overlay's `bg-black/50` click-through or focus loss can cause `showImageManager` to reset. The `onFocusOutside` fix on the Dialog should already handle this — need to verify the ImageManager overlay isn't also closing on focus loss.
 
-1. **document_type exacto**: usa `dt === 'contrato'` directo (sin `.toLowerCase()` ni check de `'contract'`)
-2. **ddjj_salud explícito**: filtra por `dt === 'ddjj_salud'` en vez de "todo lo que no sea contrato"
-3. **Anexos excluidos**: `dt === 'anexo'` retorna `false` explícitamente
-4. **Doble safeguard**: `safeDocsToSign` filtra contrato si `hasPendingContratada` como segunda capa
-5. **Error handling mejorado**: `pendingErr` se maneja separadamente del catch
+### V2 OpenSign (BlockPropertyPanel → ImageProperties)
+The `<input type="file">` at line 543 of `BlockPropertyPanel.tsx` lives inside `ImageProperties`, which is rendered inside the right panel's `BlockPropertyPanel`. When the file picker opens:
+1. Focus leaves the browser → the selected block can lose selection
+2. If `selectedBlockId` becomes `null`, `BlockPropertyPanel` renders "no block selected" state → the `ImageProperties` component unmounts → the `<input>` disappears
+3. The file picker returns with no handler → upload silently fails
 
-### Código resultante (reemplaza líneas 598-682)
+This is the exact "component transitorio" pattern the user described.
 
-```typescript
-// Post-signature: generate base PDF + PAdES only when it corresponds to this signer + step
-try {
-  const supabaseUrl = SUPABASE_URL;
-  const anonKey = SUPABASE_PUBLISHABLE_KEY;
+## Plan
 
-  const { data: docs, error: docsErr } = await signatureClient
-    .from('documents')
-    .select('id, document_type, beneficiary_id, is_final, signed_pdf_url')
-    .eq('sale_id', data.sale_id)
-    .eq('is_final', true)
-    .neq('document_type', 'firma');
+### 1. Move `<input type="file">` to stable level in `OpenSignTemplateEditor.tsx`
 
-  if (docsErr) {
-    console.warn('Could not fetch final documents:', docsErr);
-  } else if (docs && docs.length > 0) {
-    const recipientType = data.recipient_type;
+Add a hidden `<input ref={imageFileInputRef}>` at the editor root level, plus state for `pendingImageBlockId`. Provide a callback `onRequestPickImage` that:
+- Stores `selectedBlockId` as `pendingImageBlockId`
+- Triggers `imageFileInputRef.current?.click()`
 
-    let hasPendingContratada = false;
-    try {
-      const { data: pendingCL, error: pendingErr } = await signatureClient
-        .from('signature_links').select('id')
-        .eq('sale_id', data.sale_id)
-        .eq('recipient_type', 'contratada')
-        .eq('status', 'pendiente');
-      if (pendingErr) {
-        console.warn('Could not check pending contratada links:', pendingErr);
-        hasPendingContratada = true;
-      } else {
-        hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
-      }
-    } catch (e) {
-      console.warn('Could not check pending contratada links (exception):', e);
-      hasPendingContratada = true;
-    }
+On `onChange`, upload the file and update the pending block's `content.src`.
 
-    const docsToSign = docs.filter((d: any) => {
-      if (d.signed_pdf_url) return false;
-      const dt = d.document_type;
+### 2. Thread `onRequestPickImage` through to `BlockPropertyPanel`
 
-      if (dt === 'contrato') {
-        return recipientType === 'contratada';
-      }
-      if (dt === 'ddjj_salud') {
-        if (recipientType === 'titular') return d.beneficiary_id == null;
-        if (recipientType === 'adherente') return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
-        return false;
-      }
-      if (dt === 'anexo') return false;
-      return false;
-    });
+- Add `onRequestPickImage?: () => void` prop to `BlockPropertyPanel`
+- Pass it into `ImageProperties` 
+- Replace `fileRef.current?.click()` calls with `onRequestPickImage()` when provided
+- Keep the local `fileRef` as fallback for standalone usage
 
-    const safeDocsToSign = docsToSign.filter((d: any) => {
-      if (d.document_type === 'contrato' && hasPendingContratada) return false;
-      return true;
-    });
+### 3. Wire it in `OpenSignRightPanel`
 
-    for (const doc of safeDocsToSign) {
-      try {
-        await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-        await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-      } catch (pdfErr) {
-        console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
-      }
-    }
-  }
-} catch (pdfGenErr) {
-  console.warn('Post-signature PDF generation error:', pdfGenErr);
-}
-```
+- Add `onRequestPickImage?: () => void` to `OpenSignRightPanelProps`
+- Pass it through to `BlockPropertyPanel`
 
-### Impacto
-- 1 archivo, 1 bloque (~85 líneas reemplaza ~85 líneas)
-- No afecta bloque de activación contratada (Fase 3)
-- No requiere migraciones
+### 4. Same pattern for `TemplateDesigner2.tsx` (old V2)
+
+- Add the same stable input + pending block state
+- Pass `onRequestPickImage` to its `BlockPropertyPanel`
+
+### 5. Legacy V1 — verify ImageManager overlay
+
+The `TipTapEditor.tsx` ImageManager overlay (lines 488-499) already has its own `<input>` inside `ImageManager`. Since the outer Dialog now has `onFocusOutside` prevention, this should work. If not, apply the same stable-input pattern to `TipTapEditor`.
+
+### Files to modify
+
+| File | Change |
+|---|---|
+| `src/components/designer2/opensign/OpenSignTemplateEditor.tsx` | Add stable `<input type="file">` + `pendingImageBlockId` state + `handleImageFileSelected` handler |
+| `src/components/designer2/opensign/OpenSignRightPanel.tsx` | Add `onRequestPickImage` prop, pass to `BlockPropertyPanel` |
+| `src/components/designer2/BlockPropertyPanel.tsx` | Add `onRequestPickImage` prop, use it in `ImageProperties` instead of local `fileRef.click()` |
+| `src/components/designer2/TemplateDesigner2.tsx` | Same stable input pattern |
 
