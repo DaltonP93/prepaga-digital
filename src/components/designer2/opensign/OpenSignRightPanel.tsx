@@ -2,7 +2,7 @@ import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Users, Layers, Settings2, History, Check, Trash2, MousePointerClick } from "lucide-react";
+import { Users, Layers, Settings2, History, Check, Trash2, MousePointerClick, FilePlus2 } from "lucide-react";
 import { FieldOverlay } from "@/components/designer2/FieldOverlay";
 import { BlockPropertyPanel } from "@/components/designer2/BlockPropertyPanel";
 import { VersionPanel } from "@/components/designer2/VersionPanel";

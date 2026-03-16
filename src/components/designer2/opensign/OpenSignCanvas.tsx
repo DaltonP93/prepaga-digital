@@ -192,7 +192,7 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
 
       {/* Canvas area */}
       <div
-        ref={(el) => { (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = el; setDropRef(el); }}
+        ref={setCanvasRefs}
         className={`flex-1 overflow-auto flex justify-center items-start py-6 transition-colors ${isOver ? "bg-primary/5 ring-2 ring-inset ring-primary/20" : ""}`}
         onClick={handleCanvasClick}
         data-canvas="true"
