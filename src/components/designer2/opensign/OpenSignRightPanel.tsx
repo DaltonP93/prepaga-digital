@@ -255,6 +255,7 @@ export const OpenSignRightPanel: React.FC<OpenSignRightPanelProps> = ({
                 <>
                   <Separator className="my-3" />
                   <Button
+                    type="button"
                     variant="outline"
                     size="sm"
                     className="w-full gap-1.5 text-[11px] h-8"
