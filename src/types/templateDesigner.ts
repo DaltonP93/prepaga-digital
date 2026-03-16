@@ -26,7 +26,10 @@ export type FieldType =
   | 'checkbox'
   | 'name'
   | 'dni'
-  | 'email';
+  | 'email'
+  | 'stamp'
+  | 'dropdown'
+  | 'radio';
 
 export type AssetType = 'image' | 'pdf' | 'docx' | 'logo' | 'attachment';
 
