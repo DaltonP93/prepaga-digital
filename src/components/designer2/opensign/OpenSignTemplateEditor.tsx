@@ -381,6 +381,7 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
           selectedFieldId={selectedFieldId}
           onFieldSelect={handleSelectField}
           onPageChange={setCurrentPage}
+          onUploadPdf={() => setShowAssetModal(true)}
         />
         <OpenSignRightPanel
           templateId={templateId}
