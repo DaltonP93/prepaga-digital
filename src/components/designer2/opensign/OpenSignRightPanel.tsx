@@ -31,6 +31,7 @@ interface OpenSignRightPanelProps {
   onUpdateField: (updates: Partial<TemplateField>) => void;
   onDeleteField: (id: string) => void;
   onInsertDocument?: () => void;
+  onRequestPickImage?: () => void;
 }
 
 const ROLES: {
