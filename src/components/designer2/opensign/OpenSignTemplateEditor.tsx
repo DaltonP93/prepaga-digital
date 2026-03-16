@@ -307,6 +307,14 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   /* ─── Editor content ─── */
   const editorContent = (
     <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
+      {/* Stable hidden file input — never unmounts */}
+      <input
+        ref={imageFileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={handleImageFileSelected}
+      />
       {/* Migration banner */}
       {needsMigration && (
         <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800">
