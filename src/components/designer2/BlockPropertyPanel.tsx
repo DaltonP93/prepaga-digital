@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { TemplateBlock, SignerRole, BlockType } from "@/types/templateDesigner";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadTemplateImage } from "@/lib/templateImageUpload";
 import { useToast } from "@/hooks/use-toast";
 
 interface BlockPropertyPanelProps {
@@ -504,11 +505,9 @@ function ImageProperties({
     if (!file || !templateId) return;
     setUploading(true);
     try {
-      const path = `template-assets/${templateId}/${Date.now()}-${file.name}`;
-      const { error: upErr } = await supabase.storage.from("documents").upload(path, file);
-      if (upErr) throw upErr;
-      const { data: urlData } = supabase.storage.from("documents").getPublicUrl(path);
-      updateContent("src", urlData.publicUrl);
+      const result = await uploadTemplateImage(file, templateId);
+      updateContent("src", result.signedUrl);
+      updateContent("storage_path", result.storagePath);
       updateContent("alt", file.name);
       toast({ title: "Imagen subida" });
     } catch (err: any) {
