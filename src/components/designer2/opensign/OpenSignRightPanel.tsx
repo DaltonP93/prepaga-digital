@@ -2,7 +2,7 @@ import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Users, Layers, Settings2, History, Check, Trash2, MousePointerClick, FilePlus2 } from "lucide-react";
+import { Users, Layers, Settings2, History, Check, Trash2, MousePointerClick, FilePlus2, ImagePlus, AlertTriangle } from "lucide-react";
 import { FieldOverlay } from "@/components/designer2/FieldOverlay";
 import { BlockPropertyPanel } from "@/components/designer2/BlockPropertyPanel";
 import { VersionPanel } from "@/components/designer2/VersionPanel";
@@ -12,6 +12,8 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import type { TemplateBlock, TemplateField, FieldType, SignerRole, BlockType } from "@/types/templateDesigner";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +33,7 @@ interface OpenSignRightPanelProps {
   onUpdateField: (updates: Partial<TemplateField>) => void;
   onDeleteField: (id: string) => void;
   onInsertDocument?: () => void;
+  onInsertImage?: () => void;
   onRequestPickImage?: () => void;
 }
 
@@ -49,13 +52,18 @@ const FIELD_TYPE_LABELS: Record<string, string> = {
   stamp: "Sello", dropdown: "Desplegable", radio: "Radio",
 };
 
-/* ───── Field Property Panel ───── */
+/* ───── Field Property Panel (enhanced) ───── */
 const FieldPropertyPanel: React.FC<{
   field: TemplateField;
   onUpdate: (updates: Partial<TemplateField>) => void;
   onDelete: (id: string) => void;
 }> = ({ field, onUpdate, onDelete }) => {
   const role = ROLES.find((r) => r.value === field.signer_role);
+  const meta = (field as any).meta || {};
+
+  const updateMeta = (key: string, value: any) => {
+    onUpdate({ meta: { ...meta, [key]: value } } as any);
+  };
 
   return (
     <ScrollArea className="h-full">
@@ -100,6 +108,46 @@ const FieldPropertyPanel: React.FC<{
             </SelectContent>
           </Select>
         </div>
+
+        <Separator />
+
+        {/* Placeholder text */}
+        <div className="space-y-1">
+          <Label className="text-[11px]">Placeholder</Label>
+          <Input
+            className="h-7 text-[12px]"
+            placeholder="Texto de ejemplo..."
+            value={meta.placeholder || ""}
+            onChange={(e) => updateMeta("placeholder", e.target.value)}
+          />
+        </div>
+
+        {/* Border style */}
+        <div className="space-y-1">
+          <Label className="text-[11px]">Borde</Label>
+          <Select value={meta.borderStyle || "solid"} onValueChange={(v) => updateMeta("borderStyle", v)}>
+            <SelectTrigger className="h-7 text-[12px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="solid">Sólido</SelectItem>
+              <SelectItem value="dashed">Punteado</SelectItem>
+              <SelectItem value="dotted">Puntos</SelectItem>
+              <SelectItem value="none">Sin borde</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Dropdown / Radio options */}
+        {(field.field_type === "dropdown" || field.field_type === "radio") && (
+          <div className="space-y-1">
+            <Label className="text-[11px]">Opciones (una por línea)</Label>
+            <Textarea
+              className="text-[12px] min-h-[60px]"
+              value={(meta.options || []).join("\n")}
+              onChange={(e) => updateMeta("options", e.target.value.split("\n").filter(Boolean))}
+              placeholder={"Opción 1\nOpción 2\nOpción 3"}
+            />
+          </div>
+        )}
 
         <Separator />
 
@@ -159,6 +207,7 @@ export const OpenSignRightPanel: React.FC<OpenSignRightPanelProps> = ({
   onUpdateField,
   onDeleteField,
   onInsertDocument,
+  onInsertImage,
   onRequestPickImage,
 }) => {
   return (
@@ -187,8 +236,10 @@ export const OpenSignRightPanel: React.FC<OpenSignRightPanelProps> = ({
                 Roles / Firmantes
               </p>
               {ROLES.map((role) => {
-                const count = fields.filter((f) => f.signer_role === role.value).length;
+                const roleFields = fields.filter((f) => f.signer_role === role.value);
+                const count = roleFields.length;
                 const hasFields = count > 0;
+                const hasSignature = roleFields.some((f) => f.field_type === "signature");
                 const isActive = activeRole === role.value;
                 return (
                   <button
@@ -213,17 +264,36 @@ export const OpenSignRightPanel: React.FC<OpenSignRightPanelProps> = ({
                         {count} campo{count !== 1 ? "s" : ""}
                       </p>
                     </div>
-                    {hasFields && (
-                      <div className={cn("h-5 w-5 rounded-full flex items-center justify-center shrink-0", isActive ? "bg-white/20" : role.bg)}>
-                        <Check className={cn("h-3 w-3", isActive ? "text-white" : role.text)} />
-                      </div>
-                    )}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {hasFields && !hasSignature && (
+                        <div title="Sin campo de firma" className="h-5 w-5 rounded-full flex items-center justify-center bg-amber-100 dark:bg-amber-900/50">
+                          <AlertTriangle className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                        </div>
+                      )}
+                      {hasFields && hasSignature && (
+                        <div className={cn("h-5 w-5 rounded-full flex items-center justify-center", isActive ? "bg-white/20" : role.bg)}>
+                          <Check className={cn("h-3 w-3", isActive ? "text-white" : role.text)} />
+                        </div>
+                      )}
+                    </div>
                   </button>
                 );
               })}
               <p className="text-[10px] text-muted-foreground pt-3">
                 Seleccioná un rol y luego andá a la pestaña <strong>Campos</strong> para agregar widgets al canvas.
               </p>
+              {/* Roles without signature warning */}
+              {ROLES.some((r) => {
+                const rf = fields.filter((f) => f.signer_role === r.value);
+                return rf.length > 0 && !rf.some((f) => f.field_type === "signature");
+              }) && (
+                <div className="flex items-start gap-2 mt-2 p-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                  <p className="text-[10px] text-amber-800 dark:text-amber-200">
+                    Hay roles con campos asignados pero sin firma. Cada rol activo debe tener al menos un campo de firma.
+                  </p>
+                </div>
+              )}
             </div>
           </ScrollArea>
         </TabsContent>
@@ -251,20 +321,34 @@ export const OpenSignRightPanel: React.FC<OpenSignRightPanelProps> = ({
                 onSignerRoleChange={onRoleChange}
               />
 
+              <Separator className="my-3" />
+
+              {/* Insert Image button */}
+              {onInsertImage && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-1.5 text-[11px] h-8 mb-2"
+                  onClick={onInsertImage}
+                >
+                  <ImagePlus className="h-3.5 w-3.5" />
+                  Insertar Imagen
+                </Button>
+              )}
+
+              {/* Insert Document button */}
               {onInsertDocument && (
-                <>
-                  <Separator className="my-3" />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-full gap-1.5 text-[11px] h-8"
-                    onClick={onInsertDocument}
-                  >
-                    <FilePlus2 className="h-3.5 w-3.5" />
-                    Insertar Documento (PDF/DOCX)
-                  </Button>
-                </>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-1.5 text-[11px] h-8"
+                  onClick={onInsertDocument}
+                >
+                  <FilePlus2 className="h-3.5 w-3.5" />
+                  Insertar Documento (PDF)
+                </Button>
               )}
             </div>
           </ScrollArea>

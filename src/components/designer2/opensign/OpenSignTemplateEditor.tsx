@@ -398,6 +398,7 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
           onUpdateField={handleUpdateField}
           onDeleteField={handleDeleteField}
           onInsertDocument={() => setShowAssetModal(true)}
+          onInsertImage={handleInsertImageBlock}
           onRequestPickImage={openImageFilePicker}
         />
       </div>
