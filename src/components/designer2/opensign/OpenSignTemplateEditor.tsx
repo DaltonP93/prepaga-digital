@@ -99,7 +99,7 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
       template_id: templateId, block_type: "image" as BlockType, page: currentPage,
       x: 10, y: 10, w: 30, h: 20, z_index: 10, rotation: 0,
       is_locked: false, is_visible: true,
-      content: { src: "", alt: "", storage_path: "" },
+      content: { src: "", alt: "", storage_path: "" } as any,
       style: {}, visibility_rules: { roles: ["titular", "adherente", "contratada"], conditions: [] },
       sort_order: blocks.length,
     }, {
