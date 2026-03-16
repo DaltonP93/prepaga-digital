@@ -248,6 +248,21 @@ export const OpenSignRightPanel: React.FC<OpenSignRightPanelProps> = ({
                 onFieldTypeChange={onFieldTypeChange}
                 onSignerRoleChange={onRoleChange}
               />
+
+              {onInsertDocument && (
+                <>
+                  <Separator className="my-3" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full gap-1.5 text-[11px] h-8"
+                    onClick={onInsertDocument}
+                  >
+                    <FilePlus2 className="h-3.5 w-3.5" />
+                    Insertar Documento (PDF/DOCX)
+                  </Button>
+                </>
+              )}
             </div>
           </ScrollArea>
         </TabsContent>
