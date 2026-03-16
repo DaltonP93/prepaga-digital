@@ -3,7 +3,8 @@ import { useDroppable } from "@dnd-kit/core";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ZoomIn, ZoomOut, MousePointer, Maximize, Columns, ChevronUp, ChevronDown, Download, Printer } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ZoomIn, ZoomOut, MousePointer, Maximize, Columns, ChevronUp, ChevronDown, Download, Printer, Save, Eye, Upload } from "lucide-react";
 import { CanvasBlock, POSITIONED_TYPES } from "@/components/designer2/CanvasBlock";
 import { CanvasFieldOverlay } from "@/components/designer2/CanvasFieldOverlay";
 import usePdfPinchZoom from "@/hooks/usePdfPinchZoom";
@@ -30,49 +31,167 @@ interface OpenSignCanvasProps {
   selectedFieldId: string | null;
   onFieldSelect: (id: string | null) => void;
   onPageChange: (page: number) => void;
+  templateName?: string;
+  onTemplateNameChange?: (name: string) => void;
+  onSave?: () => void;
+  onPreview?: () => void;
+  onUploadPdf?: () => void;
 }
 
 const A4_W = 794;
 const A4_H = 1123;
 
+/* ─── Empty Canvas Dropzone ─── */
+const EmptyCanvasDropzone: React.FC<{ onUploadPdf?: () => void }> = ({ onUploadPdf }) => (
+  <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
+    <div className="w-20 h-20 rounded-2xl bg-muted/50 flex items-center justify-center">
+      <Upload className="h-8 w-8 text-muted-foreground/60" />
+    </div>
+    <div>
+      <p className="text-sm font-medium text-foreground">Sin documento base</p>
+      <p className="text-[11px] text-muted-foreground mt-1">
+        Arrastrá un PDF aquí o hacé click para seleccionar
+      </p>
+    </div>
+    {onUploadPdf && (
+      <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={onUploadPdf}>
+        <Upload className="h-3.5 w-3.5" />
+        Subir PDF
+      </Button>
+    )}
+  </div>
+);
+
+/* ─── Canvas Toolbar ─── */
+const CanvasToolbar: React.FC<{
+  currentPage: number;
+  totalPages: number;
+  zoom: number;
+  onZoomChange: (z: number) => void;
+  onPageChange: (page: number) => void;
+  placementActive: boolean;
+  pageBackgroundUrl?: string;
+  templateName?: string;
+  onTemplateNameChange?: (name: string) => void;
+  onSave?: () => void;
+  onPreview?: () => void;
+  fitWidth: () => void;
+  fitPage: () => void;
+}> = ({
+  currentPage, totalPages, zoom, onZoomChange, onPageChange,
+  placementActive, pageBackgroundUrl, templateName, onTemplateNameChange,
+  onSave, onPreview, fitWidth, fitPage,
+}) => (
+  <div className="flex items-center justify-between px-3 py-1.5 border-b bg-background/90 backdrop-blur-sm shrink-0 gap-2">
+    <div className="flex items-center gap-1">
+      {/* Page nav */}
+      <Button type="button" variant="ghost" size="icon" className="h-7 w-7"
+        onClick={() => onPageChange(Math.max(1, currentPage - 1))} disabled={currentPage <= 1}
+        title="Página anterior (Alt+↑)">
+        <ChevronUp className="h-3.5 w-3.5" />
+      </Button>
+      <Button type="button" variant="ghost" size="icon" className="h-7 w-7"
+        onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))} disabled={currentPage >= totalPages}
+        title="Página siguiente (Alt+↓)">
+        <ChevronDown className="h-3.5 w-3.5" />
+      </Button>
+      <span className="text-[11px] text-muted-foreground font-medium tabular-nums min-w-[50px] text-center">
+        {currentPage} / {totalPages}
+      </span>
+
+      <Separator orientation="vertical" className="h-5 mx-1" />
+
+      {/* Zoom */}
+      <Button type="button" variant="ghost" size="icon" className="h-7 w-7"
+        onClick={() => onZoomChange(Math.max(30, zoom - 10))} disabled={zoom <= 30}>
+        <ZoomOut className="h-3.5 w-3.5" />
+      </Button>
+      <span className="text-[11px] font-medium w-10 text-center tabular-nums">{zoom}%</span>
+      <Button type="button" variant="ghost" size="icon" className="h-7 w-7"
+        onClick={() => onZoomChange(Math.min(200, zoom + 10))} disabled={zoom >= 200}>
+        <ZoomIn className="h-3.5 w-3.5" />
+      </Button>
+
+      <Separator orientation="vertical" className="h-5 mx-1" />
+
+      <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={fitWidth} title="Ajustar al ancho">
+        <Columns className="h-3.5 w-3.5" />
+      </Button>
+      <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={fitPage} title="Ajustar a la página">
+        <Maximize className="h-3.5 w-3.5" />
+      </Button>
+    </div>
+
+    {/* Editable template name */}
+    {onTemplateNameChange ? (
+      <Input
+        className="h-7 text-[12px] font-medium max-w-[200px] bg-transparent border-transparent hover:border-border focus:border-primary text-center"
+        value={templateName || ""}
+        onChange={(e) => onTemplateNameChange(e.target.value)}
+        placeholder="Nombre del template..."
+      />
+    ) : (
+      templateName && (
+        <span className="text-[12px] font-medium text-foreground truncate max-w-[200px]">{templateName}</span>
+      )
+    )}
+
+    <div className="flex items-center gap-1">
+      {placementActive && (
+        <Badge variant="default" className="gap-1 text-[10px] animate-pulse">
+          <MousePointer className="h-3 w-3" />
+          Click para colocar
+        </Badge>
+      )}
+
+      <Separator orientation="vertical" className="h-5 mx-1" />
+
+      {onPreview && (
+        <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 text-[11px]" onClick={onPreview}>
+          <Eye className="h-3.5 w-3.5" /> Vista previa
+        </Button>
+      )}
+
+      {onSave && (
+        <Button type="button" variant="default" size="sm" className="h-7 gap-1 text-[11px]" onClick={onSave}>
+          <Save className="h-3.5 w-3.5" /> Guardar
+        </Button>
+      )}
+
+      <Button type="button" variant="ghost" size="icon" className="h-7 w-7" title="Imprimir"
+        onClick={() => window.print()}>
+        <Printer className="h-3.5 w-3.5" />
+      </Button>
+      <Button type="button" variant="ghost" size="icon" className="h-7 w-7" title="Descargar PDF"
+        onClick={() => { if (pageBackgroundUrl) window.open(pageBackgroundUrl, "_blank"); }}
+        disabled={!pageBackgroundUrl}>
+        <Download className="h-3.5 w-3.5" />
+      </Button>
+    </div>
+  </div>
+);
+
+/* ─── Main Component ─── */
 export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
-  templateId,
-  blocks,
-  currentPage,
-  zoom,
-  onZoomChange,
-  totalPages,
-  selectedBlockId,
-  onSelectBlock,
-  onDeleteBlock,
-  onDuplicateBlock,
-  onToggleLock,
-  onToggleVisibility,
-  onUpdatePosition,
-  placementActive,
-  activeFieldType,
-  activeSignerRole,
-  pageBackgroundUrl,
-  selectedFieldId,
-  onFieldSelect,
-  onPageChange,
+  templateId, blocks, currentPage, zoom, onZoomChange, totalPages,
+  selectedBlockId, onSelectBlock, onDeleteBlock, onDuplicateBlock,
+  onToggleLock, onToggleVisibility, onUpdatePosition,
+  placementActive, activeFieldType, activeSignerRole,
+  pageBackgroundUrl, selectedFieldId, onFieldSelect, onPageChange,
+  templateName, onTemplateNameChange, onSave, onPreview, onUploadPdf,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
 
-  // Drop zone for @dnd-kit widgets
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: "canvas-drop-zone" });
 
-  // Memoized ref callback to avoid render loop (setDropRef + containerRef)
   const setCanvasRefs = useCallback((el: HTMLDivElement | null) => {
     containerRef.current = el;
     setDropRef(el);
   }, [setDropRef]);
 
-  // Pinch-to-zoom
   usePdfPinchZoom(containerRef, zoom, onZoomChange);
 
-  // Observe container size for fit calculations
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -83,7 +202,6 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
     return () => ro.disconnect();
   }, []);
 
-  // Keyboard: arrow up/down for page nav
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).tagName === "INPUT" || (e.target as HTMLElement).tagName === "TEXTAREA") return;
@@ -125,70 +243,25 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
     [onSelectBlock, onFieldSelect]
   );
 
+  const isEmpty = totalPages === 0 && blocks.length === 0;
+
   return (
     <div className="flex flex-col h-full bg-neutral-200 dark:bg-neutral-900">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b bg-background/90 backdrop-blur-sm shrink-0">
-        <div className="flex items-center gap-1">
-          {/* Prev/Next page buttons */}
-          <Button type="button" variant="ghost" size="icon" className="h-7 w-7"
-            onClick={() => onPageChange(Math.max(1, currentPage - 1))} disabled={currentPage <= 1}
-            title="Página anterior (Alt+↑)">
-            <ChevronUp className="h-3.5 w-3.5" />
-          </Button>
-          <Button type="button" variant="ghost" size="icon" className="h-7 w-7"
-            onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))} disabled={currentPage >= totalPages}
-            title="Página siguiente (Alt+↓)">
-            <ChevronDown className="h-3.5 w-3.5" />
-          </Button>
-
-          <Separator orientation="vertical" className="h-5 mx-1" />
-
-          <Button type="button" variant="ghost" size="icon" className="h-7 w-7"
-            onClick={() => onZoomChange(Math.max(30, zoom - 10))} disabled={zoom <= 30}>
-            <ZoomOut className="h-3.5 w-3.5" />
-          </Button>
-          <span className="text-[11px] font-medium w-10 text-center tabular-nums">{zoom}%</span>
-          <Button type="button" variant="ghost" size="icon" className="h-7 w-7"
-            onClick={() => onZoomChange(Math.min(200, zoom + 10))} disabled={zoom >= 200}>
-            <ZoomIn className="h-3.5 w-3.5" />
-          </Button>
-
-          <Separator orientation="vertical" className="h-5 mx-1" />
-
-          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={fitWidth} title="Ajustar al ancho">
-            <Columns className="h-3.5 w-3.5" />
-          </Button>
-          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={fitPage} title="Ajustar a la página">
-            <Maximize className="h-3.5 w-3.5" />
-          </Button>
-
-          <Separator orientation="vertical" className="h-5 mx-1" />
-
-          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" title="Imprimir"
-            onClick={() => window.print()}>
-            <Printer className="h-3.5 w-3.5" />
-          </Button>
-          <Button type="button" variant="ghost" size="icon" className="h-7 w-7" title="Descargar PDF"
-            onClick={() => {
-              if (pageBackgroundUrl) window.open(pageBackgroundUrl, "_blank");
-            }}
-            disabled={!pageBackgroundUrl}>
-            <Download className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-
-        <span className="text-[11px] text-muted-foreground font-medium">
-          Pág {currentPage} / {totalPages}
-        </span>
-
-        {placementActive && (
-          <Badge variant="default" className="gap-1 text-[10px] animate-pulse">
-            <MousePointer className="h-3 w-3" />
-            Click para colocar
-          </Badge>
-        )}
-      </div>
+      <CanvasToolbar
+        currentPage={currentPage}
+        totalPages={totalPages}
+        zoom={zoom}
+        onZoomChange={onZoomChange}
+        onPageChange={onPageChange}
+        placementActive={placementActive}
+        pageBackgroundUrl={pageBackgroundUrl}
+        templateName={templateName}
+        onTemplateNameChange={onTemplateNameChange}
+        onSave={onSave}
+        onPreview={onPreview}
+        fitWidth={fitWidth}
+        fitPage={fitPage}
+      />
 
       {/* Canvas area */}
       <div
@@ -197,82 +270,88 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
         onClick={handleCanvasClick}
         data-canvas="true"
       >
-        <div
-          data-a4-page="true"
-          className="relative bg-background shadow-2xl ring-1 ring-border/40"
-          style={{
-            width: A4_W,
-            height: A4_H,
-            transform: `scale(${zoom / 100})`,
-            transformOrigin: "top center",
-            ...(pageBackgroundUrl
-              ? {
-                  backgroundImage: `url(${pageBackgroundUrl})`,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                  backgroundRepeat: "no-repeat",
-                }
-              : {}),
-          }}
-          data-canvas="true"
-        >
-          {/* Flow blocks */}
-          <div className="p-8 space-y-1" data-canvas="true">
-            {flowBlocks.map((block) => (
-              <CanvasBlock
-                key={block.id}
-                block={block}
-                isSelected={selectedBlockId === block.id}
-                onSelect={() => onSelectBlock(block.id)}
-                onDelete={() => onDeleteBlock(block.id)}
-                onDuplicate={() => onDuplicateBlock(block.id)}
-                onToggleLock={() => onToggleLock(block.id)}
-                onToggleVisibility={() => onToggleVisibility(block.id)}
-                templateId={templateId}
-                fieldPlacementRole={activeSignerRole}
-                fieldPlacementType={activeFieldType}
-              />
-            ))}
+        {isEmpty ? (
+          <div className="w-full max-w-md my-auto">
+            <EmptyCanvasDropzone onUploadPdf={onUploadPdf} />
           </div>
-
-          {/* Positioned blocks */}
-          {positionedBlocks.map((block) => (
-            <div
-              key={block.id}
-              className="absolute"
-              style={{
-                left: `${block.x}%`, top: `${block.y}%`,
-                width: `${block.w}%`, height: `${block.h}%`,
-                zIndex: block.z_index,
-              }}
-            >
-              <CanvasBlock
-                block={block}
-                isSelected={selectedBlockId === block.id}
-                onSelect={() => onSelectBlock(block.id)}
-                onDelete={() => onDeleteBlock(block.id)}
-                onDuplicate={() => onDuplicateBlock(block.id)}
-                onToggleLock={() => onToggleLock(block.id)}
-                onToggleVisibility={() => onToggleVisibility(block.id)}
-                onUpdatePosition={(x, y, w, h) => onUpdatePosition(block.id, x, y, w, h)}
-                templateId={templateId}
-                fieldPlacementRole={activeSignerRole}
-                fieldPlacementType={activeFieldType}
-              />
+        ) : (
+          <div
+            data-a4-page="true"
+            className="relative bg-background shadow-2xl ring-1 ring-border/40"
+            style={{
+              width: A4_W,
+              height: A4_H,
+              transform: `scale(${zoom / 100})`,
+              transformOrigin: "top center",
+              ...(pageBackgroundUrl
+                ? {
+                    backgroundImage: `url(${pageBackgroundUrl})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                    backgroundRepeat: "no-repeat",
+                  }
+                : {}),
+            }}
+            data-canvas="true"
+          >
+            {/* Flow blocks */}
+            <div className="p-8 space-y-1" data-canvas="true">
+              {flowBlocks.map((block) => (
+                <CanvasBlock
+                  key={block.id}
+                  block={block}
+                  isSelected={selectedBlockId === block.id}
+                  onSelect={() => onSelectBlock(block.id)}
+                  onDelete={() => onDeleteBlock(block.id)}
+                  onDuplicate={() => onDuplicateBlock(block.id)}
+                  onToggleLock={() => onToggleLock(block.id)}
+                  onToggleVisibility={() => onToggleVisibility(block.id)}
+                  templateId={templateId}
+                  fieldPlacementRole={activeSignerRole}
+                  fieldPlacementType={activeFieldType}
+                />
+              ))}
             </div>
-          ))}
 
-          {/* Field overlays */}
-          <CanvasFieldOverlay
-            templateId={templateId}
-            activeFieldType={activeFieldType}
-            activeSignerRole={activeSignerRole}
-            placementActive={placementActive}
-            currentPage={currentPage}
-            selectedFieldId={selectedFieldId}
-            onFieldSelect={onFieldSelect}
-          />
-        </div>
+            {/* Positioned blocks */}
+            {positionedBlocks.map((block) => (
+              <div
+                key={block.id}
+                className="absolute"
+                style={{
+                  left: `${block.x}%`, top: `${block.y}%`,
+                  width: `${block.w}%`, height: `${block.h}%`,
+                  zIndex: block.z_index,
+                }}
+              >
+                <CanvasBlock
+                  block={block}
+                  isSelected={selectedBlockId === block.id}
+                  onSelect={() => onSelectBlock(block.id)}
+                  onDelete={() => onDeleteBlock(block.id)}
+                  onDuplicate={() => onDuplicateBlock(block.id)}
+                  onToggleLock={() => onToggleLock(block.id)}
+                  onToggleVisibility={() => onToggleVisibility(block.id)}
+                  onUpdatePosition={(x, y, w, h) => onUpdatePosition(block.id, x, y, w, h)}
+                  templateId={templateId}
+                  fieldPlacementRole={activeSignerRole}
+                  fieldPlacementType={activeFieldType}
+                />
+              </div>
+            ))}
+
+            {/* Field overlays */}
+            <CanvasFieldOverlay
+              templateId={templateId}
+              activeFieldType={activeFieldType}
+              activeSignerRole={activeSignerRole}
+              placementActive={placementActive}
+              currentPage={currentPage}
+              selectedFieldId={selectedFieldId}
+              onFieldSelect={onFieldSelect}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
