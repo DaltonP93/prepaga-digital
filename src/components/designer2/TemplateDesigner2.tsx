@@ -547,6 +547,7 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
               onUpdate={handleUpdateBlock}
               onAddBlock={handleAddFlowBlock}
               templateId={templateId}
+              onRequestPickImage={openImageFilePicker}
             />
           </TabsContent>
 
