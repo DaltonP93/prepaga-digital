@@ -483,13 +483,14 @@ function TypeProperties({
 /* ─── Image properties with upload/library/URL ─── */
 
 function ImageProperties({
-  content, updateContent, templateId, onUpdate, block,
+  content, updateContent, templateId, onUpdate, block, onRequestPickImage,
 }: {
   content: any;
   updateContent: (k: string, v: any) => void;
   templateId?: string;
   onUpdate: (u: Partial<TemplateBlock>) => void;
   block: TemplateBlock;
+  onRequestPickImage?: () => void;
 }) {
   const { toast } = useToast();
   const [imageTab, setImageTab] = useState<"upload" | "url">("upload");
