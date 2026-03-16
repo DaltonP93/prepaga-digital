@@ -15,6 +15,7 @@ import { OpenSignPagesSidebar, type PageEntry } from "./OpenSignPagesSidebar";
 import { OpenSignCanvas } from "./OpenSignCanvas";
 import { OpenSignRightPanel } from "./OpenSignRightPanel";
 import { WidgetDragOverlay } from "@/components/designer2/WidgetDragOverlay";
+import { AssetUploadModal } from "@/components/designer2/AssetUploadModal";
 import type { WidgetDragData } from "@/lib/widgetUtils";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,16 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   const [resolvedPages, setResolvedPages] = useState<PageEntry[]>([]);
   const [migrating, setMigrating] = useState(false);
   const [activeDragData, setActiveDragData] = useState<WidgetDragData | null>(null);
+  const [showAssetModal, setShowAssetModal] = useState(false);
+
+  /* ─── Progressive mount: defer DnD to avoid freeze ─── */
+  const [dndReady, setDndReady] = useState(false);
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      setDndReady(true);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   /* ─── @dnd-kit sensors ─── */
   const sensors = useSensors(
@@ -155,7 +166,7 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
     if (id) setSelectedBlockId(null);
   }, []);
 
-  /* ─── Resolve signed URLs ─── */
+  /* ─── Resolve signed URLs — LAZY: only current page ─── */
   const rawPages: PageEntry[] = useMemo(() => {
     if (assetPages.length > 0) {
       return assetPages.map((ap) => ({ page: ap.page_number, previewUrl: ap.preview_image_url }));
@@ -164,26 +175,37 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
     return Array.from({ length: maxPage }, (_, i) => ({ page: i + 1, previewUrl: null }));
   }, [assetPages, blocks]);
 
+  // Resolve only the current page's signed URL (lazy)
+  const [resolvedUrlMap, setResolvedUrlMap] = useState<Record<number, string>>({});
+
   useEffect(() => {
+    const page = rawPages.find((p) => p.page === currentPage);
+    if (!page?.previewUrl) return;
+    // Already resolved or is a full URL
+    if (resolvedUrlMap[currentPage]) return;
+    if (page.previewUrl.startsWith("http") || page.previewUrl.startsWith("data:") || page.previewUrl.startsWith("blob:")) {
+      setResolvedUrlMap((prev) => ({ ...prev, [currentPage]: page.previewUrl! }));
+      return;
+    }
     let cancelled = false;
-    const resolve = async () => {
-      const results: PageEntry[] = await Promise.all(
-        rawPages.map(async (p) => {
-          if (!p.previewUrl) return p;
-          if (p.previewUrl.startsWith("http") || p.previewUrl.startsWith("data:") || p.previewUrl.startsWith("blob:")) return p;
-          const signed = await getAssetSignedUrl(p.previewUrl);
-          return { ...p, previewUrl: signed || null };
-        })
-      );
-      if (!cancelled) setResolvedPages(results);
-    };
-    resolve();
+    getAssetSignedUrl(page.previewUrl).then((signed) => {
+      if (!cancelled && signed) {
+        setResolvedUrlMap((prev) => ({ ...prev, [currentPage]: signed }));
+      }
+    });
     return () => { cancelled = true; };
-  }, [rawPages]);
+  }, [rawPages, currentPage, resolvedUrlMap]);
+
+  const pages: PageEntry[] = useMemo(() => {
+    return rawPages.map((p) => ({
+      ...p,
+      previewUrl: resolvedUrlMap[p.page] || p.previewUrl,
+    }));
+  }, [rawPages, resolvedUrlMap]);
 
   const currentPageBackground = useMemo(() => {
-    return resolvedPages.find((p) => p.page === currentPage)?.previewUrl || undefined;
-  }, [resolvedPages, currentPage]);
+    return resolvedUrlMap[currentPage] || undefined;
+  }, [resolvedUrlMap, currentPage]);
 
   const selectedBlock = useMemo(() => blocks.find((b) => b.id === selectedBlockId) || null, [blocks, selectedBlockId]);
   const selectedField = useMemo(() => fields.find((f) => f.id === selectedFieldId) || null, [fields, selectedFieldId]);
@@ -254,74 +276,90 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
     if (selectedFieldId === id) setSelectedFieldId(null);
   }, [deleteField, templateId, selectedFieldId]);
 
-  const pages = resolvedPages.length > 0 ? resolvedPages : rawPages;
-
-  /* ─── Render ─── */
-  return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
-        {/* Migration banner */}
-        {needsMigration && (
-          <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800">
-            <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
-            <p className="text-sm text-amber-800 dark:text-amber-200 flex-1">
-              Este template tiene contenido Legacy y todavía no fue migrado a V2.
-            </p>
-            <Button size="sm" onClick={handleMigrate} disabled={migrating}>
-              {migrating ? <><Loader2 className="h-4 w-4 animate-spin" /> Migrando…</> : "Migrar a V2"}
-            </Button>
-          </div>
-        )}
-
-        <div className="grid grid-cols-[180px_1fr_280px] flex-1 overflow-hidden">
-          <OpenSignPagesSidebar
-            pages={pages}
-            currentPage={currentPage}
-            onPageChange={setCurrentPage}
-            fields={fields}
-          />
-          <OpenSignCanvas
-            templateId={templateId}
-            blocks={blocks}
-            currentPage={currentPage}
-            zoom={zoom}
-            onZoomChange={setZoom}
-            totalPages={pages.length}
-            selectedBlockId={selectedBlockId}
-            onSelectBlock={handleSelectBlock}
-            onDeleteBlock={handleDeleteBlock}
-            onDuplicateBlock={handleDuplicateBlock}
-            onToggleLock={handleToggleLock}
-            onToggleVisibility={handleToggleVisibility}
-            onUpdatePosition={handleUpdatePosition}
-            placementActive={placementActive}
-            activeFieldType={activeFieldType}
-            activeSignerRole={activeRole}
-            pageBackgroundUrl={currentPageBackground}
-            selectedFieldId={selectedFieldId}
-            onFieldSelect={handleSelectField}
-            onPageChange={setCurrentPage}
-          />
-          <OpenSignRightPanel
-            templateId={templateId}
-            selectedBlock={selectedBlock}
-            onUpdateBlock={handleUpdateBlock}
-            onAddBlock={handleAddBlock}
-            fields={fields}
-            activeRole={activeRole}
-            onRoleChange={setActiveRole}
-            activeFieldType={activeFieldType}
-            onFieldTypeChange={setActiveFieldType}
-            placementActive={placementActive}
-            onTogglePlacement={setPlacementActive}
-            selectedField={selectedField}
-            onUpdateField={handleUpdateField}
-            onDeleteField={handleDeleteField}
-          />
+  /* ─── Editor content ─── */
+  const editorContent = (
+    <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
+      {/* Migration banner */}
+      {needsMigration && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800">
+          <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+          <p className="text-sm text-amber-800 dark:text-amber-200 flex-1">
+            Este template tiene contenido Legacy y todavía no fue migrado a V2.
+          </p>
+          <Button size="sm" onClick={handleMigrate} disabled={migrating}>
+            {migrating ? <><Loader2 className="h-4 w-4 animate-spin" /> Migrando…</> : "Migrar a V2"}
+          </Button>
         </div>
+      )}
+
+      <div className="grid grid-cols-[180px_1fr_280px] flex-1 overflow-hidden">
+        <OpenSignPagesSidebar
+          pages={pages}
+          currentPage={currentPage}
+          onPageChange={setCurrentPage}
+          fields={fields}
+        />
+        <OpenSignCanvas
+          templateId={templateId}
+          blocks={blocks}
+          currentPage={currentPage}
+          zoom={zoom}
+          onZoomChange={setZoom}
+          totalPages={pages.length}
+          selectedBlockId={selectedBlockId}
+          onSelectBlock={handleSelectBlock}
+          onDeleteBlock={handleDeleteBlock}
+          onDuplicateBlock={handleDuplicateBlock}
+          onToggleLock={handleToggleLock}
+          onToggleVisibility={handleToggleVisibility}
+          onUpdatePosition={handleUpdatePosition}
+          placementActive={placementActive}
+          activeFieldType={activeFieldType}
+          activeSignerRole={activeRole}
+          pageBackgroundUrl={currentPageBackground}
+          selectedFieldId={selectedFieldId}
+          onFieldSelect={handleSelectField}
+          onPageChange={setCurrentPage}
+        />
+        <OpenSignRightPanel
+          templateId={templateId}
+          selectedBlock={selectedBlock}
+          onUpdateBlock={handleUpdateBlock}
+          onAddBlock={handleAddBlock}
+          fields={fields}
+          activeRole={activeRole}
+          onRoleChange={setActiveRole}
+          activeFieldType={activeFieldType}
+          onFieldTypeChange={setActiveFieldType}
+          placementActive={placementActive}
+          onTogglePlacement={setPlacementActive}
+          selectedField={selectedField}
+          onUpdateField={handleUpdateField}
+          onDeleteField={handleDeleteField}
+          onInsertDocument={() => setShowAssetModal(true)}
+        />
       </div>
 
-      {/* Ghost drag preview */}
+      {/* Asset upload modal */}
+      <AssetUploadModal
+        templateId={templateId}
+        open={showAssetModal}
+        onOpenChange={setShowAssetModal}
+        onAssetInserted={() => {
+          queryClient.invalidateQueries({ queryKey: ["template-assets", templateId] });
+        }}
+      />
+    </div>
+  );
+
+  /* ─── Render: progressive mount wraps DnD only when ready ─── */
+  if (!dndReady) {
+    return editorContent;
+  }
+
+  return (
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      {editorContent}
       <WidgetDragOverlay activeData={activeDragData} />
     </DndContext>
   );

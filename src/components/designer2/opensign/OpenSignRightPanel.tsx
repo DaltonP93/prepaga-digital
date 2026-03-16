@@ -2,7 +2,7 @@ import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Users, Layers, Settings2, History, Check, Trash2, MousePointerClick } from "lucide-react";
+import { Users, Layers, Settings2, History, Check, Trash2, MousePointerClick, FilePlus2 } from "lucide-react";
 import { FieldOverlay } from "@/components/designer2/FieldOverlay";
 import { BlockPropertyPanel } from "@/components/designer2/BlockPropertyPanel";
 import { VersionPanel } from "@/components/designer2/VersionPanel";
@@ -30,6 +30,7 @@ interface OpenSignRightPanelProps {
   selectedField: TemplateField | null;
   onUpdateField: (updates: Partial<TemplateField>) => void;
   onDeleteField: (id: string) => void;
+  onInsertDocument?: () => void;
 }
 
 const ROLES: {
@@ -156,6 +157,7 @@ export const OpenSignRightPanel: React.FC<OpenSignRightPanelProps> = ({
   selectedField,
   onUpdateField,
   onDeleteField,
+  onInsertDocument,
 }) => {
   return (
     <aside className="flex flex-col border-l bg-background h-full">
@@ -246,6 +248,21 @@ export const OpenSignRightPanel: React.FC<OpenSignRightPanelProps> = ({
                 onFieldTypeChange={onFieldTypeChange}
                 onSignerRoleChange={onRoleChange}
               />
+
+              {onInsertDocument && (
+                <>
+                  <Separator className="my-3" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full gap-1.5 text-[11px] h-8"
+                    onClick={onInsertDocument}
+                  >
+                    <FilePlus2 className="h-3.5 w-3.5" />
+                    Insertar Documento (PDF/DOCX)
+                  </Button>
+                </>
+              )}
             </div>
           </ScrollArea>
         </TabsContent>

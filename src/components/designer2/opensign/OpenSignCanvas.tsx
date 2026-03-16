@@ -57,11 +57,17 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
   onFieldSelect,
   onPageChange,
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
 
   // Drop zone for @dnd-kit widgets
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: "canvas-drop-zone" });
+
+  // Memoized ref callback to avoid render loop (setDropRef + containerRef)
+  const setCanvasRefs = useCallback((el: HTMLDivElement | null) => {
+    containerRef.current = el;
+    setDropRef(el);
+  }, [setDropRef]);
 
   // Pinch-to-zoom
   usePdfPinchZoom(containerRef, zoom, onZoomChange);
@@ -186,7 +192,7 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
 
       {/* Canvas area */}
       <div
-        ref={(el) => { (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = el; setDropRef(el); }}
+        ref={setCanvasRefs}
         className={`flex-1 overflow-auto flex justify-center items-start py-6 transition-colors ${isOver ? "bg-primary/5 ring-2 ring-inset ring-primary/20" : ""}`}
         onClick={handleCanvasClick}
         data-canvas="true"
