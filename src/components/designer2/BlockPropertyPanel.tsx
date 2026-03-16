@@ -541,11 +541,14 @@ function ImageProperties({
 
       {imageTab === "upload" ? (
         <div className="space-y-2">
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
+          {/* Only render local input when no stable picker is provided */}
+          {!onRequestPickImage && (
+            <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleFileUpload} />
+          )}
           <Button
             type="button" variant="outline" size="sm"
             className="w-full h-8 text-[11px] gap-1.5 border-dashed"
-            onClick={() => fileRef.current?.click()}
+            onClick={() => onRequestPickImage ? onRequestPickImage() : fileRef.current?.click()}
             disabled={uploading}
           >
             <ImageIcon className="h-3.5 w-3.5" />
