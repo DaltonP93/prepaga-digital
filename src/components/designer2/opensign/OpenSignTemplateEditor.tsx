@@ -63,11 +63,16 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
     if (!legacyContent?.trim()) return;
     setMigrating(true);
     try {
+      // Yield to browser so React can paint the spinner before heavy sync work
+      await new Promise(r => setTimeout(r, 50));
+
       const { blocks: parsedBlocks, signatureFields } = parseLegacyHtml(templateId, legacyContent);
       let blocksCreated = 0;
       let fieldsCreated = 0;
 
-      // Insert blocks only if none exist yet
+      const CHUNK = 50;
+
+      // Insert blocks only if none exist yet (chunked)
       if (canMigrateBlocks && parsedBlocks.length > 0) {
         const rows = parsedBlocks.map((b, i) => ({
           ...b,
@@ -76,8 +81,10 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
           style: b.style as unknown as Json,
           visibility_rules: b.visibility_rules as unknown as Json,
         }));
-        const { error: bErr } = await supabase.from("template_blocks").insert(rows as any);
-        if (bErr) throw bErr;
+        for (let i = 0; i < rows.length; i += CHUNK) {
+          const { error: bErr } = await supabase.from("template_blocks").insert(rows.slice(i, i + CHUNK) as any);
+          if (bErr) throw bErr;
+        }
         blocksCreated = parsedBlocks.length;
       }
 
