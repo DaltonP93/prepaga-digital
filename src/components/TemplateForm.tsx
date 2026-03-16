@@ -467,6 +467,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
             className="max-w-7xl max-h-[95vh] overflow-y-auto"
             onPointerDownOutside={(e) => e.preventDefault()}
             onInteractOutside={(e) => e.preventDefault()}
+            onFocusOutside={(e) => e.preventDefault()}
           >
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
