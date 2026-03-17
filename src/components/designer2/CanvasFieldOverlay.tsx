@@ -196,7 +196,9 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
       if (e.key === "Delete" || e.key === "Backspace") {
         if ((e.target as HTMLElement).tagName === "INPUT" || (e.target as HTMLElement).tagName === "TEXTAREA") return;
         e.preventDefault();
-        deleteField.mutate({ id: selectedFieldId, templateId });
+        deleteField.mutate({ id: selectedFieldId, templateId }, {
+          onError: (err: any) => { console.error("deleteField error:", err); toast({ title: "Error al eliminar campo", description: err.message, variant: "destructive" }); },
+        });
         selectField(null);
       }
       if (e.key === "Escape") selectField(null);
