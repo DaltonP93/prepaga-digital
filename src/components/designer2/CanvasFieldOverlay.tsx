@@ -1,7 +1,7 @@
 import React, { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { useTemplateFields, useCreateTemplateField, useUpdateTemplateField, useDeleteTemplateField } from "@/hooks/useTemplateFields";
 import type { TemplateField, FieldType, SignerRole } from "@/types/templateDesigner";
-import { PenTool, Calendar, Type, CheckSquare, User, CreditCard, Mail, Hash, Stamp, ListFilter, Circle } from "lucide-react";
+import { PenTool, Calendar, Type, CheckSquare, User, CreditCard, Mail, Hash, Stamp, ListFilter, Circle, Pen, Building2, AlignLeft } from "lucide-react";
 import { FIELD_DEFAULT_SIZE, FIELD_LABELS, clamp, applyResize, type ResizeHandle } from "@/lib/widgetUtils";
 
 /* ───────── types ───────── */
@@ -16,30 +16,36 @@ interface CanvasFieldOverlayProps {
   onFieldSelect?: (fieldId: string | null) => void;
 }
 
-/* ───────── constants ───────── */
+/* ───────── constants (OpenSign colors) ───────── */
 
 const ROLE_COLORS: Record<SignerRole, string> = {
-  titular: "rgba(37,99,235,0.18)",
-  adherente: "rgba(22,163,74,0.18)",
-  contratada: "rgba(147,51,234,0.18)",
+  titular: "rgba(59,130,246,0.12)",
+  adherente: "rgba(16,185,129,0.12)",
+  contratada: "rgba(245,158,11,0.12)",
 };
 
 const ROLE_BORDER: Record<SignerRole, string> = {
-  titular: "#2563eb",
-  adherente: "#16a34a",
-  contratada: "#9333ea",
+  titular: "#3b82f6",
+  adherente: "#10b981",
+  contratada: "#f59e0b",
 };
 
 const ROLE_RING: Record<SignerRole, string> = {
-  titular: "rgba(37,99,235,0.35)",
-  adherente: "rgba(22,163,74,0.35)",
-  contratada: "rgba(147,51,234,0.35)",
+  titular: "rgba(59,130,246,0.35)",
+  adherente: "rgba(16,185,129,0.35)",
+  contratada: "rgba(245,158,11,0.35)",
+};
+
+const ROLE_LABELS: Record<SignerRole, string> = {
+  titular: "Titular",
+  adherente: "Adherente",
+  contratada: "Contratada",
 };
 
 const FIELD_ICONS: Record<string, React.ElementType> = {
-  signature: PenTool, initials: Hash, date: Calendar, text: Type,
+  signature: PenTool, initials: Pen, date: Calendar, text: AlignLeft,
   checkbox: CheckSquare, name: User, dni: CreditCard, email: Mail,
-  stamp: Stamp, dropdown: ListFilter, radio: Circle,
+  stamp: Building2, dropdown: ListFilter, radio: Circle,
 };
 
 const HANDLE_SIZE = 8;
@@ -193,12 +199,37 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
     return () => window.removeEventListener("keydown", handler);
   }, [selectedFieldId, templateId, deleteField, selectField]);
 
+  /* ─── Native HTML drop support (from widget palette) ─── */
+  const handleNativeDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    const widgetType = e.dataTransfer.getData("widget_type") as FieldType;
+    const signerRole = e.dataTransfer.getData("signer_role") as SignerRole;
+    if (!widgetType || !signerRole) return;
+
+    e.preventDefault();
+    const rect = overlayRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const nx = (e.clientX - rect.left) / rect.width;
+    const ny = (e.clientY - rect.top) / rect.height;
+    const defaults = FIELD_DEFAULT_SIZE[widgetType] || { w: 0.18, h: 0.04 };
+
+    createField.mutate({
+      template_id: templateId, block_id: null,
+      signer_role: signerRole, field_type: widgetType,
+      page: currentPage, x: clamp(nx - defaults.w / 2, 0, 1 - defaults.w), y: clamp(ny - defaults.h / 2, 0, 1 - defaults.h),
+      w: defaults.w, h: defaults.h,
+      required: true, label: FIELD_LABELS[widgetType] || widgetType,
+      meta: {} as any,
+    });
+  }, [templateId, currentPage, createField]);
+
   /* ─── Render ─── */
   return (
     <div
       ref={overlayRef}
       className={`absolute inset-0 z-20 ${placementActive ? "cursor-crosshair" : "pointer-events-none"}`}
       onClick={handleClick}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={handleNativeDrop}
     >
       {pageFields.map((field) => {
         const Icon = FIELD_ICONS[field.field_type] || PenTool;
@@ -233,17 +264,25 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
             onMouseDown={(e) => handleFieldMouseDown(e, field)}
             onClick={(e) => { e.stopPropagation(); selectField(field.id); }}
           >
+            {/* Role badge above field (OpenSign style) */}
+            <div
+              className="absolute -top-5 left-0 px-1.5 py-0.5 rounded text-[9px] font-semibold whitespace-nowrap pointer-events-none"
+              style={{ backgroundColor: borderColor, color: "#fff" }}
+            >
+              {ROLE_LABELS[field.signer_role] || field.signer_role}
+            </div>
+
             {/* Type-specific content */}
             {field.field_type === "checkbox" ? (
               <div className="flex items-center gap-1">
-                <div className="h-3 w-3 border-2 rounded-sm" style={{ borderColor: borderColor }} />
+                <div className="h-3 w-3 border-2 rounded-sm" style={{ borderColor }} />
                 <span className="text-[8px] font-medium truncate" style={{ color: borderColor }}>
                   {field.label || "Check"}
                 </span>
               </div>
             ) : field.field_type === "radio" ? (
               <div className="flex items-center gap-1">
-                <div className="h-3 w-3 border-2 rounded-full" style={{ borderColor: borderColor }} />
+                <div className="h-3 w-3 border-2 rounded-full" style={{ borderColor }} />
                 <span className="text-[8px] font-medium truncate" style={{ color: borderColor }}>
                   {field.label || "Radio"}
                 </span>
@@ -265,14 +304,14 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
               <div className="flex flex-col items-center justify-center gap-0.5 w-full">
                 <Icon className="h-4 w-4 shrink-0" style={{ color: borderColor }} />
                 <span className="text-[7px] font-medium" style={{ color: borderColor }}>
-                  {field.label || "Firma"} — {field.signer_role}
+                  {field.label || "Firma"}
                 </span>
               </div>
             ) : (
               <>
                 <Icon className="h-3 w-3 shrink-0" style={{ color: borderColor }} />
                 <span className="text-[8px] font-medium ml-0.5 truncate" style={{ color: borderColor }}>
-                  {field.label || field.field_type} — {field.signer_role}
+                  {field.label || field.field_type}
                 </span>
               </>
             )}

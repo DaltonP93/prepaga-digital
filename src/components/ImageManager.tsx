@@ -1,13 +1,11 @@
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { 
   Upload, 
   ImageIcon, 
-  Copy, 
   Eye
 } from 'lucide-react';
 import { useFileUpload } from '@/hooks/useFileUpload';
@@ -32,26 +30,19 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { uploadFile, uploadState } = useFileUpload();
+  const [resolvedUrls, setResolvedUrls] = useState<Record<string, string>>({});
 
   // Fetch uploaded images
   const { data: images, isLoading, refetch } = useQuery({
     queryKey: ['template-images'],
     queryFn: async () => {
-      console.log('🔍 Fetching images from database...');
-      
       const { data, error } = await supabase
         .from('file_uploads')
         .select('id, file_name, file_url, file_size, file_type, created_at')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('❌ Error fetching images:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('✅ Images fetched from database:', data?.length || 0, 'items');
-
-      // Filter to only image files
       const imageFiles = (data || []).filter(img => 
         img.file_type?.startsWith('image/') || 
         img.file_name?.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)
@@ -60,6 +51,54 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
       return imageFiles as UploadedImage[];
     }
   });
+
+  // Resolve signed URLs for images that are storage paths
+  useEffect(() => {
+    if (!images || images.length === 0) return;
+    let cancelled = false;
+
+    const resolve = async () => {
+      const newUrls: Record<string, string> = {};
+      for (const img of images) {
+        if (resolvedUrls[img.id]) continue;
+        const url = img.file_url;
+        // Already a full URL
+        if (url.startsWith('http') || url.startsWith('data:') || url.startsWith('blob:')) {
+          newUrls[img.id] = url;
+          continue;
+        }
+        // It's a storage path — resolve signed URL
+        try {
+          const { data, error } = await supabase.storage
+            .from('documents')
+            .createSignedUrl(url, 3600);
+          if (!error && data?.signedUrl) {
+            newUrls[img.id] = data.signedUrl;
+          }
+        } catch {
+          // Try other common bucket
+          try {
+            const { data, error } = await supabase.storage
+              .from('avatars')
+              .createSignedUrl(url, 3600);
+            if (!error && data?.signedUrl) {
+              newUrls[img.id] = data.signedUrl;
+            }
+          } catch { /* skip */ }
+        }
+      }
+      if (!cancelled && Object.keys(newUrls).length > 0) {
+        setResolvedUrls(prev => ({ ...prev, ...newUrls }));
+      }
+    };
+
+    resolve();
+    return () => { cancelled = true; };
+  }, [images]);
+
+  const getImageUrl = (img: UploadedImage) => {
+    return resolvedUrls[img.id] || img.file_url;
+  };
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -82,8 +121,6 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
   }, []);
 
   const handleFileUpload = async (file: File) => {
-    console.log('📤 Starting file upload:', file.name, file.type);
-    
     if (!file.type.startsWith('image/')) {
       toast.error('Por favor selecciona solo archivos de imagen');
       return;
@@ -91,18 +128,12 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
 
     try {
       const url = await uploadFile(file, 'documents', 'template-images');
-      console.log('✅ File uploaded successfully:', url);
-      
       if (url) {
-        // Refresh the images list
         await refetch();
         toast.success('Imagen subida exitosamente');
-        
-        // Automatically select the uploaded image
         onImageSelect(url);
       }
     } catch (error) {
-      console.error('❌ Error uploading file:', error);
       toast.error('Error al subir la imagen');
     }
   };
@@ -113,17 +144,17 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
     }
   };
 
-  const copyToClipboard = (url: string) => {
-    navigator.clipboard.writeText(url);
-    toast.success('URL copiada al portapapeles');
-  };
-
   const formatFileSize = (bytes: number | null) => {
     if (!bytes || bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const handleImageClick = (img: UploadedImage) => {
+    const url = getImageUrl(img);
+    onImageSelect(url);
   };
 
   return (
@@ -140,7 +171,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
           className={`relative border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
             dragActive 
               ? 'border-primary bg-primary/5' 
-              : 'border-gray-300 hover:border-gray-400'
+              : 'border-border hover:border-muted-foreground/40'
           }`}
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
@@ -165,7 +196,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
             </div>
           ) : (
             <div className="space-y-2">
-              <Upload className="w-8 h-8 mx-auto text-gray-400" />
+              <Upload className="w-8 h-8 mx-auto text-muted-foreground/60" />
               <div>
                 <p className="text-sm font-medium">Arrastra una imagen aquí</p>
                 <p className="text-xs text-muted-foreground">o haz clic para seleccionar</p>
@@ -192,44 +223,49 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
             </div>
           ) : images && images.length > 0 ? (
             <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
-              {images.map((image) => (
-                <div key={image.id} className="relative group border rounded-lg p-2">
-                  <img
-                    src={image.file_url}
-                    alt={image.file_name}
-                    className="w-full h-20 object-cover rounded cursor-pointer"
-                    onClick={() => onImageSelect(image.file_url)}
-                  />
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-1">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      className="h-6 w-6 p-0"
-                      onClick={() => onImageSelect(image.file_url)}
-                    >
-                      <Eye className="w-3 h-3" />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      className="h-6 w-6 p-0"
-                      onClick={() => copyToClipboard(image.file_url)}
-                    >
-                      <Copy className="w-3 h-3" />
-                    </Button>
+              {images.map((image) => {
+                const imgUrl = getImageUrl(image);
+                const isResolved = imgUrl.startsWith('http') || imgUrl.startsWith('data:') || imgUrl.startsWith('blob:');
+                return (
+                  <div
+                    key={image.id}
+                    className="relative group border rounded-lg p-2 cursor-pointer hover:border-primary/50 transition-colors"
+                    onClick={() => handleImageClick(image)}
+                  >
+                    {isResolved ? (
+                      <img
+                        src={imgUrl}
+                        alt={image.file_name}
+                        className="w-full h-20 object-cover rounded"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-20 rounded bg-muted flex items-center justify-center">
+                        <ImageIcon className="h-6 w-6 text-muted-foreground/40" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        className="h-7 gap-1 text-xs"
+                        onClick={(e) => { e.stopPropagation(); handleImageClick(image); }}
+                      >
+                        <Eye className="w-3 h-3" /> Usar
+                      </Button>
+                    </div>
+                    <div className="mt-1">
+                      <p className="text-xs truncate" title={image.file_name}>
+                        {image.file_name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatFileSize(image.file_size)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="mt-1">
-                    <p className="text-xs truncate" title={image.file_name}>
-                      {image.file_name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatFileSize(image.file_size)}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-4">
@@ -238,39 +274,6 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
               </p>
             </div>
           )}
-        </div>
-
-        {/* Quick Insert URLs */}
-        <div className="space-y-2">
-          <h4 className="text-sm font-medium">Insertar desde URL</h4>
-          <div className="flex gap-2">
-            <Input
-              placeholder="https://ejemplo.com/imagen.jpg"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const url = (e.target as HTMLInputElement).value;
-                  if (url) {
-                    onImageSelect(url);
-                    (e.target as HTMLInputElement).value = '';
-                  }
-                }
-              }}
-            />
-            <Button
-              type="button"
-              size="sm"
-              onClick={(e) => {
-                const input = (e.currentTarget.parentElement?.querySelector('input') as HTMLInputElement);
-                const url = input?.value;
-                if (url) {
-                  onImageSelect(url);
-                  input.value = '';
-                }
-              }}
-            >
-              Insertar
-            </Button>
-          </div>
         </div>
       </CardContent>
     </Card>
