@@ -331,7 +331,9 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
               className="absolute -top-2.5 -right-2.5 h-4 w-4 rounded-full bg-destructive text-destructive-foreground text-[9px] leading-none hidden group-hover:flex items-center justify-center shadow-sm"
               onClick={(e) => {
                 e.stopPropagation();
-                deleteField.mutate({ id: field.id, templateId });
+                deleteField.mutate({ id: field.id, templateId }, {
+                  onError: (err: any) => { console.error("deleteField error:", err); toast({ title: "Error al eliminar campo", description: err.message, variant: "destructive" }); },
+                });
                 if (selectedFieldId === field.id) selectField(null);
               }}
             >
