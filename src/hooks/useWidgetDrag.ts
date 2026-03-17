@@ -27,9 +27,9 @@ interface UseWidgetDragOptions {
 }
 
 const ROLE_BORDER: Record<SignerRole, string> = {
-  titular: "#2563eb",
-  adherente: "#16a34a",
-  contratada: "#9333ea",
+  titular: "#3b82f6",
+  adherente: "#10b981",
+  contratada: "#f59e0b",
 };
 
 /**
