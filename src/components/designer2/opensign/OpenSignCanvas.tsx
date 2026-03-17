@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
-import { ZoomIn, ZoomOut, MousePointer, Maximize, Columns, ChevronUp, ChevronDown, Download, Printer, Save, Eye, Upload } from "lucide-react";
+import { ZoomIn, ZoomOut, MousePointer, Maximize, Columns, Download, Printer, Save, Eye, Upload, Trash2 } from "lucide-react";
 import { CanvasBlock, POSITIONED_TYPES } from "@/components/designer2/CanvasBlock";
 import { CanvasFieldOverlay } from "@/components/designer2/CanvasFieldOverlay";
 import usePdfPinchZoom from "@/hooks/usePdfPinchZoom";
@@ -27,7 +27,7 @@ interface OpenSignCanvasProps {
   placementActive: boolean;
   activeFieldType: FieldType;
   activeSignerRole: SignerRole;
-  pageBackgroundUrl?: string;
+  pageBackgrounds: Record<number, string>;
   selectedFieldId: string | null;
   onFieldSelect: (id: string | null) => void;
   onPageChange: (page: number) => void;
@@ -36,10 +36,13 @@ interface OpenSignCanvasProps {
   onSave?: () => void;
   onPreview?: () => void;
   onUploadPdf?: () => void;
+  onDeleteAsset?: () => void;
+  hasAsset?: boolean;
 }
 
 const A4_W = 794;
 const A4_H = 1123;
+const PAGE_GAP = 24;
 
 /* ─── Empty Canvas Dropzone ─── */
 const EmptyCanvasDropzone: React.FC<{ onUploadPdf?: () => void }> = ({ onUploadPdf }) => (
@@ -68,40 +71,29 @@ const CanvasToolbar: React.FC<{
   totalPages: number;
   zoom: number;
   onZoomChange: (z: number) => void;
-  onPageChange: (page: number) => void;
   placementActive: boolean;
-  pageBackgroundUrl?: string;
   templateName?: string;
   onTemplateNameChange?: (name: string) => void;
   onSave?: () => void;
   onPreview?: () => void;
+  onDeleteAsset?: () => void;
+  hasAsset?: boolean;
   fitWidth: () => void;
   fitPage: () => void;
+  pageBackgrounds: Record<number, string>;
 }> = ({
-  currentPage, totalPages, zoom, onZoomChange, onPageChange,
-  placementActive, pageBackgroundUrl, templateName, onTemplateNameChange,
-  onSave, onPreview, fitWidth, fitPage,
+  currentPage, totalPages, zoom, onZoomChange,
+  placementActive, templateName, onTemplateNameChange,
+  onSave, onPreview, onDeleteAsset, hasAsset, fitWidth, fitPage, pageBackgrounds,
 }) => (
   <div className="flex items-center justify-between px-3 py-1.5 border-b bg-background/90 backdrop-blur-sm shrink-0 gap-2">
     <div className="flex items-center gap-1">
-      {/* Page nav */}
-      <Button type="button" variant="ghost" size="icon" className="h-7 w-7"
-        onClick={() => onPageChange(Math.max(1, currentPage - 1))} disabled={currentPage <= 1}
-        title="Página anterior (Alt+↑)">
-        <ChevronUp className="h-3.5 w-3.5" />
-      </Button>
-      <Button type="button" variant="ghost" size="icon" className="h-7 w-7"
-        onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))} disabled={currentPage >= totalPages}
-        title="Página siguiente (Alt+↓)">
-        <ChevronDown className="h-3.5 w-3.5" />
-      </Button>
       <span className="text-[11px] text-muted-foreground font-medium tabular-nums min-w-[50px] text-center">
         {currentPage} / {totalPages}
       </span>
 
       <Separator orientation="vertical" className="h-5 mx-1" />
 
-      {/* Zoom */}
       <Button type="button" variant="ghost" size="icon" className="h-7 w-7"
         onClick={() => onZoomChange(Math.max(30, zoom - 10))} disabled={zoom <= 30}>
         <ZoomOut className="h-3.5 w-3.5" />
@@ -144,6 +136,15 @@ const CanvasToolbar: React.FC<{
         </Badge>
       )}
 
+      {hasAsset && onDeleteAsset && (
+        <>
+          <Separator orientation="vertical" className="h-5 mx-1" />
+          <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 text-[11px] text-destructive hover:text-destructive" onClick={onDeleteAsset}>
+            <Trash2 className="h-3.5 w-3.5" /> Eliminar PDF
+          </Button>
+        </>
+      )}
+
       <Separator orientation="vertical" className="h-5 mx-1" />
 
       {onPreview && (
@@ -163,8 +164,11 @@ const CanvasToolbar: React.FC<{
         <Printer className="h-3.5 w-3.5" />
       </Button>
       <Button type="button" variant="ghost" size="icon" className="h-7 w-7" title="Descargar PDF"
-        onClick={() => { if (pageBackgroundUrl) window.open(pageBackgroundUrl, "_blank"); }}
-        disabled={!pageBackgroundUrl}>
+        onClick={() => {
+          const bg = pageBackgrounds[1];
+          if (bg) window.open(bg, "_blank");
+        }}
+        disabled={!pageBackgrounds[1]}>
         <Download className="h-3.5 w-3.5" />
       </Button>
     </div>
@@ -177,11 +181,13 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
   selectedBlockId, onSelectBlock, onDeleteBlock, onDuplicateBlock,
   onToggleLock, onToggleVisibility, onUpdatePosition,
   placementActive, activeFieldType, activeSignerRole,
-  pageBackgroundUrl, selectedFieldId, onFieldSelect, onPageChange,
+  pageBackgrounds, selectedFieldId, onFieldSelect, onPageChange,
   templateName, onTemplateNameChange, onSave, onPreview, onUploadPdf,
+  onDeleteAsset, hasAsset,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
+  const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: "canvas-drop-zone" });
 
@@ -202,15 +208,40 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
     return () => ro.disconnect();
   }, []);
 
+  /* ─── IntersectionObserver: sync currentPage on scroll ─── */
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).tagName === "INPUT" || (e.target as HTMLElement).tagName === "TEXTAREA") return;
-      if (e.key === "ArrowUp" && e.altKey) { e.preventDefault(); onPageChange(Math.max(1, currentPage - 1)); }
-      if (e.key === "ArrowDown" && e.altKey) { e.preventDefault(); onPageChange(Math.min(totalPages, currentPage + 1)); }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [currentPage, totalPages, onPageChange]);
+    const container = containerRef.current;
+    if (!container || totalPages <= 1) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        let bestPage = currentPage;
+        let bestRatio = 0;
+        for (const entry of entries) {
+          const pageNum = Number(entry.target.getAttribute("data-page-num"));
+          if (entry.intersectionRatio > bestRatio) {
+            bestRatio = entry.intersectionRatio;
+            bestPage = pageNum;
+          }
+        }
+        if (bestRatio > 0.3 && bestPage !== currentPage) {
+          onPageChange(bestPage);
+        }
+      },
+      { root: container, threshold: [0.3, 0.5, 0.7] }
+    );
+
+    pageRefs.current.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [totalPages, currentPage, onPageChange]);
+
+  /* ─── Scroll to page when sidebar click ─── */
+  useEffect(() => {
+    const el = pageRefs.current.get(currentPage);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [currentPage]);
 
   const fitWidth = useCallback(() => {
     if (containerSize.w <= 0) return;
@@ -225,14 +256,6 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
     onZoomChange(Math.max(30, Math.min(200, Math.floor(Math.min(zw, zh)))));
   }, [containerSize, onZoomChange]);
 
-  const pageBlocks = useMemo(
-    () => blocks.filter((b) => b.page === currentPage && b.is_visible),
-    [blocks, currentPage]
-  );
-
-  const flowBlocks = pageBlocks.filter((b) => !POSITIONED_TYPES.has(b.block_type));
-  const positionedBlocks = pageBlocks.filter((b) => POSITIONED_TYPES.has(b.block_type));
-
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent) => {
       if (e.target === e.currentTarget || (e.target as HTMLElement).dataset.canvas) {
@@ -245,6 +268,16 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
 
   const isEmpty = totalPages === 0 && blocks.length === 0;
 
+  /* ─── Per-page block filtering ─── */
+  const blocksByPage = useMemo(() => {
+    const map: Record<number, TemplateBlock[]> = {};
+    for (let p = 1; p <= totalPages; p++) map[p] = [];
+    for (const b of blocks) {
+      if (b.is_visible && map[b.page]) map[b.page].push(b);
+    }
+    return map;
+  }, [blocks, totalPages]);
+
   return (
     <div className="flex flex-col h-full bg-neutral-200 dark:bg-neutral-900">
       <CanvasToolbar
@@ -252,21 +285,22 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
         totalPages={totalPages}
         zoom={zoom}
         onZoomChange={onZoomChange}
-        onPageChange={onPageChange}
         placementActive={placementActive}
-        pageBackgroundUrl={pageBackgroundUrl}
         templateName={templateName}
         onTemplateNameChange={onTemplateNameChange}
         onSave={onSave}
         onPreview={onPreview}
+        onDeleteAsset={onDeleteAsset}
+        hasAsset={hasAsset}
         fitWidth={fitWidth}
         fitPage={fitPage}
+        pageBackgrounds={pageBackgrounds}
       />
 
-      {/* Canvas area */}
+      {/* Canvas area — all pages stacked */}
       <div
         ref={setCanvasRefs}
-        className={`flex-1 overflow-auto flex justify-center items-start py-6 transition-colors ${isOver ? "bg-primary/5 ring-2 ring-inset ring-primary/20" : ""}`}
+        className={`flex-1 overflow-auto flex flex-col items-center py-6 transition-colors ${isOver ? "bg-primary/5 ring-2 ring-inset ring-primary/20" : ""}`}
         onClick={handleCanvasClick}
         data-canvas="true"
       >
@@ -275,82 +309,100 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
             <EmptyCanvasDropzone onUploadPdf={onUploadPdf} />
           </div>
         ) : (
-          <div
-            data-a4-page="true"
-            className="relative bg-background shadow-2xl ring-1 ring-border/40"
-            style={{
-              width: A4_W,
-              height: A4_H,
-              transform: `scale(${zoom / 100})`,
-              transformOrigin: "top center",
-              ...(pageBackgroundUrl
-                ? {
-                    backgroundImage: `url(${pageBackgroundUrl})`,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                    backgroundRepeat: "no-repeat",
-                  }
-                : {}),
-            }}
-            data-canvas="true"
-          >
-            {/* Flow blocks */}
-            <div className="p-8 space-y-1" data-canvas="true">
-              {flowBlocks.map((block) => (
-                <CanvasBlock
-                  key={block.id}
-                  block={block}
-                  isSelected={selectedBlockId === block.id}
-                  onSelect={() => onSelectBlock(block.id)}
-                  onDelete={() => onDeleteBlock(block.id)}
-                  onDuplicate={() => onDuplicateBlock(block.id)}
-                  onToggleLock={() => onToggleLock(block.id)}
-                  onToggleVisibility={() => onToggleVisibility(block.id)}
-                  templateId={templateId}
-                  fieldPlacementRole={activeSignerRole}
-                  fieldPlacementType={activeFieldType}
-                />
-              ))}
-            </div>
+          Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
+            const pageBg = pageBackgrounds[pageNum];
+            const pageBlocks = blocksByPage[pageNum] || [];
+            const flowBlocks = pageBlocks.filter((b) => !POSITIONED_TYPES.has(b.block_type));
+            const positionedBlocks = pageBlocks.filter((b) => POSITIONED_TYPES.has(b.block_type));
 
-            {/* Positioned blocks */}
-            {positionedBlocks.map((block) => (
+            return (
               <div
-                key={block.id}
-                className="absolute"
+                key={pageNum}
+                ref={(el) => { if (el) pageRefs.current.set(pageNum, el); else pageRefs.current.delete(pageNum); }}
+                data-page-num={pageNum}
+                data-a4-page="true"
+                className="relative bg-background shadow-2xl ring-1 ring-border/40"
                 style={{
-                  left: `${block.x}%`, top: `${block.y}%`,
-                  width: `${block.w}%`, height: `${block.h}%`,
-                  zIndex: block.z_index,
+                  width: A4_W,
+                  height: A4_H,
+                  transform: `scale(${zoom / 100})`,
+                  transformOrigin: "top center",
+                  marginBottom: PAGE_GAP,
+                  ...(pageBg
+                    ? {
+                        backgroundImage: `url(${pageBg})`,
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                        backgroundRepeat: "no-repeat",
+                      }
+                    : {}),
                 }}
+                data-canvas="true"
               >
-                <CanvasBlock
-                  block={block}
-                  isSelected={selectedBlockId === block.id}
-                  onSelect={() => onSelectBlock(block.id)}
-                  onDelete={() => onDeleteBlock(block.id)}
-                  onDuplicate={() => onDuplicateBlock(block.id)}
-                  onToggleLock={() => onToggleLock(block.id)}
-                  onToggleVisibility={() => onToggleVisibility(block.id)}
-                  onUpdatePosition={(x, y, w, h) => onUpdatePosition(block.id, x, y, w, h)}
+                {/* Page number indicator */}
+                <div className="absolute -top-5 left-0 text-[10px] text-muted-foreground font-medium">
+                  Pág. {pageNum}
+                </div>
+
+                {/* Flow blocks */}
+                <div className="p-8 space-y-1" data-canvas="true">
+                  {flowBlocks.map((block) => (
+                    <CanvasBlock
+                      key={block.id}
+                      block={block}
+                      isSelected={selectedBlockId === block.id}
+                      onSelect={() => onSelectBlock(block.id)}
+                      onDelete={() => onDeleteBlock(block.id)}
+                      onDuplicate={() => onDuplicateBlock(block.id)}
+                      onToggleLock={() => onToggleLock(block.id)}
+                      onToggleVisibility={() => onToggleVisibility(block.id)}
+                      templateId={templateId}
+                      fieldPlacementRole={activeSignerRole}
+                      fieldPlacementType={activeFieldType}
+                    />
+                  ))}
+                </div>
+
+                {/* Positioned blocks */}
+                {positionedBlocks.map((block) => (
+                  <div
+                    key={block.id}
+                    className="absolute"
+                    style={{
+                      left: `${block.x}%`, top: `${block.y}%`,
+                      width: `${block.w}%`, height: `${block.h}%`,
+                      zIndex: block.z_index,
+                    }}
+                  >
+                    <CanvasBlock
+                      block={block}
+                      isSelected={selectedBlockId === block.id}
+                      onSelect={() => onSelectBlock(block.id)}
+                      onDelete={() => onDeleteBlock(block.id)}
+                      onDuplicate={() => onDuplicateBlock(block.id)}
+                      onToggleLock={() => onToggleLock(block.id)}
+                      onToggleVisibility={() => onToggleVisibility(block.id)}
+                      onUpdatePosition={(x, y, w, h) => onUpdatePosition(block.id, x, y, w, h)}
+                      templateId={templateId}
+                      fieldPlacementRole={activeSignerRole}
+                      fieldPlacementType={activeFieldType}
+                    />
+                  </div>
+                ))}
+
+                {/* Field overlays per page */}
+                <CanvasFieldOverlay
                   templateId={templateId}
-                  fieldPlacementRole={activeSignerRole}
-                  fieldPlacementType={activeFieldType}
+                  activeFieldType={activeFieldType}
+                  activeSignerRole={activeSignerRole}
+                  placementActive={placementActive}
+                  currentPage={pageNum}
+                  selectedFieldId={selectedFieldId}
+                  onFieldSelect={onFieldSelect}
                 />
               </div>
-            ))}
-
-            {/* Field overlays */}
-            <CanvasFieldOverlay
-              templateId={templateId}
-              activeFieldType={activeFieldType}
-              activeSignerRole={activeSignerRole}
-              placementActive={placementActive}
-              currentPage={currentPage}
-              selectedFieldId={selectedFieldId}
-              onFieldSelect={onFieldSelect}
-            />
-          </div>
+            );
+          })
         )}
       </div>
     </div>
