@@ -1,5 +1,6 @@
 import React, { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { useTemplateFields, useCreateTemplateField, useUpdateTemplateField, useDeleteTemplateField } from "@/hooks/useTemplateFields";
+import { useToast } from "@/hooks/use-toast";
 import type { TemplateField, FieldType, SignerRole } from "@/types/templateDesigner";
 import { PenTool, Calendar, Type, CheckSquare, User, CreditCard, Mail, Hash, Stamp, ListFilter, Circle, Pen, Building2, AlignLeft } from "lucide-react";
 import { FIELD_DEFAULT_SIZE, FIELD_LABELS, clamp, applyResize, type ResizeHandle } from "@/lib/widgetUtils";
