@@ -177,6 +177,8 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
           id: interactionState.fieldId,
           x: livePos.x, y: livePos.y, w: livePos.w, h: livePos.h,
           meta: { ...(field?.meta as any), normalized: { x: livePos.x, y: livePos.y, w: livePos.w, h: livePos.h } },
+        }, {
+          onError: (err: any) => { console.error("updateField error:", err); toast({ title: "Error al mover campo", description: err.message, variant: "destructive" }); },
         });
       }
       setInteractionState(null);
