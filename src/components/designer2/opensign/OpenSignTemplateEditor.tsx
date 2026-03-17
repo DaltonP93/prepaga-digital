@@ -3,7 +3,7 @@ import { DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core"
 import { useQueryClient } from "@tanstack/react-query";
 import { useTemplateBlocks, useUpdateTemplateBlock, useDeleteTemplateBlock, useCreateTemplateBlock } from "@/hooks/useTemplateBlocks";
 import { useTemplateFields, useUpdateTemplateField, useDeleteTemplateField, useCreateTemplateField } from "@/hooks/useTemplateFields";
-import { useTemplateAssets, useTemplateAssetPages } from "@/hooks/useTemplateAssets";
+import { useTemplateAssets, useTemplateAssetPages, useDeleteTemplateAsset } from "@/hooks/useTemplateAssets";
 import { getAssetSignedUrl } from "@/lib/assetUrlHelper";
 import { parseLegacyHtml } from "@/lib/legacyToBlocks";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,11 +31,39 @@ const ROLE_BORDER: Record<SignerRole, string> = {
 interface OpenSignTemplateEditorProps {
   templateId: string;
   legacyContent?: string;
+  onContentSync?: (html: string) => void;
+  onSave?: () => void;
+  onPreview?: () => void;
+  templateName?: string;
+  onTemplateNameChange?: (name: string) => void;
+}
+
+/** Serialize V2 blocks to basic HTML for templates.content */
+function serializeBlocksToHtml(blocks: TemplateBlock[]): string {
+  const sorted = [...blocks].sort((a, b) => a.page - b.page || a.sort_order - b.sort_order);
+  const parts: string[] = [];
+  for (const b of sorted) {
+    const c = b.content as any;
+    if (b.block_type === "heading") {
+      const level = c?.level || 2;
+      parts.push(`<h${level}>${c?.text || ""}</h${level}>`);
+    } else if (b.block_type === "text") {
+      parts.push(c?.html || `<p>${c?.plain_text || ""}</p>`);
+    } else if (b.block_type === "image") {
+      parts.push(`<img src="${c?.storage_path || c?.src || ""}" alt="${c?.alt || ""}" />`);
+    }
+  }
+  return parts.join("\n");
 }
 
 export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   templateId,
   legacyContent,
+  onContentSync,
+  onSave: onSaveProp,
+  onPreview: onPreviewProp,
+  templateName,
+  onTemplateNameChange,
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -54,19 +82,16 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   const [showAssetModal, setShowAssetModal] = useState(false);
   const [pendingImageBlockId, setPendingImageBlockId] = useState<string | null>(null);
 
-  /* ─── Stable image file input ref (lives at editor root, never unmounts) ─── */
+  /* ─── Stable image file input ref ─── */
   const imageFileInputRef = useRef<HTMLInputElement>(null);
 
-  /* ─── Progressive mount: defer DnD to avoid freeze ─── */
+  /* ─── Progressive mount ─── */
   const [dndReady, setDndReady] = useState(false);
   useEffect(() => {
-    const raf = requestAnimationFrame(() => {
-      setDndReady(true);
-    });
+    const raf = requestAnimationFrame(() => setDndReady(true));
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  /* ─── @dnd-kit sensors ─── */
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
@@ -85,6 +110,42 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   const createBlock = useCreateTemplateBlock();
   const updateField = useUpdateTemplateField();
   const deleteField = useDeleteTemplateField();
+  const deleteAsset = useDeleteTemplateAsset();
+
+  /* ─── Save handler: sync content then call parent save ─── */
+  const handleSave = useCallback(() => {
+    if (onContentSync) {
+      const html = serializeBlocksToHtml(blocks);
+      onContentSync(html);
+    }
+    // Small delay to let setValue propagate before form submit
+    setTimeout(() => onSaveProp?.(), 50);
+  }, [blocks, onContentSync, onSaveProp]);
+
+  /* ─── Delete asset handler ─── */
+  const handleDeleteAsset = useCallback(async () => {
+    if (!pdfAsset) return;
+    const confirmed = window.confirm("¿Eliminar el documento PDF base? Los bloques asociados también se eliminarán.");
+    if (!confirmed) return;
+    try {
+      // Delete blocks associated with this asset
+      const assetBlocks = blocks.filter((b) => b.block_type === "pdf_embed" || b.block_type === "attachment_card");
+      for (const b of assetBlocks) {
+        await supabase.from("template_blocks").delete().eq("id", b.id);
+      }
+      // Delete asset pages
+      await supabase.from("template_asset_pages").delete().eq("asset_id", pdfAsset.id);
+      // Delete asset
+      await supabase.from("template_assets").delete().eq("id", pdfAsset.id);
+
+      queryClient.invalidateQueries({ queryKey: ["template-blocks", templateId] });
+      queryClient.invalidateQueries({ queryKey: ["template-assets", templateId] });
+      queryClient.invalidateQueries({ queryKey: ["template-asset-pages"] });
+      toast({ title: "Documento eliminado" });
+    } catch (err: any) {
+      toast({ title: "Error al eliminar", description: err.message, variant: "destructive" });
+    }
+  }, [pdfAsset, blocks, templateId, queryClient, toast]);
 
   /* ─── Stable image picker callbacks ─── */
   const openImageFilePicker = useCallback(() => {
@@ -93,7 +154,6 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
     imageFileInputRef.current?.click();
   }, [selectedBlockId]);
 
-  /* ─── Insert image block: create block then open picker ─── */
   const handleInsertImageBlock = useCallback(() => {
     createBlock.mutate({
       template_id: templateId, block_type: "image" as BlockType, page: currentPage,
@@ -109,7 +169,6 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
           setPendingImageBlockId(blockId);
           setSelectedBlockId(blockId);
         }
-        // Open file picker after short delay to ensure state is set
         setTimeout(() => {
           if (imageFileInputRef.current) imageFileInputRef.current.value = "";
           imageFileInputRef.current?.click();
@@ -134,13 +193,9 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
     }
   }, [pendingImageBlockId, templateId, updateBlock, blocks, toast]);
 
-  /* ─── Drag-and-drop hook (consolidated logic) ─── */
+  /* ─── Drag-and-drop ─── */
   const { handleDragStart: onDragStart, handleDragEnd: onDragEnd } = useWidgetDrag({
-    templateId,
-    currentPage,
-    activeRole,
-    pageSelector: "[data-a4-page]",
-    zoom,
+    templateId, currentPage, activeRole, pageSelector: "[data-a4-page]", zoom,
     onCreateField: (params) => createField.mutate(params as any),
   });
 
@@ -155,7 +210,7 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
     onDragEnd(event);
   }, [onDragEnd]);
 
-  /* ─── Migration detection ─── */
+  /* ─── Migration ─── */
   const dataLoaded = !blocksLoading && !fieldsLoading;
   const hasLegacy = !!legacyContent?.trim();
   const canMigrateBlocks = dataLoaded && hasLegacy && blocks.length === 0;
@@ -168,8 +223,6 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
     try {
       await new Promise(r => setTimeout(r, 50));
       const { blocks: parsedBlocks, signatureFields } = parseLegacyHtml(templateId, legacyContent);
-      let blocksCreated = 0;
-      let fieldsCreated = 0;
       const CHUNK = 50;
 
       if (canMigrateBlocks && parsedBlocks.length > 0) {
@@ -183,14 +236,12 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
           const { error: bErr } = await supabase.from("template_blocks").insert(rows.slice(i, i + CHUNK) as any);
           if (bErr) throw bErr;
         }
-        blocksCreated = parsedBlocks.length;
       }
 
       if (canMigrateFields && signatureFields.length > 0) {
         const fieldRows = signatureFields.map((f) => ({ ...f, meta: f.meta as unknown as Json }));
         const { error: fErr } = await supabase.from("template_fields").insert(fieldRows as any);
         if (fErr) throw fErr;
-        fieldsCreated = signatureFields.length;
       }
 
       await Promise.all([
@@ -199,7 +250,7 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
       ]);
 
       setCurrentPage(1); setSelectedBlockId(null); setSelectedFieldId(null); setPlacementActive(false);
-      toast({ title: "Migración completada", description: `${blocksCreated} bloques y ${fieldsCreated} campos creados.` });
+      toast({ title: "Migración completada" });
     } catch (err: any) {
       console.error("Migration error:", err);
       toast({ title: "Error en migración", description: err.message, variant: "destructive" });
@@ -210,16 +261,13 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
 
   /* ─── Selection coordination ─── */
   const handleSelectBlock = useCallback((id: string | null) => {
-    setSelectedBlockId(id);
-    if (id) setSelectedFieldId(null);
+    setSelectedBlockId(id); if (id) setSelectedFieldId(null);
   }, []);
-
   const handleSelectField = useCallback((id: string | null) => {
-    setSelectedFieldId(id);
-    if (id) setSelectedBlockId(null);
+    setSelectedFieldId(id); if (id) setSelectedBlockId(null);
   }, []);
 
-  /* ─── Resolve signed URLs — LAZY: only current page ─── */
+  /* ─── Resolve signed URLs for ALL pages ─── */
   const rawPages: PageEntry[] = useMemo(() => {
     if (assetPages.length > 0) {
       return assetPages.map((ap) => ({ page: ap.page_number, previewUrl: ap.preview_image_url }));
@@ -228,26 +276,31 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
     return Array.from({ length: maxPage }, (_, i) => ({ page: i + 1, previewUrl: null }));
   }, [assetPages, blocks]);
 
-  // Resolve only the current page's signed URL (lazy)
   const [resolvedUrlMap, setResolvedUrlMap] = useState<Record<number, string>>({});
 
   useEffect(() => {
-    const page = rawPages.find((p) => p.page === currentPage);
-    if (!page?.previewUrl) return;
-    // Already resolved or is a full URL
-    if (resolvedUrlMap[currentPage]) return;
-    if (page.previewUrl.startsWith("http") || page.previewUrl.startsWith("data:") || page.previewUrl.startsWith("blob:")) {
-      setResolvedUrlMap((prev) => ({ ...prev, [currentPage]: page.previewUrl! }));
-      return;
-    }
     let cancelled = false;
-    getAssetSignedUrl(page.previewUrl).then((signed) => {
-      if (!cancelled && signed) {
-        setResolvedUrlMap((prev) => ({ ...prev, [currentPage]: signed }));
+    const toResolve = rawPages.filter((p) => p.previewUrl && !resolvedUrlMap[p.page]);
+    if (toResolve.length === 0) return;
+
+    const resolveAll = async () => {
+      const newEntries: Record<number, string> = {};
+      for (const p of toResolve) {
+        if (!p.previewUrl) continue;
+        if (p.previewUrl.startsWith("http") || p.previewUrl.startsWith("data:") || p.previewUrl.startsWith("blob:")) {
+          newEntries[p.page] = p.previewUrl;
+          continue;
+        }
+        const signed = await getAssetSignedUrl(p.previewUrl);
+        if (signed) newEntries[p.page] = signed;
       }
-    });
+      if (!cancelled && Object.keys(newEntries).length > 0) {
+        setResolvedUrlMap((prev) => ({ ...prev, ...newEntries }));
+      }
+    };
+    resolveAll();
     return () => { cancelled = true; };
-  }, [rawPages, currentPage, resolvedUrlMap]);
+  }, [rawPages, resolvedUrlMap]);
 
   const pages: PageEntry[] = useMemo(() => {
     return rawPages.map((p) => ({
@@ -256,9 +309,13 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
     }));
   }, [rawPages, resolvedUrlMap]);
 
-  const currentPageBackground = useMemo(() => {
-    return resolvedUrlMap[currentPage] || undefined;
-  }, [resolvedUrlMap, currentPage]);
+  const pageBackgrounds: Record<number, string> = useMemo(() => {
+    const map: Record<number, string> = {};
+    for (const [pageStr, url] of Object.entries(resolvedUrlMap)) {
+      map[Number(pageStr)] = url;
+    }
+    return map;
+  }, [resolvedUrlMap]);
 
   const selectedBlock = useMemo(() => blocks.find((b) => b.id === selectedBlockId) || null, [blocks, selectedBlockId]);
   const selectedField = useMemo(() => fields.find((f) => f.id === selectedFieldId) || null, [fields, selectedFieldId]);
@@ -332,7 +389,6 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   /* ─── Editor content ─── */
   const editorContent = (
     <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
-      {/* Stable hidden file input — never unmounts */}
       <input
         ref={imageFileInputRef}
         type="file"
@@ -340,7 +396,6 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
         className="hidden"
         onChange={handleImageFileSelected}
       />
-      {/* Migration banner */}
       {needsMigration && (
         <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800">
           <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
@@ -377,11 +432,17 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
           placementActive={placementActive}
           activeFieldType={activeFieldType}
           activeSignerRole={activeRole}
-          pageBackgroundUrl={currentPageBackground}
+          pageBackgrounds={pageBackgrounds}
           selectedFieldId={selectedFieldId}
           onFieldSelect={handleSelectField}
           onPageChange={setCurrentPage}
+          templateName={templateName}
+          onTemplateNameChange={onTemplateNameChange}
+          onSave={handleSave}
+          onPreview={onPreviewProp}
           onUploadPdf={() => setShowAssetModal(true)}
+          onDeleteAsset={handleDeleteAsset}
+          hasAsset={!!pdfAsset}
         />
         <OpenSignRightPanel
           templateId={templateId}
@@ -404,7 +465,6 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
         />
       </div>
 
-      {/* Asset upload modal */}
       <AssetUploadModal
         templateId={templateId}
         open={showAssetModal}
@@ -416,10 +476,7 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
     </div>
   );
 
-  /* ─── Render: progressive mount wraps DnD only when ready ─── */
-  if (!dndReady) {
-    return editorContent;
-  }
+  if (!dndReady) return editorContent;
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>

@@ -1,5 +1,6 @@
 import React, { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { useTemplateFields, useCreateTemplateField, useUpdateTemplateField, useDeleteTemplateField } from "@/hooks/useTemplateFields";
+import { useToast } from "@/hooks/use-toast";
 import type { TemplateField, FieldType, SignerRole } from "@/types/templateDesigner";
 import { PenTool, Calendar, Type, CheckSquare, User, CreditCard, Mail, Hash, Stamp, ListFilter, Circle, Pen, Building2, AlignLeft } from "lucide-react";
 import { FIELD_DEFAULT_SIZE, FIELD_LABELS, clamp, applyResize, type ResizeHandle } from "@/lib/widgetUtils";
@@ -72,6 +73,7 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
   selectedFieldId: controlledSelectedId,
   onFieldSelect,
 }) => {
+  const { toast } = useToast();
   const { data: fields = [] } = useTemplateFields(templateId);
   const createField = useCreateTemplateField();
   const updateField = useUpdateTemplateField();
@@ -126,6 +128,8 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
           normalized: { x: fx, y: fy, w: defaults.w, h: defaults.h },
           appearance: { placeholderText: FIELD_LABELS[activeFieldType] || activeFieldType, borderStyle: "dashed", color: ROLE_BORDER[activeSignerRole] },
         } as any,
+      }, {
+        onError: (err: any) => { console.error("createField error:", err); toast({ title: "Error al crear campo", description: err.message, variant: "destructive" }); },
       });
     },
     [placementActive, interactionState, activeFieldType, activeSignerRole, templateId, currentPage, createField, selectField]
@@ -173,6 +177,8 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
           id: interactionState.fieldId,
           x: livePos.x, y: livePos.y, w: livePos.w, h: livePos.h,
           meta: { ...(field?.meta as any), normalized: { x: livePos.x, y: livePos.y, w: livePos.w, h: livePos.h } },
+        }, {
+          onError: (err: any) => { console.error("updateField error:", err); toast({ title: "Error al mover campo", description: err.message, variant: "destructive" }); },
         });
       }
       setInteractionState(null);
@@ -190,7 +196,9 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
       if (e.key === "Delete" || e.key === "Backspace") {
         if ((e.target as HTMLElement).tagName === "INPUT" || (e.target as HTMLElement).tagName === "TEXTAREA") return;
         e.preventDefault();
-        deleteField.mutate({ id: selectedFieldId, templateId });
+        deleteField.mutate({ id: selectedFieldId, templateId }, {
+          onError: (err: any) => { console.error("deleteField error:", err); toast({ title: "Error al eliminar campo", description: err.message, variant: "destructive" }); },
+        });
         selectField(null);
       }
       if (e.key === "Escape") selectField(null);
@@ -219,6 +227,8 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
       w: defaults.w, h: defaults.h,
       required: true, label: FIELD_LABELS[widgetType] || widgetType,
       meta: {} as any,
+    }, {
+      onError: (err: any) => { console.error("createField drop error:", err); toast({ title: "Error al crear campo", description: err.message, variant: "destructive" }); },
     });
   }, [templateId, currentPage, createField]);
 
@@ -321,7 +331,9 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
               className="absolute -top-2.5 -right-2.5 h-4 w-4 rounded-full bg-destructive text-destructive-foreground text-[9px] leading-none hidden group-hover:flex items-center justify-center shadow-sm"
               onClick={(e) => {
                 e.stopPropagation();
-                deleteField.mutate({ id: field.id, templateId });
+                deleteField.mutate({ id: field.id, templateId }, {
+                  onError: (err: any) => { console.error("deleteField error:", err); toast({ title: "Error al eliminar campo", description: err.message, variant: "destructive" }); },
+                });
                 if (selectedFieldId === field.id) selectField(null);
               }}
             >

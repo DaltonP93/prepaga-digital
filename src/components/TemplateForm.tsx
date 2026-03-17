@@ -344,7 +344,17 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
           {watch("designer_version") === "2.0" ? (
             isEditing && template?.id ? (
               <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-                <OpenSignTemplateEditor templateId={template.id} legacyContent={template?.content || undefined} />
+                <OpenSignTemplateEditor
+                  templateId={template.id}
+                  legacyContent={template?.content || undefined}
+                  templateName={watch("name")}
+                  onTemplateNameChange={(name) => setValue("name", name)}
+                  onContentSync={(html) => setValue("content", html)}
+                  onSave={() => handleSubmit(onSubmit)()}
+                  onPreview={() => {
+                    setActiveTab("preview");
+                  }}
+                />
               </Suspense>
             ) : (
               <Card>

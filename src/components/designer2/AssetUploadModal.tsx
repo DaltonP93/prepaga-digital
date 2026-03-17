@@ -179,7 +179,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     const pageInfos: PdfPageInfo[] = [];
-    const THUMB_SCALE = 0.5;
+    const THUMB_SCALE = 1.5;
 
     for (let i = 1; i <= pdf.numPages; i++) {
       try {
