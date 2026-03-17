@@ -227,6 +227,8 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
       w: defaults.w, h: defaults.h,
       required: true, label: FIELD_LABELS[widgetType] || widgetType,
       meta: {} as any,
+    }, {
+      onError: (err: any) => { console.error("createField drop error:", err); toast({ title: "Error al crear campo", description: err.message, variant: "destructive" }); },
     });
   }, [templateId, currentPage, createField]);
 
