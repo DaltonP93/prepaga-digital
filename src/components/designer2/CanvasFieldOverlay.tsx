@@ -128,6 +128,8 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
           normalized: { x: fx, y: fy, w: defaults.w, h: defaults.h },
           appearance: { placeholderText: FIELD_LABELS[activeFieldType] || activeFieldType, borderStyle: "dashed", color: ROLE_BORDER[activeSignerRole] },
         } as any,
+      }, {
+        onError: (err: any) => { console.error("createField error:", err); toast({ title: "Error al crear campo", description: err.message, variant: "destructive" }); },
       });
     },
     [placementActive, interactionState, activeFieldType, activeSignerRole, templateId, currentPage, createField, selectField]
