@@ -43,7 +43,7 @@ const ROLES: {
 }[] = [
   { value: "titular", label: "Titular / Contratante", initial: "T", bg: "bg-blue-100", bgActive: "bg-blue-500", bgHover: "hover:bg-blue-50", text: "text-blue-700" },
   { value: "adherente", label: "Adherente", initial: "A", bg: "bg-green-100", bgActive: "bg-green-500", bgHover: "hover:bg-green-50", text: "text-green-700" },
-  { value: "contratada", label: "Contratada / Empresa", initial: "C", bg: "bg-purple-100", bgActive: "bg-purple-500", bgHover: "hover:bg-purple-50", text: "text-purple-700" },
+  { value: "contratada", label: "Contratada / Empresa", initial: "C", bg: "bg-amber-100", bgActive: "bg-amber-500", bgHover: "hover:bg-amber-50", text: "text-amber-700" },
 ];
 
 const FIELD_TYPE_LABELS: Record<string, string> = {
