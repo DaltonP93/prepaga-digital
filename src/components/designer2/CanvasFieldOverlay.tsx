@@ -73,6 +73,7 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
   selectedFieldId: controlledSelectedId,
   onFieldSelect,
 }) => {
+  const { toast } = useToast();
   const { data: fields = [] } = useTemplateFields(templateId);
   const createField = useCreateTemplateField();
   const updateField = useUpdateTemplateField();
