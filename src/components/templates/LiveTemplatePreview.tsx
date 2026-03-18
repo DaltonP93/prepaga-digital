@@ -222,6 +222,19 @@ export const LiveTemplatePreview: React.FC<LiveTemplatePreviewProps> = ({
     return { processedContent: processed, context: ctx };
   }, [content, sampleData]);
 
+  // Resolve storage image URLs in processedContent
+  useEffect(() => {
+    if (!processedContent) {
+      setResolvedHtml("");
+      return;
+    }
+    let cancelled = false;
+    resolveStorageImages(processedContent).then((html) => {
+      if (!cancelled) setResolvedHtml(html);
+    });
+    return () => { cancelled = true; };
+  }, [processedContent]);
+
   const viewportClasses = {
     desktop: 'w-full',
     mobile: 'max-w-[375px] mx-auto border-x',
