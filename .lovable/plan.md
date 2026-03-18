@@ -1,104 +1,58 @@
 
 
-## Plan: Fase 5 — PAdES con document_type exactos y doble safeguard
+# Plan: Repeating Header/Footer on Every Page of Generated PDFs
 
-### Archivo único
-`src/hooks/useSignatureLinkPublic.ts` — líneas 598-682
+## Problem
+When contracts and DDJJ documents are generated as PDFs, the header (company logo + name) and footer (page number, contact info) appear only once at the beginning and end of the document. The user wants them to repeat on **every page**, like the reference document "CONTRATO_full.pdf".
 
-### Cambio
-Reemplazar el bloque PAdES actual por la versión con valores exactos de `document_type` (`contrato`, `ddjj_salud`, `anexo`) en lugar de comparaciones genéricas con `.toLowerCase()`. Agrega doble safeguard para contratada pendiente.
+## Root Cause
+The `generate-base-pdf` edge function sends raw `doc.content` HTML to the Render service (Puppeteer) without any wrapping HTML document, styles, or page-level header/footer configuration. The content is just interpolated template HTML with no `@page` CSS rules or `position: fixed` elements.
 
-### Diferencias clave vs. código actual (Fase 4)
+## Solution
+Modify `generate-base-pdf` to:
+1. Fetch the **company data** (logo, name, phone, address) from the sale's company
+2. Wrap `doc.content` in a complete HTML document with CSS that renders repeating headers/footers on every printed page using `position: fixed` (the proven technique for Puppeteer PDF rendering)
+3. Pass proper **margins** to the Render service so header/footer areas don't overlap body content
 
-1. **document_type exacto**: usa `dt === 'contrato'` directo (sin `.toLowerCase()` ni check de `'contract'`)
-2. **ddjj_salud explícito**: filtra por `dt === 'ddjj_salud'` en vez de "todo lo que no sea contrato"
-3. **Anexos excluidos**: `dt === 'anexo'` retorna `false` explícitamente
-4. **Doble safeguard**: `safeDocsToSign` filtra contrato si `hasPendingContratada` como segunda capa
-5. **Error handling mejorado**: `pendingErr` se maneja separadamente del catch
+## Changes
 
-### Código resultante (reemplaza líneas 598-682)
+### `supabase/functions/generate-base-pdf/index.ts`
 
-```typescript
-// Post-signature: generate base PDF + PAdES only when it corresponds to this signer + step
-try {
-  const supabaseUrl = SUPABASE_URL;
-  const anonKey = SUPABASE_PUBLISHABLE_KEY;
+**A) Fetch company info via the sale:**
+- Query `sales.company_id` using `doc.sale_id`
+- Then query `companies` for `name`, `logo_url`, `phone`, `address`, `email`
 
-  const { data: docs, error: docsErr } = await signatureClient
-    .from('documents')
-    .select('id, document_type, beneficiary_id, is_final, signed_pdf_url')
-    .eq('sale_id', data.sale_id)
-    .eq('is_final', true)
-    .neq('document_type', 'firma');
+**B) Build a wrapper HTML function** that includes:
+- `position: fixed; top: 0` header div with company logo (left) + document name (right), with a bottom border — repeats on every page via CSS print rules
+- `position: fixed; bottom: 0` footer div with company contact info + page counter
+- `@page` margin rules (`margin-top: 35mm; margin-bottom: 25mm`) to reserve space for header/footer
+- Body content placed in a `main` div that flows naturally between the fixed header/footer
 
-  if (docsErr) {
-    console.warn('Could not fetch final documents:', docsErr);
-  } else if (docs && docs.length > 0) {
-    const recipientType = data.recipient_type;
-
-    let hasPendingContratada = false;
-    try {
-      const { data: pendingCL, error: pendingErr } = await signatureClient
-        .from('signature_links').select('id')
-        .eq('sale_id', data.sale_id)
-        .eq('recipient_type', 'contratada')
-        .eq('status', 'pendiente');
-      if (pendingErr) {
-        console.warn('Could not check pending contratada links:', pendingErr);
-        hasPendingContratada = true;
-      } else {
-        hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
-      }
-    } catch (e) {
-      console.warn('Could not check pending contratada links (exception):', e);
-      hasPendingContratada = true;
-    }
-
-    const docsToSign = docs.filter((d: any) => {
-      if (d.signed_pdf_url) return false;
-      const dt = d.document_type;
-
-      if (dt === 'contrato') {
-        return recipientType === 'contratada';
-      }
-      if (dt === 'ddjj_salud') {
-        if (recipientType === 'titular') return d.beneficiary_id == null;
-        if (recipientType === 'adherente') return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
-        return false;
-      }
-      if (dt === 'anexo') return false;
-      return false;
-    });
-
-    const safeDocsToSign = docsToSign.filter((d: any) => {
-      if (d.document_type === 'contrato' && hasPendingContratada) return false;
-      return true;
-    });
-
-    for (const doc of safeDocsToSign) {
-      try {
-        await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-        await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-      } catch (pdfErr) {
-        console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
-      }
-    }
-  }
-} catch (pdfGenErr) {
-  console.warn('Post-signature PDF generation error:', pdfGenErr);
+**C) Pass margins to the Render service:**
+```json
+{
+  "format": "A4",
+  "printBackground": true,
+  "margin": { "top": "35mm", "right": "15mm", "bottom": "25mm", "left": "15mm" }
 }
 ```
 
-### Impacto
-- 1 archivo, 1 bloque (~85 líneas reemplaza ~85 líneas)
-- No afecta bloque de activación contratada (Fase 3)
-- No requiere migraciones
+### CSS structure for repeating header/footer (inside the wrapper)
+```text
+┌──────────────────────────────────┐
+│  [Logo]  Company Name    Doc Name│  ← position:fixed; top:0
+│──────────────────────────────────│
+│                                  │
+│         Body content             │  ← normal flow, margin-top:35mm
+│         (doc.content)            │
+│                                  │
+│──────────────────────────────────│
+│  Company info     Page X of Y    │  ← position:fixed; bottom:0
+└──────────────────────────────────┘
+```
+
+The `position: fixed` technique works in Chromium-based PDF renderers (which the Render service uses) to repeat elements on every printed page.
+
+### No frontend changes needed
+The documents will automatically render with repeating headers/footers on next generation. Existing documents would need to be regenerated (using the existing "Regenerar Documentos" button) to pick up the new formatting.
 
