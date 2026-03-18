@@ -55,6 +55,35 @@ serve(async (req) => {
       });
     }
 
+    // Role authorization — only admin, super_admin, gestor can send campaigns
+    const { data: roles } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userData.user.id);
+
+    const allowedRoles = ['admin', 'super_admin', 'gestor'];
+    if (!roles?.some((r: any) => allowedRoles.includes(r.role))) {
+      return new Response(JSON.stringify({ error: "Forbidden: insufficient role" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Validate campaign belongs to caller's company
+    if (campaignId) {
+      const { data: campaign } = await supabase
+        .from('sms_campaigns')
+        .select('company_id')
+        .eq('id', campaignId)
+        .single();
+      if (campaign && campaign.company_id !== companyId) {
+        return new Response(JSON.stringify({ error: "Campaign not found" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const results = [];
     let sentCount = 0;
 

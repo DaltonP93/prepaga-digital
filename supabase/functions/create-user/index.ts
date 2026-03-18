@@ -195,6 +195,9 @@ serve(async (req) => {
       )
     }
 
+    // Determine caller's role (highest priority)
+    const callerRole = roleData[0].role;
+
     // Handle password reset action
     if (requestBody.action === 'reset_password') {
       const targetUserId = requestBody.user_id;
@@ -212,6 +215,22 @@ serve(async (req) => {
           JSON.stringify({ error: 'La contraseña debe tener al menos 6 caracteres' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      }
+
+      // Cross-company check: non-super_admin can only reset within their company
+      if (callerRole !== 'super_admin') {
+        const { data: callerProfile } = await supabaseAdmin
+          .from('profiles').select('company_id').eq('id', caller.id).single();
+        const { data: targetProfile } = await supabaseAdmin
+          .from('profiles').select('company_id').eq('id', targetUserId).single();
+
+        if (!callerProfile?.company_id || !targetProfile?.company_id ||
+            callerProfile.company_id !== targetProfile.company_id) {
+          return new Response(
+            JSON.stringify({ error: 'Forbidden - target user not in your company' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
       }
 
       const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
