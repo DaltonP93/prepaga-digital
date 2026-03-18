@@ -417,7 +417,8 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
                 },
                 plan, company, sale, effectiveBeneficiaries || [], undefined, benResponsesMap
               );
-              const renderedContent = interpolateEnhancedTemplate(ddjiTemplate.content || '', beneficiaryContext);
+              let renderedContent = interpolateEnhancedTemplate(ddjiTemplate.content || '', beneficiaryContext);
+              renderedContent = await resolveStorageImages(renderedContent);
 
               const { error: benInsertError } = await supabase.from('documents').insert({
                 sale_id: saleId,
