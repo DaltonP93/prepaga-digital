@@ -22,7 +22,15 @@ interface SaleTemplatesTabProps {
 }
 
 const normalizeAccents = (s: string) =>
-  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+const isDDJJTemplate = (template: { name?: string; template_type?: string; document_type?: string }): boolean => {
+  const norm = normalizeAccents(template.name || '');
+  return norm.includes('declaracion') ||
+    norm.includes('ddjj') ||
+    template.template_type === 'ddjj_salud' ||
+    template.document_type === 'ddjj_salud';
+};
 
 /** Determine document type badge from name */
 const getTemplateTypeBadge = (name: string) => {
@@ -640,10 +648,10 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
 
       // Sort templates: DDJJ and Contrato first, Anexo last
       const sortedTpls = [...(templateContents || [])].sort((a, b) => {
-        const aL = a.name.toLowerCase();
-        const bL = b.name.toLowerCase();
-        const aIsAnexo = isAnexoPlanName(a.name) || (!aL.includes('ddjj') && !aL.includes('declaración') && !aL.includes('declaracion') && !aL.includes('contrato'));
-        const bIsAnexo = isAnexoPlanName(b.name) || (!bL.includes('ddjj') && !bL.includes('declaración') && !bL.includes('declaracion') && !bL.includes('contrato'));
+        const aNorm = normalizeAccents(a.name);
+        const bNorm = normalizeAccents(b.name);
+        const aIsAnexo = isAnexoPlanName(a.name) || (!isDDJJTemplate(a) && !aNorm.includes('contrato'));
+        const bIsAnexo = isAnexoPlanName(b.name) || (!isDDJJTemplate(b) && !bNorm.includes('contrato'));
         if (aIsAnexo && !bIsAnexo) return 1;
         if (!aIsAnexo && bIsAnexo) return -1;
         return 0;
@@ -652,11 +660,8 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       for (const template of sortedTpls) {
         try {
           const hasContent = !!template.content?.trim();
-          const lower = template.name.toLowerCase();
-          const lowerNorm = lower.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-          const isDDJJ = lower.includes('ddjj') || lower.includes('declaración') || lower.includes('declaracion')
-            || lowerNorm.includes('declaracion') || lowerNorm.includes('ddjj');
-          const isContrato = lower.includes('contrato');
+          const isDDJJ = isDDJJTemplate(template);
+          const isContrato = normalizeAccents(template.name).includes('contrato');
           const isAnexo = isAnexoPlanName(template.name) || (!isDDJJ && !isContrato);
 
           if (isAnexo && !hasContent && templatesWithAttachments.has(template.id)) {
@@ -698,9 +703,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       }
 
       // DDJJ per adherente
-      const ddjiTpls = (templateContents || []).filter(t =>
-        t.name.toLowerCase().includes('ddjj') || t.name.toLowerCase().includes('declaración')
-      );
+      const ddjiTpls = (templateContents || []).filter(isDDJJTemplate);
       if (effectiveBeneficiaries.length > 0 && ddjiTpls.length > 0) {
         for (const b of effectiveBeneficiaries) {
           if (b.signature_required !== false && !b.is_primary) {

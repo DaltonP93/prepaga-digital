@@ -338,8 +338,9 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
 
           const ddjjTemplateIds = (saleTemplateRows || [])
             .filter((row: any) => {
-              const name = (row.templates?.name || '').toLowerCase();
-              return name.includes('ddjj') || name.includes('declaración') || name.includes('declaracion');
+              const norm = (row.templates?.name || '')
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+              return norm.includes('ddjj') || norm.includes('declaracion');
             })
             .map((row: any) => row.template_id)
             .filter(Boolean);
