@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createHmac } from "node:crypto";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,6 +17,33 @@ const mapProviderStatus = (status?: string): string => {
 };
 
 const getNowIso = () => new Date().toISOString();
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  const encoder = new TextEncoder();
+  const bufA = encoder.encode(a);
+  const bufB = encoder.encode(b);
+  let result = 0;
+  for (let i = 0; i < bufA.length; i++) {
+    result |= bufA[i] ^ bufB[i];
+  }
+  return result === 0;
+}
+
+function verifyTwilioSignature(authToken: string, signature: string, url: string, params: Record<string, string>): boolean {
+  const sortedKeys = Object.keys(params).sort();
+  let data = url;
+  for (const key of sortedKeys) {
+    data += key + params[key];
+  }
+  const computed = createHmac("sha1", authToken).update(data).digest("base64");
+  return timingSafeEqual(signature, computed);
+}
+
+function verifyMetaSignature(appSecret: string, signature: string, rawBody: string): boolean {
+  const expected = createHmac("sha256", appSecret).update(rawBody).digest("hex");
+  return timingSafeEqual(signature, expected);
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -56,11 +84,40 @@ serve(async (req) => {
 
     // Twilio webhook payload
     if (contentType.includes("application/x-www-form-urlencoded")) {
-      const form = await req.formData();
-      const sid = String(form.get("MessageSid") || "");
-      const providerStatus = String(form.get("MessageStatus") || "");
-      const errorCode = String(form.get("ErrorCode") || "");
-      const errorMessage = String(form.get("ErrorMessage") || "");
+      // Validate Twilio HMAC signature
+      const twilioAuthToken = Deno.env.get("TWILIO_AUTH_TOKEN");
+      const twilioSignature = req.headers.get("x-twilio-signature") || "";
+
+      const rawBody = await req.text();
+      const form = new URLSearchParams(rawBody);
+      const params: Record<string, string> = {};
+      for (const [key, value] of form.entries()) {
+        params[key] = value;
+      }
+
+      if (twilioAuthToken && twilioSignature) {
+        const requestUrl = req.url;
+        if (!verifyTwilioSignature(twilioAuthToken, twilioSignature, requestUrl, params)) {
+          console.warn("Twilio signature verification failed");
+          return new Response(JSON.stringify({ success: false, error: "Invalid signature" }), {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } else if (twilioAuthToken) {
+        // Token configured but no signature header — reject
+        console.warn("Missing x-twilio-signature header");
+        return new Response(JSON.stringify({ success: false, error: "Missing signature" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // If no twilioAuthToken configured, allow through (graceful degradation)
+
+      const sid = params["MessageSid"] || "";
+      const providerStatus = params["MessageStatus"] || "";
+      const errorCode = params["ErrorCode"] || "";
+      const errorMessage = params["ErrorMessage"] || "";
       const mappedStatus = mapProviderStatus(providerStatus);
 
       if (!sid) {
@@ -93,8 +150,29 @@ serve(async (req) => {
       });
     }
 
-    // Meta webhook payload
-    const body = await req.json();
+    // Meta webhook payload — validate HMAC
+    const metaAppSecret = Deno.env.get("META_APP_SECRET");
+    const metaSignatureHeader = req.headers.get("x-hub-signature-256") || "";
+    const rawBody = await req.text();
+
+    if (metaAppSecret && metaSignatureHeader) {
+      const sig = metaSignatureHeader.replace("sha256=", "");
+      if (!verifyMetaSignature(metaAppSecret, sig, rawBody)) {
+        console.warn("Meta webhook signature verification failed");
+        return new Response(JSON.stringify({ success: false, error: "Invalid signature" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } else if (metaAppSecret) {
+      console.warn("Missing x-hub-signature-256 header");
+      return new Response(JSON.stringify({ success: false, error: "Missing signature" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const body = JSON.parse(rawBody);
     const statuses = body?.entry?.flatMap((entry: any) =>
       entry?.changes?.flatMap((change: any) => change?.value?.statuses || [])
     ) || [];
