@@ -124,7 +124,7 @@ serve(async (req) => {
           plan: {
             nombre: sale.plans?.name || '',
             precio: sale.plans?.price || 0,
-            precioFormateado: `$${(sale.plans?.price || 0).toLocaleString()}`,
+            precioFormateado: `$${(sale.total_amount || sale.plans?.price || 0).toLocaleString()}`,
             descripcion: sale.plans?.description || '',
           },
           empresa: {

@@ -622,10 +622,10 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     '{{representante_dni}}': context.facturacion.ruc,
     '{{testigo_nombre}}': context.venta.vendedor,
     '{{testigo_dni}}': '',
-    // Global amount aliases (plan price)
-    '{{amount}}': context.plan.precioFormateado,
-    '{{monto}}': context.plan.precioFormateado,
-    '{{precio}}': context.plan.precioFormateado,
+    // Global amount aliases (sale total, not plan base price)
+    '{{amount}}': context.venta.totalFormateado,
+    '{{monto}}': context.venta.totalFormateado,
+    '{{precio}}': context.venta.totalFormateado,
   };
   Object.entries(legacyAliases).forEach(([placeholder, value]) => {
     const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
