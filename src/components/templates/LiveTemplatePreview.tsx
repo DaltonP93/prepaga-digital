@@ -25,6 +25,7 @@ import {
   interpolateEnhancedTemplate,
   generateBeneficiariesTable,
 } from "@/lib/enhancedTemplateEngine";
+import { resolveStorageImages } from "@/lib/resolveStorageImages";
 
 interface TemplateAttachment {
   id: string;
