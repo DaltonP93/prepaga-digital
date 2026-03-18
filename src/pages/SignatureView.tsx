@@ -555,7 +555,7 @@ const SignatureView = () => {
               <CardContent className="space-y-2 text-sm">
                 <p className="font-medium">{plan.name}</p>
                 <p className="text-xl font-bold text-primary">
-                  {formatCurrency(Number(plan.price || 0))}
+                  {formatCurrency(Number(sale?.total_amount || plan.price || 0))}
                 </p>
               </CardContent>
             </Card>

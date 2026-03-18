@@ -25,11 +25,10 @@ export const usePDFGeneration = () => {
     error: null,
   });
 
-  const generatePDF = async (options: GeneratePDFOptions): Promise<Blob | null> => {
+  const generateHTML = async (options: GeneratePDFOptions): Promise<string | null> => {
     try {
       setState({ isGenerating: true, progress: 0, error: null });
       
-      // Validation
       if (!options.htmlContent) {
         throw new Error('Content HTML is required');
       }
@@ -40,7 +39,6 @@ export const usePDFGeneration = () => {
 
       setState(prev => ({ ...prev, progress: 20 }));
 
-      // Prepare data for the edge function
       const payload = {
         htmlContent: options.htmlContent,
         filename: options.filename.endsWith('.pdf') ? options.filename : `${options.filename}.pdf`,
@@ -53,7 +51,6 @@ export const usePDFGeneration = () => {
 
       setState(prev => ({ ...prev, progress: 40 }));
 
-      // Call the improved edge function
       const { data, error } = await supabase.functions.invoke('generate-pdf', {
         body: payload,
         headers: {
@@ -67,25 +64,27 @@ export const usePDFGeneration = () => {
 
       setState(prev => ({ ...prev, progress: 80 }));
 
-      // Convert response to blob
-      const pdfBlob = new Blob([data], { type: 'application/pdf' });
+      // The edge function returns JSON with { html: string }
+      const htmlContent = typeof data === 'string' ? JSON.parse(data)?.html : data?.html;
+
+      if (!htmlContent) {
+        throw new Error('No HTML content returned from server');
+      }
 
       setState(prev => ({ ...prev, progress: 100 }));
 
-      // Success notification
-      toast.success('PDF generado exitosamente', {
+      toast.success('Documento generado exitosamente', {
         description: `Archivo: ${payload.filename}`,
       });
 
-      // Reset state after success
       setTimeout(() => {
         setState({ isGenerating: false, progress: 0, error: null });
       }, 1000);
 
-      return pdfBlob;
+      return htmlContent;
 
     } catch (error: any) {
-      const errorMessage = error.message || 'Error al generar PDF';
+      const errorMessage = error.message || 'Error al generar documento';
       
       setState({
         isGenerating: false,
@@ -93,7 +92,7 @@ export const usePDFGeneration = () => {
         error: errorMessage,
       });
 
-      toast.error('Error al generar PDF', {
+      toast.error('Error al generar documento', {
         description: errorMessage,
       });
 
@@ -102,52 +101,47 @@ export const usePDFGeneration = () => {
     }
   };
 
-  const downloadPDF = async (options: GeneratePDFOptions) => {
-    const pdfBlob = await generatePDF(options);
-    
-    if (pdfBlob) {
-      // Create download link
-      const url = URL.createObjectURL(pdfBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = options.filename.endsWith('.pdf') ? options.filename : `${options.filename}.pdf`;
-      
-      // Trigger download
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // Clean up URL
-      URL.revokeObjectURL(url);
-      
-      return true;
+  // Keep backward-compatible generatePDF that returns a Blob from the HTML
+  const generatePDF = async (options: GeneratePDFOptions): Promise<Blob | null> => {
+    const html = await generateHTML(options);
+    if (!html) return null;
+    return new Blob([html], { type: 'text/html' });
+  };
+
+  const openHtmlInNewWindow = (html: string, title: string): Window | null => {
+    const newWindow = window.open('', '_blank');
+    if (!newWindow) {
+      toast.error('Por favor permita ventanas emergentes para ver la vista previa');
+      return null;
     }
-    
-    return false;
+    newWindow.document.open();
+    newWindow.document.write(html);
+    newWindow.document.close();
+    newWindow.document.title = title;
+    return newWindow;
+  };
+
+  const downloadPDF = async (options: GeneratePDFOptions) => {
+    const html = await generateHTML(options);
+    if (!html) return false;
+
+    const newWindow = openHtmlInNewWindow(html, options.filename);
+    if (!newWindow) return false;
+
+    // Trigger print dialog so user can save as PDF
+    setTimeout(() => {
+      newWindow.print();
+    }, 500);
+
+    return true;
   };
 
   const previewPDF = async (options: GeneratePDFOptions) => {
-    const pdfBlob = await generatePDF(options);
-    
-    if (pdfBlob) {
-      // Open PDF in new tab for preview
-      const url = URL.createObjectURL(pdfBlob);
-      const newWindow = window.open(url, '_blank');
-      
-      if (!newWindow) {
-        toast.error('Por favor permita ventanas emergentes para ver la vista previa');
-        return false;
-      }
-      
-      // Clean up URL after some time
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-      }, 60000); // 1 minute
-      
-      return true;
-    }
-    
-    return false;
+    const html = await generateHTML(options);
+    if (!html) return false;
+
+    const newWindow = openHtmlInNewWindow(html, options.filename);
+    return !!newWindow;
   };
 
   const generateFromTemplate = async (templateData: any, clientData: any = {}) => {
