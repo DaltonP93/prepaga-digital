@@ -271,10 +271,14 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
     editor.chain().focus().insertContent(text).run();
   }, [editor]);
 
-  const addImage = useCallback((url: string = '') => {
+  const addImage = useCallback((url: string = '', storagePath?: string) => {
     if (!editor) return;
 
-    (editor.chain().focus() as any).setImage({ src: url }).run();
+    const attrs: any = { src: url };
+    if (storagePath) {
+      attrs["data-storage-path"] = storagePath;
+    }
+    (editor.chain().focus() as any).setImage(attrs).run();
     setShowImageManager(false);
   }, [editor, setShowImageManager]);
 
