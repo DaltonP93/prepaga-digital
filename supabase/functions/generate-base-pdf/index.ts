@@ -11,6 +11,130 @@ async function sha256Hex(data: Uint8Array): Promise<string> {
   return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+function buildWrappedHtml(
+  bodyContent: string,
+  company: { name: string; logo_url: string | null; phone: string | null; address: string | null; email: string | null },
+  documentName: string
+): string {
+  const logoHtml = company.logo_url
+    ? `<img src="${company.logo_url}" style="max-height:40px;max-width:180px;object-fit:contain;" />`
+    : `<span style="font-weight:700;font-size:16px;">${company.name}</span>`;
+
+  const contactParts: string[] = [];
+  if (company.phone) contactParts.push(company.phone);
+  if (company.email) contactParts.push(company.email);
+  if (company.address) contactParts.push(company.address);
+  const contactLine = contactParts.join(" | ");
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<style>
+  @page {
+    size: A4;
+    margin: 35mm 15mm 28mm 15mm;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px;
+    color: #222;
+  }
+
+  /* ── Fixed header – repeats on every page ── */
+  .page-header {
+    position: fixed;
+    top: -30mm;
+    left: 0;
+    right: 0;
+    height: 25mm;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2mm;
+    border-bottom: 1.5px solid #333;
+  }
+  .page-header .logo-area {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .page-header .doc-name {
+    font-size: 10px;
+    color: #555;
+    text-align: right;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ── Fixed footer – repeats on every page ── */
+  .page-footer {
+    position: fixed;
+    bottom: -23mm;
+    left: 0;
+    right: 0;
+    height: 18mm;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2mm;
+    border-top: 1px solid #999;
+    font-size: 8px;
+    color: #777;
+  }
+  .page-footer .contact {
+    max-width: 80%;
+  }
+  .page-footer .page-number::after {
+    content: counter(page);
+  }
+
+  /* ── Main content ── */
+  .content {
+    /* flows naturally between header/footer margins */
+  }
+
+  /* Ensure images in content don't overflow */
+  .content img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Table styling for content tables */
+  .content table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .content table td, .content table th {
+    padding: 4px 6px;
+  }
+</style>
+</head>
+<body>
+  <div class="page-header">
+    <div class="logo-area">${logoHtml}</div>
+    <div class="doc-name">${documentName}</div>
+  </div>
+
+  <div class="page-footer">
+    <div class="contact">${contactLine}</div>
+    <div class="page-number">Pág. </div>
+  </div>
+
+  <div class="content">
+    ${bodyContent}
+  </div>
+</body>
+</html>`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -51,7 +175,29 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 2. Call render service
+    // 2. Fetch company info via sale
+    let company = { name: "", logo_url: null as string | null, phone: null as string | null, address: null as string | null, email: null as string | null };
+    const { data: sale } = await supabaseAdmin
+      .from("sales")
+      .select("company_id")
+      .eq("id", doc.sale_id)
+      .single();
+
+    if (sale?.company_id) {
+      const { data: comp } = await supabaseAdmin
+        .from("companies")
+        .select("name, logo_url, phone, address, email")
+        .eq("id", sale.company_id)
+        .single();
+      if (comp) {
+        company = comp;
+      }
+    }
+
+    // 3. Build wrapped HTML with repeating header/footer
+    const wrappedHtml = buildWrappedHtml(doc.content, company, doc.name || "Documento");
+
+    // 4. Call render service
     const renderUrl = Deno.env.get("RENDER_URL");
     const renderKey = Deno.env.get("RENDER_KEY");
     if (!renderUrl || !renderKey) {
@@ -68,8 +214,12 @@ Deno.serve(async (req) => {
         "X-RENDER-KEY": renderKey,
       },
       body: JSON.stringify({
-        html: doc.content,
-        options: { format: "A4", printBackground: true },
+        html: wrappedHtml,
+        options: {
+          format: "A4",
+          printBackground: true,
+          margin: { top: "35mm", right: "15mm", bottom: "28mm", left: "15mm" },
+        },
       }),
     });
 
@@ -84,10 +234,10 @@ Deno.serve(async (req) => {
 
     const pdfBytes = new Uint8Array(await renderResponse.arrayBuffer());
 
-    // 3. Calculate SHA-256
+    // 5. Calculate SHA-256
     const hash = await sha256Hex(pdfBytes);
 
-    // 4. Upload to Storage
+    // 6. Upload to Storage
     const bucket = Deno.env.get("STORAGE_BUCKET") || "documents";
     const storagePath = `contracts/base/${doc.sale_id}/${doc.id}.pdf`;
 
@@ -106,7 +256,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 5. Update document record
+    // 7. Update document record
     const basePdfUrl = `${bucket}:${storagePath}`;
     const { error: updateErr } = await supabaseAdmin
       .from("documents")
