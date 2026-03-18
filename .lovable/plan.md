@@ -1,104 +1,39 @@
 
 
-## Plan: Fase 5 — PAdES con document_type exactos y doble safeguard
+# Plan: Ampliar Realtime para reflejar cambios sin recargar
 
-### Archivo único
-`src/hooks/useSignatureLinkPublic.ts` — líneas 598-682
+## Diagnóstico
 
-### Cambio
-Reemplazar el bloque PAdES actual por la versión con valores exactos de `document_type` (`contrato`, `ddjj_salud`, `anexo`) en lugar de comparaciones genéricas con `.toLowerCase()`. Agrega doble safeguard para contratada pendiente.
+El hook `useRealTimeNotifications` (usado en `NotificationCenter` → `MainLayout`) escucha solo 7 tablas: `notifications`, `sales`, `documents`, `signature_links`, `signature_workflow_steps`, `beneficiaries`, `sale_templates`, `audit_processes`.
 
-### Diferencias clave vs. código actual (Fase 4)
+**Tablas sin cobertura realtime** que los usuarios modifican frecuentemente:
+- `clients` → query key `['clients']`
+- `templates` → query key `['templates']`
+- `plans` → query key `['plans']`
+- `profiles` → query key `['users']`, `['profile']`
+- `companies` → query key `['companies']`
+- `sale_requirements` → query key `['sale-requirements']`
+- `sale_notes` → query key `['sale-notes']`
 
-1. **document_type exacto**: usa `dt === 'contrato'` directo (sin `.toLowerCase()` ni check de `'contract'`)
-2. **ddjj_salud explícito**: filtra por `dt === 'ddjj_salud'` en vez de "todo lo que no sea contrato"
-3. **Anexos excluidos**: `dt === 'anexo'` retorna `false` explícitamente
-4. **Doble safeguard**: `safeDocsToSign` filtra contrato si `hasPendingContratada` como segunda capa
-5. **Error handling mejorado**: `pendingErr` se maneja separadamente del catch
+Nota: `incidents` ya tiene su propio canal realtime dentro de `useIncidents.ts`, así que no se duplica.
 
-### Código resultante (reemplaza líneas 598-682)
+## Cambio
 
-```typescript
-// Post-signature: generate base PDF + PAdES only when it corresponds to this signer + step
-try {
-  const supabaseUrl = SUPABASE_URL;
-  const anonKey = SUPABASE_PUBLISHABLE_KEY;
+**Archivo:** `src/hooks/useRealTimeNotifications.ts`
 
-  const { data: docs, error: docsErr } = await signatureClient
-    .from('documents')
-    .select('id, document_type, beneficiary_id, is_final, signed_pdf_url')
-    .eq('sale_id', data.sale_id)
-    .eq('is_final', true)
-    .neq('document_type', 'firma');
+Agregar listeners `.on('postgres_changes', ...)` para las tablas faltantes, invalidando sus query keys correspondientes. Cada listener sigue el mismo patrón existente:
 
-  if (docsErr) {
-    console.warn('Could not fetch final documents:', docsErr);
-  } else if (docs && docs.length > 0) {
-    const recipientType = data.recipient_type;
+| Tabla | Evento | Query keys a invalidar |
+|---|---|---|
+| `clients` | `*` | `['clients']` |
+| `templates` | `*` | `['templates']`, `['templates-for-selection']` |
+| `plans` | `*` | `['plans']` |
+| `profiles` | `*` | `['users']`, `['profile']` |
+| `companies` | `*` | `['companies']` |
+| `sale_requirements` | `*` | `['sale-requirements']` |
+| `sale_notes` | `*` | `['sale-notes']` |
 
-    let hasPendingContratada = false;
-    try {
-      const { data: pendingCL, error: pendingErr } = await signatureClient
-        .from('signature_links').select('id')
-        .eq('sale_id', data.sale_id)
-        .eq('recipient_type', 'contratada')
-        .eq('status', 'pendiente');
-      if (pendingErr) {
-        console.warn('Could not check pending contratada links:', pendingErr);
-        hasPendingContratada = true;
-      } else {
-        hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
-      }
-    } catch (e) {
-      console.warn('Could not check pending contratada links (exception):', e);
-      hasPendingContratada = true;
-    }
+Esto garantiza que cuando otro usuario (o el mismo usuario en otra pestaña) modifica un cliente, template, plan, etc., la UI se actualiza automáticamente sin recargar.
 
-    const docsToSign = docs.filter((d: any) => {
-      if (d.signed_pdf_url) return false;
-      const dt = d.document_type;
-
-      if (dt === 'contrato') {
-        return recipientType === 'contratada';
-      }
-      if (dt === 'ddjj_salud') {
-        if (recipientType === 'titular') return d.beneficiary_id == null;
-        if (recipientType === 'adherente') return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
-        return false;
-      }
-      if (dt === 'anexo') return false;
-      return false;
-    });
-
-    const safeDocsToSign = docsToSign.filter((d: any) => {
-      if (d.document_type === 'contrato' && hasPendingContratada) return false;
-      return true;
-    });
-
-    for (const doc of safeDocsToSign) {
-      try {
-        await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-        await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-      } catch (pdfErr) {
-        console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
-      }
-    }
-  }
-} catch (pdfGenErr) {
-  console.warn('Post-signature PDF generation error:', pdfGenErr);
-}
-```
-
-### Impacto
-- 1 archivo, 1 bloque (~85 líneas reemplaza ~85 líneas)
-- No afecta bloque de activación contratada (Fase 3)
-- No requiere migraciones
+No se modifica ningún otro archivo. No cambia diseño ni UX.
 
