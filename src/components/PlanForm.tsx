@@ -80,7 +80,6 @@ export function PlanForm({ open, onOpenChange, plan }: PlanFormProps) {
         await createPlan.mutateAsync({
           name: data.name,
           description: data.description,
-          price: data.price,
           coverage_details: data.coverage_details,
           company_id: data.company_id,
           is_active: data.active,
