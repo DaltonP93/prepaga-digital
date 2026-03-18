@@ -58,7 +58,6 @@ export function PlanForm({ open, onOpenChange, plan }: PlanFormProps) {
       reset({
         name: "",
         description: "",
-        price: 0,
         coverage_details: "",
         company_id: profile?.company_id || "",
         active: true,
