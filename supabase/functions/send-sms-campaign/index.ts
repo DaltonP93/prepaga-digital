@@ -37,9 +37,23 @@ serve(async (req) => {
       });
     }
 
-    const { campaignId, recipients, message, companyId } = await req.json();
+    const { campaignId, recipients, message } = await req.json();
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Derive companyId from authenticated user's profile — never trust client-supplied value
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('id', userData.user.id)
+      .single();
+    const companyId = profile?.company_id;
+    if (!companyId) {
+      return new Response(JSON.stringify({ error: "User has no company assigned" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const results = [];
     let sentCount = 0;

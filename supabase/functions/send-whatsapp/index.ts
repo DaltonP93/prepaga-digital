@@ -59,7 +59,26 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    const { to, templateName, templateKey, templateData, saleId, companyId, messageType = 'general' }: WhatsAppRequest = await req.json()
+    const { to, templateName, templateKey, templateData, saleId, companyId: bodyCompanyId, messageType = 'general' }: WhatsAppRequest = await req.json()
+
+    // Derive companyId server-side for non-internal calls
+    let companyId = bodyCompanyId;
+    if (!isInternalCall) {
+      const anonClientForProfile = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader! } }
+      })
+      const { data: { user: profileUser } } = await anonClientForProfile.auth.getUser()
+      if (profileUser) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('id', profileUser.id)
+          .single()
+        if (profile?.company_id) {
+          companyId = profile.company_id
+        }
+      }
+    }
 
     if (!to || !companyId) {
       return new Response(JSON.stringify({
