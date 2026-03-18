@@ -3677,7 +3677,47 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      company_settings_public: {
+        Row: {
+          company_id: string | null
+          contratada_signature_mode: string | null
+          contratada_signer_dni: string | null
+          contratada_signer_email: string | null
+          contratada_signer_name: string | null
+          email_provider: string | null
+          signature_block_style: Json | null
+          whatsapp_provider: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          contratada_signature_mode?: string | null
+          contratada_signer_dni?: string | null
+          contratada_signer_email?: string | null
+          contratada_signer_name?: string | null
+          email_provider?: string | null
+          signature_block_style?: Json | null
+          whatsapp_provider?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          contratada_signature_mode?: string | null
+          contratada_signer_dni?: string | null
+          contratada_signer_email?: string | null
+          contratada_signer_name?: string | null
+          email_provider?: string | null
+          signature_block_style?: Json | null
+          whatsapp_provider?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       check_all_signatures_completed: {
