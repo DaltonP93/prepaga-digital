@@ -217,6 +217,22 @@ serve(async (req) => {
         );
       }
 
+      // Cross-company check: non-super_admin can only reset within their company
+      if (callerRole !== 'super_admin') {
+        const { data: callerProfile } = await supabaseAdmin
+          .from('profiles').select('company_id').eq('id', caller.id).single();
+        const { data: targetProfile } = await supabaseAdmin
+          .from('profiles').select('company_id').eq('id', targetUserId).single();
+
+        if (!callerProfile?.company_id || !targetProfile?.company_id ||
+            callerProfile.company_id !== targetProfile.company_id) {
+          return new Response(
+            JSON.stringify({ error: 'Forbidden - target user not in your company' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+
       const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
         targetUserId,
         { password: newPassword }
