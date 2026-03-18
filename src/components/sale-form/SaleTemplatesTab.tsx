@@ -339,6 +339,8 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           } else {
             normalizedContent = interpolateEnhancedTemplate(template.content || '', context);
           }
+          // Resolve expired storage image URLs before persisting
+          normalizedContent = await resolveStorageImages(normalizedContent);
 
           const { error: insertError } = await supabase.from('documents').insert({
             sale_id: saleId,
