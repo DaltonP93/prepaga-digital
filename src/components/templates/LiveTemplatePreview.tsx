@@ -314,11 +314,13 @@ export const LiveTemplatePreview: React.FC<LiveTemplatePreviewProps> = ({
           <TabsContent value="preview">
             <ScrollArea className="h-[500px] border rounded-lg">
               <div className={`p-6 ${viewportClasses[viewMode]}`}>
-                {processedContent ? (
+                {(resolvedHtml || processedContent) ? (
                   <div 
                     className="prose prose-sm max-w-none"
                     dangerouslySetInnerHTML={{ 
-                      __html: DOMPurify.sanitize(processedContent) 
+                      __html: DOMPurify.sanitize(resolvedHtml || processedContent, {
+                        ADD_ATTR: ['data-storage-path'],
+                      })
                     }}
                   />
                 ) : annexes.length > 0 ? (
