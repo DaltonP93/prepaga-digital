@@ -266,7 +266,7 @@ export function createEnhancedTemplateContext(
         gender: '',
         relationship: 'Titular',
         is_primary: true,
-        amount: plan?.price || 0,
+        amount: sale?.total_amount || plan?.price || 0,
         signature_required: true,
       }
     : null;
@@ -278,7 +278,7 @@ export function createEnhancedTemplateContext(
   const beneficiaryContexts = mergedBeneficiaries.map((b) => {
     // Titular with amount=0: use plan price as fallback
     if ((b.is_primary || b.relationship?.toLowerCase() === 'titular') && !b.amount) {
-      return createBeneficiaryContext({ ...b, amount: plan?.price || 0 });
+      return createBeneficiaryContext({ ...b, amount: sale?.total_amount || plan?.price || 0 });
     }
     return createBeneficiaryContext(b);
   });
