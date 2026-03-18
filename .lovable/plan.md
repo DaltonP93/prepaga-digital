@@ -1,104 +1,72 @@
 
 
-## Plan: Fase 5 — PAdES con document_type exactos y doble safeguard
+# Plan: Fix DDJJ Detection Bug + Normalize Unicode Comparisons
 
-### Archivo único
-`src/hooks/useSignatureLinkPublic.ts` — líneas 598-682
+## Problem
 
-### Cambio
-Reemplazar el bloque PAdES actual por la versión con valores exactos de `document_type` (`contrato`, `ddjj_salud`, `anexo`) en lugar de comparaciones genéricas con `.toLowerCase()`. Agrega doble safeguard para contratada pendiente.
+The DDJJ document detection fails because some code paths use raw `.toLowerCase()` with literal accented characters (`'declaración'`) instead of the normalized comparison function `normalizeAccents()` that already exists. This causes encoding mismatches where `'declaración'.toLowerCase()` doesn't match `'declaracion'` (NFD-normalized).
 
-### Diferencias clave vs. código actual (Fase 4)
+## Files to Change
 
-1. **document_type exacto**: usa `dt === 'contrato'` directo (sin `.toLowerCase()` ni check de `'contract'`)
-2. **ddjj_salud explícito**: filtra por `dt === 'ddjj_salud'` en vez de "todo lo que no sea contrato"
-3. **Anexos excluidos**: `dt === 'anexo'` retorna `false` explícitamente
-4. **Doble safeguard**: `safeDocsToSign` filtra contrato si `hasPendingContratada` como segunda capa
-5. **Error handling mejorado**: `pendingErr` se maneja separadamente del catch
+### 1. `src/components/sale-form/SaleTemplatesTab.tsx`
 
-### Código resultante (reemplaza líneas 598-682)
-
-```typescript
-// Post-signature: generate base PDF + PAdES only when it corresponds to this signer + step
-try {
-  const supabaseUrl = SUPABASE_URL;
-  const anonKey = SUPABASE_PUBLISHABLE_KEY;
-
-  const { data: docs, error: docsErr } = await signatureClient
-    .from('documents')
-    .select('id, document_type, beneficiary_id, is_final, signed_pdf_url')
-    .eq('sale_id', data.sale_id)
-    .eq('is_final', true)
-    .neq('document_type', 'firma');
-
-  if (docsErr) {
-    console.warn('Could not fetch final documents:', docsErr);
-  } else if (docs && docs.length > 0) {
-    const recipientType = data.recipient_type;
-
-    let hasPendingContratada = false;
-    try {
-      const { data: pendingCL, error: pendingErr } = await signatureClient
-        .from('signature_links').select('id')
-        .eq('sale_id', data.sale_id)
-        .eq('recipient_type', 'contratada')
-        .eq('status', 'pendiente');
-      if (pendingErr) {
-        console.warn('Could not check pending contratada links:', pendingErr);
-        hasPendingContratada = true;
-      } else {
-        hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
-      }
-    } catch (e) {
-      console.warn('Could not check pending contratada links (exception):', e);
-      hasPendingContratada = true;
-    }
-
-    const docsToSign = docs.filter((d: any) => {
-      if (d.signed_pdf_url) return false;
-      const dt = d.document_type;
-
-      if (dt === 'contrato') {
-        return recipientType === 'contratada';
-      }
-      if (dt === 'ddjj_salud') {
-        if (recipientType === 'titular') return d.beneficiary_id == null;
-        if (recipientType === 'adherente') return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
-        return false;
-      }
-      if (dt === 'anexo') return false;
-      return false;
-    });
-
-    const safeDocsToSign = docsToSign.filter((d: any) => {
-      if (d.document_type === 'contrato' && hasPendingContratada) return false;
-      return true;
-    });
-
-    for (const doc of safeDocsToSign) {
-      try {
-        await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-        await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-      } catch (pdfErr) {
-        console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
-      }
-    }
-  }
-} catch (pdfGenErr) {
-  console.warn('Post-signature PDF generation error:', pdfGenErr);
-}
+**A) Enhance `normalizeAccents` (line 24)** — add `.trim()` for safety:
+```ts
+const normalizeAccents = (s: string) =>
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 ```
 
-### Impacto
-- 1 archivo, 1 bloque (~85 líneas reemplaza ~85 líneas)
-- No afecta bloque de activación contratada (Fase 3)
-- No requiere migraciones
+**B) Extract a reusable `isDDJJTemplate` helper** (new, after line 26):
+```ts
+const isDDJJTemplate = (template: any): boolean => {
+  const norm = normalizeAccents(template.name || '');
+  return norm.includes('declaracion') ||
+    norm.includes('ddjj') ||
+    template.template_type === 'ddjj_salud' ||
+    template.document_type === 'ddjj_salud';
+};
+```
+
+**C) Fix `handleRegenerateDocuments` sorting (lines 641-650)** — replace raw `.toLowerCase()` + `'declaración'` with `normalizeAccents()`:
+```ts
+const sortedTpls = [...(templateContents || [])].sort((a, b) => {
+  const aNorm = normalizeAccents(a.name);
+  const bNorm = normalizeAccents(b.name);
+  const aIsAnexo = isAnexoPlanName(a.name) || (!isDDJJTemplate(a) && !aNorm.includes('contrato'));
+  const bIsAnexo = isAnexoPlanName(b.name) || (!isDDJJTemplate(b) && !bNorm.includes('contrato'));
+  ...
+});
+```
+
+**D) Fix regenerate isDDJJ detection (lines 655-658)** — use the helper:
+```ts
+const isDDJJ = isDDJJTemplate(template);
+```
+
+**E) Fix regenerate ddjiTpls filter (lines 701-703)** — use the helper:
+```ts
+const ddjiTpls = (templateContents || []).filter(isDDJJTemplate);
+```
+
+### 2. `src/components/sale-form/SaleDDJJTab.tsx`
+
+**Fix line 341-342** — the filter that finds DDJJ template IDs uses raw `.toLowerCase()` with `'declaración'`. Replace with normalized comparison:
+```ts
+const ddjjTemplateIds = (saleTemplateRows || [])
+  .filter((row: any) => {
+    const norm = (row.templates?.name || '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    return norm.includes('ddjj') || norm.includes('declaracion');
+  })
+  ...
+```
+
+## What This Does NOT Change
+- No visual/UX changes
+- No database changes
+- The `handleSendDocuments` path already uses `normalizeAccents()` correctly — no changes needed there
+- The edge function `finalize-signature-link` compares `document_type === 'ddjj_salud'` (enum value, no accent issue) — no change needed
+
+## Regarding "Regenerate All PDFs" Endpoint
+The prompt mentions calling a `regenerate-all-pdfs` edge function. This function does **not exist** in the project. Creating and deploying a bulk regeneration endpoint is a separate task — this plan focuses solely on fixing the DDJJ detection bug so new sales work correctly going forward.
 
