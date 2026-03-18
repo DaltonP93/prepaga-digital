@@ -131,9 +131,21 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
     },
   });
 
+  // Resolve expired storage image URLs when editor is ready
   useEffect(() => {
     if (!editor) return;
+    const html = editor.getHTML();
+    if (!html || !html.includes('<img')) return;
 
+    resolveStorageImages(html).then((resolved) => {
+      if (resolved !== html) {
+        editor.commands.setContent(resolved, false);
+      }
+    });
+  }, [editor]);
+
+  useEffect(() => {
+    if (!editor) return;
     editor.commands.extendMarkRange('link');
   }, [editor]);
 
