@@ -268,7 +268,7 @@ Deno.serve(async (req) => {
     }
 
     // Return PDF directly if no sale_id
-    return new Response(pdfBytes, {
+    return new Response(new Uint8Array(pdfBytes), {
       headers: {
         ...corsHeaders,
         "Content-Type": "application/pdf",

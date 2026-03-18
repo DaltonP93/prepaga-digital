@@ -316,81 +316,92 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
             const positionedBlocks = pageBlocks.filter((b) => POSITIONED_TYPES.has(b.block_type));
 
             return (
+              {/* Outer wrapper: unscaled, carries data-a4-page for coordinate detection */}
               <div
                 key={pageNum}
                 ref={(el) => { if (el) pageRefs.current.set(pageNum, el); else pageRefs.current.delete(pageNum); }}
                 data-page-num={pageNum}
                 data-a4-page="true"
-                className="relative bg-background shadow-2xl ring-1 ring-border/40"
+                className="relative"
                 style={{
-                  width: A4_W,
-                  height: A4_H,
-                  transform: `scale(${zoom / 100})`,
-                  transformOrigin: "top center",
+                  width: A4_W * (zoom / 100),
+                  height: A4_H * (zoom / 100),
                   marginBottom: PAGE_GAP,
-                  ...(pageBg
-                    ? {
-                        backgroundImage: `url(${pageBg})`,
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                        backgroundRepeat: "no-repeat",
-                      }
-                    : {}),
                 }}
-                data-canvas="true"
               >
                 {/* Page number indicator */}
                 <div className="absolute -top-5 left-0 text-[10px] text-muted-foreground font-medium">
                   Pág. {pageNum}
                 </div>
 
-                {/* Flow blocks */}
-                <div className="p-8 space-y-1" data-canvas="true">
-                  {flowBlocks.map((block) => (
-                    <CanvasBlock
+                {/* Inner scaled A4 container: visual rendering */}
+                <div
+                  className="absolute top-0 left-0 bg-background shadow-2xl ring-1 ring-border/40"
+                  style={{
+                    width: A4_W,
+                    height: A4_H,
+                    transform: `scale(${zoom / 100})`,
+                    transformOrigin: "top left",
+                    ...(pageBg
+                      ? {
+                          backgroundImage: `url(${pageBg})`,
+                          backgroundSize: "cover",
+                          backgroundPosition: "center",
+                          backgroundRepeat: "no-repeat",
+                        }
+                      : {}),
+                  }}
+                  data-canvas="true"
+                >
+                  {/* Flow blocks */}
+                  <div className="p-8 space-y-1" data-canvas="true">
+                    {flowBlocks.map((block) => (
+                      <CanvasBlock
+                        key={block.id}
+                        block={block}
+                        isSelected={selectedBlockId === block.id}
+                        onSelect={() => onSelectBlock(block.id)}
+                        onDelete={() => onDeleteBlock(block.id)}
+                        onDuplicate={() => onDuplicateBlock(block.id)}
+                        onToggleLock={() => onToggleLock(block.id)}
+                        onToggleVisibility={() => onToggleVisibility(block.id)}
+                        templateId={templateId}
+                        fieldPlacementRole={activeSignerRole}
+                        fieldPlacementType={activeFieldType}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Positioned blocks */}
+                  {positionedBlocks.map((block) => (
+                    <div
                       key={block.id}
-                      block={block}
-                      isSelected={selectedBlockId === block.id}
-                      onSelect={() => onSelectBlock(block.id)}
-                      onDelete={() => onDeleteBlock(block.id)}
-                      onDuplicate={() => onDuplicateBlock(block.id)}
-                      onToggleLock={() => onToggleLock(block.id)}
-                      onToggleVisibility={() => onToggleVisibility(block.id)}
-                      templateId={templateId}
-                      fieldPlacementRole={activeSignerRole}
-                      fieldPlacementType={activeFieldType}
-                    />
+                      className="absolute"
+                      style={{
+                        left: `${block.x}%`, top: `${block.y}%`,
+                        width: `${block.w}%`, height: `${block.h}%`,
+                        zIndex: block.z_index,
+                      }}
+                    >
+                      <CanvasBlock
+                        block={block}
+                        isSelected={selectedBlockId === block.id}
+                        onSelect={() => onSelectBlock(block.id)}
+                        onDelete={() => onDeleteBlock(block.id)}
+                        onDuplicate={() => onDuplicateBlock(block.id)}
+                        onToggleLock={() => onToggleLock(block.id)}
+                        onToggleVisibility={() => onToggleVisibility(block.id)}
+                        onUpdatePosition={(x, y, w, h) => onUpdatePosition(block.id, x, y, w, h)}
+                        templateId={templateId}
+                        fieldPlacementRole={activeSignerRole}
+                        fieldPlacementType={activeFieldType}
+                      />
+                    </div>
                   ))}
                 </div>
 
-                {/* Positioned blocks */}
-                {positionedBlocks.map((block) => (
-                  <div
-                    key={block.id}
-                    className="absolute"
-                    style={{
-                      left: `${block.x}%`, top: `${block.y}%`,
-                      width: `${block.w}%`, height: `${block.h}%`,
-                      zIndex: block.z_index,
-                    }}
-                  >
-                    <CanvasBlock
-                      block={block}
-                      isSelected={selectedBlockId === block.id}
-                      onSelect={() => onSelectBlock(block.id)}
-                      onDelete={() => onDeleteBlock(block.id)}
-                      onDuplicate={() => onDuplicateBlock(block.id)}
-                      onToggleLock={() => onToggleLock(block.id)}
-                      onToggleVisibility={() => onToggleVisibility(block.id)}
-                      onUpdatePosition={(x, y, w, h) => onUpdatePosition(block.id, x, y, w, h)}
-                      templateId={templateId}
-                      fieldPlacementRole={activeSignerRole}
-                      fieldPlacementType={activeFieldType}
-                    />
-                  </div>
-                ))}
-
-                {/* Field overlays per page */}
+                {/* Field overlay: positioned on the OUTER (unscaled) wrapper
+                    so getBoundingClientRect() matches pointer coordinates */}
                 <CanvasFieldOverlay
                   templateId={templateId}
                   activeFieldType={activeFieldType}

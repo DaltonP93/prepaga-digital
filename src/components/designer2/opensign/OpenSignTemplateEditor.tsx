@@ -195,7 +195,7 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
 
   /* ─── Drag-and-drop ─── */
   const { handleDragStart: onDragStart, handleDragEnd: onDragEnd } = useWidgetDrag({
-    templateId, currentPage, activeRole, pageSelector: "[data-a4-page]", zoom,
+    templateId, currentPage, activeRole, zoom,
     onCreateField: (params) => createField.mutate(params as any),
   });
 
