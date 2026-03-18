@@ -249,6 +249,13 @@ export function createEnhancedTemplateContext(
   const normalizedBeneficiaries = Array.isArray(beneficiaries) ? beneficiaries : [];
   const hasPrimaryBeneficiary = normalizedBeneficiaries.some((b: any) => b?.is_primary === true);
 
+  // Calculate titular's individual share: total minus sum of adherent amounts
+  const adherentSum = normalizedBeneficiaries
+    .filter((b: any) => !b?.is_primary)
+    .reduce((sum: number, b: any) => sum + (b?.amount || 0), 0);
+  const titularAmount = (sale?.total_amount || 0) - adherentSum;
+  const effectiveTitularAmount = titularAmount > 0 ? titularAmount : (sale?.total_amount || plan?.price || 0);
+
   const titularFallback = !hasPrimaryBeneficiary && client
     ? {
         first_name: client?.first_name || '',
@@ -266,7 +273,7 @@ export function createEnhancedTemplateContext(
         gender: '',
         relationship: 'Titular',
         is_primary: true,
-        amount: sale?.total_amount || plan?.price || 0,
+        amount: effectiveTitularAmount,
         signature_required: true,
       }
     : null;
@@ -276,9 +283,9 @@ export function createEnhancedTemplateContext(
     : normalizedBeneficiaries;
 
   const beneficiaryContexts = mergedBeneficiaries.map((b) => {
-    // Titular with amount=0: use plan price as fallback
+    // Titular with amount=0: use calculated titular share as fallback
     if ((b.is_primary || b.relationship?.toLowerCase() === 'titular') && !b.amount) {
-      return createBeneficiaryContext({ ...b, amount: sale?.total_amount || plan?.price || 0 });
+      return createBeneficiaryContext({ ...b, amount: effectiveTitularAmount });
     }
     return createBeneficiaryContext(b);
   });
