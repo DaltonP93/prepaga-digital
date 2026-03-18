@@ -293,6 +293,11 @@ export function createEnhancedTemplateContext(
     || sortedBeneficiaryContexts[0]
     || null;
 
+  // Compute effective total from beneficiary amounts (source of truth)
+  const effectiveTotal = sortedBeneficiaryContexts.length > 0
+    ? sortedBeneficiaryContexts.reduce((sum, b) => sum + (b.monto || 0), 0)
+    : (sale?.total_amount || 0);
+
   return {
     cliente: {
       nombre: client?.first_name || '',
@@ -333,9 +338,9 @@ export function createEnhancedTemplateContext(
       id: sale?.id || '',
       fecha: sale?.sale_date || formatDate(now, 'yyyy-MM-dd'),
       fechaFormateada: formatDate(sale?.sale_date || now, "d 'de' MMMM 'de' yyyy"),
-      total: sale?.total_amount || 0,
-      totalFormateado: formatCurrency(sale?.total_amount || 0),
-      totalLetras: numberToWordsES(sale?.total_amount || 0) + ' GUARANÍES',
+      total: effectiveTotal,
+      totalFormateado: formatCurrency(effectiveTotal),
+      totalLetras: numberToWordsES(effectiveTotal) + ' GUARANÍES',
       vendedor: sale?.salesperson ? `${sale.salesperson.first_name || ''} ${sale.salesperson.last_name || ''}`.trim() : '',
       vendedorEmail: sale?.salesperson?.email || '',
       notas: sale?.notes || '',

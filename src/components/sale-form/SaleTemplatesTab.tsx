@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useTemplates } from '@/hooks/useTemplates';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { resolveStorageImages } from '@/lib/resolveStorageImages';
 import { toast } from 'sonner';
 import { useBeneficiaries } from '@/hooks/useBeneficiaries';
 import { useCreateSignatureLink } from '@/hooks/useSignatureLinks';
@@ -339,6 +340,8 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           } else {
             normalizedContent = interpolateEnhancedTemplate(template.content || '', context);
           }
+          // Resolve expired storage image URLs before persisting
+          normalizedContent = await resolveStorageImages(normalizedContent);
 
           const { error: insertError } = await supabase.from('documents').insert({
             sale_id: saleId,
@@ -415,7 +418,8 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
                 },
                 plan, company, sale, effectiveBeneficiaries || [], undefined, benResponsesMap
               );
-              const renderedContent = interpolateEnhancedTemplate(ddjiTemplate.content || '', beneficiaryContext);
+              let renderedContent = interpolateEnhancedTemplate(ddjiTemplate.content || '', beneficiaryContext);
+              renderedContent = await resolveStorageImages(renderedContent);
 
               const { error: benInsertError } = await supabase.from('documents').insert({
                 sale_id: saleId,
