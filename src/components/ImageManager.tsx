@@ -14,7 +14,7 @@ import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 interface ImageManagerProps {
-  onImageSelect: (url: string) => void;
+  onImageSelect: (url: string, storagePath?: string) => void;
 }
 
 interface UploadedImage {
