@@ -50,7 +50,6 @@ export function PlanForm({ open, onOpenChange, plan }: PlanFormProps) {
     if (plan && open) {
       setValue("name", plan.name || "");
       setValue("description", plan.description || "");
-      setValue("price", Number(plan.price) || 0);
       setValue("coverage_details", typeof plan.coverage_details === 'string' ? plan.coverage_details : JSON.stringify(plan.coverage_details || {}));
       setValue("company_id", plan.company_id || profile?.company_id || "");
       setValue("active", plan.is_active ?? true);
