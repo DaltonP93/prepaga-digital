@@ -39,7 +39,6 @@ export function PlanForm({ open, onOpenChange, plan }: PlanFormProps) {
     defaultValues: {
       name: "",
       description: "",
-      price: 0,
       coverage_details: "",
       company_id: profile?.company_id || "",
       active: true,
