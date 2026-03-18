@@ -293,6 +293,11 @@ export function createEnhancedTemplateContext(
     || sortedBeneficiaryContexts[0]
     || null;
 
+  // Compute effective total from beneficiary amounts (source of truth)
+  const effectiveTotal = sortedBeneficiaryContexts.length > 0
+    ? sortedBeneficiaryContexts.reduce((sum, b) => sum + (b.monto || 0), 0)
+    : (sale?.total_amount || 0);
+
   return {
     cliente: {
       nombre: client?.first_name || '',
@@ -329,11 +334,6 @@ export function createEnhancedTemplateContext(
       colorPrimario: company?.primary_color || '#3B82F6',
       colorSecundario: company?.secondary_color || '#1E40AF',
     },
-    // Compute effective total from beneficiary amounts (source of truth)
-    const effectiveTotal = sortedBeneficiaryContexts.length > 0
-      ? sortedBeneficiaryContexts.reduce((sum, b) => sum + (b.monto || 0), 0)
-      : (sale?.total_amount || 0);
-
     venta: {
       id: sale?.id || '',
       fecha: sale?.sale_date || formatDate(now, 'yyyy-MM-dd'),
