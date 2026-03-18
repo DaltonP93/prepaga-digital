@@ -339,7 +339,7 @@ export const useSubmitSignatureLink = () => {
                 companyInfo = (saleInfo as any)?.companies || null;
                 if ((saleInfo as any)?.company_id) {
                   const { data: cs } = await signatureClient
-                    .from('company_settings')
+                    .from('company_settings_public')
                     .select('contratada_signer_name, contratada_signer_dni')
                     .eq('company_id', (saleInfo as any).company_id)
                     .single();
