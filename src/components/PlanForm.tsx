@@ -23,7 +23,6 @@ interface PlanFormProps {
 interface PlanFormData {
   name: string;
   description?: string;
-  price: number;
   coverage_details?: string;
   company_id?: string;
   active: boolean;
