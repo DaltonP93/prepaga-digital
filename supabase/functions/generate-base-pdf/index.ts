@@ -135,6 +135,88 @@ function buildWrappedHtml(
 </html>`;
 }
 
+/**
+ * Resolve expired Supabase Storage signed URLs in HTML content.
+ * Scans for <img> with data-storage-path and refreshes src.
+ * Also handles legacy images whose src contains a supabase storage URL.
+ */
+async function resolveContentImages(
+  html: string,
+  supabaseAdmin: ReturnType<typeof createClient>,
+  bucket: string
+): Promise<string> {
+  if (!html) return html;
+
+  const imgRegex = /<img\s[^>]*>/gi;
+  const matches = html.match(imgRegex);
+  if (!matches) return html;
+
+  let result = html;
+
+  for (const imgTag of matches) {
+    // Case 1: has data-storage-path
+    const spMatch = imgTag.match(/data-storage-path="([^"]+)"/);
+    if (spMatch) {
+      const storagePath = spMatch[1];
+      const { data } = await supabaseAdmin.storage
+        .from(bucket)
+        .createSignedUrl(storagePath, 3600);
+      if (data?.signedUrl) {
+        const updatedTag = imgTag.replace(/src="[^"]*"/, `src="${data.signedUrl}"`);
+        result = result.replace(imgTag, updatedTag);
+      }
+      continue;
+    }
+
+    // Case 2: legacy — src contains supabase storage URL
+    const srcMatch = imgTag.match(/src="([^"]+)"/);
+    if (!srcMatch) continue;
+    const src = srcMatch[1];
+
+    if (src.includes('.supabase.co/storage/v1/')) {
+      const pathMatch = src.match(/\/storage\/v1\/object\/(?:sign|public)\/([^/]+)\/([^?]+)/);
+      if (pathMatch) {
+        const srcBucket = pathMatch[1];
+        const storagePath = decodeURIComponent(pathMatch[2]);
+        const { data } = await supabaseAdmin.storage
+          .from(srcBucket)
+          .createSignedUrl(storagePath, 3600);
+        if (data?.signedUrl) {
+          const updatedTag = imgTag.replace(/src="[^"]*"/, `src="${data.signedUrl}"`);
+          result = result.replace(imgTag, updatedTag);
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Resolve a company logo URL if it's a Supabase storage URL.
+ */
+async function resolveLogoUrl(
+  logoUrl: string | null,
+  supabaseAdmin: ReturnType<typeof createClient>
+): Promise<string | null> {
+  if (!logoUrl) return null;
+
+  // If it's a supabase storage URL, generate a fresh signed URL
+  if (logoUrl.includes('.supabase.co/storage/v1/')) {
+    const pathMatch = logoUrl.match(/\/storage\/v1\/object\/(?:sign|public)\/([^/]+)\/([^?]+)/);
+    if (pathMatch) {
+      const bucket = pathMatch[1];
+      const storagePath = decodeURIComponent(pathMatch[2]);
+      const { data } = await supabaseAdmin.storage
+        .from(bucket)
+        .createSignedUrl(storagePath, 3600);
+      if (data?.signedUrl) return data.signedUrl;
+    }
+  }
+
+  return logoUrl;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -194,8 +276,15 @@ Deno.serve(async (req) => {
       }
     }
 
+    // 2b. Resolve company logo URL
+    company.logo_url = await resolveLogoUrl(company.logo_url, supabaseAdmin);
+
+    // 2c. Resolve expired image URLs in document content
+    const bucket = Deno.env.get("STORAGE_BUCKET") || "documents";
+    const resolvedContent = await resolveContentImages(doc.content, supabaseAdmin, bucket);
+
     // 3. Build wrapped HTML with repeating header/footer
-    const wrappedHtml = buildWrappedHtml(doc.content, company, doc.name || "Documento");
+    const wrappedHtml = buildWrappedHtml(resolvedContent, company, doc.name || "Documento");
 
     // 4. Call render service
     const renderUrl = Deno.env.get("RENDER_URL");
