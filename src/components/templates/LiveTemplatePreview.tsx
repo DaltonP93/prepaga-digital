@@ -145,6 +145,7 @@ export const LiveTemplatePreview: React.FC<LiveTemplatePreviewProps> = ({
   const [annexes, setAnnexes] = useState<TemplateAttachment[]>([]);
   const [annexesLoading, setAnnexesLoading] = useState(false);
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+  const [resolvedHtml, setResolvedHtml] = useState<string>("");
 
   // Fetch annexes for this template
   useEffect(() => {
