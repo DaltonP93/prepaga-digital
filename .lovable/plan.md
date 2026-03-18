@@ -1,42 +1,104 @@
 
 
-# Plan: Quitar campo Precio del formulario de Plan + Fix firma Contratada
+## Plan: Fase 5 — PAdES con document_type exactos y doble safeguard
 
-## Problema 1: Campo "Precio (Gs.)" en Crear Plan
-El formulario de Plan muestra un campo de precio que no se usa. Hay que eliminarlo del formulario.
+### Archivo único
+`src/hooks/useSignatureLinkPublic.ts` — líneas 598-682
 
-**Archivo:** `src/components/PlanForm.tsx`
-- Eliminar el bloque del campo `price` (líneas 131-145)
-- Eliminar `price` del `defaultValues`, del `reset()`, y del `onSubmit`
-- Eliminar la validación de `price` en el tipo `PlanFormData`
+### Cambio
+Reemplazar el bloque PAdES actual por la versión con valores exactos de `document_type` (`contrato`, `ddjj_salud`, `anexo`) en lugar de comparaciones genéricas con `.toLowerCase()`. Agrega doble safeguard para contratada pendiente.
 
-## Problema 2: Firma Contratada muestra datos incorrectos
+### Diferencias clave vs. código actual (Fase 4)
 
-**Causa raíz:** La tabla `company_settings` tiene RLS que solo permite acceso a `admin`/`super_admin` autenticados. El flujo de firma pública usa `signatureClient` con header `x-signature-token` (rol anon), por lo que la query a `company_settings` devuelve `null`. El fallback usa `companyInfo?.name` ("Prepaga Digital") en vez del nombre del representante configurado ("Eder Arguello"), y el CI queda vacío.
+1. **document_type exacto**: usa `dt === 'contrato'` directo (sin `.toLowerCase()` ni check de `'contract'`)
+2. **ddjj_salud explícito**: filtra por `dt === 'ddjj_salud'` en vez de "todo lo que no sea contrato"
+3. **Anexos excluidos**: `dt === 'anexo'` retorna `false` explícitamente
+4. **Doble safeguard**: `safeDocsToSign` filtra contrato si `hasPendingContratada` como segunda capa
+5. **Error handling mejorado**: `pendingErr` se maneja separadamente del catch
 
-**Fix:** Agregar una política RLS SELECT en `company_settings` para acceso por signature token, similar a las políticas existentes en `companies`, `plans`, etc.
+### Código resultante (reemplaza líneas 598-682)
 
-**Archivo:** Nueva migración SQL
-```sql
-CREATE POLICY "Public can read company_settings via signature token"
-ON public.company_settings
-FOR SELECT
-USING (
-  company_id IN (
-    SELECT company_id FROM public.sales
-    WHERE id = public.get_sale_id_from_signature_token()
-  )
-);
+```typescript
+// Post-signature: generate base PDF + PAdES only when it corresponds to this signer + step
+try {
+  const supabaseUrl = SUPABASE_URL;
+  const anonKey = SUPABASE_PUBLISHABLE_KEY;
+
+  const { data: docs, error: docsErr } = await signatureClient
+    .from('documents')
+    .select('id, document_type, beneficiary_id, is_final, signed_pdf_url')
+    .eq('sale_id', data.sale_id)
+    .eq('is_final', true)
+    .neq('document_type', 'firma');
+
+  if (docsErr) {
+    console.warn('Could not fetch final documents:', docsErr);
+  } else if (docs && docs.length > 0) {
+    const recipientType = data.recipient_type;
+
+    let hasPendingContratada = false;
+    try {
+      const { data: pendingCL, error: pendingErr } = await signatureClient
+        .from('signature_links').select('id')
+        .eq('sale_id', data.sale_id)
+        .eq('recipient_type', 'contratada')
+        .eq('status', 'pendiente');
+      if (pendingErr) {
+        console.warn('Could not check pending contratada links:', pendingErr);
+        hasPendingContratada = true;
+      } else {
+        hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
+      }
+    } catch (e) {
+      console.warn('Could not check pending contratada links (exception):', e);
+      hasPendingContratada = true;
+    }
+
+    const docsToSign = docs.filter((d: any) => {
+      if (d.signed_pdf_url) return false;
+      const dt = d.document_type;
+
+      if (dt === 'contrato') {
+        return recipientType === 'contratada';
+      }
+      if (dt === 'ddjj_salud') {
+        if (recipientType === 'titular') return d.beneficiary_id == null;
+        if (recipientType === 'adherente') return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
+        return false;
+      }
+      if (dt === 'anexo') return false;
+      return false;
+    });
+
+    const safeDocsToSign = docsToSign.filter((d: any) => {
+      if (d.document_type === 'contrato' && hasPendingContratada) return false;
+      return true;
+    });
+
+    for (const doc of safeDocsToSign) {
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
+          body: JSON.stringify({ document_id: doc.id }),
+        });
+        await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
+          body: JSON.stringify({ document_id: doc.id }),
+        });
+      } catch (pdfErr) {
+        console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
+      }
+    }
+  }
+} catch (pdfGenErr) {
+  console.warn('Post-signature PDF generation error:', pdfGenErr);
+}
 ```
 
-Esto permite que el flujo público de firma lea `contratada_signer_name` y `contratada_signer_dni` correctamente. Los datos sensibles como SMTP ya están en otra tabla (`company_otp_policy`), así que `company_settings` es seguro de exponer en lectura.
-
-**Nota de seguridad:** La política solo expone las filas de la empresa vinculada a la venta del token activo, no todas las empresas.
-
-## Archivos a modificar
-
-| Archivo | Cambio |
-|---------|--------|
-| `src/components/PlanForm.tsx` | Eliminar campo price |
-| Nueva migración SQL | RLS policy para company_settings con signature token |
+### Impacto
+- 1 archivo, 1 bloque (~85 líneas reemplaza ~85 líneas)
+- No afecta bloque de activación contratada (Fase 3)
+- No requiere migraciones
 

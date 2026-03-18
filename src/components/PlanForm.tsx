@@ -23,7 +23,6 @@ interface PlanFormProps {
 interface PlanFormData {
   name: string;
   description?: string;
-  price: number;
   coverage_details?: string;
   company_id?: string;
   active: boolean;
@@ -40,7 +39,6 @@ export function PlanForm({ open, onOpenChange, plan }: PlanFormProps) {
     defaultValues: {
       name: "",
       description: "",
-      price: 0,
       coverage_details: "",
       company_id: profile?.company_id || "",
       active: true,
@@ -52,7 +50,6 @@ export function PlanForm({ open, onOpenChange, plan }: PlanFormProps) {
     if (plan && open) {
       setValue("name", plan.name || "");
       setValue("description", plan.description || "");
-      setValue("price", Number(plan.price) || 0);
       setValue("coverage_details", typeof plan.coverage_details === 'string' ? plan.coverage_details : JSON.stringify(plan.coverage_details || {}));
       setValue("company_id", plan.company_id || profile?.company_id || "");
       setValue("active", plan.is_active ?? true);
@@ -61,7 +58,6 @@ export function PlanForm({ open, onOpenChange, plan }: PlanFormProps) {
       reset({
         name: "",
         description: "",
-        price: 0,
         coverage_details: "",
         company_id: profile?.company_id || "",
         active: true,
@@ -76,7 +72,6 @@ export function PlanForm({ open, onOpenChange, plan }: PlanFormProps) {
           id: plan.id,
           name: data.name,
           description: data.description,
-          price: data.price,
           coverage_details: data.coverage_details,
           company_id: data.company_id,
           is_active: data.active,
@@ -85,7 +80,6 @@ export function PlanForm({ open, onOpenChange, plan }: PlanFormProps) {
         await createPlan.mutateAsync({
           name: data.name,
           description: data.description,
-          price: data.price,
           coverage_details: data.coverage_details,
           company_id: data.company_id,
           is_active: data.active,
@@ -128,21 +122,8 @@ export function PlanForm({ open, onOpenChange, plan }: PlanFormProps) {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="price">Precio (Gs.)</Label>
-            <Input
-              id="price"
-              type="number"
-              step="1"
-              {...register("price", { 
-                required: "El precio es requerido",
-                min: { value: 0, message: "El precio debe ser mayor a 0" }
-              })}
-            />
-            {errors.price && (
-              <span className="text-sm text-red-500">{errors.price.message}</span>
-            )}
-          </div>
+
+
 
           <div className="space-y-2">
             <Label htmlFor="coverage_details">Detalles de Cobertura</Label>
