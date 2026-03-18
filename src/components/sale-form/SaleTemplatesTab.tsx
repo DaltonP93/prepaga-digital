@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useTemplates } from '@/hooks/useTemplates';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { resolveStorageImages } from '@/lib/resolveStorageImages';
 import { toast } from 'sonner';
 import { useBeneficiaries } from '@/hooks/useBeneficiaries';
 import { useCreateSignatureLink } from '@/hooks/useSignatureLinks';
