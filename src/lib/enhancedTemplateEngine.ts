@@ -283,8 +283,8 @@ export function createEnhancedTemplateContext(
     : normalizedBeneficiaries;
 
   const beneficiaryContexts = mergedBeneficiaries.map((b) => {
-    // Titular with amount=0: use calculated titular share as fallback
-    if ((b.is_primary || b.relationship?.toLowerCase() === 'titular') && !b.amount) {
+    // Titular: always use calculated share (total - adherent sum) for accuracy
+    if (b.is_primary || b.relationship?.toLowerCase() === 'titular') {
       return createBeneficiaryContext({ ...b, amount: effectiveTitularAmount });
     }
     return createBeneficiaryContext(b);
