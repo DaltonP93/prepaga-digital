@@ -1,104 +1,77 @@
 
 
-## Plan: Fase 5 — PAdES con document_type exactos y doble safeguard
+# Plan: Fix de imágenes rotas en templates (cabecera/zócalo)
 
-### Archivo único
-`src/hooks/useSignatureLinkPublic.ts` — líneas 598-682
+## Problema raíz
 
-### Cambio
-Reemplazar el bloque PAdES actual por la versión con valores exactos de `document_type` (`contrato`, `ddjj_salud`, `anexo`) en lugar de comparaciones genéricas con `.toLowerCase()`. Agrega doble safeguard para contratada pendiente.
+Las imágenes insertadas en el editor TipTap (Legacy 1.0) se guardan en el HTML con `<img src="signed-url">` donde la URL firmada expira en 1 hora. Al volver a abrir el template, las imágenes aparecen rotas porque la URL ya no es válida. El `file_uploads` table tiene el `file_url` (storage path), pero el HTML del template solo guarda la URL firmada temporal.
 
-### Diferencias clave vs. código actual (Fase 4)
+## Solución: almacenar `storage_path` y resolver al renderizar
 
-1. **document_type exacto**: usa `dt === 'contrato'` directo (sin `.toLowerCase()` ni check de `'contract'`)
-2. **ddjj_salud explícito**: filtra por `dt === 'ddjj_salud'` en vez de "todo lo que no sea contrato"
-3. **Anexos excluidos**: `dt === 'anexo'` retorna `false` explícitamente
-4. **Doble safeguard**: `safeDocsToSign` filtra contrato si `hasPendingContratada` como segunda capa
-5. **Error handling mejorado**: `pendingErr` se maneja separadamente del catch
+### A. Agregar atributo `storage_path` a `ResizableImageExtension`
 
-### Código resultante (reemplaza líneas 598-682)
+**Archivo:** `src/components/editor/ResizableImageExtension.tsx`
 
-```typescript
-// Post-signature: generate base PDF + PAdES only when it corresponds to this signer + step
-try {
-  const supabaseUrl = SUPABASE_URL;
-  const anonKey = SUPABASE_PUBLISHABLE_KEY;
+- Agregar atributo `"data-storage-path"` al schema de la extensión (`addAttributes` + `renderHTML` + `parseHTML`)
+- Cuando el HTML se serializa, incluye `data-storage-path="companyId/template-images/..."` como atributo del `<img>`
 
-  const { data: docs, error: docsErr } = await signatureClient
-    .from('documents')
-    .select('id, document_type, beneficiary_id, is_final, signed_pdf_url')
-    .eq('sale_id', data.sale_id)
-    .eq('is_final', true)
-    .neq('document_type', 'firma');
+### B. Pasar storage path al insertar imagen
 
-  if (docsErr) {
-    console.warn('Could not fetch final documents:', docsErr);
-  } else if (docs && docs.length > 0) {
-    const recipientType = data.recipient_type;
+**Archivo:** `src/components/ImageManager.tsx`
 
-    let hasPendingContratada = false;
-    try {
-      const { data: pendingCL, error: pendingErr } = await signatureClient
-        .from('signature_links').select('id')
-        .eq('sale_id', data.sale_id)
-        .eq('recipient_type', 'contratada')
-        .eq('status', 'pendiente');
-      if (pendingErr) {
-        console.warn('Could not check pending contratada links:', pendingErr);
-        hasPendingContratada = true;
-      } else {
-        hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
-      }
-    } catch (e) {
-      console.warn('Could not check pending contratada links (exception):', e);
-      hasPendingContratada = true;
-    }
+- Cambiar `onImageSelect` callback para pasar tanto la URL firmada como el storage path: `onImageSelect(signedUrl, storagePath)`
+- El `handleImageClick` ya tiene acceso a `img.file_url` (storage path) y `getImageUrl(img)` (signed URL)
 
-    const docsToSign = docs.filter((d: any) => {
-      if (d.signed_pdf_url) return false;
-      const dt = d.document_type;
+**Archivo:** `src/components/TipTapEditor.tsx`
 
-      if (dt === 'contrato') {
-        return recipientType === 'contratada';
-      }
-      if (dt === 'ddjj_salud') {
-        if (recipientType === 'titular') return d.beneficiary_id == null;
-        if (recipientType === 'adherente') return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
-        return false;
-      }
-      if (dt === 'anexo') return false;
-      return false;
-    });
+- Actualizar `addImage` para aceptar un `storagePath` opcional
+- Al insertar imagen, setear `{ src: signedUrl, "data-storage-path": storagePath }`
 
-    const safeDocsToSign = docsToSign.filter((d: any) => {
-      if (d.document_type === 'contrato' && hasPendingContratada) return false;
-      return true;
-    });
+### C. Resolver storage paths al cargar contenido en el editor
 
-    for (const doc of safeDocsToSign) {
-      try {
-        await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-        await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-      } catch (pdfErr) {
-        console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
-      }
-    }
-  }
-} catch (pdfGenErr) {
-  console.warn('Post-signature PDF generation error:', pdfGenErr);
-}
-```
+**Archivo:** `src/components/TipTapEditor.tsx`
 
-### Impacto
-- 1 archivo, 1 bloque (~85 líneas reemplaza ~85 líneas)
-- No afecta bloque de activación contratada (Fase 3)
-- No requiere migraciones
+- Crear función `resolveContentImages(html)` que:
+  1. Parsea el HTML con regex buscando `<img[^>]*data-storage-path="([^"]+)"[^>]*>`
+  2. Para cada match, genera nueva signed URL via `supabase.storage.from("documents").createSignedUrl(path, 3600)`
+  3. Reemplaza el `src` con la URL fresca
+- Ejecutar esta función en el `useEffect` que setea el contenido inicial del editor
+
+### D. Resolver storage paths en LiveTemplatePreview
+
+**Archivo:** `src/components/templates/LiveTemplatePreview.tsx`
+
+- Antes de renderizar con `dangerouslySetInnerHTML`, ejecutar la misma resolución de storage paths
+- Usar `useEffect` + `useState` para resolver URLs asíncronamente
+- Reemplazar `src` expirados con URLs frescas en el HTML procesado
+
+### E. Migrar imágenes existentes (fix para templates ya guardados)
+
+**Archivo:** `src/components/TipTapEditor.tsx`
+
+- En la función de resolución, si un `<img>` tiene `src` que es una URL de Supabase Storage (contiene `/storage/v1/`) pero NO tiene `data-storage-path`, intentar extraer el path de la URL y agregar el atributo automáticamente
+- Esto permite que templates existentes con URLs expiradas se auto-reparen al abrirlos en el editor
+
+### F. Proteger imágenes en DOMPurify
+
+**Archivo:** `src/components/templates/LiveTemplatePreview.tsx`
+
+- Configurar DOMPurify para permitir el atributo `data-storage-path` en `<img>` tags:
+  `DOMPurify.sanitize(html, { ADD_ATTR: ['data-storage-path'] })`
+
+## Archivos a modificar
+
+| Archivo | Cambio |
+|---------|--------|
+| `src/components/editor/ResizableImageExtension.tsx` | Agregar atributo `data-storage-path` |
+| `src/components/ImageManager.tsx` | Pasar storage path en callback |
+| `src/components/TipTapEditor.tsx` | Resolver URLs al cargar, insertar con storage path |
+| `src/components/templates/LiveTemplatePreview.tsx` | Resolver URLs antes de renderizar |
+
+## Orden de implementación
+
+1. ResizableImageExtension — agregar atributo
+2. ImageManager — pasar storage path
+3. TipTapEditor — resolver al cargar + insertar con path
+4. LiveTemplatePreview — resolver antes de render
 
