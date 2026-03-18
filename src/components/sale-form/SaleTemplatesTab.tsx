@@ -22,7 +22,15 @@ interface SaleTemplatesTabProps {
 }
 
 const normalizeAccents = (s: string) =>
-  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+const isDDJJTemplate = (template: { name?: string; template_type?: string; document_type?: string }): boolean => {
+  const norm = normalizeAccents(template.name || '');
+  return norm.includes('declaracion') ||
+    norm.includes('ddjj') ||
+    template.template_type === 'ddjj_salud' ||
+    template.document_type === 'ddjj_salud';
+};
 
 /** Determine document type badge from name */
 const getTemplateTypeBadge = (name: string) => {
