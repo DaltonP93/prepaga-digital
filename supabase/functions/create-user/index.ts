@@ -195,6 +195,9 @@ serve(async (req) => {
       )
     }
 
+    // Determine caller's role (highest priority)
+    const callerRole = roleData[0].role;
+
     // Handle password reset action
     if (requestBody.action === 'reset_password') {
       const targetUserId = requestBody.user_id;
