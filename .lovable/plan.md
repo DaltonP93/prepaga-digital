@@ -1,104 +1,41 @@
 
 
-## Plan: Fase 5 — PAdES con document_type exactos y doble safeguard
+# Plan: Fix Titular CUOTA Calculation in Template Engine
 
-### Archivo único
-`src/hooks/useSignatureLinkPublic.ts` — líneas 598-682
+## Problem
+In `enhancedTemplateEngine.ts`, when the titular has no entry in the `beneficiaries` table, a fallback is created with `amount: sale.total_amount`. This is the **sum of all amounts**, not the titular's individual share. So in the CUOTA column of the contract table, the titular shows the total instead of their portion.
 
-### Cambio
-Reemplazar el bloque PAdES actual por la versión con valores exactos de `document_type` (`contrato`, `ddjj_salud`, `anexo`) en lugar de comparaciones genéricas con `.toLowerCase()`. Agrega doble safeguard para contratada pendiente.
+**Example:** Sale total = 450,000. Adherent amount = 50,000. Titular's CUOTA should be 400,000 but currently shows 450,000.
 
-### Diferencias clave vs. código actual (Fase 4)
+## Database Fields (for reference)
+- `sales.total_amount` → "Monto Total (Gs.)" in the Básico tab = sum of all beneficiary amounts
+- `beneficiaries.amount` → "Monto (Gs.)" per adherent/titular
+- Template `{{monto}}` inside `{{#beneficiarios}}` loop → each beneficiary's individual amount (CUOTA column)
+- Template `{{monto_total}}` → formatted total of all amounts
+- Template `{{monto_total_letras}}` → total in words
 
-1. **document_type exacto**: usa `dt === 'contrato'` directo (sin `.toLowerCase()` ni check de `'contract'`)
-2. **ddjj_salud explícito**: filtra por `dt === 'ddjj_salud'` en vez de "todo lo que no sea contrato"
-3. **Anexos excluidos**: `dt === 'anexo'` retorna `false` explícitamente
-4. **Doble safeguard**: `safeDocsToSign` filtra contrato si `hasPendingContratada` como segunda capa
-5. **Error handling mejorado**: `pendingErr` se maneja separadamente del catch
+## Change: `src/lib/enhancedTemplateEngine.ts`
 
-### Código resultante (reemplaza líneas 598-682)
+In `createEnhancedTemplateContext()`, calculate the titular's individual amount correctly:
 
-```typescript
-// Post-signature: generate base PDF + PAdES only when it corresponds to this signer + step
-try {
-  const supabaseUrl = SUPABASE_URL;
-  const anonKey = SUPABASE_PUBLISHABLE_KEY;
+**Lines 252-282 — Titular fallback logic:**
 
-  const { data: docs, error: docsErr } = await signatureClient
-    .from('documents')
-    .select('id, document_type, beneficiary_id, is_final, signed_pdf_url')
-    .eq('sale_id', data.sale_id)
-    .eq('is_final', true)
-    .neq('document_type', 'firma');
-
-  if (docsErr) {
-    console.warn('Could not fetch final documents:', docsErr);
-  } else if (docs && docs.length > 0) {
-    const recipientType = data.recipient_type;
-
-    let hasPendingContratada = false;
-    try {
-      const { data: pendingCL, error: pendingErr } = await signatureClient
-        .from('signature_links').select('id')
-        .eq('sale_id', data.sale_id)
-        .eq('recipient_type', 'contratada')
-        .eq('status', 'pendiente');
-      if (pendingErr) {
-        console.warn('Could not check pending contratada links:', pendingErr);
-        hasPendingContratada = true;
-      } else {
-        hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
-      }
-    } catch (e) {
-      console.warn('Could not check pending contratada links (exception):', e);
-      hasPendingContratada = true;
-    }
-
-    const docsToSign = docs.filter((d: any) => {
-      if (d.signed_pdf_url) return false;
-      const dt = d.document_type;
-
-      if (dt === 'contrato') {
-        return recipientType === 'contratada';
-      }
-      if (dt === 'ddjj_salud') {
-        if (recipientType === 'titular') return d.beneficiary_id == null;
-        if (recipientType === 'adherente') return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
-        return false;
-      }
-      if (dt === 'anexo') return false;
-      return false;
-    });
-
-    const safeDocsToSign = docsToSign.filter((d: any) => {
-      if (d.document_type === 'contrato' && hasPendingContratada) return false;
-      return true;
-    });
-
-    for (const doc of safeDocsToSign) {
-      try {
-        await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-        await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
-          body: JSON.stringify({ document_id: doc.id }),
-        });
-      } catch (pdfErr) {
-        console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
-      }
-    }
-  }
-} catch (pdfGenErr) {
-  console.warn('Post-signature PDF generation error:', pdfGenErr);
-}
+1. Before building the fallback, compute sum of non-primary beneficiary amounts:
+```ts
+const adherentSum = normalizedBeneficiaries
+  .filter(b => !b.is_primary)
+  .reduce((sum, b) => sum + (b.amount || 0), 0);
+const titularAmount = (sale?.total_amount || 0) - adherentSum;
 ```
 
-### Impacto
-- 1 archivo, 1 bloque (~85 líneas reemplaza ~85 líneas)
-- No afecta bloque de activación contratada (Fase 3)
-- No requiere migraciones
+2. Use `titularAmount` (instead of `sale.total_amount`) for:
+   - Line 269: `amount: titularAmount > 0 ? titularAmount : (sale?.total_amount || plan?.price || 0)`
+   - Line 281: same fallback for titular with amount=0
+
+This ensures the CUOTA column in the contract shows:
+- Row 1 (Titular): 400,000
+- Row 2 (Adherent): 50,000  
+- TOTAL: 450,000
+
+No other files need changes — the template variables `{{monto_total}}` and `{{monto_total_letras}}` already use `effectiveTotal` which sums all beneficiary amounts correctly.
 
