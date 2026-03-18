@@ -94,6 +94,57 @@ export const useRealTimeNotifications = () => {
           queryClient.invalidateQueries({ queryKey: ['sales'] });
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'clients' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['clients'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'templates' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['templates'] });
+          queryClient.invalidateQueries({ queryKey: ['templates-for-selection'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'plans' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['plans'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'profiles' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['users'] });
+          queryClient.invalidateQueries({ queryKey: ['profile'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'companies' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['companies'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'sale_requirements' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['sale-requirements'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'sale_notes' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['sale-notes'] });
+        }
+      )
       .subscribe((status) => {
         setIsConnected(status === 'SUBSCRIBED');
         console.log('Realtime connection status:', status);
