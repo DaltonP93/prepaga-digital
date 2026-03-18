@@ -122,21 +122,8 @@ export function PlanForm({ open, onOpenChange, plan }: PlanFormProps) {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="price">Precio (Gs.)</Label>
-            <Input
-              id="price"
-              type="number"
-              step="1"
-              {...register("price", { 
-                required: "El precio es requerido",
-                min: { value: 0, message: "El precio debe ser mayor a 0" }
-              })}
-            />
-            {errors.price && (
-              <span className="text-sm text-red-500">{errors.price.message}</span>
-            )}
-          </div>
+
+
 
           <div className="space-y-2">
             <Label htmlFor="coverage_details">Detalles de Cobertura</Label>
