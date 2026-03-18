@@ -519,7 +519,7 @@ export const useSubmitSignatureLink = () => {
             // Fetch contratada signer info from company_settings
             if ((saleInfo as any)?.company_id) {
               const { data: cs } = await signatureClient
-                .from('company_settings')
+                .from('company_settings_public')
                 .select('contratada_signer_name, contratada_signer_dni, contratada_signer_email, contratada_signature_mode')
                 .eq('company_id', (saleInfo as any).company_id)
                 .single();
