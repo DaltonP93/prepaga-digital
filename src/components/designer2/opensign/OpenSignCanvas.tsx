@@ -316,7 +316,6 @@ export const OpenSignCanvas: React.FC<OpenSignCanvasProps> = ({
             const positionedBlocks = pageBlocks.filter((b) => POSITIONED_TYPES.has(b.block_type));
 
             return (
-              {/* Outer wrapper: unscaled, carries data-a4-page for coordinate detection */}
               <div
                 key={pageNum}
                 ref={(el) => { if (el) pageRefs.current.set(pageNum, el); else pageRefs.current.delete(pageNum); }}
