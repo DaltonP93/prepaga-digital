@@ -488,7 +488,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
                 <X className="w-4 h-4" />
               </Button>
             </div>
-            <ImageManager onImageSelect={addImage} />
+            <ImageManager onImageSelect={(url, sp) => addImage(url, sp)} />
           </div>
         </div>
       )}
