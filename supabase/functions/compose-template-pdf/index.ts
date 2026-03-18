@@ -275,7 +275,7 @@ Deno.serve(async (req) => {
         "Content-Disposition": `attachment; filename="composed-template-${template_id}.pdf"`,
       },
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error("compose-template-pdf error:", err);
     return new Response(
       JSON.stringify({ error: err.message || "Internal error" }),
