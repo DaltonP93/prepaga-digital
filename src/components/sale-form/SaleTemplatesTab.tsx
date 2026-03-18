@@ -703,9 +703,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       }
 
       // DDJJ per adherente
-      const ddjiTpls = (templateContents || []).filter(t =>
-        t.name.toLowerCase().includes('ddjj') || t.name.toLowerCase().includes('declaración')
-      );
+      const ddjiTpls = (templateContents || []).filter(isDDJJTemplate);
       if (effectiveBeneficiaries.length > 0 && ddjiTpls.length > 0) {
         for (const b of effectiveBeneficiaries) {
           if (b.signature_required !== false && !b.is_primary) {
