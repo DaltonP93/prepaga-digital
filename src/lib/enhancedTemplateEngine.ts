@@ -329,13 +329,18 @@ export function createEnhancedTemplateContext(
       colorPrimario: company?.primary_color || '#3B82F6',
       colorSecundario: company?.secondary_color || '#1E40AF',
     },
+    // Compute effective total from beneficiary amounts (source of truth)
+    const effectiveTotal = sortedBeneficiaryContexts.length > 0
+      ? sortedBeneficiaryContexts.reduce((sum, b) => sum + (b.monto || 0), 0)
+      : (sale?.total_amount || 0);
+
     venta: {
       id: sale?.id || '',
       fecha: sale?.sale_date || formatDate(now, 'yyyy-MM-dd'),
       fechaFormateada: formatDate(sale?.sale_date || now, "d 'de' MMMM 'de' yyyy"),
-      total: sale?.total_amount || 0,
-      totalFormateado: formatCurrency(sale?.total_amount || 0),
-      totalLetras: numberToWordsES(sale?.total_amount || 0) + ' GUARANÍES',
+      total: effectiveTotal,
+      totalFormateado: formatCurrency(effectiveTotal),
+      totalLetras: numberToWordsES(effectiveTotal) + ' GUARANÍES',
       vendedor: sale?.salesperson ? `${sale.salesperson.first_name || ''} ${sale.salesperson.last_name || ''}`.trim() : '',
       vendedorEmail: sale?.salesperson?.email || '',
       notas: sale?.notes || '',
