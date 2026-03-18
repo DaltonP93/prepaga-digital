@@ -173,6 +173,14 @@ export const ResizableImageExtension = Node.create({
       height: { default: "auto" },
       float: { default: "none" },
       display: { default: "block" },
+      "data-storage-path": {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.getAttribute("data-storage-path"),
+        renderHTML: (attributes: any) => {
+          if (!attributes["data-storage-path"]) return {};
+          return { "data-storage-path": attributes["data-storage-path"] };
+        },
+      },
     };
   },
 

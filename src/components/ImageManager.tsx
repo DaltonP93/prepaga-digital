@@ -14,7 +14,7 @@ import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 interface ImageManagerProps {
-  onImageSelect: (url: string) => void;
+  onImageSelect: (url: string, storagePath?: string) => void;
 }
 
 interface UploadedImage {
@@ -154,7 +154,9 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
 
   const handleImageClick = (img: UploadedImage) => {
     const url = getImageUrl(img);
-    onImageSelect(url);
+    // file_url is the storage path (e.g. companyId/template-images/...)
+    const storagePath = img.file_url && !img.file_url.startsWith('http') ? img.file_url : undefined;
+    onImageSelect(url, storagePath);
   };
 
   return (

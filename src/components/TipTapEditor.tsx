@@ -30,6 +30,7 @@ import { useToast } from '@/hooks/use-toast';
 import { SignatureFieldExtension, SignatureInsertDialog } from './editor/SignatureFieldExtension';
 import { DynamicPlaceholderExtension } from './editor/DynamicPlaceholderExtension';
 import { TemplateAnnexesManager } from './templates/TemplateAnnexesManager';
+import { resolveStorageImages } from '@/lib/resolveStorageImages';
 
 export interface TipTapEditorProps {
   initialContent?: string;
@@ -130,9 +131,21 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
     },
   });
 
+  // Resolve expired storage image URLs when editor is ready
   useEffect(() => {
     if (!editor) return;
+    const html = editor.getHTML();
+    if (!html || !html.includes('<img')) return;
 
+    resolveStorageImages(html).then((resolved) => {
+      if (resolved !== html) {
+        editor.commands.setContent(resolved, false);
+      }
+    });
+  }, [editor]);
+
+  useEffect(() => {
+    if (!editor) return;
     editor.commands.extendMarkRange('link');
   }, [editor]);
 
@@ -258,10 +271,14 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
     editor.chain().focus().insertContent(text).run();
   }, [editor]);
 
-  const addImage = useCallback((url: string = '') => {
+  const addImage = useCallback((url: string = '', storagePath?: string) => {
     if (!editor) return;
 
-    (editor.chain().focus() as any).setImage({ src: url }).run();
+    const attrs: any = { src: url };
+    if (storagePath) {
+      attrs["data-storage-path"] = storagePath;
+    }
+    (editor.chain().focus() as any).setImage(attrs).run();
     setShowImageManager(false);
   }, [editor, setShowImageManager]);
 
@@ -471,7 +488,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
                 <X className="w-4 h-4" />
               </Button>
             </div>
-            <ImageManager onImageSelect={addImage} />
+            <ImageManager onImageSelect={(url, sp) => addImage(url, sp)} />
           </div>
         </div>
       )}

@@ -25,6 +25,7 @@ import {
   interpolateEnhancedTemplate,
   generateBeneficiariesTable,
 } from "@/lib/enhancedTemplateEngine";
+import { resolveStorageImages } from "@/lib/resolveStorageImages";
 
 interface TemplateAttachment {
   id: string;
@@ -144,6 +145,7 @@ export const LiveTemplatePreview: React.FC<LiveTemplatePreviewProps> = ({
   const [annexes, setAnnexes] = useState<TemplateAttachment[]>([]);
   const [annexesLoading, setAnnexesLoading] = useState(false);
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+  const [resolvedHtml, setResolvedHtml] = useState<string>("");
 
   // Fetch annexes for this template
   useEffect(() => {
@@ -219,6 +221,19 @@ export const LiveTemplatePreview: React.FC<LiveTemplatePreviewProps> = ({
 
     return { processedContent: processed, context: ctx };
   }, [content, sampleData]);
+
+  // Resolve storage image URLs in processedContent
+  useEffect(() => {
+    if (!processedContent) {
+      setResolvedHtml("");
+      return;
+    }
+    let cancelled = false;
+    resolveStorageImages(processedContent).then((html) => {
+      if (!cancelled) setResolvedHtml(html);
+    });
+    return () => { cancelled = true; };
+  }, [processedContent]);
 
   const viewportClasses = {
     desktop: 'w-full',
@@ -299,11 +314,13 @@ export const LiveTemplatePreview: React.FC<LiveTemplatePreviewProps> = ({
           <TabsContent value="preview">
             <ScrollArea className="h-[500px] border rounded-lg">
               <div className={`p-6 ${viewportClasses[viewMode]}`}>
-                {processedContent ? (
+                {(resolvedHtml || processedContent) ? (
                   <div 
                     className="prose prose-sm max-w-none"
                     dangerouslySetInnerHTML={{ 
-                      __html: DOMPurify.sanitize(processedContent) 
+                      __html: DOMPurify.sanitize(resolvedHtml || processedContent, {
+                        ADD_ATTR: ['data-storage-path'],
+                      })
                     }}
                   />
                 ) : annexes.length > 0 ? (
