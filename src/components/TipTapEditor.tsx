@@ -30,6 +30,7 @@ import { useToast } from '@/hooks/use-toast';
 import { SignatureFieldExtension, SignatureInsertDialog } from './editor/SignatureFieldExtension';
 import { DynamicPlaceholderExtension } from './editor/DynamicPlaceholderExtension';
 import { TemplateAnnexesManager } from './templates/TemplateAnnexesManager';
+import { resolveStorageImages } from '@/lib/resolveStorageImages';
 
 export interface TipTapEditorProps {
   initialContent?: string;
