@@ -7,8 +7,6 @@ interface UseWidgetDragOptions {
   templateId: string;
   currentPage: number;
   activeRole: SignerRole;
-  /** CSS selector or ref to the A4 page element inside the canvas */
-  pageSelector: string;
   zoom: number;
   onCreateField: (params: {
     template_id: string;
@@ -34,39 +32,25 @@ const ROLE_BORDER: Record<SignerRole, string> = {
 
 /**
  * Consolidates drag-and-drop logic for placing widgets on the canvas.
- * Equivalent to OpenSign's useWidgetDrag.js but adapted for @dnd-kit
- * and our normalized 0..1 coordinate system.
+ * Uses querySelectorAll('[data-a4-page="true"]') to detect which page
+ * receives the drop, supporting multi-page scroll layouts.
  */
 export function useWidgetDrag({
   templateId,
   currentPage,
   activeRole,
-  pageSelector,
   zoom,
   onCreateField,
 }: UseWidgetDragOptions) {
   const activeDragDataRef = useRef<WidgetDragData | null>(null);
 
   /**
-   * Given a pointer event from the drag end, compute normalized 0..1
-   * coordinates relative to the A4 page element, accounting for zoom/scale.
+   * Given a pointer event from the drag end, find which A4 page the pointer
+   * is over and compute normalized 0..1 coordinates relative to that page.
+   * Returns { x, y, page } or null if not over any page.
    */
   const getDropCoordinates = useCallback(
-    (event: DragEndEvent): { x: number; y: number } | null => {
-      // Try to get pointer position from the activatorEvent (the original mouse/touch event)
-      // or from delta + initial position
-      const pageEl = document.querySelector(pageSelector) as HTMLElement | null;
-      if (!pageEl) return null;
-
-      const pageRect = pageEl.getBoundingClientRect();
-      const scale = zoom / 100;
-
-      // The actual rendered size of the A4 page (after CSS transform: scale)
-      // getBoundingClientRect already reflects the transform, so pageRect
-      // already contains scaled dimensions.
-
-      // Get pointer coordinates: DragEndEvent has `activatorEvent` (the original
-      // mousedown) plus `delta` (cumulative movement during drag).
+    (event: DragEndEvent): { x: number; y: number; page: number } | null => {
       const activatorEvent = event.activatorEvent as MouseEvent | TouchEvent | null;
       if (!activatorEvent) return null;
 
@@ -85,22 +69,35 @@ export function useWidgetDrag({
       const pointerX = startX + delta.x;
       const pointerY = startY + delta.y;
 
-      // Convert pointer to position within the A4 page.
-      // pageRect is already in scaled screen space, so just use it directly.
-      const relX = (pointerX - pageRect.left) / pageRect.width;
-      const relY = (pointerY - pageRect.top) / pageRect.height;
+      // Iterate all A4 page elements to find the one under the pointer
+      const pages = document.querySelectorAll<HTMLElement>('[data-a4-page="true"]');
+      for (const pageEl of pages) {
+        const rect = pageEl.getBoundingClientRect();
 
-      // Only valid if within the page bounds (with some tolerance)
-      if (relX < -0.05 || relX > 1.05 || relY < -0.05 || relY > 1.05) {
-        return null;
+        // Check if pointer is within this page (with small tolerance)
+        const tolerance = 10;
+        if (
+          pointerX >= rect.left - tolerance &&
+          pointerX <= rect.right + tolerance &&
+          pointerY >= rect.top - tolerance &&
+          pointerY <= rect.bottom + tolerance
+        ) {
+          const relX = (pointerX - rect.left) / rect.width;
+          const relY = (pointerY - rect.top) / rect.height;
+
+          const pageNum = Number(pageEl.getAttribute("data-page-num")) || currentPage;
+
+          return {
+            x: clamp(relX, 0, 1),
+            y: clamp(relY, 0, 1),
+            page: pageNum,
+          };
+        }
       }
 
-      return {
-        x: clamp(relX, 0, 1),
-        y: clamp(relY, 0, 1),
-      };
+      return null;
     },
-    [pageSelector, zoom]
+    [currentPage]
   );
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -122,16 +119,17 @@ export function useWidgetDrag({
       const fieldType = activeData.fieldType;
       const defaults = FIELD_DEFAULT_SIZE[fieldType] || { w: 0.18, h: 0.04 };
 
-      // Calculate real drop position
+      // Calculate real drop position and detect target page
       const dropPos = getDropCoordinates(event);
 
       let fx: number, fy: number;
+      let targetPage = currentPage;
+
       if (dropPos) {
-        // Center the widget on the drop point
         fx = clamp(dropPos.x - defaults.w / 2, 0, 1 - defaults.w);
         fy = clamp(dropPos.y - defaults.h / 2, 0, 1 - defaults.h);
+        targetPage = dropPos.page;
       } else {
-        // Fallback: center of canvas
         fx = clamp(0.5 - defaults.w / 2, 0, 1 - defaults.w);
         fy = clamp(0.5 - defaults.h / 2, 0, 1 - defaults.h);
       }
@@ -141,7 +139,7 @@ export function useWidgetDrag({
         block_id: null,
         signer_role: activeRole,
         field_type: fieldType,
-        page: currentPage,
+        page: targetPage,
         x: fx,
         y: fy,
         w: defaults.w,

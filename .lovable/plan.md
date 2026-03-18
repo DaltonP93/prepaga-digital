@@ -1,39 +1,104 @@
 
 
-# Plan: Fix campos V2 + Build errors
+## Plan: Fase 5 — PAdES con document_type exactos y doble safeguard
 
-## Cambios
+### Archivo único
+`src/hooks/useSignatureLinkPublic.ts` — líneas 598-682
 
-### 1. Fix `useWidgetDrag` — buscar páginas por `data-a4-page` en vez de `pageSelector`
+### Cambio
+Reemplazar el bloque PAdES actual por la versión con valores exactos de `document_type` (`contrato`, `ddjj_salud`, `anexo`) en lugar de comparaciones genéricas con `.toLowerCase()`. Agrega doble safeguard para contratada pendiente.
 
-El hook actual usa `document.querySelector(pageSelector)` que solo encuentra UNA página. Reemplazar `getDropCoordinates` para iterar sobre TODAS las páginas con `querySelectorAll('[data-a4-page="true"]')`, detectar cuál recibe el drop, y calcular coordenadas relativas. Eliminar la prop `pageSelector` ya que no se necesita.
+### Diferencias clave vs. código actual (Fase 4)
 
-**Archivo:** `src/hooks/useWidgetDrag.ts`
+1. **document_type exacto**: usa `dt === 'contrato'` directo (sin `.toLowerCase()` ni check de `'contract'`)
+2. **ddjj_salud explícito**: filtra por `dt === 'ddjj_salud'` en vez de "todo lo que no sea contrato"
+3. **Anexos excluidos**: `dt === 'anexo'` retorna `false` explícitamente
+4. **Doble safeguard**: `safeDocsToSign` filtra contrato si `hasPendingContratada` como segunda capa
+5. **Error handling mejorado**: `pendingErr` se maneja separadamente del catch
 
-### 2. Fix `OpenSignCanvas` — wrapper sin transform para coordenadas correctas
+### Código resultante (reemplaza líneas 598-682)
 
-`getBoundingClientRect()` en un elemento con `transform: scale()` devuelve el tamaño escalado, pero las coordenadas internas del canvas son a 794×1123. Separar en dos divs:
-- Wrapper externo: `data-a4-page`, `data-page-num`, tamaño visual escalado, sin transform
-- Div interno: tamaño A4 real, `transform: scale()`, contiene bloques y background
-- `CanvasFieldOverlay` se mueve al wrapper externo (fuera del scale)
+```typescript
+// Post-signature: generate base PDF + PAdES only when it corresponds to this signer + step
+try {
+  const supabaseUrl = SUPABASE_URL;
+  const anonKey = SUPABASE_PUBLISHABLE_KEY;
 
-**Archivo:** `src/components/designer2/opensign/OpenSignCanvas.tsx`
+  const { data: docs, error: docsErr } = await signatureClient
+    .from('documents')
+    .select('id, document_type, beneficiary_id, is_final, signed_pdf_url')
+    .eq('sale_id', data.sale_id)
+    .eq('is_final', true)
+    .neq('document_type', 'firma');
 
-### 3. Fix `CanvasFieldOverlay` coordenadas
+  if (docsErr) {
+    console.warn('Could not fetch final documents:', docsErr);
+  } else if (docs && docs.length > 0) {
+    const recipientType = data.recipient_type;
 
-Ya está correcto porque usa `overlayRef.current.getBoundingClientRect()` — al moverlo fuera del div escalado, las coordenadas de click serán correctas automáticamente.
+    let hasPendingContratada = false;
+    try {
+      const { data: pendingCL, error: pendingErr } = await signatureClient
+        .from('signature_links').select('id')
+        .eq('sale_id', data.sale_id)
+        .eq('recipient_type', 'contratada')
+        .eq('status', 'pendiente');
+      if (pendingErr) {
+        console.warn('Could not check pending contratada links:', pendingErr);
+        hasPendingContratada = true;
+      } else {
+        hasPendingContratada = !!(pendingCL && pendingCL.length > 0);
+      }
+    } catch (e) {
+      console.warn('Could not check pending contratada links (exception):', e);
+      hasPendingContratada = true;
+    }
 
-### 4. Build errors en Edge Functions
+    const docsToSign = docs.filter((d: any) => {
+      if (d.signed_pdf_url) return false;
+      const dt = d.document_type;
 
-- `compose-template-pdf`: cast `pdfBytes` a `Uint8Array` → usar `new Blob([pdfBytes])` y type `err` as `any`
-- `publish-template-version`: type `err` as `any`
-- `upload-template-asset`: type `err` as `any`
+      if (dt === 'contrato') {
+        return recipientType === 'contratada';
+      }
+      if (dt === 'ddjj_salud') {
+        if (recipientType === 'titular') return d.beneficiary_id == null;
+        if (recipientType === 'adherente') return d.beneficiary_id != null && d.beneficiary_id === data.recipient_id;
+        return false;
+      }
+      if (dt === 'anexo') return false;
+      return false;
+    });
 
-**Archivos:** 3 edge functions
+    const safeDocsToSign = docsToSign.filter((d: any) => {
+      if (d.document_type === 'contrato' && hasPendingContratada) return false;
+      return true;
+    });
 
-### 5. Actualizar `OpenSignTemplateEditor` — quitar `pageSelector`
+    for (const doc of safeDocsToSign) {
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/generate-base-pdf`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
+          body: JSON.stringify({ document_id: doc.id }),
+        });
+        await fetch(`${supabaseUrl}/functions/v1/pades-sign-document`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
+          body: JSON.stringify({ document_id: doc.id }),
+        });
+      } catch (pdfErr) {
+        console.warn(`PDF generation/signing failed for doc ${doc.id}:`, pdfErr);
+      }
+    }
+  }
+} catch (pdfGenErr) {
+  console.warn('Post-signature PDF generation error:', pdfGenErr);
+}
+```
 
-Eliminar la prop `pageSelector` del llamado a `useWidgetDrag`.
-
-**Archivo:** `src/components/designer2/opensign/OpenSignTemplateEditor.tsx`
+### Impacto
+- 1 archivo, 1 bloque (~85 líneas reemplaza ~85 líneas)
+- No afecta bloque de activación contratada (Fase 3)
+- No requiere migraciones
 

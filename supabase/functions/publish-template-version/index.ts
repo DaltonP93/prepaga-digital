@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (err) {
+  } catch (err: any) {
     console.error("publish-template-version error:", err);
     return new Response(
       JSON.stringify({ error: err.message || "Internal error" }),

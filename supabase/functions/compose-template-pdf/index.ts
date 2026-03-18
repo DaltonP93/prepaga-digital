@@ -268,14 +268,14 @@ Deno.serve(async (req) => {
     }
 
     // Return PDF directly if no sale_id
-    return new Response(pdfBytes, {
+    return new Response(new Uint8Array(pdfBytes), {
       headers: {
         ...corsHeaders,
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="composed-template-${template_id}.pdf"`,
       },
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error("compose-template-pdf error:", err);
     return new Response(
       JSON.stringify({ error: err.message || "Internal error" }),
