@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { useCreateUser, useUpdateUser, useResetUserPassword, UserWithRole } from "@/hooks/useUsers";
 import { useCompanies } from "@/hooks/useCompanies";
 import { PermissionManager } from "./PermissionManager";
@@ -28,6 +30,7 @@ interface UserFormData {
   phone?: string;
   role: 'super_admin' | 'admin' | 'supervisor' | 'auditor' | 'gestor' | 'vendedor' | 'financiero';
   company_id: string;
+  is_active: boolean;
 }
 
 const getUserRole = (user: UserWithRole | null | undefined): UserFormData['role'] => {
@@ -56,6 +59,7 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
       phone: user?.phone || "",
       role: getUserRole(user),
       company_id: user?.company_id || "",
+      is_active: user?.is_active ?? true,
     }
   });
 
@@ -68,6 +72,7 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
         phone: user.phone || "",
         role: getUserRole(user),
         company_id: user.company_id || "",
+        is_active: user.is_active ?? true,
       });
     }
   }, [user, reset]);
@@ -102,6 +107,7 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
           last_name: data.last_name,
           phone: data.phone,
           company_id: data.company_id,
+          is_active: data.is_active,
           role: data.role,
         });
         toast.success('Usuario actualizado exitosamente');
@@ -242,6 +248,21 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
                   </SelectContent>
                 </Select>
               </div>
+
+              {isEditing && (
+                <div className="flex items-center justify-between border-t pt-4">
+                  <div className="flex items-center gap-2">
+                    <Label>Estado del usuario</Label>
+                    <Badge variant={watch("is_active") ? "default" : "secondary"}>
+                      {watch("is_active") ? "Activo" : "Inactivo"}
+                    </Badge>
+                  </div>
+                  <Switch
+                    checked={watch("is_active")}
+                    onCheckedChange={(val) => setValue("is_active", val)}
+                  />
+                </div>
+              )}
 
               {isEditing && user && (
                 <div className="space-y-2 border-t pt-4">
