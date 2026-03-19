@@ -209,7 +209,7 @@ Deno.serve(async (req) => {
 
     const signatureToken = req.headers.get('x-signature-token');
     const body = await req.json();
-    const { action, otp_code, signature_link_id, sale_id, recipient_email, recipient_phone, channel: requestedChannel } = body;
+    const { action, otp_code, signature_link_id, sale_id, channel: requestedChannel } = body;
 
     const ip = req.headers.get('x-forwarded-for') || req.headers.get('cf-connecting-ip') || 'unknown';
     const userAgent = req.headers.get('user-agent') || 'unknown';
@@ -221,6 +221,37 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+
+      // Rate limit: max 10 OTP sends per 15 minutes per IP
+      const clientIp = getClientIdentifier(req);
+      const rateCheck = checkRateLimit(`otp:${clientIp}`, { windowMs: 15 * 60 * 1000, maxRequests: 10 });
+      if (!rateCheck.allowed) return rateLimitResponse(corsHeaders, rateCheck.retryAfterMs);
+
+      // Validate signature_link_id and get stored recipient from DB (never trust request body)
+      const { data: linkData, error: linkError } = await supabase
+        .from('signature_links')
+        .select('recipient_email, recipient_phone, sale_id')
+        .eq('id', signature_link_id)
+        .single();
+
+      if (linkError || !linkData) {
+        return new Response(JSON.stringify({ error: 'Invalid signature link' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Verify sale_id matches the link's sale to prevent cross-link abuse
+      if (linkData.sale_id !== sale_id) {
+        return new Response(JSON.stringify({ error: 'Sale ID mismatch' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Use only DB-stored recipients, never from request body
+      const recipient_email = linkData.recipient_email;
+      const recipient_phone = linkData.recipient_phone;
 
       // Get company ID from sale
       const { data: saleData } = await supabase
