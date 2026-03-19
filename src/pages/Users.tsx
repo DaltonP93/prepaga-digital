@@ -55,6 +55,10 @@ const Users = () => {
   };
 
   const handleToggleUserStatus = async (user: UserWithRole) => {
+    const action = user.is_active ? 'desactivar' : 'activar';
+    if (!window.confirm(`¿Estás seguro de que deseas ${action} al usuario ${user.first_name} ${user.last_name}?`)) {
+      return;
+    }
     await updateUser.mutateAsync({
       id: user.id,
       is_active: !user.is_active,

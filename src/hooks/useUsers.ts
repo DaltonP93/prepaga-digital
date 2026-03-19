@@ -134,9 +134,13 @@ export const useUpdateUser = () => {
 
   return useMutation({
     mutationFn: async ({ id, role, ...profileUpdates }: ProfileUpdate & { id: string; role?: string }) => {
-      const { data: actorData } = await supabase.auth.getUser();
-      const actorId = actorData.user?.id;
-      if (!actorId) throw new Error('Sesión inválida. Inicia sesión nuevamente.');
+      const { data: userData } = await supabase.auth.getUser();
+      let actorId = userData.user?.id;
+      if (!actorId) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        actorId = sessionData.session?.user?.id;
+      }
+      if (!actorId) throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
 
       const [actorSuperAdminRes, actorAdminRes, targetRolesRes] = await Promise.all([
         supabase.rpc('has_role', { _user_id: actorId, _role: 'super_admin' }),
