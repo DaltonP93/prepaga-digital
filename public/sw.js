@@ -9,15 +9,6 @@ const urlsToCache = [
   '/',
   '/manifest.json',
   '/offline.html',
-  '/src/main.tsx',
-  '/src/App.tsx',
-  '/src/index.css',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png',
-  '/sounds/notification.mp3',
-  '/sounds/success.mp3',
-  '/sounds/info.mp3',
-  '/sounds/error.mp3'
 ];
 
 // Instalación del Service Worker con limpieza automática
@@ -26,10 +17,12 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('Cache abierto:', CACHE_NAME);
-        return cache.addAll(urlsToCache);
+        // Use addAll only for guaranteed-available resources
+        return Promise.allSettled(
+          urlsToCache.map(url => cache.add(url).catch(err => console.warn('Cache skip:', url, err)))
+        );
       })
       .then(() => {
-        // Forzar activación inmediata
         return self.skipWaiting();
       })
   );

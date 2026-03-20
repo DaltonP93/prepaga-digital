@@ -80,8 +80,28 @@ export const usePushNotifications = () => {
         return;
       }
 
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await (registration as any).pushManager.subscribe({
+      // Ensure service worker is registered
+      let registration: ServiceWorkerRegistration;
+      try {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        if (registrations.length === 0) {
+          registration = await navigator.serviceWorker.register('/sw.js');
+          // Wait for the SW to be ready
+          await navigator.serviceWorker.ready;
+        } else {
+          registration = await navigator.serviceWorker.ready;
+        }
+      } catch (swError) {
+        console.error('Service Worker registration failed:', swError);
+        toast({
+          title: "Error",
+          description: "No se pudo registrar el Service Worker. Intenta recargar la página.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const pushSubscription = await (registration as any).pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(
           'BEl62iUYgUivxIkv69yViEuiBIa40HI80NkhVCXoNWQRGBx3mLDqjSjrn8BXGMVfWLksNGh0bJ4lWGbwvbIFYmM'
@@ -89,17 +109,15 @@ export const usePushNotifications = () => {
       });
 
       const subscriptionData = {
-        endpoint: subscription.endpoint,
+        endpoint: pushSubscription.endpoint,
         keys: {
-          p256dh: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('p256dh')!))),
-          auth: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('auth')!)))
+          p256dh: btoa(String.fromCharCode(...new Uint8Array(pushSubscription.getKey('p256dh')!))),
+          auth: btoa(String.fromCharCode(...new Uint8Array(pushSubscription.getKey('auth')!)))
         }
       };
 
       setIsSubscribed(true);
       setSubscription(subscriptionData);
-
-      // Guardar suscripción en localStorage
       localStorage.setItem('pushSubscription', JSON.stringify(subscriptionData));
 
       toast({
@@ -111,7 +129,7 @@ export const usePushNotifications = () => {
       console.error('Error subscribing to push notifications:', error);
       toast({
         title: "Error",
-        description: "No se pudieron activar las notificaciones",
+        description: "No se pudieron activar las notificaciones. Verifica que tu navegador las soporte.",
         variant: "destructive"
       });
     } finally {
