@@ -9,15 +9,6 @@ const urlsToCache = [
   '/',
   '/manifest.json',
   '/offline.html',
-  '/src/main.tsx',
-  '/src/App.tsx',
-  '/src/index.css',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png',
-  '/sounds/notification.mp3',
-  '/sounds/success.mp3',
-  '/sounds/info.mp3',
-  '/sounds/error.mp3'
 ];
 
 // Instalación del Service Worker con limpieza automática
