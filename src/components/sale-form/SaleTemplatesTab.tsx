@@ -341,17 +341,41 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           const isAnexoPlan = isAnexoPlanName(template.name);
           const isAnexo = isAnexoPlan || (!isDDJJ && !isContrato);
 
-          // Skip annexo templates without designer content that have file attachments
-          if (isAnexo && !hasDesignerContent && templatesWithAttachments.has(template.id)) {
-            console.log(`[DocGen] Skipped "${template.name}" (anexo with attachments, no designer content)`);
+          // For annexes with PDF attachments, link to the original PDF file
+          // instead of embedding thumbnail images in HTML content
+          const pdfAttachment = isAnexo ? templatePdfAttachmentMap.get(template.id) : null;
+          if (isAnexo && pdfAttachment) {
+            // Store the original PDF file URL directly — the preview will render via iframe
+            const { error: insertError } = await supabase.from('documents').insert({
+              sale_id: saleId,
+              name: template.name,
+              document_type: 'anexo',
+              content: null,
+              file_url: pdfAttachment.file_url,
+              status: 'pendiente' as any,
+              requires_signature: false,
+              is_final: true,
+              generated_from_template: true,
+              beneficiary_id: null,
+            });
+            if (insertError) {
+              console.error(`[DocGen] Error inserting anexo "${template.name}":`, insertError);
+              toast.error(`Error al generar documento: ${template.name}`);
+            } else {
+              console.log(`[DocGen] ✓ Generated anexo "${template.name}" (linked to PDF attachment)`);
+            }
+            continue;
+          }
+
+          // Skip annexo templates without designer content and no attachments
+          if (isAnexo && !hasDesignerContent) {
+            console.log(`[DocGen] Skipped "${template.name}" (anexo without content or attachments)`);
             continue;
           }
 
           // Skip interpolation for anexo templates (they contain static content like embedded images)
           let normalizedContent: string;
-          if (!hasDesignerContent && isAnexo) {
-            normalizedContent = `<p>Documento de anexo cargado sin estructura de diseñador. Procesado como template interno.</p>`;
-          } else if (isAnexo && hasDesignerContent) {
+          if (isAnexo && hasDesignerContent) {
             normalizedContent = template.content || '';
             console.log(`[DocGen] Skipped interpolation for anexo "${template.name}" (${(normalizedContent.length / 1024).toFixed(0)} KB)`);
           } else {
