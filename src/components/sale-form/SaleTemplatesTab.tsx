@@ -314,7 +314,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       const templatesWithAttachments = new Set((allAttachments || []).map((a: any) => a.template_id));
       // Build a map of template_id -> first PDF attachment for direct file linking
       const templatePdfAttachmentMap = new Map<string, any>();
-      for (const att of (allAttachments || [])) {
+      for (const att of (allAttachments as any[] || [])) {
         const isPDF = att.file_type === 'application/pdf' || att.file_name?.endsWith('.pdf');
         if (isPDF && !templatePdfAttachmentMap.has(att.template_id)) {
           templatePdfAttachmentMap.set(att.template_id, att);
