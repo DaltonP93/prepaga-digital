@@ -3681,32 +3681,20 @@ export type Database = {
         Row: {
           company_id: string | null
           contratada_signature_mode: string | null
-          contratada_signer_dni: string | null
-          contratada_signer_email: string | null
           contratada_signer_name: string | null
-          email_provider: string | null
           signature_block_style: Json | null
-          whatsapp_provider: string | null
         }
         Insert: {
           company_id?: string | null
           contratada_signature_mode?: string | null
-          contratada_signer_dni?: string | null
-          contratada_signer_email?: string | null
           contratada_signer_name?: string | null
-          email_provider?: string | null
           signature_block_style?: Json | null
-          whatsapp_provider?: string | null
         }
         Update: {
           company_id?: string | null
           contratada_signature_mode?: string | null
-          contratada_signer_dni?: string | null
-          contratada_signer_email?: string | null
           contratada_signer_name?: string | null
-          email_provider?: string | null
           signature_block_style?: Json | null
-          whatsapp_provider?: string | null
         }
         Relationships: [
           {
@@ -3723,6 +3711,18 @@ export type Database = {
       check_all_signatures_completed: {
         Args: { p_sale_id: string }
         Returns: boolean
+      }
+      get_otp_policy_for_signature: {
+        Args: { p_company_id: string }
+        Returns: {
+          allowed_channels: Json
+          default_channel: string
+          max_attempts: number
+          otp_expiration_seconds: number
+          otp_length: number
+          require_otp_for_signature: boolean
+          whatsapp_otp_enabled: boolean
+        }[]
       }
       get_sale_id_from_signature_token: { Args: never; Returns: string }
       get_signature_link_id_from_token: { Args: never; Returns: string }
