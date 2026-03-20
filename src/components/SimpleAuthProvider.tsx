@@ -135,8 +135,16 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
     );
 
-    // 2. INITIAL load (controls loading state)
+    // 2. INITIAL load (controls loading state) with safety timeout
     const initializeAuth = async () => {
+      // Safety timeout: if auth takes too long, unblock the UI
+      const safetyTimeout = setTimeout(() => {
+        if (isMounted && loading) {
+          console.warn('⚠️ Auth init timeout — unblocking UI');
+          setLoading(false);
+        }
+      }, 5000);
+
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!isMounted) return;
@@ -151,6 +159,7 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       } catch (error) {
         console.error('❌ Auth init error:', error);
       } finally {
+        clearTimeout(safetyTimeout);
         if (isMounted) setLoading(false);
       }
     };
