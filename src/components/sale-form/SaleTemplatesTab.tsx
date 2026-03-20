@@ -212,6 +212,21 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       const plan = sale?.plans as any;
       const company = sale?.companies as any;
 
+      // Resolve company logo URL if it's an expired Supabase storage URL
+      if (company?.logo_url && company.logo_url.includes('.supabase.co/storage/v1/')) {
+        const pathMatch = company.logo_url.match(/\/storage\/v1\/object\/(?:sign|public)\/([^/]+)\/([^?]+)/);
+        if (pathMatch) {
+          const logoBucket = pathMatch[1];
+          const logoPath = decodeURIComponent(pathMatch[2]);
+          const { data: logoData } = await supabase.storage
+            .from(logoBucket)
+            .createSignedUrl(logoPath, 3600);
+          if (logoData?.signedUrl) {
+            company.logo_url = logoData.signedUrl;
+          }
+        }
+      }
+
       // Fetch template contents for all associated templates
       const templateIds = saleTemplates.map((st: any) => st.templates?.id || st.template_id).filter(Boolean);
 
