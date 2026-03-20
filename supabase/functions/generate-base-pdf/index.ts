@@ -327,7 +327,6 @@ Deno.serve(async (req) => {
     const hash = await sha256Hex(pdfBytes);
 
     // 6. Upload to Storage
-    const bucket = Deno.env.get("STORAGE_BUCKET") || "documents";
     const storagePath = `contracts/base/${doc.sale_id}/${doc.id}.pdf`;
 
     const { error: uploadErr } = await supabaseAdmin.storage
