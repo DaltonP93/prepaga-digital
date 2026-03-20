@@ -232,7 +232,7 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
               </div>
 
               <div className="space-y-2">
-                <Label>Empresa *</Label>
+                <Label>Empresa {watch("role") !== 'super_admin' ? '*' : '(opcional)'}</Label>
                 <Select value={watch("company_id")} onValueChange={(value) => setValue("company_id", value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar empresa" />
@@ -245,6 +245,11 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
                     ))}
                   </SelectContent>
                 </Select>
+                {watch("role") === 'super_admin' && (
+                  <p className="text-xs text-muted-foreground">
+                    El Super Admin tiene acceso a todas las empresas
+                  </p>
+                )}
               </div>
 
               {isEditing && (
