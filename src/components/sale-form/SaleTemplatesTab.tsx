@@ -212,6 +212,21 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       const plan = sale?.plans as any;
       const company = sale?.companies as any;
 
+      // Resolve company logo URL if it's an expired Supabase storage URL
+      if (company?.logo_url && company.logo_url.includes('.supabase.co/storage/v1/')) {
+        const pathMatch = company.logo_url.match(/\/storage\/v1\/object\/(?:sign|public)\/([^/]+)\/([^?]+)/);
+        if (pathMatch) {
+          const logoBucket = pathMatch[1];
+          const logoPath = decodeURIComponent(pathMatch[2]);
+          const { data: logoData } = await supabase.storage
+            .from(logoBucket)
+            .createSignedUrl(logoPath, 3600);
+          if (logoData?.signedUrl) {
+            company.logo_url = logoData.signedUrl;
+          }
+        }
+      }
+
       // Fetch template contents for all associated templates
       const templateIds = saleTemplates.map((st: any) => st.templates?.id || st.template_id).filter(Boolean);
 
@@ -308,9 +323,18 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       // Preload attachment info to detect annexo-only templates
       const { data: allAttachments } = await supabase
         .from('template_attachments' as any)
-        .select('template_id')
-        .in('template_id', templateIds);
+        .select('*')
+        .in('template_id', templateIds)
+        .order('sort_order', { ascending: true });
       const templatesWithAttachments = new Set((allAttachments || []).map((a: any) => a.template_id));
+      // Build a map of template_id -> first PDF attachment for direct file linking
+      const templatePdfAttachmentMap = new Map<string, any>();
+      for (const att of (allAttachments as any[] || [])) {
+        const isPDF = att.file_type === 'application/pdf' || att.file_name?.endsWith('.pdf');
+        if (isPDF && !templatePdfAttachmentMap.has(att.template_id)) {
+          templatePdfAttachmentMap.set(att.template_id, att);
+        }
+      }
 
       // Sort templates: DDJJ and Contrato first, Anexo last (large content processed last)
       const sortedTemplates = [...(templateContents || [])].sort((a, b) => {
@@ -332,17 +356,41 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           const isAnexoPlan = isAnexoPlanName(template.name);
           const isAnexo = isAnexoPlan || (!isDDJJ && !isContrato);
 
-          // Skip annexo templates without designer content that have file attachments
-          if (isAnexo && !hasDesignerContent && templatesWithAttachments.has(template.id)) {
-            console.log(`[DocGen] Skipped "${template.name}" (anexo with attachments, no designer content)`);
+          // For annexes with PDF attachments, link to the original PDF file
+          // instead of embedding thumbnail images in HTML content
+          const pdfAttachment = isAnexo ? templatePdfAttachmentMap.get(template.id) : null;
+          if (isAnexo && pdfAttachment) {
+            // Store the original PDF file URL directly — the preview will render via iframe
+            const { error: insertError } = await supabase.from('documents').insert({
+              sale_id: saleId,
+              name: template.name,
+              document_type: 'anexo',
+              content: null,
+              file_url: pdfAttachment.file_url,
+              status: 'pendiente' as any,
+              requires_signature: false,
+              is_final: true,
+              generated_from_template: true,
+              beneficiary_id: null,
+            });
+            if (insertError) {
+              console.error(`[DocGen] Error inserting anexo "${template.name}":`, insertError);
+              toast.error(`Error al generar documento: ${template.name}`);
+            } else {
+              console.log(`[DocGen] ✓ Generated anexo "${template.name}" (linked to PDF attachment)`);
+            }
+            continue;
+          }
+
+          // Skip annexo templates without designer content and no attachments
+          if (isAnexo && !hasDesignerContent) {
+            console.log(`[DocGen] Skipped "${template.name}" (anexo without content or attachments)`);
             continue;
           }
 
           // Skip interpolation for anexo templates (they contain static content like embedded images)
           let normalizedContent: string;
-          if (!hasDesignerContent && isAnexo) {
-            normalizedContent = `<p>Documento de anexo cargado sin estructura de diseñador. Procesado como template interno.</p>`;
-          } else if (isAnexo && hasDesignerContent) {
+          if (isAnexo && hasDesignerContent) {
             normalizedContent = template.content || '';
             console.log(`[DocGen] Skipped interpolation for anexo "${template.name}" (${(normalizedContent.length / 1024).toFixed(0)} KB)`);
           } else {
