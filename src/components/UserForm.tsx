@@ -110,7 +110,6 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
           is_active: data.is_active,
           role: data.role,
         });
-        toast.success('Usuario actualizado exitosamente');
       } else {
         if (!data.password) {
           toast.error('La contraseña es requerida');
@@ -120,7 +119,6 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
           ...data,
           password: data.password
         });
-        toast.success('Usuario creado exitosamente');
       }
       onOpenChange(false);
       reset();
