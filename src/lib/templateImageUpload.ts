@@ -7,8 +7,9 @@ export interface TemplateImageUploadResult {
 }
 
 /**
- * Upload an image to the private `documents` bucket using the correct
- * company-scoped path required by the storage RLS policy.
+ * Upload a template image to the PUBLIC `company-assets` bucket.
+ * This ensures <img> tags in template HTML are always accessible,
+ * including on the public signing page (/firmar/:token).
  *
  * Path pattern: {companyId}/template-images/{context}/{timestamp}-{fileName}
  */
@@ -43,21 +44,20 @@ export async function uploadTemplateImage(
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
   const storagePath = `${companyId}/template-images/${context}/${Date.now()}-${safeName}`;
 
-  // 5. Upload
+  // 5. Upload to company-assets (PUBLIC bucket — required for <img> tags to work
+  //    in template previews and the public signing page without auth headers)
   const { error: upErr } = await supabase.storage
-    .from("documents")
-    .upload(storagePath, file, { cacheControl: "3600", upsert: false });
+    .from("company-assets")
+    .upload(storagePath, file, { cacheControl: "31536000", upsert: false });
 
   if (upErr) throw new Error(`Error al subir archivo: ${upErr.message}`);
 
-  // 6. Signed URL
-  const { data: signedData, error: signErr } = await supabase.storage
-    .from("documents")
-    .createSignedUrl(storagePath, 3600);
+  // 6. Permanent public URL (no expiry)
+  const { data: publicData } = supabase.storage
+    .from("company-assets")
+    .getPublicUrl(storagePath);
 
-  if (signErr || !signedData?.signedUrl) {
-    throw new Error("Error al generar URL firmada");
-  }
+  const signedUrl = publicData.publicUrl;
 
   // 7. Track in file_uploads (best-effort)
   await supabase.from("file_uploads").insert({
@@ -71,5 +71,5 @@ export async function uploadTemplateImage(
     if (error) console.warn("file_uploads insert failed (non-critical):", error.message);
   });
 
-  return { storagePath, signedUrl: signedData.signedUrl, companyId };
+  return { storagePath, signedUrl, companyId };
 }

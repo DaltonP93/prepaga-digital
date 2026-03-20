@@ -8,7 +8,7 @@ import {
   ImageIcon, 
   Eye
 } from 'lucide-react';
-import { useFileUpload } from '@/hooks/useFileUpload';
+import { uploadTemplateImage } from '@/lib/templateImageUpload';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -29,7 +29,7 @@ interface UploadedImage {
 export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => {
   const [dragActive, setDragActive] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { uploadFile, uploadState } = useFileUpload();
+  const [uploadState, setUploadState] = useState<{ isUploading: boolean; progress: number; error: string | null }>({ isUploading: false, progress: 0, error: null });
   const [resolvedUrls, setResolvedUrls] = useState<Record<string, string>>({});
 
   // Fetch uploaded images
@@ -67,20 +67,18 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
           newUrls[img.id] = url;
           continue;
         }
-        // It's a storage path — resolve signed URL
-        try {
-          const { data, error } = await supabase.storage
-            .from('documents')
-            .createSignedUrl(url, 3600);
-          if (!error && data?.signedUrl) {
-            newUrls[img.id] = data.signedUrl;
-          }
-        } catch {
-          // Try other common bucket
+        // It's a storage path — try public company-assets first, then signed documents
+        const { data: pubData } = supabase.storage
+          .from('company-assets')
+          .getPublicUrl(url);
+        if (pubData?.publicUrl) {
+          // Verify it's accessible by checking it's a valid public URL
+          newUrls[img.id] = pubData.publicUrl;
+        } else {
           try {
             const { data, error } = await supabase.storage
-              .from('avatars')
-              .createSignedUrl(url, 3600);
+              .from('documents')
+              .createSignedUrl(url, 86400); // 24h for display only
             if (!error && data?.signedUrl) {
               newUrls[img.id] = data.signedUrl;
             }
@@ -127,13 +125,15 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
     }
 
     try {
-      const url = await uploadFile(file, 'documents', 'template-images');
-      if (url) {
-        await refetch();
-        toast.success('Imagen subida exitosamente');
-        onImageSelect(url);
-      }
-    } catch (error) {
+      setUploadState({ isUploading: true, progress: 30, error: null });
+      // Uploads to company-assets (public) — URL never expires
+      const { signedUrl } = await uploadTemplateImage(file, 'template-images');
+      setUploadState({ isUploading: false, progress: 100, error: null });
+      await refetch();
+      toast.success('Imagen subida exitosamente');
+      onImageSelect(signedUrl);
+    } catch (error: any) {
+      setUploadState({ isUploading: false, progress: 0, error: error.message });
       toast.error('Error al subir la imagen');
     }
   };

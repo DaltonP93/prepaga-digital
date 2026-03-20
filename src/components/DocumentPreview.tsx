@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { PDFGeneratorControls } from '@/components/PDFGeneratorControls';
 import DOMPurify from 'dompurify';
+import { getAssetSignedUrl } from '@/lib/assetUrlHelper';
 
 interface DocumentPreviewProps {
   content: string;
@@ -17,6 +18,8 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   templateType,
   templateName = 'documento',
 }) => {
+  const [resolvedPreviewContent, setResolvedPreviewContent] = useState('');
+
   // Generate sample data for placeholders
   const sampleData: Record<string, string> = {
     NOMBRE_CLIENTE: 'Juan Carlos',
@@ -72,6 +75,43 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
   };
 
   const previewContent = processContent(content);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const resolvePreviewContent = async () => {
+      const signedUrlRegex = /https?:\/\/[^"'\\s]+\/storage\/v1\/object\/sign\/documents\/([^?"'\\s]+)\?[^"'\\s]*/gi;
+      const matches = [...previewContent.matchAll(signedUrlRegex)];
+
+      if (matches.length === 0) {
+        setResolvedPreviewContent(previewContent);
+        return;
+      }
+
+      let nextContent = previewContent;
+
+      for (const match of matches) {
+        const fullUrl = match[0];
+        const rawPath = match[1];
+        const storagePath = decodeURIComponent(rawPath);
+        const freshSignedUrl = await getAssetSignedUrl(storagePath);
+        if (freshSignedUrl) {
+          nextContent = nextContent.replaceAll(fullUrl, freshSignedUrl);
+        }
+      }
+
+      if (!cancelled) {
+        setResolvedPreviewContent(nextContent);
+      }
+    };
+
+    resolvePreviewContent();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [previewContent]);
+
   const wordCount = content.replace(/<[^>]*>/g, '').split(' ').filter(word => word.length > 0).length;
 
   return (
@@ -104,7 +144,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
             {/* SECURITY: Content is sanitized with DOMPurify to prevent XSS attacks */}
             <div 
               className="prose prose-sm max-w-none text-slate-900 prose-headings:text-slate-900 prose-p:text-slate-800 prose-strong:text-slate-900 prose-li:text-slate-800 prose-table:text-slate-900 prose-th:text-slate-900 prose-td:text-slate-800 [&_*]:border-slate-300"
-              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewContent) }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(resolvedPreviewContent || previewContent) }}
             />
           </div>
         </CardContent>
