@@ -308,9 +308,18 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       // Preload attachment info to detect annexo-only templates
       const { data: allAttachments } = await supabase
         .from('template_attachments' as any)
-        .select('template_id')
-        .in('template_id', templateIds);
+        .select('*')
+        .in('template_id', templateIds)
+        .order('sort_order', { ascending: true });
       const templatesWithAttachments = new Set((allAttachments || []).map((a: any) => a.template_id));
+      // Build a map of template_id -> first PDF attachment for direct file linking
+      const templatePdfAttachmentMap = new Map<string, any>();
+      for (const att of (allAttachments || [])) {
+        const isPDF = att.file_type === 'application/pdf' || att.file_name?.endsWith('.pdf');
+        if (isPDF && !templatePdfAttachmentMap.has(att.template_id)) {
+          templatePdfAttachmentMap.set(att.template_id, att);
+        }
+      }
 
       // Sort templates: DDJJ and Contrato first, Anexo last (large content processed last)
       const sortedTemplates = [...(templateContents || [])].sort((a, b) => {
