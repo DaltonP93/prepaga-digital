@@ -17,10 +17,12 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('Cache abierto:', CACHE_NAME);
-        return cache.addAll(urlsToCache);
+        // Use addAll only for guaranteed-available resources
+        return Promise.allSettled(
+          urlsToCache.map(url => cache.add(url).catch(err => console.warn('Cache skip:', url, err)))
+        );
       })
       .then(() => {
-        // Forzar activación inmediata
         return self.skipWaiting();
       })
   );
