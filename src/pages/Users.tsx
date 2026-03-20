@@ -123,7 +123,13 @@ const Users = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((user) => {
+                {users
+                  .filter((u) => {
+                    // Non-super_admin users cannot see super_admin users
+                    if (!isSuperAdmin && getUserRole(u) === 'super_admin') return false;
+                    return true;
+                  })
+                  .map((user) => {
                   const role = getUserRole(user);
                   return (
                     <TableRow key={user.id}>

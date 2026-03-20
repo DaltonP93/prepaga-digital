@@ -18,10 +18,23 @@ export const usePushNotifications = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    if ('serviceWorker' in navigator && 'PushManager' in window) {
-      setIsSupported(true);
-      checkSubscription();
-    }
+    const check = async () => {
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+        try {
+          // Ensure service worker is registered before checking
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          if (registrations.length === 0) {
+            await navigator.serviceWorker.register('/sw.js');
+          }
+          setIsSupported(true);
+          checkSubscription();
+        } catch (error) {
+          console.warn('Push notifications not available:', error);
+          setIsSupported(true); // Still allow user to try
+        }
+      }
+    };
+    check();
   }, []);
 
   const checkSubscription = async () => {
