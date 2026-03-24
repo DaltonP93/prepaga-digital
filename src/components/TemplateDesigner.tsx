@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import TipTapEditor from "@/components/TipTapEditor";
+import TipTapEditor, { type TipTapEditorAPI } from "@/components/TipTapEditor";
 import { DraggablePlaceholdersSidebar } from "@/components/DraggablePlaceholdersSidebar";
-import { Eye, FileText } from "lucide-react";
+import { Eye, FileText, PenTool, User, Building2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import DOMPurify from 'dompurify';
+import { Button } from "@/components/ui/button";
 
 interface TemplateDesignerProps {
   template?: any;
@@ -18,6 +19,7 @@ interface TemplateDesignerProps {
   onSave?: (templateData: any) => void;
   onCancel?: () => void;
   onAttachmentClick?: () => void;
+  helperMode?: "default" | "reporter";
 }
 
 export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
@@ -31,8 +33,10 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
   onSave,
   onCancel,
   onAttachmentClick,
+  helperMode = "default",
 }) => {
   const { toast } = useToast();
+  const editorApiRef = useRef<TipTapEditorAPI | null>(null);
   const [templateData, setTemplateData] = useState({
     name: template?.name || "",
     description: template?.description || "",
@@ -93,6 +97,14 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
     handleContentChange(newContent);
   };
 
+  const insertSignatureField = (label: string, signerRole: string) => {
+    editorApiRef.current?.insertSignatureForRole(label, signerRole);
+    toast({
+      title: "Campo de firma agregado",
+      description: `${label} fue agregado al documento.`,
+    });
+  };
+
   return (
     <div className="space-y-4">
       {/* Design Tabs */}
@@ -109,6 +121,32 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
         </TabsList>
 
         <TabsContent value="editor" className="space-y-4">
+          {helperMode === "reporter" && (
+            <Card className="border-primary/20 bg-primary/5">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Firma de documento</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Reporteador usa la misma firma del template normal. Agrega los campos con un clic y luego ubícalos dentro del documento.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => insertSignatureField("Firma del Contratante", "titular")}>
+                    <PenTool className="mr-2 h-4 w-4" />
+                    Firma contratante
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => insertSignatureField("Firma del Adherente", "adherente")}>
+                    <User className="mr-2 h-4 w-4" />
+                    Firma adherente
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => insertSignatureField("Firma de la Contratada", "contratada")}>
+                    <Building2 className="mr-2 h-4 w-4" />
+                    Firma contratada
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
             {/* Sidebar with placeholders - LEFT only */}
             <div className="lg:col-span-1">
@@ -123,6 +161,7 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
             {/* Main editor */}
             <div className="lg:col-span-3">
               <TipTapEditor
+                ref={editorApiRef}
                 content={templateData.content}
                 onChange={handleContentChange}
                 dynamicFields={dynamicFields}

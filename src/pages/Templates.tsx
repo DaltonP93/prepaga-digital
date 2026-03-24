@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -22,9 +22,53 @@ type ExtendedTemplate = Template & {
   company?: { name: string } | null;
 };
 
+const getDesignerMeta = (designerVersion?: string | null) => {
+  switch (designerVersion) {
+    case "2.0":
+      return { label: "v2.0 Designer", variant: "default" as const };
+    case "3.0":
+      return { label: "v3.0 Reporteador", variant: "secondary" as const };
+    default:
+      return { label: "v1.0 Legacy", variant: "outline" as const };
+  }
+};
+
+class TemplatesErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error("Templates render error:", error);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <Card className="border-destructive/40">
+          <CardHeader>
+            <CardTitle>Error renderizando Templates</CardTitle>
+            <CardDescription>{this.state.error.message || "Se produjo un error inesperado en esta pantalla."}</CardDescription>
+          </CardHeader>
+        </Card>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 const Templates = () => {
   const navigate = useNavigate();
-  const { templates = [], isLoading } = useTemplates();
+  const { templates = [], isLoading, error } = useTemplates();
   const deleteTemplate = useDeleteTemplate();
   const { can } = useRolePermissions();
 
@@ -89,8 +133,24 @@ const Templates = () => {
     );
   }
 
+  if (error) {
+    return (
+      <Layout title="Gestión de Templates" description="Administrar plantillas de documentos">
+        <Card className="border-destructive/40">
+          <CardHeader>
+            <CardTitle>No se pudieron cargar los templates</CardTitle>
+            <CardDescription>
+              {error instanceof Error ? error.message : "Ocurrió un error al consultar los templates."}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </Layout>
+    );
+  }
+
   return (
     <Layout title="Gestión de Templates" description="Administrar plantillas de documentos">
+      <TemplatesErrorBoundary>
       <div className="space-y-6">
         <div className="rounded-2xl border border-border/60 bg-gradient-to-br from-background via-background to-primary/10 p-5">
           <div className="flex flex-wrap justify-between items-start gap-4">
@@ -255,8 +315,8 @@ const Templates = () => {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Motor:</span>
-                    <Badge variant={(template as any).designer_version === "2.0" ? "default" : "outline"}>
-                      {(template as any).designer_version === "2.0" ? "v2.0 Premium" : "v1.0 Legacy"}
+                    <Badge variant={getDesignerMeta((template as any).designer_version).variant}>
+                      {getDesignerMeta((template as any).designer_version).label}
                     </Badge>
                   </div>
                   <div className="flex items-center justify-between text-sm">
@@ -297,6 +357,7 @@ const Templates = () => {
 
         <TemplateForm open={showTemplateForm} onOpenChange={handleCloseForm} template={editingTemplate} />
       </div>
+      </TemplatesErrorBoundary>
     </Layout>
   );
 };

@@ -49,6 +49,7 @@ export interface TipTapEditorProps {
 
 export interface TipTapEditorAPI {
   insertSignature: (size?: 'normal' | 'small') => void;
+  insertSignatureForRole: (label: string, signerRole: string) => void;
   insertPlaceholder: (name: string) => void;
   insertDropdown: (options?: string[]) => void;
   insertCheckbox: (label?: string) => void;
@@ -301,6 +302,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
 
   useImperativeHandle(ref, () => ({
     insertSignature,
+    insertSignatureForRole: doInsertSignature,
     insertPlaceholder,
     insertDropdown,
     insertCheckbox,
@@ -317,6 +319,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
     focus: () => editor?.commands.focus(),
   }), [
     insertSignature, 
+    doInsertSignature,
     insertPlaceholder, 
     insertDropdown, 
     insertCheckbox, 
@@ -336,6 +339,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
     if (editor && onReady) {
       onReady({
         insertSignature,
+        insertSignatureForRole: doInsertSignature,
         insertPlaceholder,
         insertDropdown,
         insertCheckbox,
@@ -352,7 +356,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
         focus: () => editor?.commands.focus(),
       });
     }
-  }, [editor, onReady, insertSignature, insertPlaceholder, insertDropdown, insertCheckbox, insertRadioButton, insertQRCode, insertBarcode, insertDynamicQuestion, insertText, addImage, updateSelectedNodeAttrs, setContent, getContent]);
+  }, [editor, onReady, insertSignature, doInsertSignature, insertPlaceholder, insertDropdown, insertCheckbox, insertRadioButton, insertQRCode, insertBarcode, insertDynamicQuestion, insertText, addImage, updateSelectedNodeAttrs, setContent, getContent]);
 
   const handleAnnexContentExtracted = useCallback((htmlContent: string) => {
     if (!editor) return;

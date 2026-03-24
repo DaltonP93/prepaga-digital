@@ -22,6 +22,7 @@ import { useTemplateQuestions } from "@/hooks/useTemplateQuestions";
 import { useEnhancedPDFGeneration } from "@/hooks/useEnhancedPDFGeneration";
 import { Database } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
+import { ReporterTemplateEditor } from "@/components/templates/ReporterTemplateEditor";
 
 const OpenSignTemplateEditor = lazy(() => import("@/components/designer2/opensign/OpenSignTemplateEditor").then(m => ({ default: m.OpenSignTemplateEditor })));
 
@@ -313,6 +314,20 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
                         <p className="text-xs text-muted-foreground mt-1">Canvas A4 con bloques, assets PDF, overlay de campos</p>
                       </div>
                     </label>
+                    <label
+                      htmlFor="engine-3"
+                      className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${watch("designer_version") === "3.0" ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`}
+                    >
+                      <RadioGroupItem value="3.0" id="engine-3" className="mt-0.5" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">Reporteador</span>
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Word</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Importa Word con variables, conserva placeholders y reutiliza el editor actual.</p>
+                      </div>
+                    </label>
                   </RadioGroup>
                 </div>
               </CardContent>
@@ -362,8 +377,18 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
                   <Blocks className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
                   <p className="text-muted-foreground">Guardá el template primero para acceder al canvas de bloques.</p>
                 </CardContent>
-              </Card>
-            )
+                </Card>
+              )
+          ) : watch("designer_version") === "3.0" ? (
+            <ReporterTemplateEditor
+              templateId={template?.id}
+              templateName={watch("name")}
+              content={watch("content")}
+              onContentChange={handleContentChange}
+              dynamicFields={dynamicFields}
+              onDynamicFieldsChange={handleDynamicFieldsChange}
+              templateQuestions={questions || []}
+            />
           ) : (
             <TemplateDesigner
               template={template}
