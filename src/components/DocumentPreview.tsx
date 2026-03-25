@@ -96,7 +96,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
         const storagePath = decodeURIComponent(rawPath);
         const freshSignedUrl = await getAssetSignedUrl(storagePath);
         if (freshSignedUrl) {
-          nextContent = nextContent.replaceAll(fullUrl, freshSignedUrl);
+          nextContent = nextContent.split(fullUrl).join(freshSignedUrl);
         }
       }
 
