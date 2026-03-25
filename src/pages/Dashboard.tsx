@@ -1,8 +1,6 @@
 
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { useDashboardStats } from '@/hooks/useDashboard';
-import { useSales } from '@/hooks/useSales';
-import { useClients } from '@/hooks/useClients';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -26,8 +24,6 @@ import { Link } from 'react-router-dom';
 const Dashboard = () => {
   const { user, loading } = useSimpleAuthContext();
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
-  const { data: sales = [], isLoading: salesLoading } = useSales();
-  const { data: clients = [], isLoading: clientsLoading } = useClients();
 
   if (loading) {
     return (
@@ -40,7 +36,7 @@ const Dashboard = () => {
     );
   }
 
-  const busy = statsLoading || salesLoading || clientsLoading;
+  const busy = statsLoading;
   const totalSales = stats?.totalSales || 0;
   const totalClients = stats?.totalClients || 0;
   const totalRevenue = stats?.totalRevenue || 0;
@@ -48,13 +44,13 @@ const Dashboard = () => {
   const salesGrowth = stats?.salesGrowth || 0;
   const clientsGrowth = stats?.clientsGrowth || 0;
 
-  const completedSales = sales.filter((sale) => sale.status === 'completado' || sale.status === 'firmado').length;
-  const pendingSales = sales.filter((sale) => sale.status === 'borrador' || sale.status === 'enviado').length;
-  const canceledSales = sales.filter((sale) => sale.status === 'cancelado').length;
+  const completedSales = stats?.completedSales || 0;
+  const pendingSales = stats?.pendingSales || 0;
+  const canceledSales = stats?.canceledSales || 0;
   const conversionRate = totalSales > 0 ? (completedSales / totalSales) * 100 : 0;
 
-  const recentSales = sales.slice(0, 5);
-  const recentClients = clients.slice(0, 5);
+  const recentSales = stats?.recentSales || [];
+  const recentClients = stats?.recentClients || [];
 
   const statusRows = [
     {

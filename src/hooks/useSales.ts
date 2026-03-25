@@ -51,6 +51,15 @@ type ExtendedSale = Sale & {
   };
 };
 
+const invalidateSalesCaches = (queryClient: ReturnType<typeof useQueryClient>, saleId?: string) => {
+  queryClient.invalidateQueries({ queryKey: ['sales'] });
+  queryClient.invalidateQueries({ queryKey: ['sales-list'] });
+  queryClient.invalidateQueries({ queryKey: ['sales-lookup'] });
+  if (saleId) {
+    queryClient.invalidateQueries({ queryKey: ['sale', saleId] });
+  }
+};
+
 export const useSales = () => {
   const { user, userRole } = useSimpleAuthContext();
   const isAdminRole = ADMIN_ROLES.includes(userRole || '');
@@ -105,6 +114,75 @@ export const useSales = () => {
       })) as unknown as ExtendedSale[];
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useSalesList = (enabled = true) => {
+  const { user, userRole } = useSimpleAuthContext();
+  const isAdminRole = ADMIN_ROLES.includes(userRole || '');
+
+  return useQuery({
+    queryKey: ['sales-list', user?.id, userRole],
+    queryFn: async () => {
+      let query = supabase
+        .from('sales')
+        .select(`
+          id,
+          contract_number,
+          status,
+          total_amount,
+          created_at,
+          signature_expires_at,
+          salesperson_id,
+          company_id,
+          clients:client_id(first_name, last_name, email),
+          plans:plan_id(name)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (!isAdminRole && user?.id) {
+        query = query.eq('salesperson_id', user.id);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as unknown as ExtendedSale[];
+    },
+    enabled: !!user && enabled,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useSalesLookup = (enabled = true) => {
+  const { user, userRole } = useSimpleAuthContext();
+  const isAdminRole = ADMIN_ROLES.includes(userRole || '');
+
+  return useQuery({
+    queryKey: ['sales-lookup', user?.id, userRole],
+    queryFn: async () => {
+      let query = supabase
+        .from('sales')
+        .select(`
+          id,
+          contract_number,
+          clients:client_id(first_name, last_name)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (!isAdminRole && user?.id) {
+        query = query.eq('salesperson_id', user.id);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as unknown as ExtendedSale[];
+    },
+    enabled: !!user && enabled,
+    staleTime: 1000 * 60 * 10,
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -124,7 +202,7 @@ export const useCreateSale = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      invalidateSalesCaches(queryClient);
       toast({
         title: "Venta creada",
         description: "La venta ha sido creada exitosamente.",
@@ -156,8 +234,8 @@ export const useUpdateSale = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sales'] });
+    onSuccess: (data) => {
+      invalidateSalesCaches(queryClient, data.id);
       toast({
         title: "Venta actualizada",
         description: "Los cambios han sido guardados exitosamente.",
@@ -187,7 +265,7 @@ export const useDeleteSale = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      invalidateSalesCaches(queryClient);
       toast({
         title: "Venta eliminada",
         description: "La venta ha sido eliminada exitosamente.",
@@ -265,7 +343,7 @@ export const useGenerateQuestionnaireLink = () => {
       return { sale: saleWithTokenInfo, questionnaireUrl, token };
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      invalidateSalesCaches(queryClient, data.sale.id);
       
       // Copy to clipboard
       navigator.clipboard.writeText(data.questionnaireUrl);
@@ -372,7 +450,7 @@ export const useGenerateSignatureLink = () => {
       return { sale: updatedSale, signatureUrl };
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      invalidateSalesCaches(queryClient, data.sale.id);
       
       // Copy to clipboard
       navigator.clipboard.writeText(data.signatureUrl);
@@ -421,8 +499,8 @@ export const useRevokeSignatureToken = () => {
       
       return { saleId, reason };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sales'] });
+    onSuccess: (_, variables) => {
+      invalidateSalesCaches(queryClient, variables.saleId);
       
       toast({
         title: "Token revocado",

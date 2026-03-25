@@ -4,7 +4,7 @@ import { ArrowLeft, Loader2, Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useTemplates } from "@/hooks/useTemplates";
+import { useTemplate } from "@/hooks/useTemplates";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import DOMPurify from 'dompurify';
@@ -12,9 +12,7 @@ import DOMPurify from 'dompurify';
 export default function TemplateDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { templates, isLoading, error } = useTemplates();
-
-  const template = templates?.find(t => t.id === id);
+  const { data: template, isLoading, error } = useTemplate(id);
 
   if (isLoading) {
     return (
@@ -59,7 +57,7 @@ export default function TemplateDetail() {
             </p>
           </div>
           <div className="flex space-x-2">
-            <Button onClick={() => navigate(`/templates/edit/${template.id}`)} variant="outline">
+            <Button onClick={() => navigate(`/templates/${template.id}/edit`)} variant="outline">
               <Edit3 className="w-4 h-4 mr-2" />
               Editar
             </Button>

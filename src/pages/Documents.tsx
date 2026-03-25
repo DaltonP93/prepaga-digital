@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useSales } from "@/hooks/useSales";
+import { useSalesLookup } from "@/hooks/useSales";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
@@ -42,7 +42,7 @@ const Documents: React.FC = () => {
   const [docSaleId, setDocSaleId] = useState("");
 
   const { documents, isLoading, createDocument, deleteDocument } = useDocuments();
-  const { data: sales } = useSales();
+  const { data: sales } = useSalesLookup(showCreateForm);
 
   // Group documents by sale
   const groupedBySale = useMemo(() => {

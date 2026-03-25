@@ -33,6 +33,7 @@ export const useDocuments = () => {
     },
     retry: 2,
     refetchOnWindowFocus: false,
+    staleTime: 1000 * 60 * 5,
   });
 
   const createDocumentMutation = useMutation({

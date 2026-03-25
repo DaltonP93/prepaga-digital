@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Clients can insert template responses via valid token" ON public.template_responses;

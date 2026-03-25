@@ -63,6 +63,37 @@ export const useClients = () => {
       return data;
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useClientsLookup = (enabled = true) => {
+  const { profile, user, userRole } = useSimpleAuthContext();
+  const isSuperRole = SUPER_ADMIN_ROLES.includes(userRole || '');
+
+  return useQuery({
+    queryKey: ['clients-lookup', profile?.company_id, user?.id, userRole],
+    queryFn: async () => {
+      let query = supabase
+        .from('clients')
+        .select('id, first_name, last_name, email, created_at')
+        .order('created_at', { ascending: false });
+
+      if (!isSuperRole) {
+        const companyId = await resolveCompanyId(profile?.company_id, user?.id);
+        if (companyId) {
+          query = query.eq('company_id', companyId);
+        }
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user && enabled,
+    staleTime: 1000 * 60 * 10,
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -94,6 +125,7 @@ export const useCreateClient = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['clients-lookup'] });
       toast({
         title: "Cliente creado",
         description: "El cliente ha sido creado exitosamente.",
@@ -134,6 +166,7 @@ export const useUpdateClient = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['clients-lookup'] });
       toast({
         title: "Cliente actualizado",
         description: "Los cambios han sido guardados exitosamente.",
@@ -171,6 +204,7 @@ export const useDeleteClient = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      queryClient.invalidateQueries({ queryKey: ['clients-lookup'] });
       toast({
         title: "Cliente eliminado",
         description: "El cliente ha sido eliminado exitosamente.",

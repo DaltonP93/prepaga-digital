@@ -40,6 +40,8 @@ export const useBeneficiaries = (saleId: string) => {
       return data;
     },
     enabled: !!saleId,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
   });
 };
 

@@ -1,0 +1,1 @@
+COMMENT ON TABLE public.template_assets IS 'Template designer 2.0 assets with processing support';

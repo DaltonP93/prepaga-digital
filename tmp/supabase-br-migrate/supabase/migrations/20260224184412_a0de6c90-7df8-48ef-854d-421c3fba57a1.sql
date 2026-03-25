@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Users can view own reset tokens" ON public.password_reset_tokens;

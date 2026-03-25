@@ -18,6 +18,8 @@ export const useSignatureLinks = (saleId: string) => {
       return data;
     },
     enabled: !!saleId,
+    staleTime: 1000 * 60 * 2,
+    refetchOnWindowFocus: false,
   });
 };
 

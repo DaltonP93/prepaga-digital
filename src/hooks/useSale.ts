@@ -37,6 +37,8 @@ export const useSale = (saleId: string) => {
       return { ...data, salesperson, profiles: salesperson };
     },
     enabled: !!saleId,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
   });
 
   useEffect(() => {
@@ -55,6 +57,8 @@ export const useSale = (saleId: string) => {
         () => {
           queryClient.invalidateQueries({ queryKey: ['sale', saleId] });
           queryClient.invalidateQueries({ queryKey: ['sales'] });
+          queryClient.invalidateQueries({ queryKey: ['sales-list'] });
+          queryClient.invalidateQueries({ queryKey: ['sales-lookup'] });
         }
       )
       .subscribe();

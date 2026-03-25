@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, Search, Filter, MoreHorizontal, FileText, Eye, Edit, Trash2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Link } from 'react-router-dom';
-import { useSales, useDeleteSale } from '@/hooks/useSales';
+import { useSalesList, useDeleteSale } from '@/hooks/useSales';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -22,7 +22,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 const Sales = () => {
-  const { data: sales, isLoading } = useSales();
+  const { data: sales, isLoading } = useSalesList();
   const queryClient = useQueryClient();
   const deleteSale = useDeleteSale();
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,6 +49,8 @@ const Sales = () => {
       return map;
     },
     enabled: saleIds.length > 0,
+    staleTime: 1000 * 60 * 2,
+    refetchOnWindowFocus: false,
   });
 
   // Real-time subscription for sales changes
@@ -57,6 +59,8 @@ const Sales = () => {
       .channel('sales-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, () => {
         queryClient.invalidateQueries({ queryKey: ['sales'] });
+        queryClient.invalidateQueries({ queryKey: ['sales-list'] });
+        queryClient.invalidateQueries({ queryKey: ['sales-lookup'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => {
         queryClient.invalidateQueries({ queryKey: ['sales-document-counts'] });

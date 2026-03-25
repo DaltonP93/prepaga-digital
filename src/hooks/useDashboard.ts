@@ -13,89 +13,45 @@ export const useDashboardStats = () => {
     queryKey: ['dashboard-stats', user?.id, userRole],
     queryFn: async () => {
       try {
-        // Get users count
-        const { count: usersCount, error: usersError } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true });
+        const currentDate = new Date();
+        const currentMonthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+        const lastMonthStart = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+        const salespersonFilter = !isAdminRole && user?.id
+          ? { salesperson_id: user.id }
+          : null;
 
-        if (usersError) throw usersError;
-
-        // Get companies count
-        const { count: companiesCount, error: companiesError } = await supabase
-          .from('companies')
-          .select('*', { count: 'exact', head: true });
-
-        if (companiesError) throw companiesError;
-
-        // Get sales data - filtered by salesperson for vendedores
-        let salesQuery = supabase
-          .from('sales')
-          .select('total_amount, status, created_at, salesperson_id');
-
-        if (!isAdminRole && user?.id) {
-          salesQuery = salesQuery.eq('salesperson_id', user.id);
-        }
-
-        const { data: salesData, error: salesError } = await salesQuery;
-        if (salesError) throw salesError;
-
-        // Get clients count - for vendedores, count only clients linked to their sales
-        let totalClients = 0;
-        if (!isAdminRole && user?.id) {
-          // Get unique client_ids from this vendedor's sales
-          const { data: vendedorSales } = await supabase
+        const buildSalesCountQuery = (status?: string, dateFrom?: string, dateTo?: string) => {
+          let query = supabase
             .from('sales')
-            .select('client_id')
-            .eq('salesperson_id', user.id)
-            .not('client_id', 'is', null);
+            .select('id', { count: 'exact', head: true });
 
-          const uniqueClientIds = [...new Set((vendedorSales || []).map(s => s.client_id).filter(Boolean))];
-          totalClients = uniqueClientIds.length;
-        } else {
-          const { count, error: clientsError } = await supabase
-            .from('clients')
-            .select('*', { count: 'exact', head: true });
-          if (clientsError) throw clientsError;
-          totalClients = count || 0;
-        }
+          if (salespersonFilter) {
+            query = query.eq('salesperson_id', salespersonFilter.salesperson_id);
+          }
+          if (status) {
+            query = query.eq('status', status);
+          }
+          if (dateFrom) {
+            query = query.gte('created_at', dateFrom);
+          }
+          if (dateTo) {
+            query = query.lt('created_at', dateTo);
+          }
 
-        const totalSales = salesData?.length || 0;
-        const totalRevenue = salesData?.reduce((sum, sale) => sum + (sale.total_amount || 0), 0) || 0;
-        const completedSales = salesData?.filter(sale => sale.status === 'completado').length || 0;
+          return query;
+        };
 
-        // Get signed documents count (documents with signed_at)
-        const { count: signedDocsCount, error: signedDocsError } = await supabase
-          .from('documents')
-          .select('*', { count: 'exact', head: true })
-          .not('signed_at', 'is', null);
+        let salesRevenueQuery = supabase
+          .from('sales')
+          .select('total_amount');
 
-        if (signedDocsError) throw signedDocsError;
-
-        // Get completed signature links count
-        const { count: completedLinksCount, error: linksError } = await supabase
-          .from('signature_links')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'completado');
-
-        if (linksError) throw linksError;
-
-        // Use the higher of both counts for signed documents
-        const signedDocuments = Math.max(signedDocsCount || 0, completedLinksCount || 0);
-
-        // Get pending signature links
-        const { count: pendingLinksCount, error: pendingLinksError } = await supabase
-          .from('signature_links')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'pendiente');
-
-        if (pendingLinksError) throw pendingLinksError;
-        const pendingSignatures = pendingLinksCount || 0;
-
-        // Get recent sales - filtered for vendedores
-        let recentQuery = supabase
+        let recentSalesQuery = supabase
           .from('sales')
           .select(`
-            *,
+            id,
+            total_amount,
+            status,
+            created_at,
             clients:client_id(first_name, last_name),
             plans:plan_id(name),
             companies:company_id(name)
@@ -103,91 +59,158 @@ export const useDashboardStats = () => {
           .order('created_at', { ascending: false })
           .limit(5);
 
-        if (!isAdminRole && user?.id) {
-          recentQuery = recentQuery.eq('salesperson_id', user.id);
+        let recentClientsQuery = supabase
+          .from('clients')
+          .select('id, first_name, last_name, email, created_at')
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (salespersonFilter) {
+          salesRevenueQuery = salesRevenueQuery.eq('salesperson_id', salespersonFilter.salesperson_id);
+          recentSalesQuery = recentSalesQuery.eq('salesperson_id', salespersonFilter.salesperson_id);
         }
 
-        const { data: recentSales, error: recentSalesError } = await recentQuery;
-        if (recentSalesError) throw recentSalesError;
+        const clientCountQuery = isAdminRole
+          ? supabase.from('clients').select('id', { count: 'exact', head: true })
+          : supabase
+              .from('sales')
+              .select('client_id')
+              .eq('salesperson_id', user!.id)
+              .not('client_id', 'is', null);
 
-        // Get sales by status
-        const salesByStatus = salesData?.reduce((acc, sale) => {
-          const status = sale.status || 'borrador';
-          acc[status] = (acc[status] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>) || {};
+        const [
+          usersResult,
+          companiesResult,
+          totalSalesResult,
+          completedSalesResult,
+          signedSalesResult,
+          draftSalesResult,
+          sentSalesResult,
+          cancelledSalesResult,
+          revenueResult,
+          recentSalesResult,
+          recentClientsResult,
+          clientCountResult,
+          signedDocsResult,
+          completedLinksResult,
+          pendingLinksResult,
+          currentMonthSalesResult,
+          lastMonthSalesResult,
+          currentMonthClientsResult,
+          lastMonthClientsResult,
+          currentMonthDocsResult,
+          lastMonthDocsResult,
+        ] = await Promise.all([
+          supabase.from('profiles').select('id', { count: 'exact', head: true }),
+          supabase.from('companies').select('id', { count: 'exact', head: true }),
+          buildSalesCountQuery(),
+          buildSalesCountQuery('completado'),
+          buildSalesCountQuery('firmado'),
+          buildSalesCountQuery('borrador'),
+          buildSalesCountQuery('enviado'),
+          buildSalesCountQuery('cancelado'),
+          salesRevenueQuery,
+          recentSalesQuery,
+          recentClientsQuery,
+          clientCountQuery,
+          supabase.from('documents').select('id', { count: 'exact', head: true }).not('signed_at', 'is', null),
+          supabase.from('signature_links').select('id', { count: 'exact', head: true }).eq('status', 'completado'),
+          supabase.from('signature_links').select('id', { count: 'exact', head: true }).eq('status', 'pendiente'),
+          buildSalesCountQuery(undefined, currentMonthStart.toISOString()),
+          buildSalesCountQuery(undefined, lastMonthStart.toISOString(), currentMonthStart.toISOString()),
+          isAdminRole
+            ? supabase.from('clients').select('id', { count: 'exact', head: true }).gte('created_at', currentMonthStart.toISOString())
+            : Promise.resolve({ count: 0, error: null } as const),
+          isAdminRole
+            ? supabase.from('clients').select('id', { count: 'exact', head: true }).gte('created_at', lastMonthStart.toISOString()).lt('created_at', currentMonthStart.toISOString())
+            : Promise.resolve({ count: 0, error: null } as const),
+          supabase.from('documents').select('id', { count: 'exact', head: true }).not('signed_at', 'is', null).gte('signed_at', currentMonthStart.toISOString()),
+          supabase.from('documents').select('id', { count: 'exact', head: true }).not('signed_at', 'is', null).gte('signed_at', lastMonthStart.toISOString()).lt('signed_at', currentMonthStart.toISOString()),
+        ]);
 
-        // Calculate growth percentages
-        const currentDate = new Date();
-        const currentMonthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-        const lastMonthStart = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
-        
-        const lastMonthSales = salesData?.filter(sale => 
-          new Date(sale.created_at!) >= lastMonthStart && 
-          new Date(sale.created_at!) < currentMonthStart
-        ).length || 0;
+        const results = [
+          usersResult,
+          companiesResult,
+          totalSalesResult,
+          completedSalesResult,
+          signedSalesResult,
+          draftSalesResult,
+          sentSalesResult,
+          cancelledSalesResult,
+          revenueResult,
+          recentSalesResult,
+          recentClientsResult,
+          clientCountResult,
+          signedDocsResult,
+          completedLinksResult,
+          pendingLinksResult,
+          currentMonthSalesResult,
+          lastMonthSalesResult,
+          currentMonthClientsResult,
+          lastMonthClientsResult,
+          currentMonthDocsResult,
+          lastMonthDocsResult,
+        ];
 
-        const currentMonthSales = salesData?.filter(sale => 
-          new Date(sale.created_at!) >= currentMonthStart
-        ).length || 0;
+        const firstError = results.find((result) => 'error' in result && result.error)?.error;
+        if (firstError) throw firstError;
 
-        const salesGrowth = lastMonthSales > 0 ? 
-          Math.round(((currentMonthSales - lastMonthSales) / lastMonthSales) * 100) : 0;
+        const totalSales = totalSalesResult.count || 0;
+        const completedSales = (completedSalesResult.count || 0) + (signedSalesResult.count || 0);
+        const pendingSales = (draftSalesResult.count || 0) + (sentSalesResult.count || 0);
+        const canceledSales = cancelledSalesResult.count || 0;
+        const totalRevenue = revenueResult.data?.reduce((sum, sale) => sum + (sale.total_amount || 0), 0) || 0;
+        const totalClients = isAdminRole
+          ? clientCountResult.count || 0
+          : [...new Set((clientCountResult.data || []).map((sale) => sale.client_id).filter(Boolean))].length;
+        const signedDocuments = Math.max(signedDocsResult.count || 0, completedLinksResult.count || 0);
+        const pendingSignatures = pendingLinksResult.count || 0;
+        const recentSales = recentSalesResult.data || [];
+        const recentClients = recentClientsResult.data || [];
 
-        // Calculate clients growth (current month vs last month)
-        let clientsGrowth = 0;
-        if (!isAdminRole && user?.id) {
-          // For vendedor, skip client growth calculation
-          clientsGrowth = 0;
-        } else {
-          const { count: currentMonthClients } = await supabase
-            .from('clients')
-            .select('*', { count: 'exact', head: true })
-            .gte('created_at', currentMonthStart.toISOString());
+        const salesByStatus = {
+          completado: completedSalesResult.count || 0,
+          firmado: signedSalesResult.count || 0,
+          borrador: draftSalesResult.count || 0,
+          enviado: sentSalesResult.count || 0,
+          cancelado: canceledSales,
+        };
 
-          const { count: lastMonthClients } = await supabase
-            .from('clients')
-            .select('*', { count: 'exact', head: true })
-            .gte('created_at', lastMonthStart.toISOString())
-            .lt('created_at', currentMonthStart.toISOString());
+        const currentMonthSales = currentMonthSalesResult.count || 0;
+        const lastMonthSales = lastMonthSalesResult.count || 0;
+        const salesGrowth = lastMonthSales > 0
+          ? Math.round(((currentMonthSales - lastMonthSales) / lastMonthSales) * 100)
+          : 0;
 
-          clientsGrowth = (lastMonthClients || 0) > 0 
-            ? Math.round((((currentMonthClients || 0) - (lastMonthClients || 0)) / (lastMonthClients || 1)) * 100) 
-            : 0;
-        }
+        const currentMonthClients = currentMonthClientsResult.count || 0;
+        const lastMonthClients = lastMonthClientsResult.count || 0;
+        const clientsGrowth = lastMonthClients > 0
+          ? Math.round(((currentMonthClients - lastMonthClients) / lastMonthClients) * 100)
+          : 0;
 
-        // Calculate documents growth
-        const { count: currentMonthDocs } = await supabase
-          .from('documents')
-          .select('*', { count: 'exact', head: true })
-          .not('signed_at', 'is', null)
-          .gte('signed_at', currentMonthStart.toISOString());
-
-        const { count: lastMonthDocs } = await supabase
-          .from('documents')
-          .select('*', { count: 'exact', head: true })
-          .not('signed_at', 'is', null)
-          .gte('signed_at', lastMonthStart.toISOString())
-          .lt('signed_at', currentMonthStart.toISOString());
-
-        const documentsGrowth = (lastMonthDocs || 0) > 0 
-          ? Math.round((((currentMonthDocs || 0) - (lastMonthDocs || 0)) / (lastMonthDocs || 1)) * 100) 
+        const currentMonthDocs = currentMonthDocsResult.count || 0;
+        const lastMonthDocs = lastMonthDocsResult.count || 0;
+        const documentsGrowth = lastMonthDocs > 0
+          ? Math.round(((currentMonthDocs - lastMonthDocs) / lastMonthDocs) * 100)
           : 0;
 
         return {
-          usersCount: usersCount || 0,
-          companiesCount: companiesCount || 0,
+          usersCount: usersResult.count || 0,
+          companiesCount: companiesResult.count || 0,
           totalClients,
           totalSales,
           totalRevenue,
           completedSales,
+          pendingSales,
+          canceledSales,
           signedDocuments,
           pendingSignatures,
-          recentSales: recentSales || [],
+          recentSales,
+          recentClients,
           salesByStatus,
           salesGrowth,
           clientsGrowth,
-          documentsGrowth
+          documentsGrowth,
         };
       } catch (error) {
         console.error('Dashboard stats error:', error);
@@ -197,5 +220,6 @@ export const useDashboardStats = () => {
     enabled: !!user,
     retry: 1,
     refetchOnWindowFocus: false,
+    staleTime: 1000 * 60 * 5,
   });
 };

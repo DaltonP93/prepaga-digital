@@ -5,7 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:us": "vite --mode us",
+    "dev:br": "vite --mode br",
     "build": "vite build",
+    "build:us": "vite build --mode us",
+    "build:br": "vite build --mode br",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview"

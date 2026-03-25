@@ -3,15 +3,13 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useTemplates } from "@/hooks/useTemplates";
+import { useTemplate } from "@/hooks/useTemplates";
 import { TemplateForm } from "@/components/TemplateForm";
 
 export default function TemplateEdit() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { templates, isLoading, error } = useTemplates();
-
-  const template = templates?.find(t => t.id === id);
+  const { data: template, isLoading, error } = useTemplate(id);
 
   if (isLoading) {
     return (

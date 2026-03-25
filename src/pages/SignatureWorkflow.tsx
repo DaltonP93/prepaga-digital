@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ArrowLeft, FileText, Users, Send, Copy, Check, MessageCircle, Download, RefreshCw, Eye, Clock, CheckCircle, Info, Monitor, Smartphone, Tablet, Globe, Building, ShieldCheck } from 'lucide-react';
-import { useSales } from '@/hooks/useSales';
+import { useSalesList } from '@/hooks/useSales';
 import { useSignatureLinks, useResendSignatureLink } from '@/hooks/useSignatureLinks';
 import { useBeneficiaries } from '@/hooks/useBeneficiaries';
 import { useCurrencySettings } from '@/hooks/useCurrencySettings';
@@ -17,6 +17,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { getSignatureLinkUrl } from '@/lib/appUrls';
 import { toast } from 'sonner';
+import { useSale } from '@/hooks/useSale';
 
 const formatDateTimePY = (dateStr: string) => {
   return new Date(dateStr).toLocaleString('es-PY', {
@@ -34,7 +35,8 @@ const SignatureWorkflow = () => {
   const { profile } = useSimpleAuthContext();
   const { role: effectiveRole, permissions } = useRolePermissions();
 
-  const { data: sales = [], isLoading } = useSales();
+  const { data: selectedSale, isLoading: saleLoading } = useSale(saleId || '');
+  const { data: sales = [], isLoading: salesLoading } = useSalesList(!saleId);
   const { formatCurrency } = useCurrencySettings();
   const { data: signatureLinks = [], isLoading: linksLoading } = useSignatureLinks(saleId || '');
   const { data: beneficiaries = [] } = useBeneficiaries(saleId || '');
@@ -49,7 +51,9 @@ const SignatureWorkflow = () => {
     const invalidateAll = () => {
       queryClient.invalidateQueries({ queryKey: ['signature-links', saleId] });
       queryClient.invalidateQueries({ queryKey: ['signed-documents', saleId] });
+      queryClient.invalidateQueries({ queryKey: ['sale', saleId] });
       queryClient.invalidateQueries({ queryKey: ['sales'] });
+      queryClient.invalidateQueries({ queryKey: ['sales-list'] });
       queryClient.invalidateQueries({ queryKey: ['signature-workflow-steps', saleId] });
     };
 
@@ -111,7 +115,6 @@ const SignatureWorkflow = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [detailLink, setDetailLink] = useState<any>(null);
 
-  const selectedSale = saleId ? sales.find(s => s.id === saleId) : null;
   const selectedSaleCompanyId = selectedSale?.company_id;
 
   // Fetch company settings for contratada signer info
@@ -413,7 +416,7 @@ const SignatureWorkflow = () => {
     );
   }
 
-  if (isLoading) {
+  if ((saleId && saleLoading) || (!saleId && salesLoading)) {
     return (
       <div className="container mx-auto py-6">
         <div className="flex items-center justify-center h-64">
