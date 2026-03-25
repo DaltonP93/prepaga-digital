@@ -227,7 +227,7 @@ export const useDocumentsList = ({
       };
     },
     retry: 2,
-    keepPreviousData: true,
+    placeholderData: (prev) => prev,
     refetchOnWindowFocus: false,
     staleTime: 1000 * 60 * 5,
     enabled: !loading && !!user,
