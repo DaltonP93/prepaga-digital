@@ -28,6 +28,7 @@ interface ReporterTemplateEditorProps {
   dynamicFields: any[];
   onDynamicFieldsChange: (fields: any[]) => void;
   templateQuestions?: any[];
+  onAttachmentClick?: () => string | void | Promise<string | void>;
 }
 
 const VARIABLE_REGEX = /\{\{[^}]+\}\}/g;
@@ -40,6 +41,7 @@ export function ReporterTemplateEditor({
   dynamicFields,
   onDynamicFieldsChange,
   templateQuestions = [],
+  onAttachmentClick,
 }: ReporterTemplateEditorProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const wordPreviewRef = useRef<HTMLDivElement | null>(null);
@@ -370,6 +372,7 @@ export function ReporterTemplateEditor({
             onDynamicFieldsChange={onDynamicFieldsChange}
             templateQuestions={templateQuestions}
             templateId={templateId}
+            onAttachmentClick={onAttachmentClick}
             helperMode="reporter"
           />
         </TabsContent>

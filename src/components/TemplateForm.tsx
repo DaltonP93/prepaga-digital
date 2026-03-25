@@ -113,9 +113,11 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
   const [showCopyDialog, setShowCopyDialog] = useState(false);
   const [dynamicFields, setDynamicFields] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<TabKey>("setup");
+  const [workingTemplateId, setWorkingTemplateId] = useState<string | undefined>(template?.id);
   
 
-  const { questions } = useTemplateQuestions(template?.id);
+  const resolvedTemplateId = workingTemplateId || template?.id;
+  const { questions } = useTemplateQuestions(resolvedTemplateId);
   const { downloadDocument, isGenerating } = useEnhancedPDFGeneration();
 
   const {
@@ -138,6 +140,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
 
   useEffect(() => {
     if (template && open) {
+      setWorkingTemplateId(template.id);
       setValue("name", template.name || "");
       setValue("description", template.description || "");
       setValue("active", template.is_active ?? true);
@@ -158,6 +161,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
           });
       }
     } else if (!template && open) {
+      setWorkingTemplateId(undefined);
       reset({
         name: "",
         description: "",
@@ -170,6 +174,39 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
       setActiveTab("setup");
     }
   }, [template, setValue, reset, open]);
+
+  const ensureTemplateDraft = async () => {
+    if (workingTemplateId) {
+      return workingTemplateId;
+    }
+
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user?.id) {
+      throw userError || new Error("No se pudo identificar el usuario actual.");
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("company_id")
+      .eq("id", userData.user.id)
+      .single();
+
+    if (profileError || !profile?.company_id) {
+      throw profileError || new Error("No se pudo obtener la empresa del usuario.");
+    }
+
+    const createdTemplate = await createTemplate.mutateAsync({
+      name: watch("name")?.trim() || "Nuevo template",
+      description: watch("description") || null,
+      content: watch("content") || "",
+      is_active: watch("active"),
+      company_id: profile.company_id,
+      designer_version: watch("designer_version"),
+    } as any);
+
+    setWorkingTemplateId(createdTemplate.id);
+    return createdTemplate.id;
+  };
 
   const onSubmit = async (data: TemplateFormData) => {
     try {
@@ -195,7 +232,8 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
           ...templateData,
         });
       } else {
-        await createTemplate.mutateAsync(templateData);
+        const createdTemplate = await createTemplate.mutateAsync(templateData as any);
+        setWorkingTemplateId(createdTemplate.id);
       }
 
       // Only close/navigate if in dialog mode; inline mode stays open
@@ -399,13 +437,14 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
           ) : watch("designer_version") === "3.0" ? (
             <Suspense fallback={<TabLoadingState />}>
               <ReporterTemplateEditor
-                templateId={template?.id}
+                templateId={resolvedTemplateId}
                 templateName={watch("name")}
                 content={watch("content")}
                 onContentChange={handleContentChange}
                 dynamicFields={dynamicFields}
                 onDynamicFieldsChange={handleDynamicFieldsChange}
                 templateQuestions={questions || []}
+                onAttachmentClick={ensureTemplateDraft}
               />
             </Suspense>
           ) : (
@@ -417,7 +456,8 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
                 dynamicFields={dynamicFields}
                 onDynamicFieldsChange={handleDynamicFieldsChange}
                 templateQuestions={questions || []}
-                templateId={template?.id}
+                templateId={resolvedTemplateId}
+                onAttachmentClick={ensureTemplateDraft}
               />
             </Suspense>
           )}
@@ -451,9 +491,9 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
               </div>
             </CardHeader>
             <CardContent>
-              {isEditing ? (
+              {resolvedTemplateId ? (
                 <Suspense fallback={<TabLoadingState />}>
-                  <QuestionBuilder templateId={template.id} />
+                  <QuestionBuilder templateId={resolvedTemplateId!} />
                 </Suspense>
               ) : (
                 <div className="text-center py-8">
@@ -468,7 +508,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
         <TabsContent value="preview" className="space-y-4">
           <Suspense fallback={<TabLoadingState />}>
             <LiveTemplatePreview
-              templateId={template?.id}
+              templateId={resolvedTemplateId}
               content={watch("content")}
               onDownloadPDF={() => {
                 downloadDocument({

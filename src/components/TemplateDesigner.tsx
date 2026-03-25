@@ -18,7 +18,7 @@ interface TemplateDesignerProps {
   templateId?: string;
   onSave?: (templateData: any) => void;
   onCancel?: () => void;
-  onAttachmentClick?: () => void;
+  onAttachmentClick?: () => string | void | Promise<string | void>;
   helperMode?: "default" | "reporter";
 }
 

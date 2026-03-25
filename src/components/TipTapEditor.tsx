@@ -44,7 +44,7 @@ export interface TipTapEditorProps {
   showToolbar?: boolean;
   showSidebar?: boolean;
   onReady?: (api: TipTapEditorAPI) => void;
-  onAttachmentClick?: () => void;
+  onAttachmentClick?: () => string | void | Promise<string | void>;
 }
 
 export interface TipTapEditorAPI {
@@ -85,6 +85,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
   } = props;
   
   const [showAnnexesManager, setShowAnnexesManager] = useState(false);
+  const [resolvedTemplateId, setResolvedTemplateId] = useState<string | undefined>(templateId);
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
   
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -94,6 +95,10 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
   const toolbarRef = useRef<HTMLDivElement>(null);
   const { primaryColor } = useBranding();
   const { toast } = useToast();
+
+  useEffect(() => {
+    setResolvedTemplateId(templateId);
+  }, [templateId]);
 
   const editor = useEditor({
     extensions: [
@@ -164,6 +169,28 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
   const insertSignature = useCallback((size: 'normal' | 'small' = 'normal') => {
     setShowSignatureDialog(true);
   }, []);
+
+  const handleAttachmentClick = useCallback(async () => {
+    if (externalAttachmentClick) {
+      const nextTemplateId = await externalAttachmentClick();
+      if (nextTemplateId) {
+        setResolvedTemplateId(nextTemplateId);
+        setShowAnnexesManager(true);
+        return;
+      }
+    }
+
+    if (resolvedTemplateId) {
+      setShowAnnexesManager(true);
+      return;
+    }
+
+    toast({
+      title: "Guarda el template primero",
+      description: "Debes guardar el template antes de adjuntar documentos.",
+      variant: "destructive",
+    });
+  }, [externalAttachmentClick, resolvedTemplateId, toast]);
 
   const doInsertSignature = useCallback((label: string, signerRole: string) => {
     if (!editor) return;
@@ -409,17 +436,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
                     onImageClick={() => setShowImageManager(true)}
                     onSignatureClick={() => insertSignature('normal')}
                     onQuestionClick={() => insertDynamicQuestion('text', 'Nueva pregunta')}
-                    onAttachmentClick={externalAttachmentClick || (() => {
-                      if (templateId) {
-                        setShowAnnexesManager(true);
-                      } else {
-                        toast({
-                          title: "Guarda el template primero",
-                          description: "Debes guardar el template antes de adjuntar documentos.",
-                          variant: "destructive",
-                        });
-                      }
-                    })}
+                    onAttachmentClick={handleAttachmentClick}
                   />
                   
                   <div className="flex items-center gap-1 p-1.5 border-b bg-muted/30">
@@ -497,7 +514,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
         </div>
       )}
 
-      {showAnnexesManager && templateId && (
+      {showAnnexesManager && resolvedTemplateId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-background rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
@@ -507,7 +524,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
               </Button>
             </div>
             <TemplateAnnexesManager 
-              templateId={templateId} 
+              templateId={resolvedTemplateId} 
               onContentExtracted={handleAnnexContentExtracted}
             />
           </div>
