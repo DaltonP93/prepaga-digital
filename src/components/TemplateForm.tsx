@@ -11,19 +11,19 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { TemplateDesigner } from "@/components/TemplateDesigner";
-import { QuestionBuilder } from "@/components/QuestionBuilder";
-import { QuestionCopyDialog } from "@/components/QuestionCopyDialog";
-import { EnhancedPlaceholdersPanel } from "@/components/templates/EnhancedPlaceholdersPanel";
-import { LiveTemplatePreview } from "@/components/templates/LiveTemplatePreview";
 import { FileText, Settings, Eye, HelpCircle, Copy, Code, Sparkles, ChevronLeft, ChevronRight, Blocks, PenTool } from "lucide-react";
 import { useCreateTemplate, useUpdateTemplate } from "@/hooks/useTemplates";
 import { useTemplateQuestions } from "@/hooks/useTemplateQuestions";
 import { useEnhancedPDFGeneration } from "@/hooks/useEnhancedPDFGeneration";
 import { Database } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
-import { ReporterTemplateEditor } from "@/components/templates/ReporterTemplateEditor";
 
+const TemplateDesigner = lazy(() => import("@/components/TemplateDesigner").then(m => ({ default: m.TemplateDesigner })));
+const QuestionBuilder = lazy(() => import("@/components/QuestionBuilder").then(m => ({ default: m.QuestionBuilder })));
+const QuestionCopyDialog = lazy(() => import("@/components/QuestionCopyDialog").then(m => ({ default: m.QuestionCopyDialog })));
+const EnhancedPlaceholdersPanel = lazy(() => import("@/components/templates/EnhancedPlaceholdersPanel").then(m => ({ default: m.EnhancedPlaceholdersPanel })));
+const LiveTemplatePreview = lazy(() => import("@/components/templates/LiveTemplatePreview").then(m => ({ default: m.LiveTemplatePreview })));
+const ReporterTemplateEditor = lazy(() => import("@/components/templates/ReporterTemplateEditor").then(m => ({ default: m.ReporterTemplateEditor })));
 const OpenSignTemplateEditor = lazy(() => import("@/components/designer2/opensign/OpenSignTemplateEditor").then(m => ({ default: m.OpenSignTemplateEditor })));
 
 type Template = Database["public"]["Tables"]["templates"]["Row"];
@@ -46,6 +46,12 @@ interface TemplateFormData {
 
 const TAB_ORDER = ["setup", "content", "variables", "questions", "preview"] as const;
 type TabKey = (typeof TAB_ORDER)[number];
+
+const TabLoadingState = () => (
+  <div className="flex items-center justify-center h-64">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+  </div>
+);
 
 const QUICK_START_TEMPLATES = [
   {
@@ -358,7 +364,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
         <TabsContent value="content" className="space-y-4">
           {watch("designer_version") === "2.0" ? (
             isEditing && template?.id ? (
-              <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+              <Suspense fallback={<TabLoadingState />}>
                 <OpenSignTemplateEditor
                   templateId={template.id}
                   legacyContent={template?.content || undefined}
@@ -380,35 +386,41 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
                 </Card>
               )
           ) : watch("designer_version") === "3.0" ? (
-            <ReporterTemplateEditor
-              templateId={template?.id}
-              templateName={watch("name")}
-              content={watch("content")}
-              onContentChange={handleContentChange}
-              dynamicFields={dynamicFields}
-              onDynamicFieldsChange={handleDynamicFieldsChange}
-              templateQuestions={questions || []}
-            />
+            <Suspense fallback={<TabLoadingState />}>
+              <ReporterTemplateEditor
+                templateId={template?.id}
+                templateName={watch("name")}
+                content={watch("content")}
+                onContentChange={handleContentChange}
+                dynamicFields={dynamicFields}
+                onDynamicFieldsChange={handleDynamicFieldsChange}
+                templateQuestions={questions || []}
+              />
+            </Suspense>
           ) : (
-            <TemplateDesigner
-              template={template}
-              content={watch("content")}
-              onContentChange={handleContentChange}
-              dynamicFields={dynamicFields}
-              onDynamicFieldsChange={handleDynamicFieldsChange}
-              templateQuestions={questions || []}
-              templateId={template?.id}
-            />
+            <Suspense fallback={<TabLoadingState />}>
+              <TemplateDesigner
+                template={template}
+                content={watch("content")}
+                onContentChange={handleContentChange}
+                dynamicFields={dynamicFields}
+                onDynamicFieldsChange={handleDynamicFieldsChange}
+                templateQuestions={questions || []}
+                templateId={template?.id}
+              />
+            </Suspense>
           )}
         </TabsContent>
 
         <TabsContent value="variables" className="space-y-4">
-          <EnhancedPlaceholdersPanel
-            onPlaceholderInsert={(placeholder) => {
-              const currentContent = watch("content");
-              setValue("content", `${currentContent} ${placeholder}`.trim());
-            }}
-          />
+          <Suspense fallback={<TabLoadingState />}>
+            <EnhancedPlaceholdersPanel
+              onPlaceholderInsert={(placeholder) => {
+                const currentContent = watch("content");
+                setValue("content", `${currentContent} ${placeholder}`.trim());
+              }}
+            />
+          </Suspense>
         </TabsContent>
 
         <TabsContent value="questions" className="space-y-4">
@@ -429,7 +441,9 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
             </CardHeader>
             <CardContent>
               {isEditing ? (
-                <QuestionBuilder templateId={template.id} />
+                <Suspense fallback={<TabLoadingState />}>
+                  <QuestionBuilder templateId={template.id} />
+                </Suspense>
               ) : (
                 <div className="text-center py-8">
                   <p className="text-muted-foreground">Guarda el template primero para poder agregar preguntas.</p>
@@ -441,18 +455,20 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
 
 
         <TabsContent value="preview" className="space-y-4">
-          <LiveTemplatePreview
-            templateId={template?.id}
-            content={watch("content")}
-            onDownloadPDF={() => {
-              downloadDocument({
-                htmlContent: watch("content"),
-                filename: watch("name") || "template",
-                documentType: "contract",
-              });
-            }}
-            isGeneratingPDF={isGenerating}
-          />
+          <Suspense fallback={<TabLoadingState />}>
+            <LiveTemplatePreview
+              templateId={template?.id}
+              content={watch("content")}
+              onDownloadPDF={() => {
+                downloadDocument({
+                  htmlContent: watch("content"),
+                  filename: watch("name") || "template",
+                  documentType: "contract",
+                });
+              }}
+              isGeneratingPDF={isGenerating}
+            />
+          </Suspense>
         </TabsContent>
       </Tabs>
 
@@ -516,7 +532,9 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
       )}
 
       {isEditing && template && (
-        <QuestionCopyDialog open={showCopyDialog} onOpenChange={setShowCopyDialog} targetTemplateId={template.id} />
+        <Suspense fallback={null}>
+          <QuestionCopyDialog open={showCopyDialog} onOpenChange={setShowCopyDialog} targetTemplateId={template.id} />
+        </Suspense>
       )}
     </>
   );

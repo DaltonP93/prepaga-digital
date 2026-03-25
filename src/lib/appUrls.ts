@@ -11,7 +11,9 @@ export const getSignatureLinkUrl = (token: string): string => {
 };
 
 export const getSupabaseFunctionsBaseUrl = (): string => {
-  return `https://ykducvvcjzdpoojxlsig.supabase.co/functions/v1`;
+  const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
+  const normalizedUrl = supabaseUrl.replace(/\/+$/, '');
+  return `${normalizedUrl}/functions/v1`;
 };
 
 export const getWhatsAppWebhookUrl = (): string => {

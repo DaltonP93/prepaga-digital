@@ -1,11 +1,11 @@
 
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useDocuments } from "@/hooks/useDocuments";
+import { useDocument, useDocumentsList, useDocuments } from "@/hooks/useDocuments";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, FileText, Search, Download, ChevronDown, ChevronRight, Eye, Trash2 } from "lucide-react";
+import { Plus, FileText, Search, Download, ChevronDown, ChevronRight, Eye, Trash2, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,8 +31,9 @@ const Documents: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState<any>(null);
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [expandedSales, setExpandedSales] = useState<Set<string>>(new Set());
 
   // Form state
@@ -41,16 +42,38 @@ const Documents: React.FC = () => {
   const [docContent, setDocContent] = useState("");
   const [docSaleId, setDocSaleId] = useState("");
 
-  const { documents, isLoading, createDocument, deleteDocument } = useDocuments();
+  const {
+    documents: documentPage,
+    isLoading,
+  } = useDocumentsList({ page, pageSize: 24, search });
+  const { createDocument, deleteDocument } = useDocuments();
   const { data: sales } = useSalesLookup(showCreateForm);
+  const { data: selectedDocument, isLoading: isLoadingSelectedDocument } = useDocument(selectedDocumentId);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
+
+  useEffect(() => {
+    const firstDocument = documentPage?.documents?.[0];
+    if (!firstDocument) {
+      setSelectedDocumentId(null);
+      return;
+    }
+
+    const selectedStillVisible = documentPage.documents.some((document) => document.id === selectedDocumentId);
+    if (!selectedDocumentId || !selectedStillVisible) {
+      setSelectedDocumentId(firstDocument.id);
+    }
+  }, [documentPage, selectedDocumentId]);
 
   // Group documents by sale
   const groupedBySale = useMemo(() => {
-    if (!documents) return [];
+    if (!documentPage?.documents) return [];
 
     const groups: Record<string, SaleGroup> = {};
 
-    for (const doc of documents) {
+    for (const doc of documentPage.documents) {
       const sale = doc.sales as any;
       const saleId = doc.sale_id;
 
@@ -70,21 +93,8 @@ const Documents: React.FC = () => {
       groups[saleId].documents.push(doc);
     }
 
-    // Filter by search
-    let result = Object.values(groups);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        (g) =>
-          g.contractNumber.toLowerCase().includes(q) ||
-          g.clientName.toLowerCase().includes(q) ||
-          g.planName.toLowerCase().includes(q) ||
-          g.documents.some((d: any) => d.name?.toLowerCase().includes(q))
-      );
-    }
-
-    return result;
-  }, [documents, search]);
+    return Object.values(groups);
+  }, [documentPage]);
 
   const toggleSale = (saleId: string) => {
     setExpandedSales((prev) => {
@@ -143,7 +153,7 @@ const Documents: React.FC = () => {
     return <Badge className={info.className}>{info.label}</Badge>;
   };
 
-  const totalDocs = documents?.length || 0;
+  const totalDocs = documentPage?.total || 0;
 
   if (isLoading) {
     return (
@@ -163,7 +173,7 @@ const Documents: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold">Documentos</h1>
           <p className="text-muted-foreground">
-            {totalDocs} documentos en {groupedBySale.length} ventas
+            {totalDocs} documentos · página {documentPage?.page || 1} de {documentPage?.totalPages || 1}
           </p>
         </div>
         <Button onClick={handleCreateDocument} className="flex items-center gap-2">
@@ -176,7 +186,7 @@ const Documents: React.FC = () => {
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Buscar por cliente, contrato o documento..."
+          placeholder="Buscar por nombre de documento..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-10"
@@ -224,11 +234,11 @@ const Documents: React.FC = () => {
                             <div
                               key={doc.id}
                               className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
-                                selectedDocument?.id === doc.id
+                                  selectedDocumentId === doc.id
                                   ? "border-primary bg-primary/5"
                                   : "hover:bg-muted/50"
                               }`}
-                              onClick={() => setSelectedDocument(doc)}
+                              onClick={() => setSelectedDocumentId(doc.id)}
                             >
                               <div className="flex items-center gap-3 min-w-0">
                                 <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -262,7 +272,7 @@ const Documents: React.FC = () => {
                                     e.stopPropagation();
                                     if (confirm("¿Eliminar este documento?")) {
                                       deleteDocument(doc.id);
-                                      if (selectedDocument?.id === doc.id) setSelectedDocument(null);
+                                      if (selectedDocumentId === doc.id) setSelectedDocumentId(null);
                                     }
                                   }}
                                 >
@@ -294,6 +304,36 @@ const Documents: React.FC = () => {
               </CardContent>
             </Card>
           )}
+
+          {documentPage && documentPage.totalPages > 1 && (
+            <div className="flex items-center justify-between pt-2">
+              <p className="text-sm text-muted-foreground">
+                Mostrando {(page - 1) * documentPage.pageSize + 1}
+                {" - "}
+                {Math.min(page * documentPage.pageSize, documentPage.total)} de {documentPage.total}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page === 1}
+                  onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                >
+                  <ChevronsLeft className="h-4 w-4 mr-1" />
+                  Anterior
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= documentPage.totalPages}
+                  onClick={() => setPage((prev) => Math.min(prev + 1, documentPage.totalPages))}
+                >
+                  Siguiente
+                  <ChevronsRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Preview panel */}
@@ -305,7 +345,11 @@ const Documents: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {selectedDocument ? (
+              {isLoadingSelectedDocument ? (
+                <p className="text-center py-8 text-muted-foreground text-sm">
+                  Cargando documento...
+                </p>
+              ) : selectedDocument ? (
                 <div className="space-y-3">
                   <div className="text-sm space-y-1">
                     <p><span className="text-muted-foreground">Tipo:</span> {selectedDocument.document_type}</p>
