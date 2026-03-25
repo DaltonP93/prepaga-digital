@@ -536,6 +536,26 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         }
       }
 
+      // Validate adherentes have documents before creating links
+      const adherentesNeedingLinks = (effectiveBeneficiaries || []).filter(
+        (b) => b.signature_required !== false && !b.is_primary
+      );
+      if (adherentesNeedingLinks.length > 0) {
+        const { data: adherenteDocs } = await supabase
+          .from('documents')
+          .select('beneficiary_id')
+          .eq('sale_id', saleId)
+          .not('beneficiary_id', 'is', null);
+        const idsWithDocs = new Set((adherenteDocs || []).map((d) => d.beneficiary_id));
+        const missing = adherentesNeedingLinks.filter((b) => !idsWithDocs.has(b.id));
+        if (missing.length > 0) {
+          const names = missing.map((b) => `${b.first_name} ${b.last_name}`).join(', ');
+          throw new Error(
+            `Los siguientes adherentes no tienen documentos generados: ${names}. Asegurate de incluir un template de DDJJ para cada adherente antes de enviar.`
+          );
+        }
+      }
+
       // Create signature link for titular
       await createSignatureLink.mutateAsync({
         saleId,

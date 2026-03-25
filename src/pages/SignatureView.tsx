@@ -580,9 +580,9 @@ const SignatureView = () => {
               <Card>
                 <CardContent className="text-center py-8">
                   <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No hay documentos disponibles para firmar aún.</p>
+                  <p className="text-muted-foreground">No hay documentos disponibles para firmar.</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Los documentos serán generados por el vendedor. Vuelva a intentar más tarde.
+                    El vendedor aún no ha generado los documentos para este firmante. Comuníquese con su agente para que complete la preparación del paquete de documentos.
                   </p>
                 </CardContent>
               </Card>
