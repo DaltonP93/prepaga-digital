@@ -1,29 +1,111 @@
 
 import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Trash2, Plus, Download } from 'lucide-react';
-import { useDocuments } from '@/hooks/useDocuments';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface DocumentsManagerProps {
   saleId: string;
 }
 
 export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [file, setFile] = useState<File | null>(null);
 
-  const { documents, isLoading, createDocument, deleteDocument, isCreating, isDeleting } = useDocuments();
+  const { data: documents = [], isLoading } = useQuery({
+    queryKey: ['sale-detail-documents', saleId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('id, name, document_type, created_at, file_url')
+        .eq('sale_id', saleId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!saleId,
+    staleTime: 1000 * 60 * 2,
+    refetchOnWindowFocus: false,
+  });
+
+  const createDocumentMutation = useMutation({
+    mutationFn: async (document: {
+      sale_id: string;
+      name: string;
+      document_type: string;
+      content: string;
+      file_url: string;
+    }) => {
+      const { data, error } = await supabase
+        .from('documents')
+        .insert(document as any)
+        .select('id, name, document_type, created_at, file_url')
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sale-detail-documents', saleId] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      toast({
+        title: 'Documento creado',
+        description: 'El documento se ha creado exitosamente.',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'No se pudo crear el documento.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const deleteDocumentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('documents')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sale-detail-documents', saleId] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      toast({
+        title: 'Documento eliminado',
+        description: 'El documento se ha eliminado exitosamente.',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'No se pudo eliminar el documento.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const isCreating = createDocumentMutation.isPending;
+  const isDeleting = deleteDocumentMutation.isPending;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !file) return;
 
-    createDocument({
+    createDocumentMutation.mutate({
       sale_id: saleId,
       name,
       document_type: file.type,
@@ -38,7 +120,7 @@ export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) =>
 
   const handleDelete = (id: string) => {
     if (confirm('¿Está seguro de que desea eliminar este documento?')) {
-      deleteDocument(id);
+      deleteDocumentMutation.mutate(id);
     }
   };
 

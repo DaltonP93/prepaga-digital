@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,15 +9,16 @@ import { useTemplates } from '@/hooks/useTemplates';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { resolveStorageImages } from '@/lib/resolveStorageImages';
+import { generateUUID } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useBeneficiaries } from '@/hooks/useBeneficiaries';
-import { useCreateSignatureLink } from '@/hooks/useSignatureLinks';
 import { validateSaleTransition } from '@/lib/workflowValidator';
 import { DocumentPreviewDialog } from '@/components/documents/DocumentPreviewDialog';
 
 interface SaleTemplatesTabProps {
   saleId?: string;
   auditStatus?: string;
+  saleStatus?: string;
   disabled?: boolean;
 }
 
@@ -72,7 +73,54 @@ const normalizeResponsePlaceholder = (value?: string | null): string => {
   return normalized;
 };
 
-const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus, disabled }) => {
+const insertDocumentsWithFallback = async (documents: Record<string, any>[]) => {
+  if (documents.length === 0) return;
+
+  const { error } = await supabase.from('documents').insert(documents as any);
+  if (!error) return;
+
+  console.error('[DocGen] Bulk document insert failed, retrying sequentially:', error);
+
+  for (const document of documents) {
+    const { error: singleError } = await supabase.from('documents').insert(document as any);
+    if (singleError) {
+      console.error(`[DocGen] Error inserting "${document.name}":`, singleError);
+      throw singleError;
+    }
+  }
+};
+
+const buildSignatureLinkPayload = ({
+  saleId,
+  recipientType,
+  recipientEmail,
+  recipientPhone,
+  beneficiaryId,
+  expirationDays = 1,
+}: {
+  saleId: string;
+  recipientType: string;
+  recipientEmail?: string;
+  recipientPhone?: string;
+  beneficiaryId?: string;
+  expirationDays?: number;
+}) => {
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + expirationDays);
+
+  return {
+    sale_id: saleId,
+    token: generateUUID(),
+    recipient_type: recipientType,
+    recipient_email: recipientEmail || '',
+    recipient_phone: recipientPhone || null,
+    recipient_id: beneficiaryId || null,
+    expires_at: expiresAt.toISOString(),
+    status: 'pendiente',
+  };
+};
+
+const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus, saleStatus, disabled }) => {
   const navigate = useNavigate();
   const { templates } = useTemplates();
   const queryClient = useQueryClient();
@@ -81,26 +129,30 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
   const [regenerating, setRegenerating] = useState(false);
   const [showDocuments, setShowDocuments] = useState(true);
   const [previewDoc, setPreviewDoc] = useState<any>(null);
-  const createSignatureLink = useCreateSignatureLink();
+  const [needsRegeneration, setNeedsRegeneration] = useState(false);
   const { data: beneficiaries } = useBeneficiaries(saleId || '');
   const [annexSignedUrls, setAnnexSignedUrls] = useState<Record<string, string>>({});
   const [expandedAnnexes, setExpandedAnnexes] = useState<Record<string, boolean>>({});
+  const regenerateActionRef = useRef<HTMLDivElement | null>(null);
 
   const isApproved = auditStatus === 'aprobado' || auditStatus === 'aprobado_para_templates';
+  const isSaleLocked = saleStatus === 'completado' || saleStatus === 'cancelado';
+  const canManageTemplates = !disabled && !isSaleLocked;
 
-  // Fetch associated templates
+  // Fetch associated templates (no content — large base64 images; content is fetched on-demand at generation)
   const { data: saleTemplates, isLoading } = useQuery({
     queryKey: ['sale-templates', saleId],
     queryFn: async () => {
       if (!saleId) return [];
       const { data, error } = await supabase
         .from('sale_templates')
-        .select('*, templates:template_id(id, name, description, content)')
+        .select('*, templates:template_id(id, name, description)')
         .eq('sale_id', saleId);
       if (error) throw error;
       return data || [];
     },
     enabled: !!saleId,
+    staleTime: 2 * 60 * 1000,
   });
 
   // Fetch annexes for all associated template IDs
@@ -172,6 +224,10 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sale-templates', saleId] });
       setSelectedTemplateId('');
+      if (generatedDocs?.length) {
+        setNeedsRegeneration(true);
+        setTimeout(() => regenerateActionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+      }
       toast.success('Template asociado exitosamente');
     },
     onError: (e: any) => toast.error(e.message),
@@ -184,6 +240,10 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sale-templates', saleId] });
+      if (generatedDocs?.length) {
+        setNeedsRegeneration(true);
+        setTimeout(() => regenerateActionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+      }
       toast.success('Template removido');
     },
     onError: (e: any) => toast.error(e.message),
@@ -195,24 +255,58 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
     try {
       setSending(true);
 
-      // Get full sale details with related data
-      const { data: sale, error: saleError } = await supabase
-        .from('sales')
-        .select(`
-          *,
-          clients:client_id(*),
-          plans:plan_id(*),
-          companies:company_id(*)
-        `)
-        .eq('id', saleId)
-        .single();
+      const templateIds = saleTemplates.map((st: any) => st.templates?.id || st.template_id).filter(Boolean);
+      const [
+        saleResult,
+        beneficiariesResult,
+        templateContentsResult,
+        templateResponsesResult,
+        attachmentsResult,
+      ] = await Promise.all([
+        supabase
+          .from('sales')
+          .select(`
+            *,
+            clients:client_id(*),
+            plans:plan_id(*),
+            companies:company_id(*)
+          `)
+          .eq('id', saleId)
+          .single(),
+        supabase
+          .from('beneficiaries')
+          .select('*')
+          .eq('sale_id', saleId)
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('templates')
+          .select('*')
+          .in('id', templateIds),
+        supabase
+          .from('template_responses')
+          .select('*, template_questions:question_id(placeholder_name)')
+          .eq('sale_id', saleId),
+        supabase
+          .from('template_attachments' as any)
+          .select('*')
+          .in('template_id', templateIds)
+          .order('sort_order', { ascending: true }),
+      ]);
 
-      if (saleError) throw saleError;
+      if (saleResult.error) throw saleResult.error;
+      if (beneficiariesResult.error) throw beneficiariesResult.error;
+      if (templateContentsResult.error) throw templateContentsResult.error;
+      if (attachmentsResult.error) throw attachmentsResult.error;
+
+      const sale = saleResult.data;
       const client = sale?.clients as any;
       const plan = sale?.plans as any;
       const company = sale?.companies as any;
+      const effectiveBeneficiaries = beneficiariesResult.data || beneficiaries || [];
+      const templateContents = templateContentsResult.data || [];
+      const templateResponses = templateResponsesResult.data || [];
+      const allAttachments = (attachmentsResult.data as any[]) || [];
 
-      // Resolve company logo URL if it's an expired Supabase storage URL
       if (company?.logo_url && company.logo_url.includes('.supabase.co/storage/v1/')) {
         const pathMatch = company.logo_url.match(/\/storage\/v1\/object\/(?:sign|public)\/([^/]+)\/([^?]+)/);
         if (pathMatch) {
@@ -226,32 +320,6 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           }
         }
       }
-
-      // Fetch template contents for all associated templates
-      const templateIds = saleTemplates.map((st: any) => st.templates?.id || st.template_id).filter(Boolean);
-
-      // Always fetch fresh beneficiaries at send-time to avoid stale placeholder rendering
-      const { data: beneficiariesFromDb, error: beneficiariesError } = await supabase
-        .from('beneficiaries')
-        .select('*')
-        .eq('sale_id', saleId)
-        .order('created_at', { ascending: true });
-
-      if (beneficiariesError) throw beneficiariesError;
-      const effectiveBeneficiaries = beneficiariesFromDb || beneficiaries || [];
-
-      const { data: templateContents, error: templateError } = await supabase
-        .from('templates')
-        .select('*')
-        .in('id', templateIds);
-
-      if (templateError) throw templateError;
-
-      // Fetch questionnaire responses for the sale (with question placeholder_names)
-      const { data: templateResponses } = await supabase
-        .from('template_responses')
-        .select('*, template_questions:question_id(placeholder_name)')
-        .eq('sale_id', saleId);
 
       // Build responses map keyed by placeholder_name
       const responsesMap: Record<string, any> = {};
@@ -319,13 +387,6 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         client, plan, company, sale, effectiveBeneficiaries || [], undefined, responsesMap
       );
 
-      // Generate documents for the titular (all templates)
-      // Preload attachment info to detect annexo-only templates
-      const { data: allAttachments } = await supabase
-        .from('template_attachments' as any)
-        .select('*')
-        .in('template_id', templateIds)
-        .order('sort_order', { ascending: true });
       const templatesWithAttachments = new Set((allAttachments || []).map((a: any) => a.template_id));
       // Build a map of template_id -> first PDF attachment for direct file linking
       const templatePdfAttachmentMap = new Map<string, any>();
@@ -347,8 +408,8 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         return 0;
       });
 
-      for (const template of sortedTemplates) {
-        try {
+      const titularDocuments = (
+        await Promise.all(sortedTemplates.map(async (template) => {
           const hasDesignerContent = !!template.content?.trim();
           const norm = normalizeAccents(template.name);
           const isDDJJ = norm.includes('ddjj') || norm.includes('declaracion') || (template as any).document_type === 'ddjj_salud';
@@ -356,12 +417,9 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           const isAnexoPlan = isAnexoPlanName(template.name);
           const isAnexo = isAnexoPlan || (!isDDJJ && !isContrato);
 
-          // For annexes with PDF attachments, link to the original PDF file
-          // instead of embedding thumbnail images in HTML content
           const pdfAttachment = isAnexo ? templatePdfAttachmentMap.get(template.id) : null;
           if (isAnexo && pdfAttachment) {
-            // Store the original PDF file URL directly — the preview will render via iframe
-            const { error: insertError } = await supabase.from('documents').insert({
+            return {
               sale_id: saleId,
               name: template.name,
               document_type: 'anexo',
@@ -372,34 +430,23 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
               is_final: true,
               generated_from_template: true,
               beneficiary_id: null,
-            });
-            if (insertError) {
-              console.error(`[DocGen] Error inserting anexo "${template.name}":`, insertError);
-              toast.error(`Error al generar documento: ${template.name}`);
-            } else {
-              console.log(`[DocGen] ✓ Generated anexo "${template.name}" (linked to PDF attachment)`);
-            }
-            continue;
+            };
           }
 
-          // Skip annexo templates without designer content and no attachments
           if (isAnexo && !hasDesignerContent) {
-            console.log(`[DocGen] Skipped "${template.name}" (anexo without content or attachments)`);
-            continue;
+            return null;
           }
 
-          // Skip interpolation for anexo templates (they contain static content like embedded images)
           let normalizedContent: string;
           if (isAnexo && hasDesignerContent) {
             normalizedContent = template.content || '';
-            console.log(`[DocGen] Skipped interpolation for anexo "${template.name}" (${(normalizedContent.length / 1024).toFixed(0)} KB)`);
           } else {
             normalizedContent = interpolateEnhancedTemplate(template.content || '', context);
           }
-          // Resolve expired storage image URLs before persisting
+
           normalizedContent = await resolveStorageImages(normalizedContent);
 
-          const { error: insertError } = await supabase.from('documents').insert({
+          return {
             sale_id: saleId,
             name: template.name,
             document_type: isAnexo ? 'anexo' : (isDDJJ ? 'ddjj_salud' : 'contrato'),
@@ -409,18 +456,9 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
             is_final: isAnexo,
             generated_from_template: true,
             beneficiary_id: null,
-          });
-          if (insertError) {
-            console.error(`[DocGen] Error inserting "${template.name}":`, insertError);
-            toast.error(`Error al generar documento: ${template.name}`);
-          } else {
-            console.log(`[DocGen] ✓ Generated "${template.name}" (${isAnexo ? 'anexo' : isDDJJ ? 'ddjj' : 'contrato'})`);
-          }
-        } catch (templateError) {
-          console.error(`[DocGen] Exception processing "${template.name}":`, templateError);
-          toast.error(`Error procesando template: ${template.name}`);
-        }
-      }
+          };
+        }))
+      ).filter(Boolean);
 
       // Generate DDJJ documents per beneficiary (adherente)
       const ddjiTemplates = (templateContents || []).filter(t => {
@@ -429,124 +467,110 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           || (t as any).document_type === 'ddjj_salud';
       });
 
-      if (effectiveBeneficiaries && effectiveBeneficiaries.length > 0 && ddjiTemplates.length > 0) {
-        for (const b of effectiveBeneficiaries) {
-          if (b.signature_required !== false && !b.is_primary) {
-            // Build per-beneficiary DDJJ responses from their own health data
-            const benResponsesMap: Record<string, any> = { ...responsesMap };
-            const benDetail = b.preexisting_conditions_detail || '';
-            const benLines = benDetail.split('; ');
-            for (const line of benLines) {
-              if (line.startsWith('Peso:')) {
-                benResponsesMap['ddjj_peso'] = line.replace('Peso:', '').replace('kg', '').trim();
-              } else if (line.startsWith('Estatura:')) {
-                benResponsesMap['ddjj_altura'] = line.replace('Estatura:', '').replace('cm', '').trim();
-              } else if (line.startsWith('Hábitos:')) {
-                const habits = line.replace('Hábitos:', '').trim();
-                benResponsesMap['ddjj_fuma'] = habits.includes('Fuma') ? 'Sí' : 'No';
-                benResponsesMap['ddjj_vapea'] = habits.includes('Vapea') ? 'Sí' : 'No';
-                benResponsesMap['ddjj_alcohol'] = habits.includes('alcohólicas') ? 'Sí' : 'No';
-              }
-            }
-            // Parse per-beneficiary health questions
-            for (let i = 1; i <= 7; i++) {
-              const questionPrefix = `${i}.`;
-              const matchingLine = benLines.find(l => l.trim().startsWith(questionPrefix));
-              if (matchingLine) {
-                benResponsesMap[`ddjj_pregunta_${i}`] = matchingLine.includes(':')
-                  ? 'Sí: ' + matchingLine.split(':').slice(1).join(':').trim()
-                  : 'Sí';
-              } else if (!benResponsesMap[`ddjj_pregunta_${i}`]) {
-                benResponsesMap[`ddjj_pregunta_${i}`] = b.has_preexisting_conditions ? '' : 'No';
-              }
-            }
-            if (!benResponsesMap['ddjj_fuma']) benResponsesMap['ddjj_fuma'] = 'No';
-            if (!benResponsesMap['ddjj_vapea']) benResponsesMap['ddjj_vapea'] = 'No';
-            if (!benResponsesMap['ddjj_alcohol']) benResponsesMap['ddjj_alcohol'] = 'No';
-
-            for (const ddjiTemplate of ddjiTemplates) {
-              const beneficiaryContext = createEnhancedTemplateContext(
-                {
-                  first_name: b.first_name, last_name: b.last_name,
-                  email: b.email, phone: b.phone, dni: b.document_number || (b as any).dni,
-                  address: b.address, birth_date: b.birth_date,
-                  city: (b as any).city, province: (b as any).province,
-                },
-                plan, company, sale, effectiveBeneficiaries || [], undefined, benResponsesMap
-              );
-              let renderedContent = interpolateEnhancedTemplate(ddjiTemplate.content || '', beneficiaryContext);
-              renderedContent = await resolveStorageImages(renderedContent);
-
-              const { error: benInsertError } = await supabase.from('documents').insert({
-                sale_id: saleId,
-                name: `${ddjiTemplate.name} - ${b.first_name} ${b.last_name}`,
-                document_type: 'ddjj_salud',
-                content: renderedContent,
-                status: 'pendiente' as any,
-                requires_signature: true,
-                beneficiary_id: b.id,
-              });
-              if (benInsertError) {
-                console.error(`Error inserting DDJJ for ${b.first_name}:`, benInsertError);
-              }
-            }
-          }
-        }
-      }
-
-      // Include template attachments (annexes) as documents
-      // Only for templates that did NOT already generate a designer-content document
-      const { data: templateAttachments } = await supabase
-        .from('template_attachments' as any)
-        .select('*')
-        .in('template_id', templateIds);
-
-      if (templateAttachments && templateAttachments.length > 0) {
-        const templateNameById = new Map(
-          (templateContents || []).map((t: any) => [t.id, t.name])
-        );
-        // Track which templates already had an HTML document generated
-        const templatesWithContent = new Set(
-          (templateContents || []).filter((t: any) => !!t.content?.trim()).map((t: any) => t.id)
-        );
-
-        for (const att of templateAttachments) {
-          const parentTemplateId = (att as any).template_id;
-          // Skip attachment if the parent template already generated an HTML document
-          // (avoids duplicate: one HTML doc + one PDF attachment for same annexo)
-          if (templatesWithContent.has(parentTemplateId)) {
-            continue;
+      const beneficiaryDocuments = (
+        await Promise.all((effectiveBeneficiaries || []).flatMap((b) => {
+          if (b.signature_required === false || b.is_primary || ddjiTemplates.length === 0) {
+            return [];
           }
 
-          const parentTemplateName = templateNameById.get(parentTemplateId);
-          const isAnexoPlanAttachment = isAnexoPlanName(parentTemplateName) || isAnexoPlanName((att as any).file_name);
+          const benResponsesMap: Record<string, any> = { ...responsesMap };
+          const benDetail = b.preexisting_conditions_detail || '';
+          const benLines = benDetail.split('; ');
+          for (const line of benLines) {
+            if (line.startsWith('Peso:')) {
+              benResponsesMap['ddjj_peso'] = line.replace('Peso:', '').replace('kg', '').trim();
+            } else if (line.startsWith('Estatura:')) {
+              benResponsesMap['ddjj_altura'] = line.replace('Estatura:', '').replace('cm', '').trim();
+            } else if (line.startsWith('Hábitos:')) {
+              const habits = line.replace('Hábitos:', '').trim();
+              benResponsesMap['ddjj_fuma'] = habits.includes('Fuma') ? 'Sí' : 'No';
+              benResponsesMap['ddjj_vapea'] = habits.includes('Vapea') ? 'Sí' : 'No';
+              benResponsesMap['ddjj_alcohol'] = habits.includes('alcohólicas') ? 'Sí' : 'No';
+            }
+          }
+          for (let i = 1; i <= 7; i++) {
+            const questionPrefix = `${i}.`;
+            const matchingLine = benLines.find(l => l.trim().startsWith(questionPrefix));
+            if (matchingLine) {
+              benResponsesMap[`ddjj_pregunta_${i}`] = matchingLine.includes(':')
+                ? 'Sí: ' + matchingLine.split(':').slice(1).join(':').trim()
+                : 'Sí';
+            } else if (!benResponsesMap[`ddjj_pregunta_${i}`]) {
+              benResponsesMap[`ddjj_pregunta_${i}`] = b.has_preexisting_conditions ? '' : 'No';
+            }
+          }
+          if (!benResponsesMap['ddjj_fuma']) benResponsesMap['ddjj_fuma'] = 'No';
+          if (!benResponsesMap['ddjj_vapea']) benResponsesMap['ddjj_vapea'] = 'No';
+          if (!benResponsesMap['ddjj_alcohol']) benResponsesMap['ddjj_alcohol'] = 'No';
 
-          await supabase.from('documents').insert({
+          return ddjiTemplates.map(async (ddjiTemplate) => {
+            const beneficiaryContext = createEnhancedTemplateContext(
+              {
+                first_name: b.first_name, last_name: b.last_name,
+                email: b.email, phone: b.phone, dni: b.document_number || (b as any).dni,
+                address: b.address, birth_date: b.birth_date,
+                city: (b as any).city, province: (b as any).province,
+              },
+              plan, company, sale, effectiveBeneficiaries || [], undefined, benResponsesMap
+            );
+            let renderedContent = interpolateEnhancedTemplate(ddjiTemplate.content || '', beneficiaryContext);
+            renderedContent = await resolveStorageImages(renderedContent);
+
+            return {
+              sale_id: saleId,
+              name: `${ddjiTemplate.name} - ${b.first_name} ${b.last_name}`,
+              document_type: 'ddjj_salud',
+              content: renderedContent,
+              status: 'pendiente' as any,
+              requires_signature: true,
+              beneficiary_id: b.id,
+            };
+          });
+        }))
+      ).filter(Boolean);
+
+      const templateNameById = new Map(
+        (templateContents || []).map((t: any) => [t.id, t.name])
+      );
+      const templatesWithContent = new Set(
+        (templateContents || []).filter((t: any) => !!t.content?.trim()).map((t: any) => t.id)
+      );
+      const attachmentDocuments = allAttachments
+        .filter((att: any) => !templatesWithContent.has(att.template_id))
+        .map((att: any) => {
+          const parentTemplateName = templateNameById.get(att.template_id);
+          const isAnexoPlanAttachment = isAnexoPlanName(parentTemplateName) || isAnexoPlanName(att.file_name);
+
+          return {
             sale_id: saleId,
-            name: `${isAnexoPlanAttachment ? 'Anexo Plan' : 'Anexo'} - ${(att as any).file_name}`,
+            name: `${isAnexoPlanAttachment ? 'Anexo Plan' : 'Anexo'} - ${att.file_name}`,
             document_type: 'anexo',
-            file_url: (att as any).file_url,
+            file_url: att.file_url,
             content: null,
             status: 'pendiente' as any,
             requires_signature: false,
             is_final: true,
             generated_from_template: true,
             beneficiary_id: null,
-          });
-        }
-      }
+          };
+        });
+
+      await insertDocumentsWithFallback([
+        ...titularDocuments,
+        ...beneficiaryDocuments,
+        ...attachmentDocuments,
+      ]);
 
       // Validate adherentes have documents before creating links
       const adherentesNeedingLinks = (effectiveBeneficiaries || []).filter(
         (b) => b.signature_required !== false && !b.is_primary
       );
       if (adherentesNeedingLinks.length > 0) {
-        const { data: adherenteDocs } = await supabase
-          .from('documents')
-          .select('beneficiary_id')
-          .eq('sale_id', saleId)
-          .not('beneficiary_id', 'is', null);
-        const idsWithDocs = new Set((adherenteDocs || []).map((d) => d.beneficiary_id));
+        const idsWithDocs = new Set(
+          beneficiaryDocuments
+            .map((document: any) => document.beneficiary_id)
+            .filter(Boolean)
+        );
         const missing = adherentesNeedingLinks.filter((b) => !idsWithDocs.has(b.id));
         if (missing.length > 0) {
           const names = missing.map((b) => `${b.first_name} ${b.last_name}`).join(', ');
@@ -556,27 +580,28 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         }
       }
 
-      // Create signature link for titular
-      await createSignatureLink.mutateAsync({
-        saleId,
-        recipientType: 'titular',
-        recipientEmail: client?.email || '',
-        recipientPhone: client?.phone || undefined,
-      });
-      // Create separate signature links for each adherente
-      if (effectiveBeneficiaries && effectiveBeneficiaries.length > 0) {
-        for (const b of effectiveBeneficiaries) {
-          if (b.signature_required !== false && !b.is_primary) {
-            await createSignatureLink.mutateAsync({
-              saleId,
-              recipientType: 'adherente',
-              recipientEmail: b.email || '',
-              recipientPhone: b.phone || undefined,
-              beneficiaryId: b.id,
-            });
-          }
-        }
-      }
+      const signatureLinkRows = [
+        buildSignatureLinkPayload({
+          saleId,
+          recipientType: 'titular',
+          recipientEmail: client?.email || '',
+          recipientPhone: client?.phone || undefined,
+        }),
+        ...adherentesNeedingLinks.map((b) =>
+          buildSignatureLinkPayload({
+            saleId,
+            recipientType: 'adherente',
+            recipientEmail: b.email || '',
+            recipientPhone: b.phone || undefined,
+            beneficiaryId: b.id,
+          })
+        ),
+      ];
+
+      const { error: signatureLinksError } = await supabase
+        .from('signature_links')
+        .insert(signatureLinkRows as any);
+      if (signatureLinksError) throw signatureLinksError;
 
       // Validate workflow transition
       const { data: saleForValidation } = await supabase.from('sales').select('*, template_responses(id)').eq('id', saleId).single();
@@ -595,6 +620,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
 
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       queryClient.invalidateQueries({ queryKey: ['sale-generated-documents', saleId] });
+      queryClient.invalidateQueries({ queryKey: ['signature-links', saleId] });
       toast.success('Documentos generados y enviados para firma. Redirigiendo...');
 
       navigate(`/signature-workflow/${saleId}`);
@@ -611,54 +637,75 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
 
     try {
       setRegenerating(true);
+      const tplIds = saleTemplates.map((st: any) => st.templates?.id || st.template_id).filter(Boolean);
 
-      // Delete old non-final generated documents first (not signed ones)
-      const { error: deleteError } = await supabase
-        .from('documents')
-        .delete()
-        .eq('sale_id', saleId)
-        .eq('generated_from_template', true)
-        .neq('status', 'firmado' as any)
-        .is('is_final', false);
+      const [
+        deleteGeneratedResult,
+        deleteAnnexesResult,
+        saleResult,
+        beneficiariesResult,
+        templateContentsResult,
+        templateResponsesResult,
+        attachmentsResult,
+      ] = await Promise.all([
+        supabase
+          .from('documents')
+          .delete()
+          .eq('sale_id', saleId)
+          .eq('generated_from_template', true)
+          .neq('status', 'firmado' as any)
+          .is('is_final', false),
+        supabase
+          .from('documents')
+          .delete()
+          .eq('sale_id', saleId)
+          .eq('generated_from_template', true)
+          .eq('document_type', 'anexo')
+          .neq('status', 'firmado' as any),
+        supabase
+          .from('sales')
+          .select(`*, clients:client_id(*), plans:plan_id(*), companies:company_id(*)`)
+          .eq('id', saleId)
+          .single(),
+        supabase
+          .from('beneficiaries')
+          .select('*')
+          .eq('sale_id', saleId)
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('templates')
+          .select('*')
+          .in('id', tplIds),
+        supabase
+          .from('template_responses')
+          .select('*, template_questions:question_id(placeholder_name)')
+          .eq('sale_id', saleId),
+        supabase
+          .from('template_attachments' as any)
+          .select('*')
+          .in('template_id', tplIds)
+          .order('sort_order', { ascending: true }),
+      ]);
 
-      if (deleteError) {
-        console.warn('Error deleting old docs (non-final):', deleteError);
+      if (deleteGeneratedResult.error) {
+        console.warn('Error deleting old docs (non-final):', deleteGeneratedResult.error);
       }
+      if (deleteAnnexesResult.error) {
+        console.warn('Error deleting old annexes:', deleteAnnexesResult.error);
+      }
+      if (saleResult.error) throw saleResult.error;
+      if (beneficiariesResult.error) throw beneficiariesResult.error;
+      if (templateContentsResult.error) throw templateContentsResult.error;
+      if (attachmentsResult.error) throw attachmentsResult.error;
 
-      // Also delete old annexes that are generated_from_template
-      await supabase
-        .from('documents')
-        .delete()
-        .eq('sale_id', saleId)
-        .eq('generated_from_template', true)
-        .eq('document_type', 'anexo')
-        .neq('status', 'firmado' as any);
-
-      const { data: sale, error: saleError } = await supabase
-        .from('sales')
-        .select(`*, clients:client_id(*), plans:plan_id(*), companies:company_id(*)`)
-        .eq('id', saleId)
-        .single();
-
-      if (saleError) throw saleError;
+      const sale = saleResult.data;
       const client = sale?.clients as any;
       const plan = sale?.plans as any;
       const company = sale?.companies as any;
-
-      const tplIds = saleTemplates.map((st: any) => st.templates?.id || st.template_id).filter(Boolean);
-
-      const { data: beneficiariesFromDb } = await supabase
-        .from('beneficiaries').select('*').eq('sale_id', saleId).order('created_at', { ascending: true });
-      const effectiveBeneficiaries = beneficiariesFromDb || beneficiaries || [];
-
-      const { data: templateContents, error: templateError } = await supabase
-        .from('templates').select('*').in('id', tplIds);
-      if (templateError) throw templateError;
-
-      const { data: templateResponses } = await supabase
-        .from('template_responses')
-        .select('*, template_questions:question_id(placeholder_name)')
-        .eq('sale_id', saleId);
+      const effectiveBeneficiaries = beneficiariesResult.data || beneficiaries || [];
+      const templateContents = templateContentsResult.data || [];
+      const templateResponses = templateResponsesResult.data || [];
+      const allAttachments = (attachmentsResult.data as any[]) || [];
 
       const responsesMap: Record<string, any> = {};
       (templateResponses || []).forEach((tr: any) => {
@@ -709,13 +756,17 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
 
       const { createEnhancedTemplateContext, interpolateEnhancedTemplate } = await import('@/lib/enhancedTemplateEngine');
       const context = createEnhancedTemplateContext(client, plan, company, sale, effectiveBeneficiaries, undefined, responsesMap);
-
-      const { data: allAttachments } = await supabase
-        .from('template_attachments' as any).select('template_id').in('template_id', tplIds);
-      const templatesWithAttachments = new Set((allAttachments || []).map((a: any) => a.template_id));
+      const templatesWithAttachments = new Set(allAttachments.map((a: any) => a.template_id));
+      const templatePdfAttachmentMap = new Map<string, any>();
+      for (const attachment of allAttachments) {
+        const isPDF = attachment.file_type === 'application/pdf' || attachment.file_name?.endsWith('.pdf');
+        if (isPDF && !templatePdfAttachmentMap.has(attachment.template_id)) {
+          templatePdfAttachmentMap.set(attachment.template_id, attachment);
+        }
+      }
 
       // Sort templates: DDJJ and Contrato first, Anexo last
-      const sortedTpls = [...(templateContents || [])].sort((a, b) => {
+      const sortedTpls = [...templateContents].sort((a, b) => {
         const aNorm = normalizeAccents(a.name);
         const bNorm = normalizeAccents(b.name);
         const aIsAnexo = isAnexoPlanName(a.name) || (!isDDJJTemplate(a) && !aNorm.includes('contrato'));
@@ -725,30 +776,45 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         return 0;
       });
 
-      for (const template of sortedTpls) {
-        try {
+      const titularDocuments = (
+        await Promise.all(sortedTpls.map(async (template) => {
           const hasContent = !!template.content?.trim();
           const isDDJJ = isDDJJTemplate(template);
           const isContrato = normalizeAccents(template.name).includes('contrato');
           const isAnexo = isAnexoPlanName(template.name) || (!isDDJJ && !isContrato);
+          const pdfAttachment = isAnexo ? templatePdfAttachmentMap.get(template.id) : null;
 
-          if (isAnexo && !hasContent && templatesWithAttachments.has(template.id)) {
-            console.log(`[RegenDoc] Skipped "${template.name}" (anexo with attachments)`);
-            continue;
+          if (isAnexo && pdfAttachment) {
+            return {
+              sale_id: saleId,
+              name: template.name,
+              document_type: 'anexo',
+              file_url: pdfAttachment.file_url,
+              content: null,
+              status: 'pendiente' as any,
+              requires_signature: false,
+              is_final: true,
+              generated_from_template: true,
+              beneficiary_id: null,
+            };
           }
 
-          // Skip interpolation for anexo templates (static content)
+          if (isAnexo && !hasContent && templatesWithAttachments.has(template.id)) {
+            return null;
+          }
+
           let rendered: string;
           if (!hasContent && isAnexo) {
             rendered = '<p>Documento de anexo.</p>';
           } else if (isAnexo && hasContent) {
             rendered = template.content || '';
-            console.log(`[RegenDoc] Skipped interpolation for anexo "${template.name}"`);
           } else {
             rendered = interpolateEnhancedTemplate(template.content || '', context);
           }
 
-          const { error: insertErr } = await supabase.from('documents').insert({
+          rendered = await resolveStorageImages(rendered);
+
+          return {
             sale_id: saleId,
             name: template.name,
             document_type: isAnexo ? 'anexo' : (isDDJJ ? 'ddjj_salud' : 'contrato'),
@@ -758,107 +824,131 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
             is_final: isAnexo,
             generated_from_template: true,
             beneficiary_id: null,
-          });
-          if (insertErr) {
-            console.error(`[RegenDoc] Error inserting "${template.name}":`, insertErr);
-          } else {
-            console.log(`[RegenDoc] ✓ Generated "${template.name}"`);
-          }
-        } catch (templateError) {
-          console.error(`[RegenDoc] Exception processing "${template.name}":`, templateError);
-          toast.error(`Error procesando template: ${template.name}`);
-        }
-      }
+          };
+        }))
+      ).filter(Boolean);
 
       // DDJJ per adherente
-      const ddjiTpls = (templateContents || []).filter(isDDJJTemplate);
-      if (effectiveBeneficiaries.length > 0 && ddjiTpls.length > 0) {
-        for (const b of effectiveBeneficiaries) {
-          if (b.signature_required !== false && !b.is_primary) {
-            // Build per-beneficiary DDJJ responses from their own health data (same as handleSendDocuments)
-            const benResponsesMap: Record<string, any> = { ...responsesMap };
-            const benDetail = b.preexisting_conditions_detail || '';
-            const benLines = benDetail.split('; ');
-            for (const line of benLines) {
-              if (line.startsWith('Peso:')) {
-                benResponsesMap['ddjj_peso'] = line.replace('Peso:', '').replace('kg', '').trim();
-              } else if (line.startsWith('Estatura:')) {
-                benResponsesMap['ddjj_altura'] = line.replace('Estatura:', '').replace('cm', '').trim();
-              } else if (line.startsWith('Hábitos:')) {
-                const habits = line.replace('Hábitos:', '').trim();
-                benResponsesMap['ddjj_fuma'] = habits.includes('Fuma') ? 'Sí' : 'No';
-                benResponsesMap['ddjj_vapea'] = habits.includes('Vapea') ? 'Sí' : 'No';
-                benResponsesMap['ddjj_alcohol'] = habits.includes('alcohólicas') ? 'Sí' : 'No';
-              }
-            }
-            for (let i = 1; i <= 7; i++) {
-              const questionPrefix = `${i}.`;
-              const matchingLine = benLines.find(l => l.trim().startsWith(questionPrefix));
-              if (matchingLine) {
-                benResponsesMap[`ddjj_pregunta_${i}`] = matchingLine.includes(':')
-                  ? 'Sí: ' + matchingLine.split(':').slice(1).join(':').trim()
-                  : 'Sí';
-              } else if (!benResponsesMap[`ddjj_pregunta_${i}`]) {
-                benResponsesMap[`ddjj_pregunta_${i}`] = b.has_preexisting_conditions ? '' : 'No';
-              }
-            }
-            if (!benResponsesMap['ddjj_fuma']) benResponsesMap['ddjj_fuma'] = 'No';
-            if (!benResponsesMap['ddjj_vapea']) benResponsesMap['ddjj_vapea'] = 'No';
-            if (!benResponsesMap['ddjj_alcohol']) benResponsesMap['ddjj_alcohol'] = 'No';
+      const ddjiTpls = templateContents.filter(isDDJJTemplate);
+      const unresolvedTraceRows: Record<string, any>[] = [];
+      const beneficiaryDocuments = (
+        await Promise.all((effectiveBeneficiaries || []).flatMap((b) => {
+          if (b.signature_required === false || b.is_primary || ddjiTpls.length === 0) {
+            return [];
+          }
 
-            const benCtx = createEnhancedTemplateContext(
-              { first_name: b.first_name, last_name: b.last_name, email: b.email, phone: b.phone, dni: b.document_number || (b as any).dni, address: b.address, birth_date: b.birth_date, city: (b as any).city, province: (b as any).province },
-              plan, company, sale, effectiveBeneficiaries, undefined, benResponsesMap
-            );
-            for (const ddji of ddjiTpls) {
-              const renderedDDJJ = interpolateEnhancedTemplate(ddji.content || '', benCtx);
-              
-              // Validate: log unresolved placeholders
-              const unresolvedMatches = renderedDDJJ.match(/\{\{[^}]+\}\}/g);
-              if (unresolvedMatches && unresolvedMatches.length > 0) {
-                console.warn(`[Regeneration] Unresolved placeholders in DDJJ for ${b.first_name}:`, unresolvedMatches);
-                await supabase.from('process_traces').insert({
-                  sale_id: saleId,
-                  action: 'regeneration_unresolved_placeholders',
-                  details: { document: ddji.name, beneficiary: `${b.first_name} ${b.last_name}`, placeholders: unresolvedMatches },
-                });
-              }
-
-              await supabase.from('documents').insert({
-                sale_id: saleId,
-                name: `${ddji.name} - ${b.first_name} ${b.last_name}`,
-                document_type: 'ddjj_salud',
-                content: renderedDDJJ,
-                status: 'pendiente' as any,
-                requires_signature: true,
-                beneficiary_id: b.id,
-              });
+          const benResponsesMap: Record<string, any> = { ...responsesMap };
+          const benDetail = b.preexisting_conditions_detail || '';
+          const benLines = benDetail.split('; ');
+          for (const line of benLines) {
+            if (line.startsWith('Peso:')) {
+              benResponsesMap['ddjj_peso'] = line.replace('Peso:', '').replace('kg', '').trim();
+            } else if (line.startsWith('Estatura:')) {
+              benResponsesMap['ddjj_altura'] = line.replace('Estatura:', '').replace('cm', '').trim();
+            } else if (line.startsWith('Hábitos:')) {
+              const habits = line.replace('Hábitos:', '').trim();
+              benResponsesMap['ddjj_fuma'] = habits.includes('Fuma') ? 'Sí' : 'No';
+              benResponsesMap['ddjj_vapea'] = habits.includes('Vapea') ? 'Sí' : 'No';
+              benResponsesMap['ddjj_alcohol'] = habits.includes('alcohólicas') ? 'Sí' : 'No';
             }
           }
-        }
-      }
+          for (let i = 1; i <= 7; i++) {
+            const questionPrefix = `${i}.`;
+            const matchingLine = benLines.find(l => l.trim().startsWith(questionPrefix));
+            if (matchingLine) {
+              benResponsesMap[`ddjj_pregunta_${i}`] = matchingLine.includes(':')
+                ? 'Sí: ' + matchingLine.split(':').slice(1).join(':').trim()
+                : 'Sí';
+            } else if (!benResponsesMap[`ddjj_pregunta_${i}`]) {
+              benResponsesMap[`ddjj_pregunta_${i}`] = b.has_preexisting_conditions ? '' : 'No';
+            }
+          }
+          if (!benResponsesMap['ddjj_fuma']) benResponsesMap['ddjj_fuma'] = 'No';
+          if (!benResponsesMap['ddjj_vapea']) benResponsesMap['ddjj_vapea'] = 'No';
+          if (!benResponsesMap['ddjj_alcohol']) benResponsesMap['ddjj_alcohol'] = 'No';
 
-      // Attachments
-      const { data: tplAttachments } = await supabase
-        .from('template_attachments' as any).select('*').in('template_id', tplIds);
-      if (tplAttachments?.length) {
-        const nameById = new Map((templateContents || []).map((t: any) => [t.id, t.name]));
-        const withContent = new Set((templateContents || []).filter((t: any) => !!t.content?.trim()).map((t: any) => t.id));
-        for (const att of tplAttachments) {
-          if (withContent.has((att as any).template_id)) continue;
-          const pName = nameById.get((att as any).template_id);
-          await supabase.from('documents').insert({
+          return ddjiTpls.map(async (ddji) => {
+            const benCtx = createEnhancedTemplateContext(
+              {
+                first_name: b.first_name,
+                last_name: b.last_name,
+                email: b.email,
+                phone: b.phone,
+                dni: b.document_number || (b as any).dni,
+                address: b.address,
+                birth_date: b.birth_date,
+                city: (b as any).city,
+                province: (b as any).province,
+              },
+              plan,
+              company,
+              sale,
+              effectiveBeneficiaries,
+              undefined,
+              benResponsesMap
+            );
+            let renderedDDJJ = interpolateEnhancedTemplate(ddji.content || '', benCtx);
+            renderedDDJJ = await resolveStorageImages(renderedDDJJ);
+
+            const unresolvedMatches = renderedDDJJ.match(/\{\{[^}]+\}\}/g);
+            if (unresolvedMatches?.length) {
+              unresolvedTraceRows.push({
+                sale_id: saleId,
+                action: 'regeneration_unresolved_placeholders',
+                details: {
+                  document: ddji.name,
+                  beneficiary: `${b.first_name} ${b.last_name}`,
+                  placeholders: unresolvedMatches,
+                },
+              });
+            }
+
+            return {
+              sale_id: saleId,
+              name: `${ddji.name} - ${b.first_name} ${b.last_name}`,
+              document_type: 'ddjj_salud',
+              content: renderedDDJJ,
+              status: 'pendiente' as any,
+              requires_signature: true,
+              beneficiary_id: b.id,
+              generated_from_template: true,
+            };
+          });
+        }))
+      ).filter(Boolean);
+
+      const templateNameById = new Map(templateContents.map((t: any) => [t.id, t.name]));
+      const templatesWithContent = new Set(
+        templateContents.filter((t: any) => !!t.content?.trim()).map((t: any) => t.id)
+      );
+      const attachmentDocuments = allAttachments
+        .filter((att: any) => !templatesWithContent.has(att.template_id))
+        .map((att: any) => {
+          const parentTemplateName = templateNameById.get(att.template_id);
+          return {
             sale_id: saleId,
-            name: `${isAnexoPlanName(pName) ? 'Anexo Plan' : 'Anexo'} - ${(att as any).file_name}`,
+            name: `${isAnexoPlanName(parentTemplateName) ? 'Anexo Plan' : 'Anexo'} - ${att.file_name}`,
             document_type: 'anexo',
-            file_url: (att as any).file_url,
+            file_url: att.file_url,
             content: null,
             status: 'pendiente' as any,
             requires_signature: false,
             is_final: true,
             generated_from_template: true,
             beneficiary_id: null,
-          });
+          };
+        });
+
+      await insertDocumentsWithFallback([
+        ...titularDocuments,
+        ...beneficiaryDocuments,
+        ...attachmentDocuments,
+      ]);
+
+      if (unresolvedTraceRows.length > 0) {
+        const { error: traceError } = await supabase.from('process_traces').insert(unresolvedTraceRows as any);
+        if (traceError) {
+          console.warn('Error logging unresolved placeholders during regeneration:', traceError);
         }
       }
 
@@ -869,6 +959,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       toast.error(error.message || 'Error al regenerar documentos');
     } finally {
       setRegenerating(false);
+      setNeedsRegeneration(false);
     }
   };
 
@@ -913,22 +1004,31 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           <FileSignature className="h-5 w-5" />
           <h3 className="text-lg font-semibold">Templates de Firma ({saleTemplates?.length || 0})</h3>
         </div>
-        {isApproved && saleTemplates && saleTemplates.length > 0 && !generatedDocs?.length && (
-          <div className="flex gap-2">
-            <Button onClick={handleSendDocuments} disabled={sending || regenerating} className="gap-2">
-              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Enviar Documentos para Firma
-            </Button>
-            <Button onClick={handleRegenerateDocuments} disabled={sending || regenerating} variant="outline" className="gap-2">
-              {regenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              Regenerar Documentos
-            </Button>
+        {isApproved && saleTemplates && saleTemplates.length > 0 && (
+          <div ref={regenerateActionRef} className="flex gap-2">
+            {!generatedDocs?.length && (
+              <Button onClick={handleSendDocuments} disabled={sending || regenerating} className="gap-2">
+                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                Enviar Documentos para Firma
+              </Button>
+            )}
+            {!!generatedDocs?.length && (
+              <Button
+                onClick={handleRegenerateDocuments}
+                disabled={sending || regenerating}
+                className="gap-2"
+                variant={needsRegeneration ? 'default' : 'outline'}
+              >
+                {regenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Regenerar Documentos
+              </Button>
+            )}
           </div>
         )}
       </div>
 
       {/* Template selector (only before generation) */}
-      {!disabled && !generatedDocs?.length && (
+      {canManageTemplates && (
         <div className="flex gap-2">
           <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
             <SelectTrigger className="flex-1">
@@ -951,6 +1051,28 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         </div>
       )}
 
+      {canManageTemplates && !!generatedDocs?.length && (
+        <Card className="border-amber-500/20 bg-amber-500/5">
+          <CardContent className="py-3 flex items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground">
+              Ya existen documentos generados. Puedes agregar o quitar templates, pero los cambios no se reflejarán hasta usar <strong>Regenerar Documentos</strong>.
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              className="gap-2 shrink-0"
+              onClick={() => {
+                regenerateActionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setNeedsRegeneration(true);
+              }}
+            >
+              <RefreshCw className="h-4 w-4" />
+              Ir a Regenerar
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Associated templates list */}
       {isLoading ? (
         <div className="text-center py-8 text-muted-foreground">Cargando templates...</div>
@@ -958,9 +1080,9 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         <div className="space-y-2">
           {saleTemplates.map((st: any) => {
             const tplId = st.templates?.id || st.template_id;
-            const hasContent = !!(st.templates?.content?.trim());
             const tplAnnexes = (templateAnnexes || []).filter((a: any) => a.template_id === tplId);
-            const isAnnexOnly = !hasContent && tplAnnexes.length > 0;
+            // isAnnexOnly: template has PDF attachments and no HTML content (content not fetched in list query)
+            const isAnnexOnly = tplAnnexes.length > 0;
             const isExpanded = expandedAnnexes[st.id] || false;
 
             return (
@@ -994,7 +1116,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
                           {isExpanded ? 'Ocultar' : 'Ver'} ({tplAnnexes.length})
                         </Button>
                       )}
-                      {!disabled && !generatedDocs?.length && (
+                      {canManageTemplates && (
                         <Button type="button" variant="ghost" size="sm" onClick={() => removeTemplate.mutate(st.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>

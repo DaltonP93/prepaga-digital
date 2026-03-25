@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { Upload, FileText, Trash2, Loader2, FileInput } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth } from "@/hooks/useAuth";
+import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 import * as pdfjsLib from "pdfjs-dist";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
@@ -30,7 +30,7 @@ export function TemplateAnnexesManager({ templateId, onContentExtracted }: Templ
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isExtracting, setIsExtracting] = useState<string | null>(null);
-  const { profile } = useAuth();
+  const { profile } = useSimpleAuthContext();
 
   const fetchAttachments = async () => {
     setIsLoading(true);

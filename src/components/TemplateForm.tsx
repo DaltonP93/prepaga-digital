@@ -140,12 +140,23 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
     if (template && open) {
       setValue("name", template.name || "");
       setValue("description", template.description || "");
-      setValue("content", typeof template.content === "string" ? template.content : template.content ? JSON.stringify(template.content) : "");
       setValue("active", template.is_active ?? true);
       setValue("is_global", false);
       setValue("designer_version", (template as any).designer_version || "1.0");
       setDynamicFields([]);
       setActiveTab("setup");
+
+      // If content wasn't loaded in the list query, fetch it on demand
+      if (template.content != null) {
+        setValue("content", typeof template.content === "string" ? template.content : JSON.stringify(template.content));
+      } else if (template.id) {
+        supabase.from("templates").select("content").eq("id", template.id).single()
+          .then(({ data }) => {
+            if (data?.content != null) {
+              setValue("content", typeof data.content === "string" ? data.content : JSON.stringify(data.content));
+            }
+          });
+      }
     } else if (!template && open) {
       reset({
         name: "",

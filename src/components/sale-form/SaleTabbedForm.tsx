@@ -335,6 +335,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                 <SaleTemplatesTab
                   saleId={sale?.id}
                   auditStatus={sale?.audit_status}
+                  saleStatus={sale?.status}
                 />
               </TabsContent>
 

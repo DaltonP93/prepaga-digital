@@ -19,7 +19,8 @@ export const useTemplates = () => {
       const { data: templatesData, error } = await supabase
         .from('templates')
         .select(`
-          *,
+          id, name, description, is_active, version, created_at, created_by,
+          company_id, designer_version, template_type,
           company:company_id(name),
           template_questions(id)
         `)

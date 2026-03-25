@@ -270,6 +270,40 @@ const enrichIncidents = async (incidents: IncidentRecord[]) => {
   }));
 };
 
+const isRlsForbiddenError = (error: { code?: string; status?: number; message?: string } | null | undefined) =>
+  error?.code === '42501' ||
+  error?.status === 401 ||
+  error?.status === 403 ||
+  error?.message?.toLowerCase().includes('permission denied') ||
+  error?.message?.toLowerCase().includes('forbidden');
+
+const fetchIncidentRelations = async (incidentId: string) => {
+  const [attachmentsResult, commentsResult] = await Promise.all([
+    supabase
+      .from('incident_attachments')
+      .select('id, file_name, file_url, file_type, file_size, created_at')
+      .eq('incident_id', incidentId)
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('incident_comments')
+      .select('id, content, is_internal, created_at, author_id')
+      .eq('incident_id', incidentId)
+      .order('created_at', { ascending: true }),
+  ]);
+
+  if (attachmentsResult.error && !isRlsForbiddenError(attachmentsResult.error)) {
+    throw attachmentsResult.error;
+  }
+  if (commentsResult.error && !isRlsForbiddenError(commentsResult.error)) {
+    throw commentsResult.error;
+  }
+
+  return {
+    incident_attachments: (attachmentsResult.data as IncidentAttachment[] | null) || [],
+    incident_comments: (commentsResult.data as IncidentComment[] | null) || [],
+  };
+};
+
 const applyIncidentFilters = (
   incidents: IncidentRecord[],
   filters: IncidentFilters | undefined,
@@ -363,11 +397,7 @@ export const useIncidents = (filters?: IncidentFilters) => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('incidents')
-        .select(`
-          *,
-          incident_attachments(id, file_name, file_url, file_type, file_size, created_at),
-          incident_comments(id, content, is_internal, created_at, author_id)
-        `)
+        .select('*')
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
@@ -387,17 +417,15 @@ export const useIncident = (id: string) => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('incidents')
-        .select(`
-          *,
-          incident_attachments(id, file_name, file_url, file_type, file_size, created_at),
-          incident_comments(id, content, is_internal, created_at, author_id)
-        `)
+        .select('*')
         .eq('id', id)
         .single();
 
       if (error) throw error;
 
-      const [enriched] = await enrichIncidents([(data as unknown as IncidentRecord)]);
+      const incident = data as unknown as IncidentRecord;
+      const relations = await fetchIncidentRelations(id);
+      const [enriched] = await enrichIncidents([{ ...incident, ...relations }]);
       return enriched;
     },
     enabled: !!id,
