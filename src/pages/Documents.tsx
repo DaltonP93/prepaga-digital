@@ -43,12 +43,17 @@ const Documents: React.FC = () => {
   const [docSaleId, setDocSaleId] = useState("");
 
   const {
-    documents: documentPage,
+    data: documentPage,
     isLoading,
+    error: documentsError,
   } = useDocumentsList({ page, pageSize: 24, search });
   const { createDocument, deleteDocument } = useDocuments();
   const { data: sales } = useSalesLookup(showCreateForm);
-  const { data: selectedDocument, isLoading: isLoadingSelectedDocument } = useDocument(selectedDocumentId);
+  const {
+    data: selectedDocument,
+    isLoading: isLoadingSelectedDocument,
+    error: selectedDocumentError,
+  } = useDocument(selectedDocumentId);
 
   useEffect(() => {
     setPage(1);
@@ -192,6 +197,24 @@ const Documents: React.FC = () => {
           className="pl-10"
         />
       </div>
+
+      {(documentsError || selectedDocumentError) && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="space-y-1">
+            {documentsError && (
+              <p>
+                Error cargando documentos: {(documentsError as Error).message}
+              </p>
+            )}
+            {selectedDocumentError && (
+              <p>
+                Error cargando vista previa: {(selectedDocumentError as Error).message}
+              </p>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Grouped documents */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
