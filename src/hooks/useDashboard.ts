@@ -29,7 +29,7 @@ export const useDashboardStats = () => {
             query = query.eq('salesperson_id', salespersonFilter.salesperson_id);
           }
           if (status) {
-            query = query.eq('status', status);
+            query = query.eq('status', status as any);
           }
           if (dateFrom) {
             query = query.gte('created_at', dateFrom);
