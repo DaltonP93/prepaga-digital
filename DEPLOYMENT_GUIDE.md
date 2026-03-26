@@ -102,11 +102,11 @@ https://ykducvvcjzdpoojxlsig.supabase.co/functions/v1/whatsapp-webhook
    - `https://tu-dominio.com/auth-callback`
 
 ### **3. Configuración de Dominio**
-1. **En Lovable**: 
-   - Ir a Project Settings > Domains
-   - Agregar tu dominio personalizado
-   - Seguir instrucciones de DNS
-2. **Configurar SSL**: Automático con Lovable
+1. **En tu proveedor de hosting**:
+   - Configurar el dominio personalizado
+   - Apuntar los registros DNS al entorno productivo
+   - Verificar la propagación DNS
+2. **Configurar SSL**: activar HTTPS en el proveedor de hosting o proxy inverso
 
 ### **4. Configuración de Stripe (REQUERIDO)**
 1. Crear cuenta en [Stripe](https://stripe.com)
@@ -125,7 +125,7 @@ https://ykducvvcjzdpoojxlsig.supabase.co/functions/v1/whatsapp-webhook
 ### **Para iOS/Android nativo:**
 1. **Exportar a GitHub**:
    ```bash
-   # Usar botón "Export to GitHub" en Lovable
+   # Clonar el repositorio principal
    git clone tu-repo.git
    cd tu-proyecto
    ```
@@ -193,7 +193,7 @@ Una vez deployado, verificar:
 - ✅ Point-in-time recovery: Últimos 7 días
 
 ### **Updates:**
-- Usar Lovable para actualizaciones de UI/funcionalidad
+- Usar el repositorio principal para actualizaciones de UI/funcionalidad
 - Migraciones de DB vía Supabase Dashboard
 - Deploy automático de edge functions
 

@@ -37,7 +37,7 @@ export const SessionTimeoutProvider = ({ children }: SessionTimeoutProviderProps
   const { user, signOut } = useSimpleAuthContext();
 
   // Solo activar en producción
-  const isProduction = window.location.hostname !== 'localhost' && !window.location.hostname.includes('lovableproject.com');
+  const isProduction = window.location.hostname !== 'localhost';
 
   // Cargar configuración
   useEffect(() => {

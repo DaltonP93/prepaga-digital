@@ -1,12 +1,12 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'app.lovable.8c2da35671bf472ba39e2298129c2aa9',
+  appId: 'py.com.samap.prepagadigital',
   appName: 'prepaga-digital',
   webDir: 'dist',
   bundledWebRuntime: false,
   server: {
-    url: 'https://8c2da356-71bf-472b-a39e-2298129c2aa9.lovableproject.com?forceHideBadge=true',
+    url: 'https://prepaga.saa.com.py',
     cleartext: true
   },
   plugins: {

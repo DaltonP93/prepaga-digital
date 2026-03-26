@@ -32,7 +32,7 @@ const EXAMPLE_DATA: Record<string, string> = {
   '{{clientName}}': 'Juan Pérez',
   '{{contractNumber}}': 'CT-2026-0042',
   '{{expirationDate}}': '10/03/2026 23:59',
-  '{{signatureUrl}}': 'https://prepaga-digital.lovable.app/firmar/abc123',
+  '{{signatureUrl}}': 'https://prepaga.saa.com.py/firmar/abc123',
   '{{planName}}': 'Plan Familiar Plus',
 };
 

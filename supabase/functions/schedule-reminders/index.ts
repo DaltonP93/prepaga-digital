@@ -102,7 +102,8 @@ serve(async (req) => {
 
       if (daysUntilExpiration > 3) continue
 
-      const signatureUrl = `${supabaseUrl.replace('.supabase.co', '.lovable.app')}/firmar/${link.token}`
+      const publicAppUrl = Deno.env.get('PUBLIC_APP_URL') || 'https://prepaga.saa.com.py'
+      const signatureUrl = `${publicAppUrl}/firmar/${link.token}`
 
       try {
         const response = await fetch(`${supabaseUrl}/functions/v1/send-whatsapp`, {
