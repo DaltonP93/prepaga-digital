@@ -16,7 +16,7 @@ import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { toast } from 'sonner';
 
 export const OtpPolicyConfigPanel: React.FC = () => {
-  const { policy, isLoading, updatePolicy, isUpdating } = useOtpPolicy();
+  const { policy, isLoading, updatePolicyAsync, isUpdating } = useOtpPolicy();
   const { configuration: apiConfig, isLoading: isLoadingApiConfig, updateConfigurationAsync, isUpdating: isUpdatingApiConfig } = useCompanyApiConfiguration();
   const [formData, setFormData] = useState<OtpPolicyConfig>(policy);
   const [apiFormData, setApiFormData] = useState<CompanyApiConfig>(apiConfig);
@@ -58,12 +58,16 @@ export const OtpPolicyConfigPanel: React.FC = () => {
   const handleSave = async () => {
     const { id, company_id, ...updates } = formData;
     try {
+      if (formData.whatsapp_otp_enabled && apiFormData.whatsapp_provider === 'wame_fallback') {
+        toast.error('wa.me es un modo manual. Para OTP por WhatsApp usa Meta, Twilio o Sesión QR.');
+        return;
+      }
       await updateConfigurationAsync({
         whatsapp_provider: apiFormData.whatsapp_provider,
         whatsapp_gateway_url: apiFormData.whatsapp_gateway_url,
         whatsapp_linked_phone: apiFormData.whatsapp_linked_phone,
       });
-      updatePolicy(updates);
+      await updatePolicyAsync(updates);
     } catch {
       // Error feedback comes from the hook mutation.
     }

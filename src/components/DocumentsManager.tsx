@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Trash2, Plus, Download } from 'lucide-react';
+import { Trash2, Plus, Download, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { DocumentPreviewDialog } from '@/components/documents/DocumentPreviewDialog';
 
 interface DocumentsManagerProps {
   saleId: string;
@@ -20,6 +21,7 @@ export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) =>
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [previewDocument, setPreviewDocument] = useState<any>(null);
 
   const { data: documents = [], isLoading } = useQuery({
     queryKey: ['sale-detail-documents', saleId],
@@ -124,6 +126,32 @@ export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) =>
     }
   };
 
+  const handleDownload = async (document: { file_url: string | null; name: string }) => {
+    if (!document.file_url) {
+      toast({
+        title: 'Documento sin archivo',
+        description: 'Este documento no tiene un archivo descargable asociado.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const { data, error } = await supabase.storage
+      .from('documents')
+      .createSignedUrl(document.file_url, 3600);
+
+    if (error || !data?.signedUrl) {
+      toast({
+        title: 'Error',
+        description: 'No se pudo generar el enlace de descarga.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+  };
+
   if (isLoading) {
     return <div>Cargando documentos...</div>;
   }
@@ -200,7 +228,10 @@ export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) =>
                   </TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" onClick={() => setPreviewDocument(document)}>
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleDownload(document)}>
                         <Download className="h-4 w-4" />
                       </Button>
                       <Button
@@ -223,6 +254,11 @@ export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) =>
           </p>
         )}
       </CardContent>
+      <DocumentPreviewDialog
+        open={!!previewDocument}
+        onOpenChange={(open) => !open && setPreviewDocument(null)}
+        document={previewDocument}
+      />
     </Card>
   );
 };

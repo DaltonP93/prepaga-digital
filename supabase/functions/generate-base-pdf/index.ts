@@ -44,6 +44,7 @@ function buildWrappedHtml(
     font-family: Arial, Helvetica, sans-serif;
     font-size: 12px;
     color: #222;
+    width: 100%;
   }
 
   /* ── Fixed header – repeats on every page ── */
@@ -98,22 +99,36 @@ function buildWrappedHtml(
 
   /* ── Main content ── */
   .content {
-    /* flows naturally between header/footer margins */
+    width: 100%;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   /* Ensure images in content don't overflow */
-  .content img {
-    max-width: 100%;
-    height: auto;
+  .content img,
+  .content svg,
+  .content canvas,
+  .content iframe {
+    max-width: 100% !important;
+    height: auto !important;
   }
 
   /* Table styling for content tables */
   .content table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
   }
   .content table td, .content table th {
     padding: 4px 6px;
+    word-break: break-word;
+  }
+
+  .content > *,
+  .content .ProseMirror,
+  .content [style*="width"] {
+    max-width: 100% !important;
   }
 </style>
 </head>

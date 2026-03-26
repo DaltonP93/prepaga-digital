@@ -390,6 +390,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       const templatesWithAttachments = new Set((allAttachments || []).map((a: any) => a.template_id));
       // Build a map of template_id -> first PDF attachment for direct file linking
       const templatePdfAttachmentMap = new Map<string, any>();
+      const directAnnexTemplateIds = new Set<string>();
       for (const att of (allAttachments as any[] || [])) {
         const isPDF = att.file_type === 'application/pdf' || att.file_name?.endsWith('.pdf');
         if (isPDF && !templatePdfAttachmentMap.has(att.template_id)) {
@@ -419,6 +420,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
 
           const pdfAttachment = isAnexo ? templatePdfAttachmentMap.get(template.id) : null;
           if (isAnexo && pdfAttachment) {
+            directAnnexTemplateIds.add(template.id);
             return {
               sale_id: saleId,
               name: template.name,
@@ -536,7 +538,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         (templateContents || []).filter((t: any) => !!t.content?.trim()).map((t: any) => t.id)
       );
       const attachmentDocuments = allAttachments
-        .filter((att: any) => !templatesWithContent.has(att.template_id))
+        .filter((att: any) => !templatesWithContent.has(att.template_id) && !directAnnexTemplateIds.has(att.template_id))
         .map((att: any) => {
           const parentTemplateName = templateNameById.get(att.template_id);
           const isAnexoPlanAttachment = isAnexoPlanName(parentTemplateName) || isAnexoPlanName(att.file_name);
@@ -758,6 +760,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       const context = createEnhancedTemplateContext(client, plan, company, sale, effectiveBeneficiaries, undefined, responsesMap);
       const templatesWithAttachments = new Set(allAttachments.map((a: any) => a.template_id));
       const templatePdfAttachmentMap = new Map<string, any>();
+      const directAnnexTemplateIds = new Set<string>();
       for (const attachment of allAttachments) {
         const isPDF = attachment.file_type === 'application/pdf' || attachment.file_name?.endsWith('.pdf');
         if (isPDF && !templatePdfAttachmentMap.has(attachment.template_id)) {
@@ -785,6 +788,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           const pdfAttachment = isAnexo ? templatePdfAttachmentMap.get(template.id) : null;
 
           if (isAnexo && pdfAttachment) {
+            directAnnexTemplateIds.add(template.id);
             return {
               sale_id: saleId,
               name: template.name,
@@ -922,7 +926,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         templateContents.filter((t: any) => !!t.content?.trim()).map((t: any) => t.id)
       );
       const attachmentDocuments = allAttachments
-        .filter((att: any) => !templatesWithContent.has(att.template_id))
+        .filter((att: any) => !templatesWithContent.has(att.template_id) && !directAnnexTemplateIds.has(att.template_id))
         .map((att: any) => {
           const parentTemplateName = templateNameById.get(att.template_id);
           return {

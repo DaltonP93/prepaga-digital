@@ -99,6 +99,15 @@ const fetchProfileData = async (userId: string): Promise<{ profile: ProfileWithR
   }
 };
 
+const ensureActiveProfile = async (profile: ProfileWithRole | null) => {
+  if (profile?.is_active === false) {
+    preserveBrandingStorage();
+    sessionStorage.clear();
+    await supabase.auth.signOut();
+    throw new Error('Usuario inactivo. Contacta al administrador para reactivar tu acceso.');
+  }
+};
+
 export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<ProfileWithRole | null>(null);
@@ -120,6 +129,15 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           // Fire and forget - don't block UI
           fetchProfileData(session.user.id).then(({ profile: p, role }) => {
             if (!isMounted) return;
+            if (p?.is_active === false) {
+              preserveBrandingStorage();
+              sessionStorage.clear();
+              supabase.auth.signOut();
+              setUser(null);
+              setProfile(null);
+              setUserRole(null);
+              return;
+            }
             setProfile(p);
             setUserRole(role);
           });
@@ -153,6 +171,15 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           setUser(session.user);
           const { profile: p, role } = await fetchProfileData(session.user.id);
           if (!isMounted) return;
+          if (p?.is_active === false) {
+            preserveBrandingStorage();
+            sessionStorage.clear();
+            await supabase.auth.signOut();
+            setUser(null);
+            setProfile(null);
+            setUserRole(null);
+            return;
+          }
           setProfile(p);
           setUserRole(role);
         }
@@ -173,7 +200,7 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       if (error.message.includes('Invalid login credentials')) {
         throw new Error('Credenciales incorrectas. Verifica tu email y contraseña.');
@@ -181,6 +208,11 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         throw new Error('Por favor confirma tu email antes de iniciar sesión.');
       }
       throw error;
+    }
+
+    if (data.user) {
+      const { profile } = await fetchProfileData(data.user.id);
+      await ensureActiveProfile(profile);
     }
   };
 

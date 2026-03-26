@@ -170,10 +170,15 @@ export const useUpdateUser = () => {
         }
       }
 
+      const profilePayload: Record<string, any> = { ...profileUpdates };
+      if (role) {
+        profilePayload.role = role;
+      }
+
       // Update profile fields (exclude role)
       const { error: profileError } = await supabase
         .from('profiles')
-        .update(profileUpdates)
+        .update(profilePayload as any)
         .eq('id', id);
 
       if (profileError) throw profileError;

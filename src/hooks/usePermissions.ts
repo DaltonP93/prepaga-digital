@@ -32,16 +32,15 @@ export const useAvailablePermissions = () => {
   return useQuery({
     queryKey: ['available-permissions'],
     queryFn: async (): Promise<Permission[]> => {
-      console.warn('Permissions table not ready yet, using defaults');
-      return [
-        { id: '1', permission_key: 'dashboard.view', permission_name: 'Ver Dashboard', category: 'dashboard', is_active: true },
-        { id: '2', permission_key: 'sales.view', permission_name: 'Ver Ventas', category: 'sales', is_active: true },
-        { id: '3', permission_key: 'sales.create', permission_name: 'Crear Ventas', category: 'sales', is_active: true },
-        { id: '4', permission_key: 'sales.edit', permission_name: 'Editar Ventas', category: 'sales', is_active: true },
-        { id: '5', permission_key: 'clients.view', permission_name: 'Ver Clientes', category: 'clients', is_active: true },
-        { id: '6', permission_key: 'plans.view', permission_name: 'Ver Planes', category: 'plans', is_active: true },
-        { id: '7', permission_key: 'users.view', permission_name: 'Ver Usuarios', category: 'admin', is_active: true },
-      ];
+      const { data, error } = await supabase
+        .from('available_permissions')
+        .select('id, permission_key, permission_name, description, category, is_active')
+        .eq('is_active', true)
+        .order('category', { ascending: true })
+        .order('permission_name', { ascending: true });
+
+      if (error) throw error;
+      return (data || []) as Permission[];
     },
   });
 };
@@ -66,20 +65,21 @@ export const useUserPermissionsWithDetails = (userId?: string) => {
     queryKey: ['user-permissions-details', userId],
     queryFn: async (): Promise<UserPermissionWithDetails[]> => {
       if (!userId) return [];
-      
-      // Return default structure for now
-      return [
-        {
-          id: '1',
-          user_id: userId,
-          permission_key: 'dashboard.view',
-          granted: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          permission_name: 'Ver Dashboard',
-          category: 'dashboard'
-        }
-      ];
+
+      const { data, error } = await supabase.rpc('get_user_permissions', { user_id: userId });
+      if (error) throw error;
+
+      return ((data as any[]) || []).map((row: any, index) => ({
+        id: row.id || `${userId}-${row.permission_key}-${index}`,
+        user_id: userId,
+        permission_key: row.permission_key,
+        granted: !!row.granted,
+        created_at: row.created_at || new Date().toISOString(),
+        updated_at: row.updated_at || new Date().toISOString(),
+        permission_name: row.permission_name,
+        description: row.description,
+        category: row.category || 'general',
+      }));
     },
     enabled: !!userId,
   });
@@ -96,8 +96,32 @@ export const useUpdateUserPermissions = () => {
       userId: string;
       permissions: { permission_key: string; granted: boolean }[];
     }) => {
-      // For now, just simulate success
-      console.log('Updating permissions for user:', userId, permissions);
+      const { data: currentUser } = await supabase.auth.getUser();
+      const grantedBy = currentUser.user?.id || null;
+
+      const { error: deleteError } = await supabase
+        .from('user_permissions')
+        .delete()
+        .eq('user_id', userId);
+
+      if (deleteError) throw deleteError;
+
+      if (permissions.length === 0) {
+        return true;
+      }
+
+      const rows = permissions.map((permission) => ({
+        user_id: userId,
+        permission_key: permission.permission_key,
+        granted: permission.granted,
+        granted_by: grantedBy,
+      }));
+
+      const { error: insertError } = await supabase
+        .from('user_permissions')
+        .insert(rows as any);
+
+      if (insertError) throw insertError;
       return true;
     },
     onSuccess: (_, variables) => {

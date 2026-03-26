@@ -138,6 +138,7 @@ export const useOtpPolicy = () => {
     policy: policy || DEFAULT_POLICY,
     isLoading,
     updatePolicy: updateMutation.mutate,
+    updatePolicyAsync: updateMutation.mutateAsync,
     isUpdating: updateMutation.isPending,
   };
 };
