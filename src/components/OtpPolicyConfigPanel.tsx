@@ -340,18 +340,6 @@ export const OtpPolicyConfigPanel: React.FC = () => {
                         Endpoint base del servidor gateway. Ej: POST /send-otp
                       </p>
                     </div>
-                    <div>
-                      <Label className="text-xs">Numero vinculado (QR)</Label>
-                      <Input
-                        className="h-9"
-                        value={apiFormData.whatsapp_linked_phone}
-                        onChange={(e) => handleApiConfigChange('whatsapp_linked_phone', e.target.value)}
-                        placeholder="+595974451232"
-                      />
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Numero que escaneo el QR y queda como remitente de los mensajes OTP.
-                      </p>
-                    </div>
                     <div className="rounded-lg border bg-background/40 p-3 text-xs text-muted-foreground">
                       1. Despliega el gateway en tu servidor.
                       <br />
