@@ -17,8 +17,8 @@ function buildWrappedHtml(
   documentName: string
 ): string {
   const logoHtml = company.logo_url
-    ? `<img src="${company.logo_url}" style="max-height:40px;max-width:180px;object-fit:contain;" />`
-    : `<span style="font-weight:700;font-size:16px;">${company.name}</span>`;
+    ? `<img src="${company.logo_url}" style="height:22mm;max-width:280px;width:auto;object-fit:contain;display:block;" />`
+    : `<span style="font-weight:700;font-size:18px;">${company.name}</span>`;
 
   const contactParts: string[] = [];
   if (company.phone) contactParts.push(company.phone);
@@ -33,7 +33,7 @@ function buildWrappedHtml(
 <style>
   @page {
     size: A4;
-    margin: 35mm 15mm 28mm 15mm;
+    margin: 38mm 15mm 28mm 15mm;
   }
 
   * { box-sizing: border-box; }
@@ -50,29 +50,31 @@ function buildWrappedHtml(
   /* ── Fixed header – repeats on every page ── */
   .page-header {
     position: fixed;
-    top: -30mm;
+    top: -33mm;
     left: 0;
     right: 0;
-    height: 25mm;
+    height: 30mm;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 2mm;
+    padding: 2mm 2mm;
     border-bottom: 1.5px solid #333;
   }
   .page-header .logo-area {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex: 1;
   }
   .page-header .doc-name {
-    font-size: 10px;
+    font-size: 9px;
     color: #555;
     text-align: right;
-    max-width: 200px;
+    max-width: 180px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    flex-shrink: 0;
   }
 
   /* ── Fixed footer – repeats on every page ── */
