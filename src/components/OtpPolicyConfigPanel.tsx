@@ -10,16 +10,14 @@ import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { KeyRound, Mail, MessageSquare, Smartphone, Shield, Server, Save, Loader2, Wifi, CheckCircle2, AlertCircle, Phone, TestTube } from 'lucide-react';
 import { useOtpPolicy, OtpPolicyConfig } from '@/hooks/useOtpPolicy';
-import { useCompanyApiConfiguration, type CompanyApiConfig } from '@/hooks/useCompanyApiConfiguration';
+
 import { supabase } from '@/integrations/supabase/client';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { toast } from 'sonner';
 
 export const OtpPolicyConfigPanel: React.FC = () => {
   const { policy, isLoading, updatePolicyAsync, isUpdating } = useOtpPolicy();
-  const { configuration: apiConfig, isLoading: isLoadingApiConfig, updateConfigurationAsync, isUpdating: isUpdatingApiConfig } = useCompanyApiConfiguration();
   const [formData, setFormData] = useState<OtpPolicyConfig>(policy);
-  const [apiFormData, setApiFormData] = useState<CompanyApiConfig>(apiConfig);
   const [testingSmtp, setTestingSmtp] = useState(false);
   const [testingWhatsapp, setTestingWhatsapp] = useState(false);
   const [whatsappTestPhone, setWhatsappTestPhone] = useState('');
@@ -30,17 +28,11 @@ export const OtpPolicyConfigPanel: React.FC = () => {
     if (policy) setFormData(policy);
   }, [policy]);
 
-  useEffect(() => {
-    if (apiConfig) setApiFormData(apiConfig);
-  }, [apiConfig]);
 
   const handleChange = (field: keyof OtpPolicyConfig, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleApiConfigChange = (field: keyof CompanyApiConfig, value: any) => {
-    setApiFormData(prev => ({ ...prev, [field]: value }));
-  };
 
   const toggleChannel = (channel: string) => {
     const current = formData.allowed_channels || [];
@@ -139,7 +131,7 @@ export const OtpPolicyConfigPanel: React.FC = () => {
     }
   };
 
-  if (isLoading || isLoadingApiConfig) {
+  if (isLoading) {
     return (
       <Card>
         <CardContent className="p-6 text-center">
@@ -168,7 +160,7 @@ export const OtpPolicyConfigPanel: React.FC = () => {
             Autenticación multifactor para firma electrónica (ISO 29115)
           </CardDescription>
         </div>
-        <Button onClick={handleSave} disabled={isUpdating || isUpdatingApiConfig} size="sm">
+        <Button onClick={handleSave} disabled={isUpdating} size="sm">
           {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
           Guardar
         </Button>
