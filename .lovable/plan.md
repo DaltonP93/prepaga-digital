@@ -1,48 +1,33 @@
 
 
-# Plan: Add is_active toggle to UserForm + Fix session error on update
+## Separar configuración OTP WhatsApp de firma WhatsApp
 
-## Problems identified
+### Problema
+El toggle "Usar Sesión QR para OTP" en el panel de Canales OTP lee/escribe `company_settings.whatsapp_provider`, que es la misma columna que controla el proveedor de firma en la pestaña WhatsApp. Cambiar uno pisa al otro.
 
-1. **No is_active field in edit form**: The UserForm dialog has no toggle to activate/deactivate a user.
-2. **All updates fail with "Sesión inválida"**: The `useUpdateUser` mutation calls `supabase.auth.getUser()` and throws if no user is found. In the preview environment (and potentially on session expiry), this fails — so both the toggle button in the table AND the save button in the form silently fail.
+### Solución
+La DB ya tiene columnas separadas en `company_otp_policy`: `otp_whatsapp_provider`, `otp_whatsapp_gateway_url`, `otp_use_signature_whatsapp`. El panel OTP debe usar estas columnas en lugar de `company_settings.whatsapp_provider`.
 
-## Changes
+**No se requiere migración de DB** -- las columnas ya existen.
 
-### 1. `src/components/UserForm.tsx` — Add is_active Switch
+### Cambios
 
-In the edit form (after the company selector, before the password section), add:
+**1. `src/hooks/useOtpPolicy.ts`**
+- Agregar 3 campos al interface `OtpPolicyConfig`: `otp_whatsapp_provider`, `otp_whatsapp_gateway_url`, `otp_use_signature_whatsapp`
+- Agregar defaults: `'qr_session'`, `''`, `true`
+- Mapear los campos en `queryFn`
 
-```tsx
-{isEditing && (
-  <div className="flex items-center justify-between border-t pt-4">
-    <Label>Estado del usuario</Label>
-    <Switch
-      checked={watch("is_active")}
-      onCheckedChange={(val) => setValue("is_active", val)}
-    />
-    <Badge variant={watch("is_active") ? "default" : "secondary"}>
-      {watch("is_active") ? "Activo" : "Inactivo"}
-    </Badge>
-  </div>
-)}
-```
+**2. `src/components/OtpPolicyConfigPanel.tsx`**
+- Toggle "Usar Sesión QR": cambiar de `apiFormData.whatsapp_provider` a `formData.otp_whatsapp_provider`
+- Campo URL Gateway: cambiar de `apiFormData.whatsapp_gateway_url` a `formData.otp_whatsapp_gateway_url`
+- Condición de visibilidad del bloque QR: usar `formData.otp_whatsapp_provider === 'qr_session'`
+- Validación en `handleSave`: usar `formData.otp_whatsapp_provider` en vez de `apiFormData.whatsapp_provider`
+- `handleSave`: eliminar la llamada a `updateConfigurationAsync` (ya no toca `company_settings`)
+- `handleTestWhatsapp`: guardar `otp_whatsapp_provider` y `otp_whatsapp_gateway_url` via `updatePolicyAsync` en vez de `updateConfigurationAsync`
+- Botón de prueba: condición disabled usa `formData.otp_whatsapp_gateway_url` en vez de `apiFormData.whatsapp_gateway_url`
 
-Add `is_active` to the form data interface and default values.
-
-### 2. `src/hooks/useUsers.ts` — Fix session validation
-
-The `useUpdateUser` mutation gets the actor via `supabase.auth.getUser()`. If this returns null (preview, expired session), it throws immediately.
-
-**Fix**: Use `supabase.auth.getSession()` as a fallback, and surface a clearer error prompting re-login. Also ensure `is_active` is included in the profile update fields so the toggle actually persists.
-
-### 3. `src/pages/Users.tsx` — Add confirmation dialog for status toggle
-
-Wrap the existing `handleToggleUserStatus` with a confirmation prompt to prevent accidental deactivation. The button already exists and works — it just needs the backend call to succeed (fixed in step 2).
-
-## Summary
-
-- Add is_active Switch inside the UserForm edit dialog
-- Fix the "Sesión inválida" error that blocks all user updates
-- Keep the existing toggle button in the table row (it already calls the right function)
+### Resultado
+- Pestaña **WhatsApp** controla solo cómo se envían links de firma
+- Pestaña **Canales OTP** controla solo cómo se envían códigos OTP
+- Se puede tener wa.me para firma + WAHA para OTP sin conflicto
 
