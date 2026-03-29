@@ -32,7 +32,7 @@ export const useAvailablePermissions = () => {
   return useQuery({
     queryKey: ['available-permissions'],
     queryFn: async (): Promise<Permission[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('available_permissions')
         .select('id, permission_key, permission_name, description, category, is_active')
         .eq('is_active', true)
@@ -66,7 +66,7 @@ export const useUserPermissionsWithDetails = (userId?: string) => {
     queryFn: async (): Promise<UserPermissionWithDetails[]> => {
       if (!userId) return [];
 
-      const { data, error } = await supabase.rpc('get_user_permissions', { user_id: userId });
+      const { data, error } = await (supabase.rpc as any)('get_user_permissions', { user_id: userId });
       if (error) throw error;
 
       return ((data as any[]) || []).map((row: any, index) => ({
@@ -99,7 +99,7 @@ export const useUpdateUserPermissions = () => {
       const { data: currentUser } = await supabase.auth.getUser();
       const grantedBy = currentUser.user?.id || null;
 
-      const { error: deleteError } = await supabase
+      const { error: deleteError } = await (supabase as any)
         .from('user_permissions')
         .delete()
         .eq('user_id', userId);
@@ -117,9 +117,9 @@ export const useUpdateUserPermissions = () => {
         granted_by: grantedBy,
       }));
 
-      const { error: insertError } = await supabase
+      const { error: insertError } = await (supabase as any)
         .from('user_permissions')
-        .insert(rows as any);
+        .insert(rows);
 
       if (insertError) throw insertError;
       return true;
