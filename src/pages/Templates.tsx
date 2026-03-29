@@ -79,7 +79,7 @@ const Templates = () => {
   const [sortBy, setSortBy] = useState<string>("recent");
   const [openInNewTab, setOpenInNewTab] = useState(false);
 
-  const typedTemplates = templates as ExtendedTemplate[];
+  const typedTemplates = templates as unknown as ExtendedTemplate[];
 
   const handleEditTemplate = (template: Template) => {
     if (openInNewTab) {
