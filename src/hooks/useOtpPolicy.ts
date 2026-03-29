@@ -20,6 +20,9 @@ export interface OtpPolicyConfig {
   smtp_from_address: string;
   smtp_from_name: string;
   smtp_tls: boolean;
+  otp_whatsapp_provider: string;
+  otp_whatsapp_gateway_url: string;
+  otp_use_signature_whatsapp: boolean;
 }
 
 const DEFAULT_POLICY: OtpPolicyConfig = {
