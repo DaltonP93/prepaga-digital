@@ -58,15 +58,10 @@ export const OtpPolicyConfigPanel: React.FC = () => {
   const handleSave = async () => {
     const { id, company_id, ...updates } = formData;
     try {
-      if (formData.whatsapp_otp_enabled && apiFormData.whatsapp_provider === 'wame_fallback') {
+      if (formData.whatsapp_otp_enabled && formData.otp_whatsapp_provider === 'wame_fallback') {
         toast.error('wa.me es un modo manual. Para OTP por WhatsApp usa Meta, Twilio o Sesión QR.');
         return;
       }
-      await updateConfigurationAsync({
-        whatsapp_provider: apiFormData.whatsapp_provider,
-        whatsapp_gateway_url: apiFormData.whatsapp_gateway_url,
-        whatsapp_linked_phone: apiFormData.whatsapp_linked_phone,
-      });
       await updatePolicyAsync(updates);
     } catch {
       // Error feedback comes from the hook mutation.
@@ -117,10 +112,9 @@ export const OtpPolicyConfigPanel: React.FC = () => {
 
     setTestingWhatsapp(true);
     try {
-      await updateConfigurationAsync({
-        whatsapp_provider: apiFormData.whatsapp_provider,
-        whatsapp_gateway_url: apiFormData.whatsapp_gateway_url,
-        whatsapp_linked_phone: apiFormData.whatsapp_linked_phone,
+      await updatePolicyAsync({
+        otp_whatsapp_provider: formData.otp_whatsapp_provider,
+        otp_whatsapp_gateway_url: formData.otp_whatsapp_gateway_url,
       });
 
       const { data, error } = await supabase.functions.invoke('signature-otp', {
@@ -328,18 +322,18 @@ export const OtpPolicyConfigPanel: React.FC = () => {
                     </p>
                   </div>
                   <Switch
-                    checked={apiFormData.whatsapp_provider === 'qr_session'}
-                    onCheckedChange={(enabled) => handleApiConfigChange('whatsapp_provider', enabled ? 'qr_session' : 'meta')}
+                    checked={formData.otp_whatsapp_provider === 'qr_session'}
+                    onCheckedChange={(enabled) => handleChange('otp_whatsapp_provider', enabled ? 'qr_session' : 'meta')}
                   />
                 </div>
-                {apiFormData.whatsapp_provider === 'qr_session' && (
+                {formData.otp_whatsapp_provider === 'qr_session' && (
                   <div className="space-y-3">
                     <div>
                       <Label className="text-xs">URL del Gateway</Label>
                       <Input
                         className="h-9"
-                        value={apiFormData.whatsapp_gateway_url}
-                        onChange={(e) => handleApiConfigChange('whatsapp_gateway_url', e.target.value)}
+                        value={formData.otp_whatsapp_gateway_url}
+                        onChange={(e) => handleChange('otp_whatsapp_gateway_url', e.target.value)}
                         placeholder="https://tu-gateway-whatsapp.com"
                       />
                       <p className="mt-1 text-xs text-muted-foreground">
@@ -380,7 +374,7 @@ export const OtpPolicyConfigPanel: React.FC = () => {
                         <Button
                           type="button"
                           variant="outline"
-                          disabled={testingWhatsapp || !whatsappTestPhone || !apiFormData.whatsapp_gateway_url || !apiFormData.whatsapp_linked_phone}
+                          disabled={testingWhatsapp || !whatsappTestPhone || !formData.otp_whatsapp_gateway_url}
                           onClick={handleTestWhatsapp}
                         >
                           {testingWhatsapp ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Enviar prueba'}
