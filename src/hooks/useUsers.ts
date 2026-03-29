@@ -171,9 +171,7 @@ export const useUpdateUser = () => {
       }
 
       const profilePayload: Record<string, any> = { ...profileUpdates };
-      if (role) {
-        profilePayload.role = role;
-      }
+      // role is handled separately via user_roles table below
 
       // Update profile fields (exclude role)
       const { error: profileError } = await supabase
