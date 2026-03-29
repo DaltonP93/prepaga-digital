@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { toast } from 'sonner';
 import { Eye, EyeOff, Monitor, Moon, Shield, Sun } from 'lucide-react';
@@ -18,6 +19,7 @@ export const SimpleLoginForm = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const [isCheckingBootstrap, setIsCheckingBootstrap] = useState(true);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
   const [canBootstrapSuperAdmin, setCanBootstrapSuperAdmin] = useState(false);
@@ -89,6 +91,7 @@ export const SimpleLoginForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginError(null);
 
     if (!email || !password) {
       toast.error('Por favor completa todos los campos');
@@ -106,7 +109,9 @@ export const SimpleLoginForm = () => {
 
     } catch (error: any) {
       console.error('❌ SimpleLoginForm: Error en login:', error);
-      toast.error(error.message || 'Error al iniciar sesión');
+      const message = error.message || 'Error al iniciar sesión';
+      setLoginError(message);
+      toast.error(message);
     } finally {
       setIsLoggingIn(false);
     }
@@ -230,13 +235,22 @@ export const SimpleLoginForm = () => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {loginError ? (
+              <Alert variant="destructive">
+                <AlertDescription>{loginError}</AlertDescription>
+              </Alert>
+            ) : null}
+
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (loginError) setLoginError(null);
+                }}
                 placeholder="tu@email.com"
                 required
                 disabled={isLoggingIn}
@@ -252,7 +266,10 @@ export const SimpleLoginForm = () => {
                   id="password"
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (loginError) setLoginError(null);
+                  }}
                   placeholder="Tu contraseña"
                   required
                   disabled={isLoggingIn}

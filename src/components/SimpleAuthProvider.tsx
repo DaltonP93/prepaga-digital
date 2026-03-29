@@ -108,6 +108,16 @@ const ensureActiveProfile = async (profile: ProfileWithRole | null) => {
   }
 };
 
+const clearAuthState = (
+  setUser: React.Dispatch<React.SetStateAction<User | null>>,
+  setProfile: React.Dispatch<React.SetStateAction<ProfileWithRole | null>>,
+  setUserRole: React.Dispatch<React.SetStateAction<string | null>>
+) => {
+  setUser(null);
+  setProfile(null);
+  setUserRole(null);
+};
+
 export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<ProfileWithRole | null>(null);
@@ -125,26 +135,31 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         console.log('🔄 Auth state change:', event);
 
         if (event === 'SIGNED_IN' && session?.user) {
-          setUser(session.user);
-          // Fire and forget - don't block UI
-          fetchProfileData(session.user.id).then(({ profile: p, role }) => {
-            if (!isMounted) return;
-            if (p?.is_active === false) {
-              preserveBrandingStorage();
-              sessionStorage.clear();
-              supabase.auth.signOut();
-              setUser(null);
-              setProfile(null);
-              setUserRole(null);
-              return;
-            }
-            setProfile(p);
-            setUserRole(role);
-          });
+          setLoading(true);
+          fetchProfileData(session.user.id)
+            .then(async ({ profile: p, role }) => {
+              if (!isMounted) return;
+              if (p?.is_active === false) {
+                preserveBrandingStorage();
+                sessionStorage.clear();
+                await supabase.auth.signOut();
+                clearAuthState(setUser, setProfile, setUserRole);
+                return;
+              }
+              setUser(session.user);
+              setProfile(p);
+              setUserRole(role);
+            })
+            .catch((error) => {
+              console.error('❌ Error resolving SIGNED_IN profile:', error);
+              if (!isMounted) return;
+              clearAuthState(setUser, setProfile, setUserRole);
+            })
+            .finally(() => {
+              if (isMounted) setLoading(false);
+            });
         } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setProfile(null);
-          setUserRole(null);
+          clearAuthState(setUser, setProfile, setUserRole);
           preserveBrandingStorage();
           sessionStorage.clear();
         } else if (event === 'TOKEN_REFRESHED' && session?.user) {
@@ -168,18 +183,16 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (!isMounted) return;
 
         if (session?.user) {
-          setUser(session.user);
           const { profile: p, role } = await fetchProfileData(session.user.id);
           if (!isMounted) return;
           if (p?.is_active === false) {
             preserveBrandingStorage();
             sessionStorage.clear();
             await supabase.auth.signOut();
-            setUser(null);
-            setProfile(null);
-            setUserRole(null);
+            clearAuthState(setUser, setProfile, setUserRole);
             return;
           }
+          setUser(session.user);
           setProfile(p);
           setUserRole(role);
         }
