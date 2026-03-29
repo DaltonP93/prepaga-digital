@@ -56,6 +56,15 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
   const currentStatus = (sale?.status || 'borrador') as SaleStatus;
   const isEditAllowed = !isEditing || canEditState(currentStatus);
   const isAuditorOrAbove = role === 'auditor' || role === 'admin' || role === 'super_admin';
+
+  // Lock ALL form fields once audit approves — no edits allowed past this point
+  const AUDIT_LOCKED_STATUSES: SaleStatus[] = [
+    'aprobado_para_templates', 'listo_para_enviar', 'enviado',
+    'firmado_parcial', 'firmado', 'completado', 'expirado',
+  ];
+  const isAuditLocked =
+    (sale?.audit_status === 'aprobado' || AUDIT_LOCKED_STATUSES.includes(currentStatus)) &&
+    role !== 'super_admin' && role !== 'admin';
   const statusLabel = SALE_STATUS_LABELS[currentStatus] || currentStatus;
 
   const [formData, setFormData] = useState({
@@ -184,7 +193,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver
           </Button>
-          {isEditAllowed && (
+          {isEditAllowed && !isAuditLocked && (
             <Button onClick={handleSave} disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
               {isEditing ? 'Guardar Cambios' : 'Crear Venta'}
@@ -247,7 +256,16 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
         </div>
       </div>
 
-      {!isEditAllowed && isEditing && (
+      {isAuditLocked && isEditing && (
+        <Alert variant="default" className="border-green-400 bg-green-50 dark:bg-green-950/20">
+          <Lock className="h-4 w-4 text-green-700" />
+          <AlertDescription className="text-green-800 dark:text-green-300">
+            Esta venta fue <strong>aprobada por auditoría</strong> y está bloqueada para edición. Solo se pueden ver los datos.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {!isAuditLocked && !isEditAllowed && isEditing && (
         <Alert variant="default" className="border-amber-300 bg-amber-50">
           <Lock className="h-4 w-4 text-amber-600" />
           <AlertDescription className="text-amber-800">
@@ -309,8 +327,9 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
             </TabsList>
 
             <div className="mt-6">
+              <fieldset disabled={isAuditLocked} style={{ all: 'unset', display: 'contents' }}>
               <TabsContent value="basico">
-                <fieldset disabled={!isEditAllowed}>
+                <fieldset disabled={!isEditAllowed && !isAuditLocked}>
                   <SaleBasicTab
                     formData={formData}
                     onChange={handleChange}
@@ -320,15 +339,19 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
               </TabsContent>
 
               <TabsContent value="adherentes">
-                <SaleAdherentsTab saleId={sale?.id} />
+                <SaleAdherentsTab saleId={sale?.id} disabled={isAuditLocked} />
               </TabsContent>
 
               <TabsContent value="documentos">
-                <SaleDocumentsTab saleId={sale?.id} />
+                <fieldset disabled={isAuditLocked}>
+                  <SaleDocumentsTab saleId={sale?.id} />
+                </fieldset>
               </TabsContent>
 
               <TabsContent value="ddjj">
-                <SaleDDJJTab saleId={sale?.id} />
+                <fieldset disabled={isAuditLocked}>
+                  <SaleDDJJTab saleId={sale?.id} />
+                </fieldset>
               </TabsContent>
 
               <TabsContent value="templates">
@@ -336,8 +359,10 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                   saleId={sale?.id}
                   auditStatus={sale?.audit_status}
                   saleStatus={sale?.status}
+                  disabled={isAuditLocked}
                 />
               </TabsContent>
+              </fieldset>
 
               {isEditing && isAuditorOrAbove && (
                 <TabsContent value="auditoria">
