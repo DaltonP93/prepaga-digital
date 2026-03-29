@@ -20,6 +20,9 @@ export interface OtpPolicyConfig {
   smtp_from_address: string;
   smtp_from_name: string;
   smtp_tls: boolean;
+  otp_whatsapp_provider: string;
+  otp_whatsapp_gateway_url: string;
+  otp_use_signature_whatsapp: boolean;
 }
 
 const DEFAULT_POLICY: OtpPolicyConfig = {
@@ -37,6 +40,9 @@ const DEFAULT_POLICY: OtpPolicyConfig = {
   smtp_from_address: '',
   smtp_from_name: '',
   smtp_tls: true,
+  otp_whatsapp_provider: 'qr_session',
+  otp_whatsapp_gateway_url: '',
+  otp_use_signature_whatsapp: true,
 };
 
 export const useOtpPolicy = () => {
@@ -78,6 +84,9 @@ export const useOtpPolicy = () => {
         smtp_from_address: (data as any).smtp_from_address ?? '',
         smtp_from_name: (data as any).smtp_from_name ?? '',
         smtp_tls: (data as any).smtp_tls ?? true,
+        otp_whatsapp_provider: (data as any).otp_whatsapp_provider ?? 'qr_session',
+        otp_whatsapp_gateway_url: (data as any).otp_whatsapp_gateway_url ?? '',
+        otp_use_signature_whatsapp: (data as any).otp_use_signature_whatsapp ?? true,
       };
     },
     enabled: !!profile?.company_id,
