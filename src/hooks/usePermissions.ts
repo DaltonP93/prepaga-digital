@@ -28,20 +28,52 @@ export interface UserPermissionWithDetails extends UserPermission {
   category: string;
 }
 
+const FALLBACK_PERMISSIONS: Permission[] = [
+  { id: 'f1', permission_key: 'dashboard.view', permission_name: 'Ver Dashboard', description: 'Acceso al dashboard principal', category: 'dashboard', is_active: true },
+  { id: 'f2', permission_key: 'sales.view', permission_name: 'Ver Ventas', description: 'Acceso a la lista de ventas', category: 'sales', is_active: true },
+  { id: 'f3', permission_key: 'sales.create', permission_name: 'Crear Ventas', description: 'Crear nuevas ventas', category: 'sales', is_active: true },
+  { id: 'f4', permission_key: 'sales.edit', permission_name: 'Editar Ventas', description: 'Modificar ventas existentes', category: 'sales', is_active: true },
+  { id: 'f5', permission_key: 'sales.delete', permission_name: 'Eliminar Ventas', description: 'Eliminar ventas', category: 'sales', is_active: true },
+  { id: 'f6', permission_key: 'clients.view', permission_name: 'Ver Clientes', description: 'Acceso a la lista de clientes', category: 'clients', is_active: true },
+  { id: 'f7', permission_key: 'clients.create', permission_name: 'Crear Clientes', description: 'Crear nuevos clientes', category: 'clients', is_active: true },
+  { id: 'f8', permission_key: 'clients.edit', permission_name: 'Editar Clientes', description: 'Modificar clientes existentes', category: 'clients', is_active: true },
+  { id: 'f9', permission_key: 'plans.view', permission_name: 'Ver Planes', description: 'Acceso a la lista de planes', category: 'plans', is_active: true },
+  { id: 'f10', permission_key: 'plans.create', permission_name: 'Crear Planes', description: 'Crear nuevos planes', category: 'plans', is_active: true },
+  { id: 'f11', permission_key: 'plans.edit', permission_name: 'Editar Planes', description: 'Modificar planes existentes', category: 'plans', is_active: true },
+  { id: 'f12', permission_key: 'documents.view', permission_name: 'Ver Documentos', description: 'Acceso a documentos', category: 'documents', is_active: true },
+  { id: 'f13', permission_key: 'templates.view', permission_name: 'Ver Templates', description: 'Acceso a templates', category: 'templates', is_active: true },
+  { id: 'f14', permission_key: 'templates.create', permission_name: 'Crear Templates', description: 'Crear nuevos templates', category: 'templates', is_active: true },
+  { id: 'f15', permission_key: 'templates.edit', permission_name: 'Editar Templates', description: 'Modificar templates existentes', category: 'templates', is_active: true },
+  { id: 'f16', permission_key: 'analytics.view', permission_name: 'Ver Analytics', description: 'Acceso a analytics', category: 'analytics', is_active: true },
+  { id: 'f17', permission_key: 'users.view', permission_name: 'Ver Usuarios', description: 'Acceso a la gestión de usuarios', category: 'admin', is_active: true },
+  { id: 'f18', permission_key: 'users.create', permission_name: 'Crear Usuarios', description: 'Crear nuevos usuarios', category: 'admin', is_active: true },
+  { id: 'f19', permission_key: 'users.edit', permission_name: 'Editar Usuarios', description: 'Modificar usuarios existentes', category: 'admin', is_active: true },
+  { id: 'f20', permission_key: 'companies.view', permission_name: 'Ver Empresas', description: 'Acceso a la gestión de empresas', category: 'admin', is_active: true },
+  { id: 'f21', permission_key: 'companies.create', permission_name: 'Crear Empresas', description: 'Crear nuevas empresas', category: 'admin', is_active: true },
+  { id: 'f22', permission_key: 'companies.edit', permission_name: 'Editar Empresas', description: 'Modificar empresas existentes', category: 'admin', is_active: true },
+  { id: 'f23', permission_key: 'audit.view', permission_name: 'Ver Auditoría', description: 'Acceso a logs de auditoría', category: 'admin', is_active: true },
+  { id: 'f24', permission_key: 'experience.view', permission_name: 'Ver Configuración', description: 'Acceso a configuración del sistema', category: 'admin', is_active: true },
+];
+
 export const useAvailablePermissions = () => {
   return useQuery({
     queryKey: ['available-permissions'],
     queryFn: async (): Promise<Permission[]> => {
-      const { data, error } = await (supabase as any)
-        .from('available_permissions')
-        .select('id, permission_key, permission_name, description, category, is_active')
-        .eq('is_active', true)
-        .order('category', { ascending: true })
-        .order('permission_name', { ascending: true });
+      try {
+        const { data, error } = await (supabase as any)
+          .from('available_permissions')
+          .select('id, permission_key, permission_name, description, category, is_active')
+          .eq('is_active', true)
+          .order('category', { ascending: true })
+          .order('permission_name', { ascending: true });
 
-      if (error) throw error;
-      return (data || []) as Permission[];
+        if (error || !data || data.length === 0) return FALLBACK_PERMISSIONS;
+        return data as Permission[];
+      } catch {
+        return FALLBACK_PERMISSIONS;
+      }
     },
+    staleTime: 0,
   });
 };
 
@@ -66,7 +98,7 @@ export const useUserPermissionsWithDetails = (userId?: string) => {
     queryFn: async (): Promise<UserPermissionWithDetails[]> => {
       if (!userId) return [];
 
-      const { data, error } = await (supabase.rpc as any)('get_user_permissions', { user_id: userId });
+      const { data, error } = await (supabase.rpc as any)('get_user_permissions', { _user_id: userId });
       if (error) throw error;
 
       return ((data as any[]) || []).map((row: any, index) => ({

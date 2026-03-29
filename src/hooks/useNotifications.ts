@@ -36,6 +36,27 @@ export const useNotifications = () => {
         .eq('id', notificationId);
       
       if (error) throw error;
+      return notificationId;
+    },
+    onMutate: async (notificationId: string) => {
+      await queryClient.cancelQueries({ queryKey: ['notifications'] });
+
+      const previousNotifications = queryClient.getQueryData<NotificationRow[]>(['notifications']);
+
+      queryClient.setQueryData<NotificationRow[]>(['notifications'], (current = []) =>
+        current.map((notification) =>
+          notification.id === notificationId
+            ? { ...notification, is_read: true }
+            : notification
+        )
+      );
+
+      return { previousNotifications };
+    },
+    onError: (_error, _notificationId, context) => {
+      if (context?.previousNotifications) {
+        queryClient.setQueryData(['notifications'], context.previousNotifications);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
@@ -106,6 +127,7 @@ export const useNotifications = () => {
     isLoading,
     error,
     markAsRead: markAsReadMutation.mutate,
+    markAsReadAsync: markAsReadMutation.mutateAsync,
     markAllAsRead: markAllAsReadMutation.mutate,
     sendSignatureNotification,
     isSending,

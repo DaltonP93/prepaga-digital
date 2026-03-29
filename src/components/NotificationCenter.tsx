@@ -20,6 +20,7 @@ const NotificationCenter = () => {
     unreadCount,
     isLoading,
     markAsRead,
+    markAsReadAsync,
     markAllAsRead,
   } = useNotifications();
 
@@ -215,10 +216,15 @@ const NotificationCenter = () => {
                               variant="link"
                               size="sm"
                               className="h-auto p-0 text-xs mt-2"
-                              onClick={() => {
-                                window.location.href = notification.link!;
-                                markAsRead(notification.id);
-                                setIsOpen(false);
+                              onClick={async () => {
+                                try {
+                                  if (!notification.is_read) {
+                                    await markAsReadAsync(notification.id);
+                                  }
+                                } finally {
+                                  setIsOpen(false);
+                                  window.location.href = notification.link!;
+                                }
                               }}
                             >
                               Ver más →
