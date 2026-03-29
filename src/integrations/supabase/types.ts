@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "14.4"
   }
   public: {
     Tables: {
@@ -173,6 +173,36 @@ export type Database = {
           ip_address?: string | null
           success?: boolean | null
           user_agent?: string | null
+        }
+        Relationships: []
+      }
+      available_permissions: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          permission_key: string
+          permission_name: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          permission_key: string
+          permission_name: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          permission_key?: string
+          permission_name?: string
         }
         Relationships: []
       }
@@ -608,6 +638,9 @@ export type Database = {
           max_attempts: number
           otp_expiration_seconds: number
           otp_length: number
+          otp_use_signature_whatsapp: boolean | null
+          otp_whatsapp_gateway_url: string | null
+          otp_whatsapp_provider: string | null
           require_otp_for_signature: boolean
           smtp_from_address: string | null
           smtp_from_name: string | null
@@ -629,6 +662,9 @@ export type Database = {
           max_attempts?: number
           otp_expiration_seconds?: number
           otp_length?: number
+          otp_use_signature_whatsapp?: boolean | null
+          otp_whatsapp_gateway_url?: string | null
+          otp_whatsapp_provider?: string | null
           require_otp_for_signature?: boolean
           smtp_from_address?: string | null
           smtp_from_name?: string | null
@@ -650,6 +686,9 @@ export type Database = {
           max_attempts?: number
           otp_expiration_seconds?: number
           otp_length?: number
+          otp_use_signature_whatsapp?: boolean | null
+          otp_whatsapp_gateway_url?: string | null
+          otp_whatsapp_provider?: string | null
           require_otp_for_signature?: boolean
           smtp_from_address?: string | null
           smtp_from_name?: string | null
@@ -3483,6 +3522,36 @@ export type Database = {
           },
         ]
       }
+      user_permissions: {
+        Row: {
+          created_at: string
+          granted: boolean
+          granted_by: string | null
+          id: string
+          permission_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted?: boolean
+          granted_by?: string | null
+          id?: string
+          permission_key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted?: boolean
+          granted_by?: string | null
+          id?: string
+          permission_key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -3727,6 +3796,13 @@ export type Database = {
       get_sale_id_from_signature_token: { Args: never; Returns: string }
       get_signature_link_id_from_token: { Args: never; Returns: string }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
+      get_user_permissions: {
+        Args: { _user_id: string }
+        Returns: {
+          granted: boolean
+          permission_key: string
+        }[]
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -3736,6 +3812,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      user_has_permission: {
+        Args: { _permission_key: string; _user_id: string }
         Returns: boolean
       }
     }

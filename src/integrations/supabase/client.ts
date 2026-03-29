@@ -2,48 +2,8 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-const PROJECT_MARKER_KEY = 'samap_supabase_project_ref';
-
-if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-  throw new Error('Missing Supabase environment variables');
-}
-
-const resetSupabaseSessionForProjectSwitch = () => {
-  if (typeof window === 'undefined' || !SUPABASE_PROJECT_ID) return;
-
-  try {
-    const previousProjectRef = localStorage.getItem(PROJECT_MARKER_KEY);
-
-    if (previousProjectRef && previousProjectRef !== SUPABASE_PROJECT_ID) {
-      const keysToRemove: string[] = [];
-
-      for (let index = 0; index < localStorage.length; index += 1) {
-        const key = localStorage.key(index);
-        if (!key) continue;
-
-        if (
-          key.startsWith('sb-') ||
-          key.includes('supabase') ||
-          key === 'samap_profile_cache'
-        ) {
-          keysToRemove.push(key);
-        }
-      }
-
-      keysToRemove.forEach((key) => localStorage.removeItem(key));
-      sessionStorage.clear();
-    }
-
-    localStorage.setItem(PROJECT_MARKER_KEY, SUPABASE_PROJECT_ID);
-  } catch {
-    // noop
-  }
-};
-
-resetSupabaseSessionForProjectSwitch();
+const SUPABASE_URL = "https://ejiycfqxgtrzaysgpzmx.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqaXljZnF4Z3RyemF5c2dwem14Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMTY1MDgsImV4cCI6MjA4OTg5MjUwOH0.U0n0WlIsSbqC8W5uEXOyjDB8kX3mI9WBc0dBwBxgASg";
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
