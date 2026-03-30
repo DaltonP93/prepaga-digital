@@ -12,10 +12,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { formatCurrency } from '@/lib/utils';
-import { 
-  CheckCircle, XCircle, Clock, AlertCircle, Eye, Search, 
+import {
+  CheckCircle, XCircle, Clock, AlertCircle, Eye, Search,
   FileText, User, DollarSign, Calendar, Filter, Download,
-  HeartPulse
+  HeartPulse, ShieldCheck, Hash, Lock
 } from 'lucide-react';
 import { ImageLightbox } from '@/components/ui/image-lightbox';
 
@@ -222,6 +222,27 @@ export const AuditorDashboard: React.FC = () => {
         })),
       }));
     },
+  });
+
+  // Fetch evidence bundles for the selected sale
+  const { data: evidenceBundles = [] } = useQuery({
+    queryKey: ['evidence-bundles', selectedSale?.id],
+    enabled: !!selectedSale?.id,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('signature_evidence_bundles')
+        .select(`
+          id, document_hash, pdf_hash, bundle_hash, storage_url, created_at,
+          signature_link_id, document_id,
+          documents ( name ),
+          signature_links ( recipient_name, recipient_email )
+        `)
+        .eq('sale_id', selectedSale.id)
+        .order('created_at', { ascending: false });
+      if (error) return [];
+      return data || [];
+    },
+    staleTime: 0,
   });
 
   // Realtime: auto-refresh when any sale's status or audit_status changes
@@ -869,6 +890,91 @@ export const AuditorDashboard: React.FC = () => {
               </CardContent>
             </Card>
           )}
+
+          {/* Evidence Bundles - Cadena de Custodia */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-green-600" />
+                Evidencia de Firmas
+                {evidenceBundles.length > 0 && (
+                  <Badge className="bg-green-600 ml-1">{evidenceBundles.length}</Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Cadena de custodia criptográfica generada al momento de cada firma
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {evidenceBundles.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground">
+                  <Lock className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">Sin firmas completadas aún</p>
+                  <p className="text-xs mt-1">Los bundles de evidencia se generan automáticamente cuando el cliente firma</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {evidenceBundles.map((bundle: any) => (
+                    <div key={bundle.id} className="p-4 border rounded-lg bg-muted/20 space-y-3">
+                      {/* Header del bundle */}
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-medium text-sm">
+                            {bundle.documents?.name || 'Documento'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Firmante: {bundle.signature_links?.recipient_name || bundle.signature_links?.recipient_email || '—'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(bundle.created_at).toLocaleString('es-PY')}
+                          </p>
+                        </div>
+                        <Badge className="bg-green-600 text-white shrink-0">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Firmado
+                        </Badge>
+                      </div>
+
+                      {/* Hashes */}
+                      <div className="space-y-1.5">
+                        {bundle.document_hash && (
+                          <div className="flex items-start gap-2">
+                            <Hash className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-[10px] text-muted-foreground uppercase font-medium">Hash Documento</p>
+                              <p className="text-xs font-mono break-all text-foreground/80">{bundle.document_hash}</p>
+                            </div>
+                          </div>
+                        )}
+                        {bundle.bundle_hash && (
+                          <div className="flex items-start gap-2">
+                            <ShieldCheck className="h-3.5 w-3.5 text-green-600 mt-0.5 shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-[10px] text-muted-foreground uppercase font-medium">Hash Bundle (integridad)</p>
+                              <p className="text-xs font-mono break-all text-foreground/80">{bundle.bundle_hash}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Descargar certificado si tiene URL */}
+                      {bundle.storage_url && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => window.open(bundle.storage_url, '_blank')}
+                        >
+                          <Download className="h-3.5 w-3.5 mr-1.5" />
+                          Descargar certificado de evidencia
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Audit Actions */}
           <Card className="lg:col-span-2">
