@@ -13,6 +13,7 @@ import { FileText, Upload, Download, Trash2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDropzone } from 'react-dropzone';
 import { ImageLightbox } from '@/components/ui/image-lightbox';
+import { uploadSaleDocumentFile } from '@/lib/saleDocumentUpload';
 
 interface SaleDocument {
   id: string;
@@ -63,17 +64,10 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
 
   const uploadDocument = useMutation({
     mutationFn: async ({ file, metadata }: { file: File; metadata: typeof uploadForm }) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Usuario no autenticado');
-
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
-      const filePath = `sale-documents/${saleId}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(filePath, file);
-      if (uploadError) throw uploadError;
+      const { filePath, userId } = await uploadSaleDocumentFile({
+        file,
+        saleId,
+      });
 
       const { data, error } = await supabase
         .from('sale_documents')
@@ -83,7 +77,7 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
           file_url: filePath,
           file_size: file.size,
           file_type: file.type,
-          uploaded_by: user.id,
+          uploaded_by: userId,
         })
         .select()
         .single();
