@@ -200,6 +200,34 @@ function formatDate(date: string | Date | null, formatStr = 'dd/MM/yyyy'): strin
   }
 }
 
+function normalizeContractHeaderHtml(html: string): string {
+  if (!html) return html;
+
+  const leadingHeaderImageRegex =
+    /^\s*<img\b([^>]*?)src="([^"]*\/company-assets\/[^"]*\/branding\/[^"]+)"([^>]*)>/i;
+
+  if (!leadingHeaderImageRegex.test(html)) {
+    return html;
+  }
+
+  return html.replace(leadingHeaderImageRegex, (_match, beforeSrc, src, afterSrc) => {
+    const mergedAttrs = `${beforeSrc ?? ''}${afterSrc ?? ''}`;
+    const withoutStyle = mergedAttrs.replace(/\sstyle="[^"]*"/gi, '');
+    const normalizedStyle = [
+      'display:block',
+      'width:100%',
+      'max-width:100%',
+      'height:auto',
+      'max-height:none',
+      'object-fit:contain',
+      'object-position:center center',
+      'margin:0 auto 12px auto',
+    ].join('; ');
+
+    return `<img${withoutStyle} src="${src}" style="${normalizedStyle}">`;
+  });
+}
+
 /**
  * Create beneficiary context from database record
  */
@@ -398,7 +426,7 @@ export function createEnhancedTemplateContext(
  * Interpolate template with enhanced context
  */
 export function interpolateEnhancedTemplate(template: string, context: EnhancedTemplateContext): string {
-  let result = template;
+  let result = normalizeContractHeaderHtml(template);
 
   // Helper to replace nested variables
   const replaceNestedVariables = (obj: any, prefix: string) => {
@@ -648,7 +676,7 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     });
   }
 
-  return result;
+  return normalizeContractHeaderHtml(result);
 }
 
 /**

@@ -17,7 +17,7 @@ function buildWrappedHtml(
   documentName: string
 ): string {
   const logoHtml = company.logo_url
-    ? `<img src="${company.logo_url}" style="height:22mm;max-width:280px;width:auto;object-fit:contain;display:block;" />`
+    ? `<img src="${company.logo_url}" class="company-header-image" />`
     : `<span style="font-weight:700;font-size:18px;">${company.name}</span>`;
 
   const contactParts: string[] = [];
@@ -57,20 +57,31 @@ function buildWrappedHtml(
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 2mm 2mm;
+    gap: 6mm;
+    padding: 2mm 0;
     border-bottom: 1.5px solid #333;
   }
   .page-header .logo-area {
     display: flex;
     align-items: center;
-    gap: 8px;
     flex: 1;
+    min-width: 0;
+  }
+  .page-header .company-header-image {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    max-height: 24mm;
+    height: auto;
+    object-fit: contain;
+    object-position: left center;
   }
   .page-header .doc-name {
     font-size: 9px;
     color: #555;
     text-align: right;
-    max-width: 180px;
+    max-width: 52mm;
+    min-width: 40mm;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -116,6 +127,12 @@ function buildWrappedHtml(
     height: auto !important;
   }
 
+  .content img[style*="width"],
+  .content img[width] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
   /* Table styling for content tables */
   .content table {
     width: 100%;
@@ -152,6 +169,34 @@ function buildWrappedHtml(
 </html>`;
 }
 
+function normalizeLegacyContractHeader(html: string): string {
+  if (!html) return html;
+
+  const leadingHeaderImageRegex =
+    /^\s*<img\b([^>]*?)src="([^"]*\/company-assets\/[^"]*\/branding\/[^"]+)"([^>]*)>/i;
+
+  if (!leadingHeaderImageRegex.test(html)) {
+    return html;
+  }
+
+  return html.replace(leadingHeaderImageRegex, (_match, beforeSrc, src, afterSrc) => {
+    const mergedAttrs = `${beforeSrc ?? ""}${afterSrc ?? ""}`;
+    const withoutStyle = mergedAttrs.replace(/\sstyle="[^"]*"/gi, "");
+    const normalizedStyle = [
+      "display:block",
+      "width:100%",
+      "max-width:100%",
+      "height:auto",
+      "max-height:none",
+      "object-fit:contain",
+      "object-position:center center",
+      "margin:0 auto 12px auto",
+    ].join("; ");
+
+    return `<img${withoutStyle} src="${src}" style="${normalizedStyle}">`;
+  });
+}
+
 /**
  * Resolve expired Supabase Storage signed URLs in HTML content.
  * Scans for <img> with data-storage-path and refreshes src.
@@ -163,6 +208,7 @@ async function resolveContentImages(
   bucket: string
 ): Promise<string> {
   if (!html) return html;
+  html = normalizeLegacyContractHeader(html);
 
   const imgRegex = /<img\s[^>]*>/gi;
   const matches = html.match(imgRegex);
@@ -206,7 +252,7 @@ async function resolveContentImages(
     }
   }
 
-  return result;
+  return normalizeLegacyContractHeader(result);
 }
 
 /**

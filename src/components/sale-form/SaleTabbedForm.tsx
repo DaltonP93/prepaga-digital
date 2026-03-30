@@ -244,7 +244,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                   if (profile?.company_id) {
                     const { data: companyProfiles, error: profilesError } = await supabase
                       .from('profiles')
-                      .select('id')
+                      .select('id, role')
                       .eq('company_id', profile.company_id)
                       .eq('is_active', true);
 
@@ -253,6 +253,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                     }
 
                     const candidateIds = (companyProfiles || []).map((candidate) => candidate.id);
+                    const auditRoles = new Set(['auditor', 'supervisor', 'admin', 'super_admin']);
 
                     let auditRecipients: Array<{ user_id: string }> = [];
                     let recipientsError: any = null;
@@ -262,11 +263,16 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                         .from('user_roles')
                         .select('user_id, role')
                         .in('user_id', candidateIds)
-                        .in('role', ['auditor', 'supervisor', 'admin', 'super_admin']);
+                        .in('role', Array.from(auditRoles));
 
                       recipientsError = rolesError;
-                      if (!rolesError && roleRows) {
-                        const uniqueUserIds = Array.from(new Set(roleRows.map((row) => row.user_id)));
+                      if (!rolesError) {
+                        const legacyProfileIds = (companyProfiles || [])
+                          .filter((candidate: any) => candidate.role && auditRoles.has(candidate.role))
+                          .map((candidate: any) => candidate.id);
+
+                        const userRoleIds = (roleRows || []).map((row) => row.user_id);
+                        const uniqueUserIds = Array.from(new Set([...legacyProfileIds, ...userRoleIds]));
                         auditRecipients = uniqueUserIds.map((userId) => ({ user_id: userId }));
                       }
                     }
