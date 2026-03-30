@@ -30,7 +30,6 @@ const resolveCompanyId = async (profileCompanyId?: string | null, userId?: strin
   // Second fallback: RPC (if available in this environment)
   const { data: rpcData, error: rpcError } = await supabase.rpc('get_user_company_id', { _user_id: userId });
   if (rpcError) {
-    console.warn('No se pudo resolver company_id por RPC:', rpcError.message);
     return null;
   }
 

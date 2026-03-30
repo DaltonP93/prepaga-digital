@@ -7,19 +7,11 @@ const Index = () => {
   const { user, loading } = useAuthContext();
   const navigate = useNavigate();
 
-  console.log('🏠 Index: Estado actual', { 
-    user: !!user, 
-    loading,
-    email: user?.email
-  });
-
   useEffect(() => {
     if (!loading) {
       if (user) {
-        console.log('✅ Index: Usuario autenticado, navegando a dashboard');
         navigate('/dashboard', { replace: true });
       } else {
-        console.log('❌ Index: No hay usuario, navegando a login');
         navigate('/login', { replace: true });
       }
     }

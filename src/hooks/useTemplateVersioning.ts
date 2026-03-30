@@ -58,8 +58,6 @@ export const useTemplateVersioning = (templateId?: string) => {
       updates: { content?: string; description?: string };
       versionNotes?: string;
     }) => {
-      console.log("Creating new version for template:", templateId);
-
       // Get the current template
       const { data: currentTemplate, error: fetchError } = await supabase
         .from("templates")
@@ -128,8 +126,6 @@ export const useTemplateVersioning = (templateId?: string) => {
       templateId: string;
       versionId: string;
     }) => {
-      console.log("Restoring version:", versionId, "for template:", templateId);
-
       // Get the version to restore
       const { data: versionToRestore, error: fetchError } = await supabase
         .from("template_versions")
@@ -184,8 +180,6 @@ export const useTemplateVersioning = (templateId?: string) => {
   // Delete version
   const deleteVersionMutation = useMutation({
     mutationFn: async (versionId: string) => {
-      console.log("Deleting version:", versionId);
-
       const { error } = await supabase
         .from("template_versions")
         .delete()

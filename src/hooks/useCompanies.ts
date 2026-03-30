@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
-import { filterToSingleCompany, SINGLE_COMPANY_PRIMARY_NAME } from '@/lib/singleCompany';
+import { SINGLE_COMPANY_PRIMARY_NAME } from '@/lib/singleCompany';
 
 type Company = Database['public']['Tables']['companies']['Row'];
 type CompanyInsert = Database['public']['Tables']['companies']['Insert'];
@@ -19,7 +19,7 @@ export const useCompanies = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return filterToSingleCompany(data);
+      return data;
     },
   });
 };

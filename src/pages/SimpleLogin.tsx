@@ -18,16 +18,9 @@ const SimpleLogin = () => {
   const { user, loading, signIn } = useSimpleAuthContext();
   const navigate = useNavigate();
 
-  console.log('🔑 SimpleLogin: Estado actual', { 
-    user: !!user, 
-    loading,
-    email: user?.email
-  });
-
   // Si ya hay usuario autenticado, redirigir
   useEffect(() => {
     if (user && !loading) {
-      console.log('✅ SimpleLogin: Usuario autenticado, redirigiendo a dashboard');
       navigate('/dashboard', { replace: true });
     }
   }, [user, loading, navigate]);
@@ -43,9 +36,7 @@ const SimpleLogin = () => {
     setIsLoggingIn(true);
 
     try {
-      console.log('🔑 SimpleLogin: Iniciando proceso de login...');
       await signIn(email, password);
-      console.log('✅ SimpleLogin: Login exitoso');
       toast.success('¡Bienvenido! Has iniciado sesión correctamente.');
     } catch (error: any) {
       console.error('❌ SimpleLogin: Error en login:', error);
@@ -57,7 +48,6 @@ const SimpleLogin = () => {
 
   // Mostrar loading durante la verificación inicial
   if (loading) {
-    console.log('⏳ SimpleLogin: Verificando autenticación...');
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
         <div className="text-center">
@@ -70,7 +60,6 @@ const SimpleLogin = () => {
 
   // Si hay usuario, mostrar loading de redirección
   if (user) {
-    console.log('🔄 SimpleLogin: Redirigiendo...');
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
         <div className="text-center">
@@ -81,7 +70,6 @@ const SimpleLogin = () => {
     );
   }
 
-  console.log('📋 SimpleLogin: Mostrando formulario de login');
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
       <Card className="w-full max-w-md">

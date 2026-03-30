@@ -283,7 +283,6 @@ serve(async (req) => {
     // Default: Meta Business API
     if (!companySettings?.whatsapp_api_key || !companySettings?.whatsapp_phone_id) {
       // Fallback to wa.me link instead of failing
-      console.warn('Meta API not configured, falling back to wa.me link')
       const formattedPhone = to.replace(/[\s+\-()]/g, '')
       const wameUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`
 
@@ -503,7 +502,6 @@ async function sendViaWAHA(
     if (apiToken) {
       headers['X-Api-Key'] = apiToken
     }
-    console.log('WAHA request:', { baseUrl: gatewayUrl, hasToken: !!apiToken, tokenLength: apiToken?.length, chatId, originalPhone: to })
 
     const baseUrl = gatewayUrl.replace(/\/+$/, '')
 

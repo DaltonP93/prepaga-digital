@@ -9,25 +9,16 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  console.log('🔑 Login: Estado actual', { 
-    user: !!user, 
-    loading,
-    email: user?.email,
-    pathname: location.pathname
-  });
-
   useEffect(() => {
     // Si el usuario está autenticado, redirigir inmediatamente
     if (user && !loading) {
       const from = location.state?.from?.pathname || '/dashboard';
-      console.log('✅ Login: Usuario autenticado, navegando a:', from);
       navigate(from, { replace: true });
     }
   }, [user, loading, navigate, location.state]);
 
   // Mostrar loading solo durante verificación inicial
   if (loading) {
-    console.log('⏳ Login: Mostrando loading...', { loading });
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
         <div className="text-center">
@@ -42,7 +33,6 @@ const Login = () => {
 
   // Si hay usuario autenticado, mostrar loading de redirección
   if (user) {
-    console.log('🔄 Login: Usuario presente, navegación en progreso...');
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
         <div className="text-center">
@@ -54,7 +44,6 @@ const Login = () => {
   }
 
   // Mostrar formulario de login solo si no hay usuario
-  console.log('📋 Login: Mostrando formulario de login');
   return <LoginForm />;
 };
 

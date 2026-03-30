@@ -40,7 +40,6 @@ import { SUPABASE_PROJECT_REF, SUPABASE_URL } from '@/integrations/supabase/clie
 
 import { useRolePermissions } from '@/hooks/useRolePermissions';
 
-
 export default function Settings() {
   const { profile } = useSimpleAuthContext();
   const { role, roleLabel, isSuperAdmin, isAdmin, isLoadingRole } = useRolePermissions();

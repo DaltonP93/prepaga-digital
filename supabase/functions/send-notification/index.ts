@@ -171,7 +171,6 @@ serve(async (req) => {
       html: html,
     });
 
-    console.log("Email sent successfully:", emailResponse);
 
     return new Response(JSON.stringify(emailResponse), {
       status: 200,

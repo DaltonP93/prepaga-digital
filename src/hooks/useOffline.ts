@@ -86,7 +86,6 @@ export const useOffline = () => {
 
   const processOfflineChange = async (change: any) => {
     // Implementar lógica de sincronización específica
-    console.log('Processing offline change:', change);
   };
 
   const saveOfflineChange = (change: any) => {

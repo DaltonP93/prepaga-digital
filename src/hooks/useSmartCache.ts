@@ -53,7 +53,6 @@ export const useSmartCache = <T>(
           sessionStorage.removeItem(cacheKey);
         }
       } catch (error) {
-        console.warn('Error reading from sessionStorage:', error);
       }
     }
 
@@ -73,7 +72,6 @@ export const useSmartCache = <T>(
       try {
         sessionStorage.setItem(cacheKey, JSON.stringify({ data, timestamp }));
       } catch (error) {
-        console.warn('Error writing to sessionStorage:', error);
       }
     }
   }, [useMemory, useSession]);

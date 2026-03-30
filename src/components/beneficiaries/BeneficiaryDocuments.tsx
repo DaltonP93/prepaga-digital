@@ -67,7 +67,6 @@ export const BeneficiaryDocuments: React.FC<BeneficiaryDocumentsProps> = ({
 
       if (uploadError) {
         // If bucket doesn't exist, just save the file reference
-        console.log('Storage upload not configured, saving reference only');
       }
 
       // Save document record

@@ -10,9 +10,9 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Upload, Palette, Type, Image as ImageIcon } from "lucide-react";
 import { useBranding } from "@/hooks/useBranding";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
+import { uploadCompanyAsset } from "@/lib/companyAssetUpload";
 
 interface BrandingFormData {
   primaryColor: string;
@@ -54,21 +54,13 @@ export function CompanyBrandingForm() {
       const companyId = profile?.company_id;
       if (!companyId) throw new Error('No hay empresa asignada al perfil');
 
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${type}-${Date.now()}.${fileExt}`;
-      const filePath = `${companyId}/branding/${fileName}`;
+      const publicUrl = await uploadCompanyAsset({
+        file,
+        companyId,
+        folder: 'branding',
+      });
 
-      const { error: uploadError } = await supabase.storage
-        .from('company-assets')
-        .upload(filePath, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('company-assets')
-        .getPublicUrl(filePath);
-
-      setValue(type === 'logo' ? 'logoUrl' : 'favicon', urlData.publicUrl);
+      setValue(type === 'logo' ? 'logoUrl' : 'favicon', publicUrl);
       toast.success(`${type === 'logo' ? 'Logo' : 'Favicon'} subido correctamente`);
     } catch (error: any) {
       toast.error(`Error al subir ${type}: ` + error.message);

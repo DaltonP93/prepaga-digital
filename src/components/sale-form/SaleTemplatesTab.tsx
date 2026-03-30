@@ -690,10 +690,8 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       ]);
 
       if (deleteGeneratedResult.error) {
-        console.warn('Error deleting old docs (non-final):', deleteGeneratedResult.error);
       }
       if (deleteAnnexesResult.error) {
-        console.warn('Error deleting old annexes:', deleteAnnexesResult.error);
       }
       if (saleResult.error) throw saleResult.error;
       if (beneficiariesResult.error) throw beneficiariesResult.error;
@@ -952,7 +950,6 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       if (unresolvedTraceRows.length > 0) {
         const { error: traceError } = await supabase.from('process_traces').insert(unresolvedTraceRows as any);
         if (traceError) {
-          console.warn('Error logging unresolved placeholders during regeneration:', traceError);
         }
       }
 

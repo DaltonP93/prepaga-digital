@@ -50,7 +50,7 @@ const Companies = () => {
           <CardHeader>
             <CardTitle>Modo Empresa Única</CardTitle>
             <CardDescription>
-              El sistema quedó bloqueado para operar solo con {singleCompany?.name || SINGLE_COMPANY_PRIMARY_NAME}. No se permite crear, seleccionar ni desactivar otras empresas.
+              El sistema quedó bloqueado para operar solo con {singleCompany?.name || SINGLE_COMPANY_PRIMARY_NAME}. No se permite crear ni seleccionar otra empresa en la operación diaria. Las empresas sobrantes pueden desactivarse desde esta pantalla.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -200,7 +200,10 @@ const Companies = () => {
                       {new Date(company.created_at || '').toLocaleDateString('es-ES')}
                     </TableCell>
                     <TableCell>
-                      <CompanyActions company={company} />
+                      <CompanyActions
+                        company={company}
+                        isLockedCompany={company.id === singleCompany?.id}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}

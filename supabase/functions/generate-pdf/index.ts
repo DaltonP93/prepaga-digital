@@ -76,7 +76,6 @@ serve(async (req) => {
     // Server-side HTML sanitization - defense in depth
     const threats = detectThreats(processedContent)
     if (threats.length > 0) {
-      console.warn('HTML threats detected in PDF content, sanitizing:', threats)
       processedContent = sanitizeHtml(processedContent)
     }
 

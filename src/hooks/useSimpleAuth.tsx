@@ -66,8 +66,6 @@ export const useSimpleAuth = (): SimpleAuthContextType => {
   // Función optimizada para obtener perfil
   const fetchProfile = useCallback(async (userId: string) => {
     try {
-      console.log('👤 SimpleAuth: Obteniendo perfil para:', userId);
-      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -79,7 +77,6 @@ export const useSimpleAuth = (): SimpleAuthContextType => {
         return null;
       }
 
-      console.log('✅ SimpleAuth: Perfil obtenido:', data);
       return data;
     } catch (error) {
       console.error('❌ SimpleAuth: Error inesperado:', error);
@@ -89,8 +86,6 @@ export const useSimpleAuth = (): SimpleAuthContextType => {
 
   const signOut = useCallback(async () => {
     try {
-      console.log('🚪 SimpleAuth: Cerrando sesión...');
-      
       // Limpiar estados primero
       setUser(null);
       setProfile(null);
@@ -122,15 +117,12 @@ export const useSimpleAuth = (): SimpleAuthContextType => {
 
     const initialize = async () => {
       try {
-        console.log('🚀 SimpleAuth: Iniciando...');
-        
         // Obtener sesión actual
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         
         if (!mounted) return;
 
         if (currentSession) {
-          console.log('✅ SimpleAuth: Sesión encontrada');
           setSession(currentSession);
           setUser(currentSession.user);
           
@@ -144,8 +136,6 @@ export const useSimpleAuth = (): SimpleAuthContextType => {
             setProfile(userProfile);
             setUserRole(role);
           }
-        } else {
-          console.log('ℹ️ SimpleAuth: No hay sesión activa');
         }
         
         if (mounted) {
@@ -168,15 +158,8 @@ export const useSimpleAuth = (): SimpleAuthContextType => {
 
   // Listener de cambios de autenticación optimizado
   useEffect(() => {
-    console.log('👂 SimpleAuth: Configurando listener...');
-    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
-        console.log('🔄 SimpleAuth: Cambio de estado:', event, { 
-          hasSession: !!newSession,
-          userId: newSession?.user?.id 
-        });
-
         setSession(newSession);
         setUser(newSession?.user ?? null);
 
@@ -207,7 +190,6 @@ export const useSimpleAuth = (): SimpleAuthContextType => {
     );
 
     return () => {
-      console.log('🔇 SimpleAuth: Desconectando listener');
       subscription.unsubscribe();
     };
   }, [fetchProfile, fetchUserRole, profile]);

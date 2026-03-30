@@ -52,7 +52,6 @@ export const useSessionManager = (
     
     // Set session timeout
     activityTimeoutRef.current = setTimeout(async () => {
-      console.log('Session timed out due to inactivity');
       await supabase.auth.signOut();
     }, timeoutMinutes * 60 * 1000);
   }, [warningMinutes, timeoutMinutes, showSessionWarning, sessionState.warningShown]);
@@ -61,7 +60,6 @@ export const useSessionManager = (
   useEffect(() => {
     const handleOnline = () => {
       setSessionState(prev => ({ ...prev, isConnected: true }));
-      console.log('Connection restored');
     };
 
     const handleOffline = () => {
@@ -104,7 +102,6 @@ export const useSessionManager = (
         try {
           const { data: { session } } = await supabase.auth.getSession();
           if (!session) {
-            console.log('Session lost during heartbeat check');
             await supabase.auth.signOut();
           }
         } catch (error) {

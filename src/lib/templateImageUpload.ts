@@ -68,7 +68,7 @@ export async function uploadTemplateImage(
     file_url: storagePath,
     company_id: companyId,
   }).then(({ error }) => {
-    if (error) console.warn("file_uploads insert failed (non-critical):", error.message);
+    if (error) {}
   });
 
   return { storagePath, signedUrl, companyId };

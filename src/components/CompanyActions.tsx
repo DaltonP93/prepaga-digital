@@ -23,22 +23,21 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Database } from "@/integrations/supabase/types";
-import { isSingleCompanyMatch } from "@/lib/singleCompany";
 
 type Company = Database['public']['Tables']['companies']['Row'];
 
 interface CompanyActionsProps {
   company: Company;
+  isLockedCompany?: boolean;
 }
 
-export function CompanyActions({ company }: CompanyActionsProps) {
+export function CompanyActions({ company, isLockedCompany = false }: CompanyActionsProps) {
   const { profile } = useSimpleAuthContext();
   const [showEditForm, setShowEditForm] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showWorkflowConfig, setShowWorkflowConfig] = useState(false);
   const deleteCompany = useDeleteCompany();
   const canConfigureWorkflow = ['admin', 'super_admin'].includes(profile?.role || '');
-  const isLockedCompany = isSingleCompanyMatch(company.name);
 
   const handleDelete = async () => {
     await deleteCompany.mutateAsync(company.id);

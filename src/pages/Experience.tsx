@@ -9,9 +9,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Smartphone, Palette, Wifi, Monitor, Globe, Bell, Upload, Trash2 } from 'lucide-react';
 import { useCompanyConfiguration } from '@/hooks/useCompanyConfiguration';
-import { supabase } from '@/integrations/supabase/client';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { toast } from 'sonner';
+import { uploadCompanyAsset } from '@/lib/companyAssetUpload';
 
 export default function Experience() {
   const { configuration, isLoading, updateConfiguration, isUpdating } = useCompanyConfiguration();
@@ -57,19 +57,11 @@ export default function Experience() {
 
     setUploading(true);
     try {
-      const ext = file.name.split('.').pop();
-      const fileName = `${profile.company_id}/${folder}/${Date.now()}.${ext}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('company-assets')
-        .upload(fileName, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('company-assets')
-        .getPublicUrl(fileName);
-
+      const publicUrl = await uploadCompanyAsset({
+        file,
+        companyId: profile.company_id,
+        folder,
+      });
       setUrl(publicUrl);
       toast.success('Imagen subida correctamente');
     } catch (error: any) {

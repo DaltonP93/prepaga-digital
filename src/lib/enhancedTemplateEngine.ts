@@ -572,7 +572,6 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
 
       // Strategy 2: If no <tr> matched, replace standalone placeholders with first beneficiary
       if (!trMatched) {
-        console.warn('Template engine: No <tr> rows matched for beneficiary expansion. Applying first-beneficiary fallback.');
         const firstBen = context.beneficiarios[0];
         if (firstBen) {
           result = applyBenAliases(result, buildBenAliases(firstBen, 0));

@@ -29,7 +29,6 @@ export const usePushNotifications = () => {
           setIsSupported(true);
           checkSubscription();
         } catch (error) {
-          console.warn('Push notifications not available:', error);
           setIsSupported(true); // Still allow user to try
         }
       }

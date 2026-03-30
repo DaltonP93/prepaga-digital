@@ -24,7 +24,6 @@ export class CacheManager {
         obsoleteKeys.map(key => caches.delete(key))
       );
       
-      console.log('Cache obsoleto limpiado:', obsoleteKeys.length);
     } catch (error) {
       console.error('Error limpiando cache obsoleto:', error);
     }
@@ -40,7 +39,6 @@ export class CacheManager {
         itemsToRemove.forEach(key => {
           localStorage.removeItem(key);
         });
-        console.log('LocalStorage limpiado:', itemsToRemove.length, 'items');
       }
     } catch (error) {
       console.error('Error limpiando localStorage:', error);
@@ -126,7 +124,6 @@ export class CacheManager {
       // Limpiar sessionStorage
       sessionStorage.clear();
       
-      console.log('Limpieza completa de cache realizada');
     } catch (error) {
       console.error('Error en limpieza completa:', error);
     }

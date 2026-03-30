@@ -326,7 +326,6 @@ const SignatureWorkflow = () => {
             continue;
           }
         } catch (err) {
-          console.warn('Could not get signed PDF URL, falling back:', err);
         }
       }
       // Fallback

@@ -98,7 +98,6 @@ serve(async (req) => {
       if (twilioAuthToken && twilioSignature) {
         const requestUrl = req.url;
         if (!verifyTwilioSignature(twilioAuthToken, twilioSignature, requestUrl, params)) {
-          console.warn("Twilio signature verification failed");
           return new Response(JSON.stringify({ success: false, error: "Invalid signature" }), {
             status: 403,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -106,7 +105,6 @@ serve(async (req) => {
         }
       } else if (twilioAuthToken) {
         // Token configured but no signature header — reject
-        console.warn("Missing x-twilio-signature header");
         return new Response(JSON.stringify({ success: false, error: "Missing signature" }), {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -158,14 +156,12 @@ serve(async (req) => {
     if (metaAppSecret && metaSignatureHeader) {
       const sig = metaSignatureHeader.replace("sha256=", "");
       if (!verifyMetaSignature(metaAppSecret, sig, rawBody)) {
-        console.warn("Meta webhook signature verification failed");
         return new Response(JSON.stringify({ success: false, error: "Invalid signature" }), {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     } else if (metaAppSecret) {
-      console.warn("Missing x-hub-signature-256 header");
       return new Response(JSON.stringify({ success: false, error: "Missing signature" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

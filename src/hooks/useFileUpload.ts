@@ -72,7 +72,7 @@ export const useFileUpload = () => {
           company_id: companyId,
         })
         .then(({ error: dbErr }) => {
-          if (dbErr) console.warn('file_uploads insert failed (non-critical):', dbErr.message);
+          if (dbErr) {}
         });
 
       setUploadState(prev => ({ ...prev, progress: 80 }));
@@ -83,7 +83,6 @@ export const useFileUpload = () => {
         .createSignedUrl(data.path, 3600);
 
       if (signedUrlError || !signedUrlData?.signedUrl) {
-        console.warn('Could not create signed URL, returning storage path:', signedUrlError);
         setUploadState({ progress: 100, isUploading: false, error: null });
         return data.path;
       }

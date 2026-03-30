@@ -47,18 +47,10 @@ export const SimpleLoginForm = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  console.log('🔑 SimpleLoginForm: Estado actual', {
-    user: !!user,
-    loading,
-    email: user?.email,
-    pathname: location.pathname
-  });
-
   // Redirect user after successful login
   useEffect(() => {
     if (user && !loading) {
       const from = location.state?.from?.pathname || '/dashboard';
-      console.log('✅ SimpleLoginForm: Usuario autenticado, navegando a:', from);
       navigate(from, { replace: true });
     }
   }, [user, loading, navigate, location.state]);
@@ -101,9 +93,7 @@ export const SimpleLoginForm = () => {
     setIsLoggingIn(true);
 
     try {
-      console.log('🔑 SimpleLoginForm: Iniciando proceso de login...');
       await signIn(email, password);
-      console.log('✅ SimpleLoginForm: Login exitoso');
 
       toast.success('¡Bienvenido! Has iniciado sesión correctamente.');
 
@@ -154,7 +144,6 @@ export const SimpleLoginForm = () => {
 
   // Show loading during auth verification
   if (loading) {
-    console.log('⏳ SimpleLoginForm: Verificando autenticación...');
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
         <div className="text-center">
@@ -169,7 +158,6 @@ export const SimpleLoginForm = () => {
 
   // Show loading during redirection if user is present
   if (user) {
-    console.log('🔄 SimpleLoginForm: Usuario presente, redirigiendo...');
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20">
         <div className="text-center">
@@ -180,7 +168,6 @@ export const SimpleLoginForm = () => {
     );
   }
 
-  console.log('📋 SimpleLoginForm: Mostrando formulario de login');
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/20 to-secondary/20" style={backgroundStyle}>
       <Card className="w-full max-w-md backdrop-blur-sm bg-background/95 border-border/50 shadow-xl">

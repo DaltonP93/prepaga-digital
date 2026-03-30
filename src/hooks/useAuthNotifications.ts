@@ -48,7 +48,6 @@ export const useAuthNotifications = (
             break;
           
           case 'TOKEN_REFRESHED':
-            console.log('Token refreshed successfully');
             break;
           
           case 'USER_UPDATED':

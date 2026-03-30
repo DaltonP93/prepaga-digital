@@ -285,7 +285,6 @@ async function activateNextStep(
 
         if (newLink) {
           step2Links = [newLink]
-          console.info(`Created contratada link for sale ${link.sale_id}`)
         }
       }
     }

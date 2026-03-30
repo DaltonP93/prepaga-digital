@@ -31,7 +31,6 @@ export class ProfileBackupManager {
         JSON.stringify(backup)
       );
     } catch (error) {
-      console.warn('Error backing up profile:', error);
     }
   }
 
@@ -50,7 +49,6 @@ export class ProfileBackupManager {
 
       return backup;
     } catch (error) {
-      console.warn('Error reading profile backup:', error);
       return null;
     }
   }
@@ -59,7 +57,6 @@ export class ProfileBackupManager {
     try {
       localStorage.removeItem(`${this.BACKUP_KEY}_${userId}`);
     } catch (error) {
-      console.warn('Error clearing profile backup:', error);
     }
   }
 
@@ -68,8 +65,6 @@ export class ProfileBackupManager {
     if (!backup) return null;
 
     try {
-      console.log('Restoring profile from backup for user:', userId);
-      
       // Try to create/update the profile with backup data
       const { data, error } = await supabase
         .from('profiles')
@@ -90,7 +85,6 @@ export class ProfileBackupManager {
         return null;
       }
 
-      console.log('Profile restored successfully from backup');
       return data;
     } catch (error) {
       console.error('Failed to restore profile from backup:', error);

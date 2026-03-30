@@ -23,8 +23,6 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
     const now = new Date().toISOString();
 
-    console.log(`[${now}] Starting cleanup of expired signature links...`);
-
     // 1. Marcar enlaces expirados
     const { data: expiredLinks, error: updateError } = await supabase
       .from('signature_links')
@@ -39,7 +37,6 @@ serve(async (req) => {
     }
 
     const expiredCount = expiredLinks?.length || 0;
-    console.log(`Marked ${expiredCount} links as expired`);
 
     // 2. Marcar documentos como vencidos si su enlace expiró
     let documentsUpdated = 0;
@@ -57,7 +54,6 @@ serve(async (req) => {
         console.error('Error updating documents:', docsError);
       } else {
         documentsUpdated = updatedDocs?.length || 0;
-        console.log(`Marked ${documentsUpdated} documents as vencido`);
       }
     }
 
@@ -112,8 +108,6 @@ serve(async (req) => {
         expired_at: l.expires_at,
       })),
     };
-
-    console.log('Cleanup completed successfully:', response);
 
     return new Response(
       JSON.stringify(response),

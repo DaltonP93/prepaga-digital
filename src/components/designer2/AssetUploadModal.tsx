@@ -221,7 +221,6 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
           height: Math.round(origViewport.height),
         });
       } catch (err) {
-        console.warn(`Failed to render page ${i}:`, err);
         const dbPage = dbPages.find((p: any) => p.page_number === i);
         pageInfos.push({
           pageNumber: i,

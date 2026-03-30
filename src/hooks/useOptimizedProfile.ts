@@ -21,7 +21,6 @@ export const useOptimizedProfile = () => {
   } = useQuery({
     queryKey: ['profile'],
     queryFn: async () => {
-      console.log('🔍 Fetching optimized profile...');
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user');
 
@@ -39,7 +38,6 @@ export const useOptimizedProfile = () => {
         throw error;
       }
       
-      console.log('✅ Optimized profile fetched:', data);
       return data;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -51,7 +49,6 @@ export const useOptimizedProfile = () => {
   // Optimized update mutation
   const updateProfile = useMutation({
     mutationFn: async (updates: ProfileUpdate) => {
-      console.log('🔄 Updating optimized profile with data:', updates);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user');
 
@@ -67,11 +64,9 @@ export const useOptimizedProfile = () => {
         throw error;
       }
       
-      console.log('✅ Optimized profile updated successfully:', data);
       return data;
     },
     onSuccess: (data) => {
-      console.log('✅ Profile update success, optimizing cache');
       queryClient.setQueryData(['profile'], data);
       toast({
         title: "Perfil actualizado",
@@ -90,13 +85,11 @@ export const useOptimizedProfile = () => {
 
   // Optimized refresh function
   const refreshProfile = useCallback(async () => {
-    console.log('🔄 Refreshing optimized profile...');
     await refetchProfile();
   }, [refetchProfile]);
 
   // Force refresh with cache invalidation
   const forceRefreshProfile = useCallback(async () => {
-    console.log('🔄 Force refreshing optimized profile...');
     await queryClient.invalidateQueries({ queryKey: ['profile'] });
     await refetchProfile();
   }, [queryClient, refetchProfile]);

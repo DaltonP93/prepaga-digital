@@ -80,7 +80,6 @@ export async function checkRateLimitPersistent(
 
     if (error || !data) {
       // Fail open — fall back to in-memory so a DB hiccup never blocks users
-      console.warn('[rate-limiter] DB check failed, using in-memory fallback:', error?.message);
       return checkRateLimit(identifier, opts);
     }
 
@@ -90,7 +89,6 @@ export async function checkRateLimitPersistent(
       retryAfterMs: data.retry_after_ms ?? undefined,
     };
   } catch (err) {
-    console.warn('[rate-limiter] Exception, using in-memory fallback:', err);
     return checkRateLimit(identifier, opts);
   }
 }

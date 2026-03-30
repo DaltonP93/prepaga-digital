@@ -16,7 +16,6 @@ export const useSaleTemplates = (saleId?: string) => {
     queryFn: async () => {
       if (!saleId) return [];
       
-      console.log("Fetching sale templates for sale:", saleId);
       const { data, error } = await supabase
         .from("sale_templates")
         .select(`
@@ -38,7 +37,6 @@ export const useSaleTemplates = (saleId?: string) => {
         throw error;
       }
 
-      console.log("Sale templates fetched:", data);
       return data;
     },
     enabled: !!saleId,
@@ -46,7 +44,6 @@ export const useSaleTemplates = (saleId?: string) => {
 
   const addSaleTemplateMutation = useMutation({
     mutationFn: async (saleTemplate: SaleTemplateInsert) => {
-      console.log("Adding sale template:", saleTemplate);
       const { data, error } = await supabase
         .from("sale_templates")
         .insert([saleTemplate])
@@ -79,7 +76,6 @@ export const useSaleTemplates = (saleId?: string) => {
 
   const updateSaleTemplateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: SaleTemplateUpdate }) => {
-      console.log("Updating sale template:", id, updates);
       const { data, error } = await supabase
         .from("sale_templates")
         .update(updates)
@@ -113,7 +109,6 @@ export const useSaleTemplates = (saleId?: string) => {
 
   const removeSaleTemplateMutation = useMutation({
     mutationFn: async (id: string) => {
-      console.log("Removing sale template:", id);
       const { error } = await supabase
         .from("sale_templates")
         .delete()

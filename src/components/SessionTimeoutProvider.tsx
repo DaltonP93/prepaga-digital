@@ -68,17 +68,12 @@ export const SessionTimeoutProvider = ({ children }: SessionTimeoutProviderProps
   }, []);
 
   const resetTimeout = () => {
-    console.log('🔄 Session timeout reset');
     setLastActivity(new Date());
     setShowWarning(false);
   };
 
   useEffect(() => {
     if (!user || !isProduction || !config.enabled) {
-      console.log('⏰ Session timeout disabled:', 
-        !user ? 'no user' : 
-        !isProduction ? 'development mode' : 
-        'disabled in config');
       return;
     }
 
@@ -106,10 +101,7 @@ export const SessionTimeoutProvider = ({ children }: SessionTimeoutProviderProps
       const now = new Date();
       const timeSinceLastActivity = (now.getTime() - lastActivity.getTime()) / 1000 / 60; // minutos
 
-      console.log(`⏰ Session check: ${Math.round(timeSinceLastActivity)} minutes since last activity`);
-
       if (timeSinceLastActivity >= config.timeoutMinutes) {
-        console.log('🚪 Auto logout due to inactivity');
         signOut();
         
         // Limpiar datos si está configurado
@@ -119,7 +111,6 @@ export const SessionTimeoutProvider = ({ children }: SessionTimeoutProviderProps
         }
       } else if (config.showWarnings && timeSinceLastActivity >= config.timeoutMinutes - config.warningMinutes) {
         const remaining = Math.ceil(config.timeoutMinutes - timeSinceLastActivity);
-        console.log(`⚠️ Session warning: ${remaining} minutes remaining`);
         setTimeLeft(remaining);
         setShowWarning(true);
       }
@@ -129,12 +120,10 @@ export const SessionTimeoutProvider = ({ children }: SessionTimeoutProviderProps
   }, [lastActivity, config, user, signOut, isProduction]);
 
   const handleExtendSession = () => {
-    console.log('✅ Session extended by user');
     resetTimeout();
   };
 
   const handleLogoutNow = () => {
-    console.log('🚪 Manual logout from timeout dialog');
     signOut();
     
     if (config.clearDataOnTimeout) {

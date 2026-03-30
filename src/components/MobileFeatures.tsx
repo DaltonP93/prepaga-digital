@@ -39,7 +39,6 @@ export default function MobileFeatures() {
         title: "Foto tomada",
         description: "La foto se ha guardado correctamente",
       });
-      console.log('Photo URL:', photoUrl);
     } catch (error) {
       toast({
         title: "Error",

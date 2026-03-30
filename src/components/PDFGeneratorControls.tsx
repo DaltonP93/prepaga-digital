@@ -51,14 +51,12 @@ export const PDFGeneratorControls: React.FC<PDFGeneratorControlsProps> = ({
   const handleDownload = async () => {
     const success = await downloadPDF(generateOptions);
     if (success) {
-      console.log('PDF downloaded successfully');
     }
   };
 
   const handlePreview = async () => {
     const success = await previewPDF(generateOptions);
     if (success) {
-      console.log('PDF preview opened');
     }
   };
 

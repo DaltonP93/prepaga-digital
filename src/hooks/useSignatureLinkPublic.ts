@@ -194,7 +194,6 @@ export const useSubmitSignatureLink = () => {
         const ipData = await ipResponse.json();
         clientIp = ipData.ip;
       } catch {
-        console.log('Could not fetch client IP');
       }
 
       const { data, error } = await signatureClient
@@ -249,7 +248,6 @@ export const useSubmitSignatureLink = () => {
           } as any)
           .eq('id', linkId);
       } catch (ipErr) {
-        console.warn('Could not update IP on signature link:', ipErr);
       }
 
       // For SignWell completions, skip canvas-specific document embedding
@@ -272,7 +270,6 @@ export const useSubmitSignatureLink = () => {
               },
             });
         } catch (traceErr) {
-          console.warn('Could not log process trace:', traceErr);
         }
         return data;
       }
@@ -300,7 +297,6 @@ export const useSubmitSignatureLink = () => {
             is_final: true,
           });
       } catch (docErr) {
-        console.warn('Could not save signature document:', docErr);
       }
 
       // Build final signed documents with embedded signature (canvas flow)
@@ -455,7 +451,6 @@ export const useSubmitSignatureLink = () => {
               contratadaMergedOk = true;
             }
           } catch (mergeErr) {
-            console.warn('Contratada merge failed, falling back to general flow:', mergeErr);
           }
         }
 
@@ -826,7 +821,6 @@ export const useSubmitSignatureLink = () => {
         }
         } // end if (!contratadaMergedOk)
       } catch (signedDocsErr) {
-        console.warn('Could not build signed final documents:', signedDocsErr);
       }
 
       // Log in process_traces for audit trail
@@ -845,7 +839,6 @@ export const useSubmitSignatureLink = () => {
             },
           });
       } catch (traceErr) {
-        console.warn('Could not log process trace:', traceErr);
       }
 
       // --- POST FIRMA: delegar todo al backend ---
@@ -868,16 +861,9 @@ export const useSubmitSignatureLink = () => {
         );
         const finalizeResult = await finalizeResponse.json();
         if (!finalizeResult.ok) {
-          console.warn('finalize-signature-link devolvió error:', finalizeResult);
-        } else {
-          console.log('finalize ok:', {
-            signed: finalizeResult.signed_documents,
-            activated: finalizeResult.activated_contratada,
-          });
         }
       } catch (finalizeErr) {
         // No bloquear la firma si falla el pipeline backend
-        console.warn('finalize-signature-link error (no bloqueante):', finalizeErr);
       }
 
       return data;

@@ -105,7 +105,6 @@ const SignatureView = () => {
           return;
         }
       } catch (err) {
-        console.warn('Could not get signed PDF URL, falling back to print:', err);
       }
     }
 

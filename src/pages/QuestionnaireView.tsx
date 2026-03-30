@@ -128,7 +128,6 @@ const QuestionnaireView = () => {
           saleId={saleData.id}
           signatureToken={token}
           onComplete={() => {
-            console.log("Cuestionario completado");
           }}
         />
       </div>

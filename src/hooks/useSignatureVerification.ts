@@ -302,7 +302,6 @@ export async function generateDocumentHash(content: string): Promise<string> {
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
-  console.warn('Web Crypto no disponible. Usando fallback SHA-256 puro en cliente.');
   return sha256Fallback(content);
 }
 

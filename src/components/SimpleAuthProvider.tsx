@@ -36,6 +36,13 @@ const preserveBrandingStorage = () => {
   }
 };
 
+const redirectToLogin = () => {
+  if (window.location.pathname !== '/login') {
+    window.history.replaceState({}, '', '/login');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }
+};
+
 const ROLE_PRIORITY: AppRole[] = [
   'super_admin',
   'admin',
@@ -132,8 +139,6 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       (event, session) => {
         if (!isMounted) return;
 
-        console.log('🔄 Auth state change:', event);
-
         if (event === 'SIGNED_IN' && session?.user) {
           setLoading(true);
           fetchProfileData(session.user.id)
@@ -173,7 +178,6 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       // Safety timeout: if auth takes too long, unblock the UI
       const safetyTimeout = setTimeout(() => {
         if (isMounted && loading) {
-          console.warn('⚠️ Auth init timeout — unblocking UI');
           setLoading(false);
         }
       }, 5000);
@@ -237,7 +241,9 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } catch (error) {
       console.error('❌ Sign out error:', error);
     } finally {
-      window.location.href = '/login';
+      clearAuthState(setUser, setProfile, setUserRole);
+      setLoading(false);
+      redirectToLogin();
     }
   };
 

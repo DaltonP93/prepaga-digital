@@ -11,7 +11,6 @@ export const useTemplateQuestions = (templateId?: string) => {
     queryFn: async () => {
       if (!templateId) return [];
       
-      console.log('Loading questions for template:', templateId);
       
       const { data, error } = await supabase
         .from('template_questions')
@@ -27,7 +26,6 @@ export const useTemplateQuestions = (templateId?: string) => {
         throw error;
       }
 
-      console.log('Template questions loaded:', data);
       return data || [];
     },
     enabled: !!templateId,
@@ -41,7 +39,6 @@ export const useTemplateQuestions = (templateId?: string) => {
       is_required: boolean;
       sort_order?: number;
     }) => {
-      console.log('Creating question:', questionData);
       
       const { data: question, error: questionError } = await supabase
         .from('template_questions')

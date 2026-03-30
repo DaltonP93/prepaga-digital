@@ -14,7 +14,6 @@ export const useTemplatePlaceholders = () => {
   const { data: placeholders, isLoading } = useQuery({
     queryKey: ["template-placeholders"],
     queryFn: async () => {
-      console.log("Fetching template placeholders...");
       const { data, error } = await supabase
         .from("template_placeholders")
         .select("*")
@@ -25,14 +24,12 @@ export const useTemplatePlaceholders = () => {
         throw error;
       }
 
-      console.log("Template placeholders fetched:", data);
       return data;
     },
   });
 
   const createPlaceholderMutation = useMutation({
     mutationFn: async (placeholder: TemplatePlaceholderInsert) => {
-      console.log("Creating template placeholder:", placeholder);
       const { data, error } = await supabase
         .from("template_placeholders")
         .insert([placeholder])
@@ -65,7 +62,6 @@ export const useTemplatePlaceholders = () => {
 
   const updatePlaceholderMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: TemplatePlaceholderUpdate }) => {
-      console.log("Updating template placeholder:", id, updates);
       const { data, error } = await supabase
         .from("template_placeholders")
         .update(updates)
@@ -99,7 +95,6 @@ export const useTemplatePlaceholders = () => {
 
   const deletePlaceholderMutation = useMutation({
     mutationFn: async (id: string) => {
-      console.log("Deleting template placeholder:", id);
       const { error } = await supabase
         .from("template_placeholders")
         .delete()

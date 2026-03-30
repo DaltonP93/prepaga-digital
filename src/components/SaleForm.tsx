@@ -57,7 +57,6 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
     if (open) {
       if (sale) {
         // Editing mode - populate with sale data
-        console.log('Loading sale data for editing:', sale);
         
         const formData = {
           client_id: sale.client_id || "",
@@ -95,7 +94,6 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
 
   const onSubmit = async (data: SaleFormData) => {
     try {
-      console.log('Form data received:', data);
       
       const saleData = {
         client_id: data.client_id,
@@ -106,25 +104,20 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
         notes: data.notes || null,
       };
 
-      console.log('Processed sale data:', saleData);
 
       if (isEditing && sale) {
-        console.log('Updating sale with ID:', sale.id);
         await updateSale.mutateAsync({ 
           id: sale.id, 
           ...saleData,
           updated_at: new Date().toISOString()
         });
-        console.log('Sale updated successfully');
       } else {
-        console.log('Creating new sale');
         await createSale.mutateAsync({
           ...saleData,
           salesperson_id: profile?.id,
           status: 'borrador' as any,
           created_at: new Date().toISOString()
         });
-        console.log('Sale created successfully');
       }
       
       onOpenChange(false);

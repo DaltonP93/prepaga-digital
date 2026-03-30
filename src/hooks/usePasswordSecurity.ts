@@ -51,7 +51,6 @@ export const usePasswordSecurity = (): UsePasswordSecurityReturn => {
       });
 
       if (!response.ok) {
-        console.warn('HIBP API no disponible, continuando sin verificación');
         return { isBreached: false, count: 0 };
       }
 
@@ -67,7 +66,6 @@ export const usePasswordSecurity = (): UsePasswordSecurityReturn => {
 
       return { isBreached: false, count: 0 };
     } catch (error) {
-      console.warn('Error verificando contraseña en HIBP:', error);
       return { isBreached: false, count: 0 };
     }
   };

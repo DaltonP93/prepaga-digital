@@ -98,7 +98,6 @@ Deno.serve(async (req) => {
             .single();
 
           if (!asset || asset.status !== "ready") {
-            console.warn(`Asset ${assetId} not ready, skipping`);
             break;
           }
 

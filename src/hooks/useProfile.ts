@@ -14,7 +14,6 @@ export const useProfile = () => {
   const { data: profile, isLoading } = useQuery({
     queryKey: ['profile'],
     queryFn: async () => {
-      console.log('🔍 Fetching profile in useProfile...');
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user');
 
@@ -32,14 +31,12 @@ export const useProfile = () => {
         throw error;
       }
       
-      console.log('✅ Profile fetched in useProfile:', data);
       return data;
     },
   });
 
   const updateProfile = useMutation({
     mutationFn: async (updates: ProfileUpdate) => {
-      console.log('🔄 Updating profile with data:', updates);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user');
 
@@ -55,11 +52,9 @@ export const useProfile = () => {
         throw error;
       }
       
-      console.log('✅ Profile updated successfully:', data);
       return data;
     },
     onSuccess: (data) => {
-      console.log('✅ Profile update success, invalidating cache');
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       queryClient.setQueryData(['profile'], data);
       toast({

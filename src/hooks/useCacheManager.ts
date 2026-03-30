@@ -23,7 +23,6 @@ export const useCacheManager = () => {
   // Detectar problemas de memoria
   useEffect(() => {
     const handleMemoryWarning = () => {
-      console.warn('Advertencia de memoria detectada, limpiando cache...');
       cacheManager.forceFullCleanup();
     };
 

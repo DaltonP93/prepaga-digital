@@ -17,7 +17,6 @@ export const useSignatureByToken = (token: string) => {
     queryFn: async () => {
       if (!token) throw new Error('Token is required');
 
-      console.log('Fetching signature data for token:', token);
 
       const { data: sale, error } = await supabase
         .from('sales')
@@ -37,7 +36,6 @@ export const useSignatureByToken = (token: string) => {
         throw error;
       }
       
-      console.log('Signature data fetched successfully:', sale);
       return sale as any;
     },
     enabled: !!token,
@@ -135,7 +133,6 @@ export const useSignature = () => {
       signature: string; 
       deviceInfo: any; 
     }) => {
-      console.log('Submitting signature with token:', token);
       
       // Get sale by token first
       const { data: sale, error: saleError } = await supabase

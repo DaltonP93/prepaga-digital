@@ -38,7 +38,8 @@ serve(async (req) => {
     }
 
     const url = new URL(req.url);
-    const action = url.searchParams.get("action");
+    const contentType = req.headers.get("content-type") || "";
+    const action = url.searchParams.get("action") || (contentType.includes("multipart/form-data") ? "upload" : null);
 
     switch (action) {
       case "upload":
@@ -67,6 +68,10 @@ async function handleFileUpload(supabase: any, req: Request, userId: string) {
   const file = formData.get("file") as File;
   const bucketName = formData.get("bucketName") as string || "documents";
   const isPublic = formData.get("isPublic") === "true";
+  const requestedFilePath = formData.get("filePath") as string | null;
+  const companyId = (formData.get("companyId") as string | null) || null;
+  const entityType = (formData.get("entityType") as string | null) || null;
+  const entityId = (formData.get("entityId") as string | null) || null;
   
   if (!file) {
     throw new Error("No file provided");
@@ -93,7 +98,8 @@ async function handleFileUpload(supabase: any, req: Request, userId: string) {
   // Create unique file path
   const timestamp = Date.now();
   const extension = file.name.split('.').pop();
-  const fileName = `${userId}/${timestamp}-${crypto.randomUUID()}.${extension}`;
+  const generatedFileName = `${userId}/${timestamp}-${crypto.randomUUID()}.${extension}`;
+  const fileName = requestedFilePath?.trim() || generatedFileName;
   
   // Convert file to array buffer
   const fileBuffer = await file.arrayBuffer();
@@ -110,25 +116,23 @@ async function handleFileUpload(supabase: any, req: Request, userId: string) {
     throw new Error(`Upload failed: ${uploadError.message}`);
   }
 
-  // Store file metadata in database
+  // Store file metadata in database (best-effort)
   const { data: fileRecord, error: dbError } = await supabase
     .from("file_uploads")
     .insert({
-      user_id: userId,
-      bucket_name: bucketName,
+      uploaded_by: userId,
+      company_id: companyId,
+      entity_type: entityType,
+      entity_id: entityId,
       file_name: file.name,
-      file_path: fileName,
       file_size: file.size,
-      mime_type: file.type,
-      upload_status: "completed"
+      file_type: file.type,
+      file_url: fileName,
     })
     .select()
     .single();
 
   if (dbError) {
-    // Clean up uploaded file if database insert fails
-    await supabase.storage.from(bucketName).remove([fileName]);
-    throw new Error(`Database error: ${dbError.message}`);
   }
 
   // Get public URL if file is public
@@ -143,13 +147,13 @@ async function handleFileUpload(supabase: any, req: Request, userId: string) {
   return new Response(JSON.stringify({
     success: true,
     file: {
-      id: fileRecord.id,
+      id: fileRecord?.id ?? null,
       name: file.name,
       path: fileName,
       size: file.size,
       type: file.type,
       url: publicUrl,
-      created_at: fileRecord.created_at
+      created_at: fileRecord?.created_at ?? new Date().toISOString()
     }
   }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" }

@@ -44,7 +44,6 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    console.log('Checking for pending signature reminders...')
 
     const { data: pendingLinks, error: linksError } = await supabase
       .from('signature_links')
@@ -73,7 +72,6 @@ serve(async (req) => {
       throw linksError
     }
 
-    console.log(`Found ${pendingLinks?.length || 0} pending signature links`)
 
     const remindersSent: string[] = []
     const errors: string[] = []

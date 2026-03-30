@@ -384,7 +384,6 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
           }
         }
       } catch (e) {
-        console.warn('Error syncing DDJJ to template_responses:', e);
       }
 
       if (result.wasVirtual) {

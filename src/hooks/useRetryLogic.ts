@@ -23,7 +23,6 @@ export const useRetryLogic = ({
       const retryDelay = Math.min(2000 * Math.pow(2, retryCount), 10000); // Exponential backoff, max 10s
       
       const timeoutId = setTimeout(() => {
-        console.log(`Auto-retry attempt ${retryCount + 1}/${maxRetries}`);
         setRetryCount(prev => prev + 1);
         setIsRetrying(true);
         
