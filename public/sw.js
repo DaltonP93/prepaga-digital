@@ -16,10 +16,9 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('Cache abierto:', CACHE_NAME);
         // Use addAll only for guaranteed-available resources
         return Promise.allSettled(
-          urlsToCache.map(url => cache.add(url).catch(err => console.warn('Cache skip:', url, err)))
+          urlsToCache.map(url => cache.add(url).catch(() => null))
         );
       })
       .then(() => {
@@ -37,9 +36,9 @@ self.addEventListener('activate', (event) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
             if (cacheName !== CACHE_NAME) {
-              console.log('Eliminando cache obsoleto:', cacheName);
               return caches.delete(cacheName);
             }
+            return Promise.resolve(false);
           })
         );
       }),
@@ -137,6 +136,8 @@ async function networkFirst(request) {
 // Limpieza automática de cache
 async function cleanupCache(cache) {
   try {
+    if (!cache) return;
+
     const keys = await cache.keys();
     const now = Date.now();
     
@@ -145,9 +146,18 @@ async function cleanupCache(cache) {
     
     for (const key of keys) {
       const response = await cache.match(key);
+      if (!response || !response.headers) {
+        expiredKeys.push(key);
+        continue;
+      }
+
       const cachedTime = response.headers.get('sw-cache-time');
+      if (!cachedTime) {
+        continue;
+      }
       
-      if (cachedTime && (now - parseInt(cachedTime)) > CACHE_EXPIRY) {
+      const parsedCachedTime = parseInt(cachedTime, 10);
+      if (Number.isNaN(parsedCachedTime) || (now - parsedCachedTime) > CACHE_EXPIRY) {
         expiredKeys.push(key);
       }
     }
@@ -161,8 +171,6 @@ async function cleanupCache(cache) {
       const keysToDelete = remainingKeys.slice(0, remainingKeys.length - 100);
       await Promise.all(keysToDelete.map(key => cache.delete(key)));
     }
-    
-    console.log(`Cache limpiado: ${expiredKeys.length} entradas expiradas eliminadas`);
   } catch (error) {
     console.error('Error limpiando cache:', error);
   }
