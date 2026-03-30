@@ -240,6 +240,62 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                     user_id: profile?.id,
                     details: { previous_status: currentStatus, new_status: 'pendiente', reason: currentStatus === 'rechazado' ? 'Reenviado tras correcciones' : 'Enviado a auditoría' },
                   });
+
+                  if (profile?.company_id) {
+                    const { data: companyProfiles, error: profilesError } = await supabase
+                      .from('profiles')
+                      .select('id')
+                      .eq('company_id', profile.company_id)
+                      .eq('is_active', true);
+
+                    if (profilesError) {
+                      console.error('Error fetching active company profiles:', profilesError);
+                    }
+
+                    const candidateIds = (companyProfiles || []).map((candidate) => candidate.id);
+
+                    let auditRecipients: Array<{ user_id: string }> = [];
+                    let recipientsError: any = null;
+
+                    if (candidateIds.length > 0) {
+                      const { data: roleRows, error: rolesError } = await supabase
+                        .from('user_roles')
+                        .select('user_id, role')
+                        .in('user_id', candidateIds)
+                        .in('role', ['auditor', 'supervisor', 'admin', 'super_admin']);
+
+                      recipientsError = rolesError;
+                      if (!rolesError && roleRows) {
+                        const uniqueUserIds = Array.from(new Set(roleRows.map((row) => row.user_id)));
+                        auditRecipients = uniqueUserIds.map((userId) => ({ user_id: userId }));
+                      }
+                    }
+
+                    if (recipientsError) {
+                      console.error('Error fetching audit notification recipients:', recipientsError);
+                    } else if (auditRecipients?.length) {
+                      const recipientRows = auditRecipients
+                        .filter((recipient) => recipient.user_id !== profile.id)
+                        .map((recipient) => ({
+                          user_id: recipient.user_id,
+                          title: currentStatus === 'rechazado' ? 'Venta reenviada a auditoría' : 'Nueva venta en auditoría',
+                          message: `La venta #${sale.contract_number || sale.id.slice(-4)} está lista para revisión de auditoría.`,
+                          type: 'info',
+                          link: `/sales/${sale.id}`,
+                        }));
+
+                      if (recipientRows.length > 0) {
+                        const { error: notificationError } = await supabase
+                          .from('notifications')
+                          .insert(recipientRows as any);
+
+                        if (notificationError) {
+                          console.error('Error creating audit notifications:', notificationError);
+                        }
+                      }
+                    }
+                  }
+
                   toast.success('Venta enviada a auditoría');
                   navigate('/sales');
                 } catch (error: any) {
