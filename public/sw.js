@@ -1,12 +1,10 @@
 
 // Service Worker optimizado para manejo de cache
-const CACHE_NAME = 'prepaga-digital-v3';
-const CACHE_VERSION = '3.0.0';
-const MAX_CACHE_SIZE = 50 * 1024 * 1024; // 50MB
+const CACHE_NAME = 'prepaga-digital-v4';
+const CACHE_VERSION = '4.0.0';
 const CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 horas
 
 const urlsToCache = [
-  '/',
   '/manifest.json',
   '/offline.html',
 ];
@@ -57,20 +55,40 @@ self.addEventListener('fetch', (event) => {
 
   // Estrategia diferente para diferentes tipos de recursos
   const url = new URL(event.request.url);
+  const isSameOrigin = url.origin === self.location.origin;
+
+  if (!isSameOrigin) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
   
   // Para archivos estáticos: Cache First
-  if (url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg)$/)) {
+  if (url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|webp|woff2?)$/)) {
     event.respondWith(cacheFirst(event.request));
   }
-  // Para páginas: Network First con fallback
-  else if (url.pathname.match(/^\/[^.]*$/)) {
-    event.respondWith(networkFirst(event.request));
+  // Para navegación HTML: Network First sin persistir app shell viejo
+  else if (event.request.mode === 'navigate' || url.pathname.match(/^\/[^.]*$/)) {
+    event.respondWith(networkFirstInternal(event.request, { cachePages: false }));
   }
   // Para API: Network Only
   else {
     event.respondWith(fetch(event.request));
   }
 });
+
+function canCacheResponse(request, response) {
+  if (!response || response.status !== 200) return false;
+
+  const contentType = response.headers.get('content-type') || '';
+  const destination = request.destination;
+
+  if (destination === 'script') return contentType.includes('javascript') || contentType.includes('ecmascript');
+  if (destination === 'style') return contentType.includes('text/css');
+  if (destination === 'image') return contentType.startsWith('image/');
+  if (destination === 'font') return contentType.startsWith('font/') || contentType.includes('application/font');
+
+  return true;
+}
 
 // Estrategia Cache First para archivos estáticos
 async function cacheFirst(request) {
@@ -89,7 +107,7 @@ async function cacheFirst(request) {
     // Si no hay cache o está expirado, buscar en red
     const networkResponse = await fetch(request);
     
-    if (networkResponse.status === 200) {
+    if (canCacheResponse(request, networkResponse)) {
       const responseClone = networkResponse.clone();
       const responseWithTime = new Response(responseClone.body, {
         status: responseClone.status,
@@ -114,10 +132,14 @@ async function cacheFirst(request) {
 
 // Estrategia Network First para páginas
 async function networkFirst(request) {
+  return networkFirstInternal(request, { cachePages: true });
+}
+
+async function networkFirstInternal(request, options = { cachePages: true }) {
   try {
     const networkResponse = await fetch(request);
     
-    if (networkResponse.status === 200) {
+    if (options.cachePages && networkResponse.status === 200) {
       const cache = await caches.open(CACHE_NAME);
       await cache.put(request, networkResponse.clone());
       await cleanupCache(cache);

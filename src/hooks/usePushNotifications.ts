@@ -24,7 +24,9 @@ export const usePushNotifications = () => {
           // Ensure service worker is registered before checking
           const registrations = await navigator.serviceWorker.getRegistrations();
           if (registrations.length === 0) {
-            await navigator.serviceWorker.register('/sw.js');
+            await navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' });
+          } else {
+            await Promise.all(registrations.map(registration => registration.update().catch(() => null)));
           }
           setIsSupported(true);
           checkSubscription();
@@ -84,10 +86,11 @@ export const usePushNotifications = () => {
       try {
         const registrations = await navigator.serviceWorker.getRegistrations();
         if (registrations.length === 0) {
-          registration = await navigator.serviceWorker.register('/sw.js');
+          registration = await navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' });
           // Wait for the SW to be ready
           await navigator.serviceWorker.ready;
         } else {
+          await Promise.all(registrations.map(existingRegistration => existingRegistration.update().catch(() => null)));
           registration = await navigator.serviceWorker.ready;
         }
       } catch (swError) {
