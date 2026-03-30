@@ -57,14 +57,32 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
   const isEditAllowed = !isEditing || canEditState(currentStatus);
   const isAuditorOrAbove = role === 'auditor' || role === 'admin' || role === 'super_admin';
 
-  // Lock ALL form fields once audit approves — no edits allowed past this point
-  const AUDIT_LOCKED_STATUSES: SaleStatus[] = [
-    'aprobado_para_templates', 'listo_para_enviar', 'enviado',
-    'firmado_parcial', 'firmado', 'completado', 'expirado',
+  // After audit approval, core sale data is locked. Templates stay manageable while
+  // the sale is in `aprobado_para_templates`, because that state exists to let the
+  // vendor attach templates before sending the signature flow.
+  const CORE_DATA_LOCKED_STATUSES: SaleStatus[] = [
+    'aprobado_para_templates',
+    'listo_para_enviar',
+    'enviado',
+    'firmado_parcial',
+    'firmado',
+    'completado',
+    'expirado',
   ];
+  const TEMPLATE_LOCKED_STATUSES: SaleStatus[] = [
+    'listo_para_enviar',
+    'enviado',
+    'firmado_parcial',
+    'firmado',
+    'completado',
+    'expirado',
+    'cancelado',
+  ];
+  const isPrivilegedRole = role === 'super_admin' || role === 'admin';
   const isAuditLocked =
-    (sale?.audit_status === 'aprobado' || AUDIT_LOCKED_STATUSES.includes(currentStatus)) &&
-    role !== 'super_admin' && role !== 'admin';
+    (sale?.audit_status === 'aprobado' || CORE_DATA_LOCKED_STATUSES.includes(currentStatus)) &&
+    !isPrivilegedRole;
+  const isTemplatesLocked = TEMPLATE_LOCKED_STATUSES.includes(currentStatus) && !isPrivilegedRole;
   const statusLabel = SALE_STATUS_LABELS[currentStatus] || currentStatus;
 
   const [formData, setFormData] = useState({
@@ -322,7 +340,9 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
         <Alert variant="default" className="border-green-400 bg-green-50 dark:bg-green-950/20">
           <Lock className="h-4 w-4 text-green-700" />
           <AlertDescription className="text-green-800 dark:text-green-300">
-            Esta venta fue <strong>aprobada por auditoría</strong> y está bloqueada para edición. Solo se pueden ver los datos.
+            {currentStatus === 'aprobado_para_templates'
+              ? <>Esta venta fue <strong>aprobada por auditoría</strong>. Los datos quedan bloqueados, pero aún puedes gestionar <strong>Templates</strong> antes del envío.</>
+              : <>Esta venta fue <strong>aprobada por auditoría</strong> y está bloqueada para edición. Solo se pueden ver los datos.</>}
           </AlertDescription>
         </Alert>
       )}
@@ -421,7 +441,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                   saleId={sale?.id}
                   auditStatus={sale?.audit_status}
                   saleStatus={sale?.status}
-                  disabled={isAuditLocked}
+                  disabled={isTemplatesLocked}
                 />
               </TabsContent>
               </fieldset>
