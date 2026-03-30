@@ -22,6 +22,8 @@ import {
   Lock,
   CheckCircle2,
   Plug,
+  Database,
+  AlertTriangle,
 } from 'lucide-react';
 import { TestDataManager } from '@/components/TestDataManager';
 import { SessionConfigurationPanel } from '@/components/SessionConfigurationPanel';
@@ -34,6 +36,7 @@ import { WorkflowConfigPanel } from '@/components/workflow/WorkflowConfigPanel';
 import { SaleProgressConfigPanel } from '@/components/workflow/SaleProgressConfigPanel';
 import { AdminConfigPanel } from '@/components/AdminConfigPanel';
 import { MenuConfigPanel } from '@/components/MenuConfigPanel';
+import { SUPABASE_PROJECT_REF, SUPABASE_URL } from '@/integrations/supabase/client';
 
 import { useRolePermissions } from '@/hooks/useRolePermissions';
 
@@ -42,6 +45,19 @@ export default function Settings() {
   const { profile } = useSimpleAuthContext();
   const { role, roleLabel, isSuperAdmin, isAdmin, isLoadingRole } = useRolePermissions();
   const canManageWorkflow = isSuperAdmin || isAdmin;
+  const viteProjectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID || null;
+  const viteSupabaseUrl = import.meta.env.VITE_SUPABASE_URL || null;
+
+  const projectCatalog: Record<string, { label: string; country: string }> = {
+    ykducvvcjzdpoojxlsig: { label: 'Seguro Digital 2', country: 'EEUU' },
+    ejiycfqxgtrzaysgpzmx: { label: 'Seguro Digital CyD', country: 'Brasil' },
+  };
+
+  const activeProjectInfo = SUPABASE_PROJECT_REF ? projectCatalog[SUPABASE_PROJECT_REF] : null;
+  const envProjectInfo = viteProjectRef ? projectCatalog[viteProjectRef] : null;
+  const hasSupabaseMismatch =
+    Boolean(viteProjectRef && SUPABASE_PROJECT_REF && viteProjectRef !== SUPABASE_PROJECT_REF) ||
+    Boolean(viteSupabaseUrl && viteSupabaseUrl !== SUPABASE_URL);
 
   const recentChanges = [
     {
@@ -110,6 +126,61 @@ export default function Settings() {
         </TabsList>
 
         <TabsContent value="general" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Database className="h-5 w-5" />
+                Entorno de Base de Datos
+              </CardTitle>
+              <CardDescription>
+                Esta sección muestra a qué proyecto Supabase está conectada realmente la aplicación.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-lg border p-4 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium">Cliente activo</p>
+                    <Badge variant="default">En uso</Badge>
+                  </div>
+                  <div className="text-sm space-y-1">
+                    <p><span className="text-muted-foreground">Proyecto:</span> {SUPABASE_PROJECT_REF || 'No detectado'}</p>
+                    <p><span className="text-muted-foreground">Servidor:</span> {activeProjectInfo?.label || 'No catalogado'}</p>
+                    <p><span className="text-muted-foreground">País:</span> {activeProjectInfo?.country || 'Desconocido'}</p>
+                    <p className="break-all"><span className="text-muted-foreground">URL:</span> {SUPABASE_URL}</p>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border p-4 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium">Variables Vite</p>
+                    <Badge variant={hasSupabaseMismatch ? 'destructive' : 'secondary'}>
+                      {hasSupabaseMismatch ? 'No coincide' : 'Coincide'}
+                    </Badge>
+                  </div>
+                  <div className="text-sm space-y-1">
+                    <p><span className="text-muted-foreground">Proyecto:</span> {viteProjectRef || 'No definido'}</p>
+                    <p><span className="text-muted-foreground">Servidor:</span> {envProjectInfo?.label || 'No catalogado'}</p>
+                    <p><span className="text-muted-foreground">País:</span> {envProjectInfo?.country || 'Desconocido'}</p>
+                    <p className="break-all"><span className="text-muted-foreground">URL:</span> {viteSupabaseUrl || 'No definida'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {hasSupabaseMismatch && (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+                  <div className="flex items-center gap-2 font-medium">
+                    <AlertTriangle className="h-4 w-4" />
+                    Hay una diferencia entre el cliente cargado y las variables del entorno
+                  </div>
+                  <p className="text-muted-foreground mt-1">
+                    La aplicación está usando el cliente Supabase configurado en código. Si cambias `.env`, eso no tendrá efecto mientras el cliente siga apuntando a otro proyecto.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <div className="grid gap-4 md:grid-cols-3">
             <Card>
               <CardHeader>

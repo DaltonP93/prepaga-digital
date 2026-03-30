@@ -4,7 +4,7 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Building2, Users, FileText, Palette } from "lucide-react";
+import { Search, Building2, Users, FileText, Palette } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useCompanies } from "@/hooks/useCompanies";
@@ -12,15 +12,17 @@ import { CompanyForm } from "@/components/CompanyForm";
 import { CompanyActions } from "@/components/CompanyActions";
 import { CompanyBrandingForm } from "@/components/CompanyBrandingForm";
 import { useRolePermissions } from "@/hooks/useRolePermissions";
+import { SINGLE_COMPANY_PRIMARY_NAME, getSingleCompany } from "@/lib/singleCompany";
 
 const Companies = () => {
   const { isSuperAdmin, isAdmin } = useRolePermissions();
   const { data: companies, isLoading } = useCompanies();
+  const singleCompany = getSingleCompany(companies || []);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showBrandingForm, setShowBrandingForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const canCreateCompany = isSuperAdmin;
+  const canCreateCompany = false;
   const canManageBranding = isSuperAdmin || isAdmin;
   
   const filteredCompanies = companies?.filter(company =>
@@ -44,6 +46,15 @@ const Companies = () => {
       description="Administrar empresas del sistema de seguros médicos"
     >
       <div className="space-y-6">
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle>Modo Empresa Única</CardTitle>
+            <CardDescription>
+              El sistema quedó bloqueado para operar solo con {singleCompany?.name || SINGLE_COMPANY_PRIMARY_NAME}. No se permite crear, seleccionar ni desactivar otras empresas.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+
         {/* Header Actions */}
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-2">

@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, generateUUID } from '@/lib/utils';
+import { getSignatureLinkUrl } from '@/lib/appUrls';
 
 interface AutomationRule {
   id: string;
@@ -52,7 +53,7 @@ export const useSignatureAutomation = () => {
               data: {
                 clientName: `${sale.clients.first_name} ${sale.clients.last_name}`,
                 planName: sale.plans.name,
-                signatureUrl: `${window.location.origin}/signature/${sale.signature_token}`,
+                signatureUrl: getSignatureLinkUrl(sale.signature_token),
                 expiresAt: sale.signature_expires_at,
                 hoursLeft: Math.ceil((new Date(sale.signature_expires_at).getTime() - Date.now()) / (1000 * 60 * 60))
               }
@@ -132,7 +133,7 @@ export const useSignatureAutomation = () => {
               data: {
                 clientName: `${sale.clients.first_name} ${sale.clients.last_name}`,
                 planName: sale.plans.name,
-                signatureUrl: `${window.location.origin}/signature/${newToken}`,
+                signatureUrl: getSignatureLinkUrl(newToken),
                 expiresAt: expiresAt.toISOString()
               }
             }

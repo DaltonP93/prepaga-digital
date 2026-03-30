@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { validateSaleTransition } from '@/lib/workflowValidator';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { generateUUID } from '@/lib/utils';
+import { getSignatureLinkUrl } from '@/lib/appUrls';
 
 const ADMIN_ROLES = ['super_admin', 'admin', 'supervisor', 'gestor', 'auditor'];
 
@@ -445,7 +446,7 @@ export const useGenerateSignatureLink = () => {
         updatedSale = { ...newSale, salesperson, profiles: salesperson } as unknown as ExtendedSale;
       }
       
-      const signatureUrl = `${window.location.origin}/signature/${token}`;
+      const signatureUrl = getSignatureLinkUrl(token);
       
       return { sale: updatedSale, signatureUrl };
     },

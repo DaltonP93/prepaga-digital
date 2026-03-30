@@ -2,6 +2,7 @@
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatCurrency as formatPygCurrency } from '@/lib/utils';
+import { getSignatureLinkUrl } from '@/lib/appUrls';
 
 /**
  * Convert a number to words in Spanish (Guaranies)
@@ -367,7 +368,7 @@ export function createEnhancedTemplateContext(
       telefono: sale?.billing_phone || '',
     },
     firma: {
-      enlace: signatureLink ? `${window.location.origin}/firmar/${signatureLink.token}` : '',
+      enlace: signatureLink ? getSignatureLinkUrl(signatureLink.token) : '',
       token: signatureLink?.token || '',
       fechaExpiracion: formatDate(signatureLink?.expires_at, "d 'de' MMMM 'de' yyyy"),
       estado: signatureLink?.status || 'pendiente',

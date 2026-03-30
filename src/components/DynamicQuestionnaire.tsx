@@ -14,6 +14,7 @@ import { useTemplateQuestions } from "@/hooks/useTemplateQuestions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Tables } from "@/integrations/supabase/types";
+import { getSignatureLinkPath } from "@/lib/appUrls";
 
 type TemplateQuestion = Tables<"template_questions"> & {
   template_question_options: Tables<"template_question_options">[];
@@ -119,7 +120,7 @@ export const DynamicQuestionnaire = ({
       
       // Redirect to signature page if we have the token
       if (signatureToken) {
-        window.location.href = `/signature/${signatureToken}`;
+        window.location.href = getSignatureLinkPath(signatureToken);
       } else {
         onComplete?.(responses);
       }

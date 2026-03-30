@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { getSignatureLinkUrl } from "../_shared/public-app-url.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -325,7 +326,7 @@ async function activateNextStep(
             templateData: {
               clientName: 'Representante Legal',
               companyName,
-              signatureUrl: `${Deno.env.get('PUBLIC_APP_URL') || 'https://prepaga.saa.com.py'}/firmar/${s2Link.token}`,
+              signatureUrl: getSignatureLinkUrl(s2Link.token),
               expirationDate: 'en 3 días',
             },
             companyId: sale?.company_id,

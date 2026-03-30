@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useGenerateQuestionnaireLink, useGenerateSignatureLink } from "@/hooks/useSales";
 import { useToast } from "@/hooks/use-toast";
+import { getSignatureLinkUrl } from "@/lib/appUrls";
 
 interface Sale {
   id: string;
@@ -99,7 +100,7 @@ export const SalesActionButtons: React.FC<SalesActionButtonsProps> = ({ sale }) 
 
   const copySignatureLink = () => {
     if (sale.signature_token) {
-      const link = `${window.location.origin}/signature/${sale.signature_token}`;
+      const link = getSignatureLinkUrl(sale.signature_token);
       navigator.clipboard.writeText(link);
       toast({
         title: "Enlace copiado",

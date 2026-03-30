@@ -24,7 +24,7 @@ export function SecuritySettings() {
 
   // Verificar nueva contraseña con debounce
   useEffect(() => {
-    if (newPassword.length >= 6) {
+    if (newPassword.length >= 8) {
       const timer = setTimeout(() => {
         checkPassword(newPassword);
       }, 500);
@@ -160,7 +160,7 @@ export function SecuritySettings() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                minLength={6}
+                minLength={8}
               />
             </div>
 

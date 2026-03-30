@@ -24,6 +24,7 @@ import {
   Share2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { getSignatureLinkPath, getSignatureLinkUrl } from "@/lib/appUrls";
 
 interface SignatureWorkflowManagerProps {
   saleId: string;
@@ -141,7 +142,7 @@ export const SignatureWorkflowManager = ({
   const copySignatureLink = () => {
     if (!signatureToken) return;
     
-    const link = `${window.location.origin}/signature/${signatureToken}`;
+    const link = getSignatureLinkUrl(signatureToken);
     navigator.clipboard.writeText(link);
     
     toast({
@@ -155,7 +156,7 @@ export const SignatureWorkflowManager = ({
     
     setIsSending(true);
     try {
-      const link = `${window.location.origin}/signature/${signatureToken}`;
+      const link = getSignatureLinkUrl(signatureToken);
       
       // Simular envío por diferentes canales
       const channels = [];
@@ -211,7 +212,7 @@ export const SignatureWorkflowManager = ({
   const isExpired = signatureExpiresAt && new Date(signatureExpiresAt) < new Date();
   const isTokenRevoked = tokenRevoked === true;
   const canUseToken = signatureToken && !isExpired && !isTokenRevoked;
-  const signatureLink = signatureToken ? `${window.location.origin}/signature/${signatureToken}` : null;
+  const signatureLink = signatureToken ? getSignatureLinkUrl(signatureToken) : null;
 
   return (
     <Card>
@@ -280,7 +281,7 @@ export const SignatureWorkflowManager = ({
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => window.open(signatureLink, '_blank')}
+                onClick={() => window.open(signatureLink || getSignatureLinkPath(signatureToken || ''), '_blank')}
                 disabled={!canUseToken}
               >
                 <Share2 className="h-4 w-4 mr-2" />

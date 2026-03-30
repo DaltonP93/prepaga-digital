@@ -1,16 +1,17 @@
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useUsers } from '@/hooks/useUsers';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useUpdateUser } from '@/hooks/useUsers';
+import { SINGLE_COMPANY_PRIMARY_NAME, getSingleCompany } from '@/lib/singleCompany';
 
 const NO_COMPANY_VALUE = '__none__';
 
 export function ProfileCompanyAssignmentPanel() {
   const { data: users = [], isLoading: usersLoading } = useUsers();
   const { data: companies = [], isLoading: companiesLoading } = useCompanies();
+  const singleCompany = getSingleCompany(companies);
   const updateUser = useUpdateUser();
 
   const [selectedCompanies, setSelectedCompanies] = useState<Record<string, string>>({});
@@ -21,9 +22,8 @@ export function ProfileCompanyAssignmentPanel() {
     [users],
   );
 
-  const getCurrentSelection = (userId: string, currentCompanyId: string | null) => {
-    return selectedCompanies[userId] ?? (currentCompanyId || NO_COMPANY_VALUE);
-  };
+  const getCurrentSelection = (userId: string, currentCompanyId: string | null) =>
+    selectedCompanies[userId] ?? currentCompanyId ?? singleCompany?.id ?? NO_COMPANY_VALUE;
 
   const handleSave = async (userId: string, selectedCompanyId: string) => {
     setSavingUserId(userId);
@@ -53,7 +53,7 @@ export function ProfileCompanyAssignmentPanel() {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Asigna o corrige el <code>company_id</code> de cada perfil. Si el usuario no tiene empresa, no verá clientes con RLS activo.
+        El sistema opera con una sola empresa. Todos los perfiles deben quedar asignados a <code>{singleCompany?.name || SINGLE_COMPANY_PRIMARY_NAME}</code>.
       </p>
 
       <Table>
@@ -80,30 +80,15 @@ export function ProfileCompanyAssignmentPanel() {
                 <TableCell>{user.email || '-'}</TableCell>
                 <TableCell>{user.companies?.name || 'Sin empresa'}</TableCell>
                 <TableCell>
-                  <Select
-                    value={selectedValue}
-                    onValueChange={(value) =>
-                      setSelectedCompanies((prev) => ({ ...prev, [user.id]: value }))
-                    }
-                  >
-                    <SelectTrigger className="w-[220px]">
-                      <SelectValue placeholder="Seleccionar empresa" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NO_COMPANY_VALUE}>Sin empresa</SelectItem>
-                      {companies.map((company) => (
-                        <SelectItem key={company.id} value={company.id}>
-                          {company.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex h-10 w-[220px] items-center rounded-md border bg-muted/30 px-3 text-sm">
+                    {singleCompany?.name || SINGLE_COMPANY_PRIMARY_NAME}
+                  </div>
                 </TableCell>
                 <TableCell className="text-right">
                   <Button
                     size="sm"
-                    disabled={!hasChanges || updateUser.isPending || isSaving}
-                    onClick={() => handleSave(user.id, selectedValue)}
+                    disabled={(!singleCompany || !hasChanges) || updateUser.isPending || isSaving}
+                    onClick={() => handleSave(user.id, singleCompany?.id || selectedValue)}
                   >
                     {isSaving ? 'Guardando...' : 'Guardar'}
                   </Button>
@@ -116,4 +101,3 @@ export function ProfileCompanyAssignmentPanel() {
     </div>
   );
 }
-

@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { checkRateLimit, rateLimitResponse, getClientIdentifier } from '../_shared/rate-limiter.ts'
+import { checkRateLimitPersistent, rateLimitResponse, getClientIdentifier } from '../_shared/rate-limiter.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -222,9 +222,9 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Rate limit: max 10 OTP sends per 15 minutes per IP
+      // Rate limit: max 10 OTP sends per 15 minutes per IP (DB-persistent, survives cold starts)
       const clientIp = getClientIdentifier(req);
-      const rateCheck = checkRateLimit(`otp:${clientIp}`, { windowMs: 15 * 60 * 1000, maxRequests: 10 });
+      const rateCheck = await checkRateLimitPersistent(`otp:${clientIp}`, { windowMs: 15 * 60 * 1000, maxRequests: 10 });
       if (!rateCheck.allowed) return rateLimitResponse(corsHeaders, rateCheck.retryAfterMs);
 
       // Validate signature_link_id and get stored recipient from DB (never trust request body)

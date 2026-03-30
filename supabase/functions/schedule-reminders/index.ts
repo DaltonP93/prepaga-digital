@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { getSignatureLinkUrl } from "../_shared/public-app-url.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -102,8 +103,7 @@ serve(async (req) => {
 
       if (daysUntilExpiration > 3) continue
 
-      const publicAppUrl = Deno.env.get('PUBLIC_APP_URL') || 'https://prepaga.saa.com.py'
-      const signatureUrl = `${publicAppUrl}/firmar/${link.token}`
+      const signatureUrl = getSignatureLinkUrl(link.token)
 
       try {
         const response = await fetch(`${supabaseUrl}/functions/v1/send-whatsapp`, {

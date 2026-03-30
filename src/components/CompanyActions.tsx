@@ -23,6 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Database } from "@/integrations/supabase/types";
+import { isSingleCompanyMatch } from "@/lib/singleCompany";
 
 type Company = Database['public']['Tables']['companies']['Row'];
 
@@ -37,6 +38,7 @@ export function CompanyActions({ company }: CompanyActionsProps) {
   const [showWorkflowConfig, setShowWorkflowConfig] = useState(false);
   const deleteCompany = useDeleteCompany();
   const canConfigureWorkflow = ['admin', 'super_admin'].includes(profile?.role || '');
+  const isLockedCompany = isSingleCompanyMatch(company.name);
 
   const handleDelete = async () => {
     await deleteCompany.mutateAsync(company.id);
@@ -62,13 +64,15 @@ export function CompanyActions({ company }: CompanyActionsProps) {
               Configurar Flujo
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem
-            onClick={() => setShowDeleteDialog(true)}
-            className="text-destructive"
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Desactivar
-          </DropdownMenuItem>
+          {!isLockedCompany && (
+            <DropdownMenuItem
+              onClick={() => setShowDeleteDialog(true)}
+              className="text-destructive"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Desactivar
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

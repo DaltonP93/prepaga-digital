@@ -15,6 +15,7 @@ import { PermissionManager } from "./PermissionManager";
 import { toast } from "sonner";
 import { Key } from "lucide-react";
 import { useRolePermissions } from "@/hooks/useRolePermissions";
+import { SINGLE_COMPANY_PRIMARY_NAME, getSingleCompany } from "@/lib/singleCompany";
 
 interface UserFormProps {
   open: boolean;
@@ -42,6 +43,7 @@ const getUserRole = (user: UserWithRole | null | undefined): UserFormData['role'
 
 export function UserForm({ open, onOpenChange, user }: UserFormProps) {
   const { data: companies = [] } = useCompanies();
+  const singleCompany = getSingleCompany(companies);
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
   const resetPassword = useResetUserPassword();
@@ -62,6 +64,7 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
       is_active: user?.is_active ?? true,
     }
   });
+  const selectedCompanyId = watch("company_id");
 
   useEffect(() => {
     if (user) {
@@ -76,6 +79,12 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
       });
     }
   }, [user, reset]);
+
+  useEffect(() => {
+    if (singleCompany && selectedCompanyId !== singleCompany.id) {
+      setValue("company_id", singleCompany.id, { shouldDirty: false });
+    }
+  }, [selectedCompanyId, setValue, singleCompany]);
 
   const canManageUsers = isAdmin || isSuperAdmin;
   const availableRoles: UserFormData['role'][] = isSuperAdmin
@@ -167,7 +176,7 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
                     type="password"
                     {...register("password", { 
                       required: !isEditing ? "La contraseña es requerida" : false,
-                      minLength: { value: 6, message: "La contraseña debe tener al menos 6 caracteres" }
+                      minLength: { value: 8, message: "La contraseña debe tener al menos 8 caracteres" }
                     })}
                   />
                   {errors.password && (
@@ -232,24 +241,11 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
               </div>
 
               <div className="space-y-2">
-                <Label>Empresa {watch("role") !== 'super_admin' ? '*' : '(opcional)'}</Label>
-                <Select value={watch("company_id")} onValueChange={(value) => setValue("company_id", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar empresa" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {companies.map((company) => (
-                      <SelectItem key={company.id} value={company.id}>
-                        {company.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {watch("role") === 'super_admin' && (
-                  <p className="text-xs text-muted-foreground">
-                    El Super Admin tiene acceso a todas las empresas
-                  </p>
-                )}
+                <Label>Empresa</Label>
+                <Input value={singleCompany?.name || SINGLE_COMPANY_PRIMARY_NAME} disabled readOnly />
+                <p className="text-xs text-muted-foreground">
+                  La asignación de empresa está bloqueada a {singleCompany?.name || SINGLE_COMPANY_PRIMARY_NAME}.
+                </p>
               </div>
 
               {isEditing && (

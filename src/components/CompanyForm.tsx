@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useCreateCompany, useUpdateCompany } from "@/hooks/useCompanies";
 import { Database } from "@/integrations/supabase/types";
+import { SINGLE_COMPANY_PRIMARY_NAME } from "@/lib/singleCompany";
 
 type Company = Database['public']['Tables']['companies']['Row'];
 
@@ -45,7 +46,7 @@ export function CompanyForm({ open, onOpenChange, company }: CompanyFormProps) {
           ...data,
         });
       } else {
-        await createCompany.mutateAsync(data);
+        throw new Error(`El sistema opera solo con ${SINGLE_COMPANY_PRIMARY_NAME}.`);
       }
       onOpenChange(false);
       reset();
@@ -62,6 +63,12 @@ export function CompanyForm({ open, onOpenChange, company }: CompanyFormProps) {
             {isEditing ? "Editar Empresa" : "Crear Empresa"}
           </DialogTitle>
         </DialogHeader>
+
+        {!isEditing && (
+          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+            La creación de nuevas empresas está deshabilitada. El sistema opera solo con {SINGLE_COMPANY_PRIMARY_NAME}.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
@@ -107,7 +114,7 @@ export function CompanyForm({ open, onOpenChange, company }: CompanyFormProps) {
             </Button>
             <Button 
               type="submit" 
-              disabled={createCompany.isPending || updateCompany.isPending}
+              disabled={createCompany.isPending || updateCompany.isPending || !isEditing}
             >
               {(createCompany.isPending || updateCompany.isPending) ? "Guardando..." : "Guardar"}
             </Button>

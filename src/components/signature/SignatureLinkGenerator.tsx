@@ -13,6 +13,7 @@ import { useSignWellConfig, useSignWellCreateDocument } from '@/hooks/useSignWel
 import { useCreateAllSignatureLinks } from '@/hooks/useCreateAllSignatureLinks';
 import { useBeneficiaries } from '@/hooks/useBeneficiaries';
 import { generateUUID } from '@/lib/utils';
+import { getSignatureLinkPath, getSignatureLinkUrl } from '@/lib/appUrls';
 
 interface SignatureLinkGeneratorProps {
   saleId: string;
@@ -138,8 +139,7 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
   });
 
   const copyLink = (token: string) => {
-    const baseUrl = window.location.origin;
-    const link = `${baseUrl}/firmar/${token}`;
+    const link = getSignatureLinkUrl(token);
     navigator.clipboard.writeText(link);
     toast({ title: 'Enlace copiado', description: 'El enlace ha sido copiado al portapapeles.' });
   };
@@ -158,7 +158,7 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
         .single();
       if (saleError || !sale) throw new Error('Venta no encontrada');
 
-      const link = `${window.location.origin}/firmar/${linkData.token}`;
+      const link = getSignatureLinkUrl(linkData.token);
       const expirationDate = new Date(linkData.expires_at).toLocaleString('es-ES', {
         day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
       });
@@ -378,7 +378,7 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
                       <Button variant="outline" size="sm" onClick={() => copyLink(link.token)}>
                         <Copy className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => window.open(`/firmar/${link.token}`, '_blank')}>
+                      <Button variant="outline" size="sm" onClick={() => window.open(getSignatureLinkPath(link.token), '_blank')}>
                         <ExternalLink className="h-4 w-4" />
                       </Button>
                       {link.status === 'pendiente' && link.is_active !== false && (

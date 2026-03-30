@@ -6,8 +6,12 @@ export const getPublicAppUrl = (): string => {
   return base.replace(/\/+$/, '');
 };
 
+export const getSignatureLinkPath = (token: string): string => {
+  return `/firmar/${token}`;
+};
+
 export const getSignatureLinkUrl = (token: string): string => {
-  return `${getPublicAppUrl()}/firmar/${token}`;
+  return `${getPublicAppUrl()}${getSignatureLinkPath(token)}`;
 };
 
 export const getSupabaseFunctionsBaseUrl = (): string => {
