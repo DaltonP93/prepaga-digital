@@ -39,7 +39,18 @@ serve(async (req) => {
 
     const url = new URL(req.url);
     const contentType = req.headers.get("content-type") || "";
-    const action = url.searchParams.get("action") || (contentType.includes("multipart/form-data") ? "upload" : null);
+    let requestPayload: Record<string, unknown> | null = null;
+    if (contentType.includes("application/json")) {
+      try {
+        requestPayload = await req.clone().json();
+      } catch {
+        requestPayload = null;
+      }
+    }
+    const action =
+      url.searchParams.get("action") ||
+      (typeof requestPayload?.action === "string" ? requestPayload.action : null) ||
+      (contentType.includes("multipart/form-data") ? "upload" : null);
 
     switch (action) {
       case "upload":
@@ -47,9 +58,9 @@ serve(async (req) => {
       case "list":
         return await handleFileList(supabase, req, userData.user.id);
       case "delete":
-        return await handleFileDelete(supabase, req, userData.user.id);
+        return await handleFileDelete(supabase, req, userData.user.id, requestPayload);
       case "get-url":
-        return await handleGetSignedUrl(supabase, req, userData.user.id);
+        return await handleGetSignedUrl(supabase, req, userData.user.id, requestPayload);
       default:
         throw new Error("Invalid action parameter");
     }
@@ -202,42 +213,72 @@ async function handleFileList(supabase: any, req: Request, userId: string) {
   });
 }
 
-async function handleFileDelete(supabase: any, req: Request, userId: string) {
-  const { fileId } = await req.json();
-  
-  if (!fileId) {
-    throw new Error("File ID required");
-  }
+async function handleFileDelete(
+  supabase: any,
+  req: Request,
+  userId: string,
+  payload?: Record<string, unknown> | null
+) {
+  const body = payload ?? await req.json();
+  const fileId = typeof body?.fileId === "string" ? body.fileId : null;
+  const bucketName = typeof body?.bucketName === "string" ? body.bucketName : null;
+  const filePath = typeof body?.filePath === "string" ? body.filePath : null;
 
-  // Get file info from database with ownership check
-  const { data: fileInfo, error: fetchError } = await supabase
-    .from("file_uploads")
-    .select("*")
-    .eq("id", fileId)
-    .eq("uploaded_by", userId)
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("company_id")
+    .eq("id", userId)
     .single();
 
-  if (fetchError || !fileInfo) {
-    throw new Error("File not found");
+  if (profileError || !profile?.company_id) {
+    throw new Error("User company not found");
   }
 
-  // Delete from storage
+  let resolvedBucket: string;
+  let resolvedPath: string;
+
+  if (fileId) {
+    const { data: fileInfo, error: fetchError } = await supabase
+      .from("file_uploads")
+      .select("id, company_id, file_url")
+      .eq("id", fileId)
+      .single();
+
+    if (fetchError || !fileInfo) {
+      throw new Error("File not found");
+    }
+
+    if (fileInfo.company_id && fileInfo.company_id !== profile.company_id) {
+      throw new Error("Access denied");
+    }
+
+    resolvedBucket = bucketName || "documents";
+    resolvedPath = fileInfo.file_url;
+  } else if (bucketName && filePath) {
+    const companyPrefix = `${profile.company_id}/`;
+    if (!filePath.startsWith(companyPrefix)) {
+      throw new Error("Access denied");
+    }
+
+    resolvedBucket = bucketName;
+    resolvedPath = filePath;
+  } else {
+    throw new Error("fileId or (bucketName + filePath) required");
+  }
+
   const { error: storageError } = await supabase.storage
-    .from(fileInfo.bucket_name)
-    .remove([fileInfo.file_path]);
+    .from(resolvedBucket)
+    .remove([resolvedPath]);
 
   if (storageError) {
-    console.error("Storage deletion error:", storageError);
+    throw new Error(`Storage deletion failed: ${storageError.message}`);
   }
 
-  // Delete from database
-  const { error: dbError } = await supabase
-    .from("file_uploads")
-    .delete()
-    .eq("id", fileId);
-
-  if (dbError) {
-    throw new Error(`Database deletion failed: ${dbError.message}`);
+  const deleteQuery = supabase.from("file_uploads").delete().eq("file_url", resolvedPath);
+  if (fileId) {
+    await deleteQuery.eq("id", fileId);
+  } else {
+    await deleteQuery.eq("company_id", profile.company_id);
   }
 
   return new Response(JSON.stringify({
@@ -248,8 +289,17 @@ async function handleFileDelete(supabase: any, req: Request, userId: string) {
   });
 }
 
-async function handleGetSignedUrl(supabase: any, req: Request, userId: string) {
-  const { filePath, bucketName, fileId, expiresIn = 3600 } = await req.json();
+async function handleGetSignedUrl(
+  supabase: any,
+  req: Request,
+  userId: string,
+  payload?: Record<string, unknown> | null
+) {
+  const body = payload ?? await req.json();
+  const filePath = typeof body?.filePath === "string" ? body.filePath : null;
+  const bucketName = typeof body?.bucketName === "string" ? body.bucketName : null;
+  const fileId = typeof body?.fileId === "string" ? body.fileId : null;
+  const expiresIn = typeof body?.expiresIn === "number" ? body.expiresIn : 3600;
 
   let resolvedPath: string;
   let resolvedBucket: string;

@@ -13,6 +13,7 @@ import { FileText, Upload, Download, Trash2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDropzone } from 'react-dropzone';
 import { ImageLightbox } from '@/components/ui/image-lightbox';
+import { deleteManagedFile } from '@/lib/storageFileManager';
 import { uploadSaleDocumentFile } from '@/lib/saleDocumentUpload';
 
 interface SaleDocument {
@@ -96,8 +97,13 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
   });
 
   const deleteDocument = useMutation({
-    mutationFn: async (documentId: string) => {
-      const { error } = await supabase.from('sale_documents').delete().eq('id', documentId);
+    mutationFn: async (document: Pick<SaleDocument, 'id' | 'file_url'>) => {
+      await deleteManagedFile({
+        bucketName: 'documents',
+        filePath: document.file_url,
+      });
+
+      const { error } = await supabase.from('sale_documents').delete().eq('id', document.id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -266,7 +272,7 @@ export const SaleDocuments: React.FC<SaleDocumentsProps> = ({
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => deleteDocument.mutate(doc.id)}
+                              onClick={() => deleteDocument.mutate({ id: doc.id, file_url: doc.file_url })}
                               disabled={deleteDocument.isPending}
                               className="text-destructive hover:text-destructive"
                             >

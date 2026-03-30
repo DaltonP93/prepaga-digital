@@ -345,14 +345,18 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
             .map((row: any) => row.template_id)
             .filter(Boolean);
 
+          if (ddjjTemplateIds.length === 0) {
+            return;
+          }
+
           const { data: ddjiQuestions } = await supabase
             .from('template_questions')
             .select('id, template_id, placeholder_name, sort_order')
-            .in('template_id', ddjjTemplateIds.length > 0 ? ddjjTemplateIds : ['784e7d0e-8001-48a6-a44d-945722293fc4'])
+            .in('template_id', ddjjTemplateIds)
             .order('sort_order');
 
           if (ddjiQuestions && ddjiQuestions.length > 0) {
-            for (const q of ddjiQuestions) {
+            const responseRows = ddjiQuestions.map((q: any) => {
               const placeholderName = normalizeDDJJPlaceholder(q.placeholder_name);
               let responseValue = '';
               if (placeholderName.startsWith('ddjj_pregunta_')) {
@@ -374,12 +378,21 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
                 responseValue = d.lastMenstruation || 'N/A';
               }
 
-              await supabase.from('template_responses').upsert({
+              return {
                 sale_id: saleId,
                 template_id: (q as any).template_id,
                 question_id: q.id,
                 response_value: responseValue,
-              }, { onConflict: 'sale_id,template_id,question_id', ignoreDuplicates: false });
+              };
+            });
+
+            const { error: syncError } = await supabase.from('template_responses').upsert(
+              responseRows,
+              { onConflict: 'sale_id,template_id,question_id', ignoreDuplicates: false }
+            );
+
+            if (syncError && syncError.code !== '42501') {
+              throw syncError;
             }
           }
         }

@@ -14,6 +14,7 @@ import { Card } from "@/components/ui/card";
 import { useDropzone } from "react-dropzone";
 import { Upload, FileText, Image, File, Loader2, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadManagedFile } from "@/lib/storageFileManager";
 import { useTemplateAssets } from "@/hooks/useTemplateAssets";
 import { useQueryClient } from "@tanstack/react-query";
 import type { TemplateAsset } from "@/types/templateDesigner";
@@ -198,9 +199,13 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
 
         // Upload to standardized path
         const thumbPath = `${companyId}/template-assets/${assetId}/previews/page-${i}.png`;
-        await supabase.storage.from("documents").upload(thumbPath, blob, {
-          contentType: "image/png",
-          upsert: true,
+        await uploadManagedFile({
+          file: new File([blob], `page-${i}.png`, { type: "image/png" }),
+          bucketName: "documents",
+          filePath: thumbPath,
+          companyId,
+          entityType: "template_asset_preview",
+          entityId: assetId,
         });
 
         // Update template_asset_pages row with preview path

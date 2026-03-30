@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { deleteManagedFile, uploadManagedFile } from "@/lib/storageFileManager";
 import { Upload, FileText, Trash2, Loader2, FileInput } from "lucide-react";
 import { toast } from "sonner";
 import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
@@ -65,11 +66,16 @@ export function TemplateAnnexesManager({ templateId, onContentExtracted }: Templ
         const fileExt = file.name.split(".").pop();
         const filePath = `${profile.company_id}/template-annexes/${templateId}/${Date.now()}-${file.name}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from("documents")
-          .upload(filePath, file);
-
-        if (uploadError) {
+        try {
+          await uploadManagedFile({
+            file,
+            bucketName: "documents",
+            filePath,
+            companyId: profile.company_id,
+            entityType: "template_attachment",
+            entityId: templateId,
+          });
+        } catch (uploadError: any) {
           toast.error(`Error subiendo ${file.name}: ${uploadError.message}`);
           continue;
         }
@@ -203,7 +209,15 @@ export function TemplateAnnexesManager({ templateId, onContentExtracted }: Templ
     const confirm = window.confirm(`¿Eliminar el anexo "${attachment.file_name}"?`);
     if (!confirm) return;
 
-    await supabase.storage.from("documents").remove([attachment.file_url]);
+    try {
+      await deleteManagedFile({
+        bucketName: "documents",
+        filePath: attachment.file_url,
+      });
+    } catch (error) {
+      toast.error("Error al eliminar archivo del storage");
+      return;
+    }
 
     const { error } = await supabase
       .from("template_attachments" as any)

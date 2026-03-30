@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { deleteManagedFile, uploadManagedFile } from '@/lib/storageFileManager';
 import { toast } from 'sonner';
 
 interface UploadProgress {
@@ -48,32 +49,16 @@ export const useFileUpload = () => {
       const subPath = path || 'general';
       const filePath = `${companyId}/${subPath}/${fileName}`;
 
-      // 3. Upload
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false,
-        });
-
-      if (error) throw new Error(`Error al subir archivo: ${error.message}`);
+      // 3. Upload via Edge Function to avoid Storage RLS failures
+      const data = await uploadManagedFile({
+        file,
+        bucketName: bucket,
+        filePath,
+        companyId,
+        entityType: 'generic_upload',
+      });
 
       setUploadState(prev => ({ ...prev, progress: 60 }));
-
-      // 4. Track file upload in database (best-effort)
-      await supabase
-        .from('file_uploads')
-        .insert({
-          uploaded_by: user.id,
-          file_name: file.name,
-          file_size: file.size,
-          file_type: file.type,
-          file_url: data.path,
-          company_id: companyId,
-        })
-        .then(({ error: dbErr }) => {
-          if (dbErr) {}
-        });
 
       setUploadState(prev => ({ ...prev, progress: 80 }));
 
@@ -98,8 +83,7 @@ export const useFileUpload = () => {
 
   const deleteFile = async (bucket: string, path: string): Promise<boolean> => {
     try {
-      const { error } = await supabase.storage.from(bucket).remove([path]);
-      if (error) throw error;
+      await deleteManagedFile({ bucketName: bucket, filePath: path });
       toast.success('Archivo eliminado exitosamente');
       return true;
     } catch (error: any) {

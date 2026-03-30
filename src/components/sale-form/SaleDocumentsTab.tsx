@@ -11,6 +11,7 @@ import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { ImageLightbox } from '@/components/ui/image-lightbox';
 import { uploadSaleDocumentFile } from '@/lib/saleDocumentUpload';
+import { deleteManagedFile } from '@/lib/storageFileManager';
 
 interface SaleDocumentsTabProps {
   saleId?: string;
@@ -72,7 +73,10 @@ const SaleDocumentsTab: React.FC<SaleDocumentsTabProps> = ({ saleId }) => {
 
   const deleteMutation = useMutation({
     mutationFn: async (doc: { id: string; file_url: string }) => {
-      await supabase.storage.from('documents').remove([doc.file_url]);
+      await deleteManagedFile({
+        bucketName: 'documents',
+        filePath: doc.file_url,
+      });
       const { error } = await supabase.from('sale_documents').delete().eq('id', doc.id);
       if (error) throw error;
     },
