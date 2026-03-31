@@ -1,26 +1,27 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@supabase/supabase-js';
 import { useToast } from '@/hooks/use-toast';
+import type { Database } from '@/integrations/supabase/types';
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || '').trim();
 const SUPABASE_PUBLISHABLE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '').trim();
 
 // Singleton clients — avoid multiple GoTrueClient instances warning
 const _publicClient = SUPABASE_URL
-  ? createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  ? createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     })
   : null;
 
-const _signatureClientCache = new Map<string, ReturnType<typeof createClient>>();
+const _signatureClientCache = new Map<string, any>();
 
-const getPublicClient = () => _publicClient!;
+const getPublicClient = (): any => _publicClient!;
 
-const getSignatureClient = (token: string) => {
+const getSignatureClient = (token: string): any => {
   if (!_signatureClientCache.has(token)) {
     _signatureClientCache.set(
       token,
-      createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+      createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
         auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
         global: { headers: { 'x-signature-token': token } },
       })
