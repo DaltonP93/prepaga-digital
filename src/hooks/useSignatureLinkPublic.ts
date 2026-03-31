@@ -30,6 +30,10 @@ const getSignatureClient = (token: string) => {
   return _signatureClientCache.get(token)!;
 };
 
+// Helper type for bypassing strict type checks on operations
+// that use columns/tables not yet reflected in auto-generated types
+const asDb = (client: ReturnType<typeof createClient<Database>>) => client as any;
+
 interface SignatureLinkData {
   id: string;
   sale_id: string;
