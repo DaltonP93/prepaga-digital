@@ -253,7 +253,10 @@ const Sales = () => {
 
                           <TableCell>
                             {(() => {
-                              const progress = getProgress(sale.status || 'borrador');
+                              // Hybrid: if all signatures completed, show 100% regardless of status
+                              const progress = (sale as any).all_signatures_completed 
+                                ? 100 
+                                : getProgress(sale.status || 'borrador');
                               return (
                                 <div className="space-y-2">
                                   <div className="flex justify-between text-sm">
