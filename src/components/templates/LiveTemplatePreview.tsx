@@ -46,6 +46,7 @@ interface LiveTemplatePreviewProps {
     beneficiaries?: any[];
     signatureLink?: any;
     responses?: Record<string, any>;
+    companySettings?: any;
   };
   className?: string;
   onDownloadPDF?: () => void;
