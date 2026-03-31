@@ -148,6 +148,7 @@ export type Database = {
       }
       auth_attempts: {
         Row: {
+          company_id: string | null
           created_at: string | null
           email: string
           failure_reason: string | null
@@ -157,6 +158,7 @@ export type Database = {
           user_agent: string | null
         }
         Insert: {
+          company_id?: string | null
           created_at?: string | null
           email: string
           failure_reason?: string | null
@@ -166,6 +168,7 @@ export type Database = {
           user_agent?: string | null
         }
         Update: {
+          company_id?: string | null
           created_at?: string | null
           email?: string
           failure_reason?: string | null
@@ -174,7 +177,15 @@ export type Database = {
           success?: boolean | null
           user_agent?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "auth_attempts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       available_permissions: {
         Row: {
