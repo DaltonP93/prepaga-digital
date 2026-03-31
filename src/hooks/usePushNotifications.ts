@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { refreshAppServiceWorker } from '@/lib/serviceWorker';
 
 interface PushSubscription {
   endpoint: string;
@@ -21,13 +22,7 @@ export const usePushNotifications = () => {
     const check = async () => {
       if ('serviceWorker' in navigator && 'PushManager' in window) {
         try {
-          // Ensure service worker is registered before checking
-          const registrations = await navigator.serviceWorker.getRegistrations();
-          if (registrations.length === 0) {
-            await navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' });
-          } else {
-            await Promise.all(registrations.map(registration => registration.update().catch(() => null)));
-          }
+          await refreshAppServiceWorker();
           setIsSupported(true);
           checkSubscription();
         } catch (error) {
@@ -84,15 +79,7 @@ export const usePushNotifications = () => {
       // Ensure service worker is registered
       let registration: ServiceWorkerRegistration;
       try {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        if (registrations.length === 0) {
-          registration = await navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' });
-          // Wait for the SW to be ready
-          await navigator.serviceWorker.ready;
-        } else {
-          await Promise.all(registrations.map(existingRegistration => existingRegistration.update().catch(() => null)));
-          registration = await navigator.serviceWorker.ready;
-        }
+        registration = (await refreshAppServiceWorker()) || await navigator.serviceWorker.ready;
       } catch (swError) {
         console.error('Service Worker registration failed:', swError);
         toast({

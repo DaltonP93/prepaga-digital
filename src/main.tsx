@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { initializeThemePreference } from './lib/theme';
+import { registerAppServiceWorker } from './lib/serviceWorker';
 
 initializeThemePreference();
 
@@ -20,3 +21,7 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
+if (import.meta.env.PROD) {
+  void registerAppServiceWorker();
+}

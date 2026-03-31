@@ -436,6 +436,8 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                 </fieldset>
               </TabsContent>
 
+              </fieldset>
+
               <TabsContent value="templates">
                 <SaleTemplatesTab
                   saleId={sale?.id}
@@ -444,7 +446,6 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                   disabled={isTemplatesLocked}
                 />
               </TabsContent>
-              </fieldset>
 
               {isEditing && isAuditorOrAbove && (
                 <TabsContent value="auditoria">
