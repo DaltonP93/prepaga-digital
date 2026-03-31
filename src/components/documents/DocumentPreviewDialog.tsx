@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { FileText, User, Download, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { resolveStorageImages } from '@/lib/resolveStorageImages';
 
 interface DocumentPreviewDialogProps {
   open: boolean;
