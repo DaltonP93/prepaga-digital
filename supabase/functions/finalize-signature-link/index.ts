@@ -272,6 +272,7 @@ async function activateNextStep(
             sale_id: link.sale_id,
             token: contratadaToken,
             recipient_type: 'contratada',
+            recipient_name: cs.contratada_signer_name || null,
             recipient_email: cs.contratada_signer_email,
             recipient_phone: cs.contratada_signer_phone || null,
             recipient_id: null,
@@ -280,7 +281,7 @@ async function activateNextStep(
             step_order: 2,
             is_active: true,
           })
-          .select('id, recipient_email, recipient_phone, token')
+          .select('id, recipient_email, recipient_phone, recipient_name, token')
           .single()
 
         if (newLink) {
