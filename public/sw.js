@@ -1,7 +1,7 @@
 
 // Service Worker optimizado para manejo de cache
-const CACHE_NAME = 'prepaga-digital-v4';
-const CACHE_VERSION = '4.0.0';
+const CACHE_NAME = 'prepaga-digital-v5';
+const CACHE_VERSION = '5.0.0';
 const CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 horas
 
 const urlsToCache = [
@@ -109,19 +109,18 @@ async function cacheFirst(request) {
     
     if (canCacheResponse(request, networkResponse)) {
       const responseClone = networkResponse.clone();
+      const headers = new Headers(responseClone.headers);
+      headers.set('sw-cache-time', Date.now().toString());
       const responseWithTime = new Response(responseClone.body, {
         status: responseClone.status,
         statusText: responseClone.statusText,
-        headers: {
-          ...responseClone.headers,
-          'sw-cache-time': Date.now().toString()
-        }
+        headers,
       });
-      
+
       await cache.put(request, responseWithTime);
       await cleanupCache(cache);
     }
-    
+
     return networkResponse;
   } catch (error) {
     console.error('Error en cacheFirst:', error);

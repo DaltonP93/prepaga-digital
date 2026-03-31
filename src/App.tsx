@@ -1,5 +1,5 @@
 
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, Component, ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -62,6 +62,32 @@ const PageLoader = () => (
   </div>
 );
 
+class AppErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4 text-center">
+          <p className="text-lg font-semibold mb-2">Ocurrió un error inesperado.</p>
+          <button
+            className="mt-2 px-4 py-2 bg-primary text-white rounded"
+            onClick={() => { sessionStorage.clear(); window.location.href = '/login'; }}
+          >
+            Volver al inicio
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // Crear cliente de React Query con configuración optimizada
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -75,6 +101,7 @@ const queryClient = new QueryClient({
 
 const App = () => {
   return (
+    <AppErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <SimpleAuthProvider>
@@ -150,6 +177,7 @@ const App = () => {
         </SimpleAuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
+    </AppErrorBoundary>
   );
 };
 
