@@ -262,7 +262,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                   if (profile?.company_id) {
                     const { data: companyProfiles, error: profilesError } = await supabase
                       .from('profiles')
-                      .select('id, role')
+                      .select('id')
                       .eq('company_id', profile.company_id)
                       .eq('is_active', true);
 
