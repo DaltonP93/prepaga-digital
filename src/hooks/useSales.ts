@@ -115,8 +115,6 @@ export const useSales = () => {
       })) as unknown as ExtendedSale[];
     },
     enabled: !!user,
-    staleTime: 1000 * 60 * 5,
-    refetchOnWindowFocus: false,
   });
 };
 
@@ -152,8 +150,6 @@ export const useSalesList = (enabled = true) => {
       return data as unknown as ExtendedSale[];
     },
     enabled: !!user && enabled,
-    staleTime: 1000 * 60 * 5,
-    refetchOnWindowFocus: false,
   });
 };
 
@@ -182,8 +178,6 @@ export const useSalesLookup = (enabled = true) => {
       return data as unknown as ExtendedSale[];
     },
     enabled: !!user && enabled,
-    staleTime: 1000 * 60 * 10,
-    refetchOnWindowFocus: false,
   });
 };
 

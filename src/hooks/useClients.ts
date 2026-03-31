@@ -62,8 +62,6 @@ export const useClients = () => {
       return data;
     },
     enabled: !!user,
-    staleTime: 1000 * 60 * 5,
-    refetchOnWindowFocus: false,
   });
 };
 
@@ -91,8 +89,6 @@ export const useClientsLookup = (enabled = true) => {
       return data;
     },
     enabled: !!user && enabled,
-    staleTime: 1000 * 60 * 10,
-    refetchOnWindowFocus: false,
   });
 };
 

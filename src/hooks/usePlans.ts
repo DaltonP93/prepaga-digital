@@ -35,7 +35,7 @@ export const usePlans = () => {
       return data || [];
     },
     retry: 1,
-    refetchOnWindowFocus: false,
+    
   });
 };
 

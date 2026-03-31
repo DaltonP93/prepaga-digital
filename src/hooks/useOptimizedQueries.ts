@@ -83,8 +83,6 @@ export const useOptimizedDashboard = () => {
         documentsGrowth: 0,
       };
     },
-    staleTime: 5 * 60 * 1000, // 5 minutos de cache
-    refetchOnWindowFocus: false,
   });
 };
 
@@ -121,6 +119,5 @@ export const useOptimizedSearch = (searchTerm: string, table: 'clients' | 'sales
       return [];
     },
     enabled: searchTerm.length >= 2,
-    staleTime: 2 * 60 * 1000, // Cache por 2 minutos
   });
 };

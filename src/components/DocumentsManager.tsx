@@ -36,8 +36,6 @@ export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) =>
       return data || [];
     },
     enabled: !!saleId,
-    staleTime: 1000 * 60 * 2,
-    refetchOnWindowFocus: false,
   });
 
   const createDocumentMutation = useMutation({

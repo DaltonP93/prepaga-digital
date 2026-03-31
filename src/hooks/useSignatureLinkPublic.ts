@@ -165,7 +165,6 @@ export const useSignatureLinkByToken = (token: string) => {
     },
     enabled: !!token,
     retry: 2,
-    staleTime: 1000 * 60,
   });
 };
 

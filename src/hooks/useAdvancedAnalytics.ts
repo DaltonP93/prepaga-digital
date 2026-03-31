@@ -278,7 +278,7 @@ export const useAdvancedAnalytics = (dateRange: DateRange, filters: AnalyticsFil
       };
     },
     retry: 1,
-    refetchOnWindowFocus: false,
+    
     enabled: !!user,
   });
 };

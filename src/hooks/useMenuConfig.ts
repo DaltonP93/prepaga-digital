@@ -60,7 +60,6 @@ export const useMenuConfig = () => {
       return (data?.menu_config as MenuConfigMap) || null;
     },
     enabled: !!companyId,
-    staleTime: 5 * 60 * 1000,
   });
 };
 
