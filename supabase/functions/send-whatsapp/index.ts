@@ -325,6 +325,21 @@ serve(async (req) => {
         company_id: companyId,
       })
 
+      // Log to communication_logs
+      try {
+        await supabase.from('communication_logs').insert({
+          company_id: companyId || null,
+          sale_id: saleId || null,
+          client_id: null,
+          channel: 'whatsapp',
+          direction: 'outbound',
+          subject: messageType || 'whatsapp_message',
+          content: message?.substring(0, 500) || '',
+          status: 'manual',
+          sent_at: new Date().toISOString(),
+        });
+      } catch { /* non-blocking */ }
+
       return new Response(JSON.stringify({
         success: true,
         fallback: true,
