@@ -1950,6 +1950,30 @@ export type Database = {
           },
         ]
       }
+      rate_limit_log: {
+        Row: {
+          count: number
+          id: number
+          key: string
+          updated_at: string
+          window_start: string
+        }
+        Insert: {
+          count?: number
+          id?: number
+          key: string
+          updated_at?: string
+          window_start: string
+        }
+        Update: {
+          count?: number
+          id?: number
+          key?: string
+          updated_at?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       sale_documents: {
         Row: {
           created_at: string | null
@@ -3781,6 +3805,11 @@ export type Database = {
         Args: { p_sale_id: string }
         Returns: boolean
       }
+      check_and_increment_rate_limit: {
+        Args: { p_key: string; p_max_requests: number; p_window_ms: number }
+        Returns: Json
+      }
+      cleanup_rate_limit_log: { Args: never; Returns: undefined }
       get_otp_policy_for_signature: {
         Args: { p_company_id: string }
         Returns: {
