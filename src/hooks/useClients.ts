@@ -62,8 +62,6 @@ export const useClients = () => {
       return data;
     },
     enabled: !!user,
-    staleTime: 1000 * 60 * 5,
-    refetchOnWindowFocus: false,
   });
 };
 
