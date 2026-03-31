@@ -1,62 +1,101 @@
 
 
-## Auditoría Completa — Errores de Build + Seguridad
+# Auditoría Completa del Sistema — Resultados
 
-### A. Errores de Compilación (5 fixes)
+## Estado General
 
-**1. `src/pages/Companies.tsx` — Falta import `Plus`**
-- Línea 7: agregar `Plus` al import de lucide-react.
-
-**2. `src/components/sale-form/SaleTabbedForm.tsx` — Query a columna `role` inexistente en `profiles`**
-- Línea 265: cambiar `.select('id, role')` → `.select('id')`.
-- Líneas 288-290: eliminar el bloque `legacyProfileIds` que intenta leer `candidate.role` de profiles. Solo usar `userRoleIds` de la tabla `user_roles`.
-
-**3. `src/components/designer2/AssetUploadModal.tsx` — Error tipo `File` constructor**
-- Línea 203: agregar cast explícito: `new File([blob], \`page-${i}.png\`, { type: "image/png" }) as any as File` o usar variable intermedia tipada.
-
-**4. `supabase/functions/generate-base-pdf/index.ts` — Tipo `SupabaseClient` incompatible**
-- Líneas 207 y 263: cambiar `supabaseAdmin: ReturnType<typeof createClient>` → `supabaseAdmin: any` en ambas funciones (`resolveContentImages` y `resolveLogoUrl`).
-
-**5. `supabase/config.toml` — Faltan todas las declaraciones de funciones**
-- Agregar las 27 funciones con `verify_jwt = false` (api, cleanup-expired-signature-links, compose-template-pdf, create-payment, create-subscription, create-user, file-manager, finalize-signature-link, generate-base-pdf, generate-evidence-certificate, generate-evidence-pdf, generate-pdf, get-document-download-url, insert-template-asset-block, pades-sign-document, process-template-asset, publish-template-version, schedule-reminders, send-email-campaign, send-notification, send-sms-campaign, send-whatsapp, signature-otp, signwell-proxy, upload-template-asset, whatsapp-webhook).
+El sistema tiene **74 tablas** con RLS habilitado en todas, **27 Edge Functions**, y la base de datos pasa el linter de Supabase sin errores. Sin embargo, se identificaron **3 vulnerabilidades activas** y varias áreas de mejora.
 
 ---
 
-### B. Problemas de Seguridad
+## PROBLEMAS CRÍTICOS (Requieren Acción)
 
-**1. Bucket `incidents` es público** (riesgo medio)
-- Contiene documentos de incidentes que pueden ser sensibles. Debería ser privado con URLs firmadas.
-- **Fix**: migración SQL para cambiar `is_public` a `false`. Luego actualizar el frontend para usar URLs firmadas (o la función `get-document-download-url`).
+### 1. Storage: Escritura cross-company en ruta `contracts/` (CRÍTICO)
+**Problema**: Las políticas `documents_insert_own_company` y `documents_update_own_company` permiten que cualquier usuario autenticado suba archivos bajo la ruta `contracts/` sin validar que pertenezcan a su empresa. Un usuario de la Empresa A podría subir/sobrescribir PDFs de contratos de la Empresa B.
 
-**2. `signwell-proxy` usa `serve()` obsoleto**
-- Línea 1: usa `serve` de `deno.land/std@0.168.0/http/server.ts` en vez de `Deno.serve()`. Funciona pero es API deprecated.
-- Línea 5: le faltan headers CORS extendidos (`x-supabase-client-platform`, etc.).
-- **Fix**: migrar a `Deno.serve()` y actualizar corsHeaders.
+**Política actual de INSERT**:
+```
+(foldername[1] = company_id) OR (foldername[1] = 'contracts')  ← sin validar company
+```
+
+**Corrección**: Modificar INSERT y UPDATE para validar company_id en la sub-ruta de contracts (ej: `contracts/{company_id}/...`), o validar mediante join a la tabla `documents`/`sales` como ya se hace en SELECT.
+
+### 2. Bucket `incidents` es público sin políticas de storage (CRÍTICO)
+**Problema**: El bucket `incidents` está marcado como **público** (`public: true`) y **no tiene ninguna política RLS de storage**. Esto significa que cualquier persona con la URL puede leer los archivos, y cualquier usuario autenticado puede subir/eliminar archivos sin restricción.
+
+Los archivos contienen adjuntos de incidentes (fotos, documentos) que son datos internos de la empresa.
+
+**Corrección**: 
+- Cambiar el bucket a privado
+- Agregar políticas de storage con validación de `company_id`
+- Actualizar el código para usar URLs firmadas en vez de `getPublicUrl()`
+
+### 3. Realtime sin autorización de canales (ALTO)
+**Problema**: No hay políticas RLS en `realtime.messages`, lo que permite que cualquier usuario autenticado se suscriba a cualquier canal Realtime. Hay **15 tablas publicadas** incluyendo `clients`, `sales`, `beneficiaries`, `profiles`, y `signature_links` — todas con datos PII sensibles.
+
+Un vendedor de la Empresa A podría recibir en tiempo real los cambios de datos de la Empresa B.
+
+**Nota**: Las consultas directas a las tablas SÍ están protegidas por RLS. El riesgo es que los eventos de Realtime transmiten los datos del cambio sin filtrar por empresa. La mitigación más práctica es:
+- Remover tablas sensibles de la publicación Realtime que no necesitan estar ahí
+- O agregar políticas a `realtime.messages` para filtrar por topic/company
 
 ---
 
-### C. Estado General — Sin Brechas Críticas
+## ADVERTENCIA (Riesgo Bajo)
 
-- ✅ RLS multi-tenant con `SECURITY DEFINER` — correcto
-- ✅ Roles gestionados vía `user_roles`, no en `profiles` — correcto
-- ✅ `profile.role` en frontend viene de `user_roles` vía `SimpleAuthProvider` — correcto
-- ✅ `ProtectedComponent` es solo UX, no seguridad — documentado correctamente
-- ✅ Edge Functions con auth guards (service role o JWT) — correcto
-- ✅ DOMPurify para `dangerouslySetInnerHTML` — correcto
-- ✅ Rate limiting en OTP — correcto
-- ✅ HMAC en webhooks — correcto
-- ✅ Prevención de escalación de privilegios en `user_roles` RLS — correcto
+### 4. View `company_settings_public` sin RLS directo
+**Status**: Ya verificado como falso positivo en auditorías anteriores. Es una VIEW con `security_invoker=true` que hereda RLS de `company_settings`. No requiere acción.
 
 ---
 
-### Archivos a modificar
+## LO QUE ESTÁ BIEN ✓
 
-| Archivo | Cambio |
-|---|---|
-| `src/pages/Companies.tsx` | Agregar `Plus` al import |
-| `src/components/sale-form/SaleTabbedForm.tsx` | Quitar `role` de query y eliminar fallback legacy |
-| `src/components/designer2/AssetUploadModal.tsx` | Cast en `new File()` |
-| `supabase/functions/generate-base-pdf/index.ts` | Tipo `any` en params |
-| `supabase/config.toml` | Agregar 27 funciones |
-| `supabase/functions/signwell-proxy/index.ts` | Migrar a `Deno.serve()` + CORS |
+| Área | Estado |
+|------|--------|
+| RLS en todas las tablas (74/74) | OK |
+| Linter de Supabase | 0 issues |
+| Edge Functions con auth guards | OK (verificado) |
+| Aislamiento multi-tenant en tablas | OK (company_id + RLS) |
+| Prevención de escalación de privilegios | OK |
+| OTP con zero-knowledge hashing | OK |
+| Rate limiting | OK |
+| Bucket `documents` SELECT policy | OK (tenant-scoped) |
+| Bucket `company-assets` público (solo branding) | OK |
+| Function search_path hardening | OK |
+| Audit logging con triggers | OK |
+| Firma pública con token validation | OK |
+
+---
+
+## Plan de Corrección
+
+### Migración 1: Corregir storage INSERT/UPDATE en `contracts/`
+- DROP policies `documents_insert_own_company` y `documents_update_own_company`
+- Recrearlas exigiendo que la ruta bajo `contracts/` incluya el `company_id` del usuario, o validando via join a `sales`
+
+### Migración 2: Asegurar bucket `incidents`
+- Cambiar bucket a privado (`UPDATE storage.buckets SET public = false WHERE name = 'incidents'`)
+- Crear políticas SELECT, INSERT, DELETE que validen `company_id` en la ruta
+
+### Cambio de código: Actualizar `useIncidents.ts`
+- Reemplazar `getPublicUrl()` por `createSignedUrl()` para el bucket incidents (ya que dejará de ser público)
+- Actualizar `IncidentAttachments.tsx` para usar URLs firmadas
+
+### Migración 3: Reducir superficie de Realtime
+- Remover tablas innecesarias de la publicación `supabase_realtime` (ej: `beneficiaries`, `signature_links`, `profiles` si no se necesitan en tiempo real)
+- O agregar política RLS a `realtime.messages` filtrando por company
+
+### Acción sobre `company_settings_public`
+- Marcar como ignorado (ya es VIEW con security_invoker)
+
+---
+
+## Resumen de Severidad
+
+| # | Hallazgo | Severidad | Acción |
+|---|----------|-----------|--------|
+| 1 | Storage contracts cross-company write | CRÍTICO | Migración SQL |
+| 2 | Bucket incidents público sin RLS | CRÍTICO | Migración SQL + código |
+| 3 | Realtime sin channel authorization | ALTO | Migración SQL |
+| 4 | company_settings_public sin RLS | Info | Ignorar (es VIEW) |
 
