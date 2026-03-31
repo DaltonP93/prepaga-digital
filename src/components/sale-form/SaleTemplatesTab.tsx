@@ -763,7 +763,15 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       }
 
       const { createEnhancedTemplateContext, interpolateEnhancedTemplate } = await import('@/lib/enhancedTemplateEngine');
-      const context = createEnhancedTemplateContext(client, plan, company, sale, effectiveBeneficiaries, undefined, responsesMap);
+
+      // Fetch company settings for representante data
+      const { data: csSettings } = await supabase
+        .from('company_settings')
+        .select('contratada_signer_name, contratada_signer_dni, contratada_signer_phone')
+        .eq('company_id', company.id)
+        .single();
+
+      const context = createEnhancedTemplateContext(client, plan, company, sale, effectiveBeneficiaries, undefined, responsesMap, csSettings);
       const templatesWithAttachments = new Set(allAttachments.map((a: any) => a.template_id));
       const templatePdfAttachmentMap = new Map<string, any>();
       const directAnnexTemplateIds = new Set<string>();

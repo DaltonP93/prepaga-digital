@@ -172,6 +172,11 @@ const App = () => {
                   />
                   <Route path="settings" element={<Settings />} />
                   <Route path="experience" element={<Experience />} />
+                  <Route path="communications" element={<Communications />} />
+                  <Route path="files" element={<FileManagement />} />
+                  <Route path="payment/success" element={<PaymentSuccess />} />
+                  <Route path="payment/canceled" element={<PaymentCanceled />} />
+                  <Route path="questionnaire/:id" element={<QuestionnaireView />} />
                   <Route path="*" element={<NotFound />} />
                 </Route>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
