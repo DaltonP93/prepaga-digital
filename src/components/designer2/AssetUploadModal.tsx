@@ -200,7 +200,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
         // Upload to standardized path
         const thumbPath = `${companyId}/template-assets/${assetId}/previews/page-${i}.png`;
         await uploadManagedFile({
-          file: new File([blob], `page-${i}.png`, { type: "image/png" }),
+          file: new (File as any)([blob], `page-${i}.png`, { type: "image/png" }),
           bucketName: "documents",
           filePath: thumbPath,
           companyId,
