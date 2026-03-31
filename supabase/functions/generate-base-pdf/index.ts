@@ -169,32 +169,28 @@ function buildWrappedHtml(
 </html>`;
 }
 
+/**
+ * Strip embedded branding images (cabecera/zócalo) from template content
+ * since the wrapper already adds proper header/footer via CSS fixed positioning.
+ * This prevents duplicate headers/footers in the generated PDF.
+ */
 function normalizeLegacyContractHeader(html: string): string {
   if (!html) return html;
 
-  const leadingHeaderImageRegex =
-    /^\s*<img\b([^>]*?)src="([^"]*\/company-assets\/[^"]*\/branding\/[^"]+)"([^>]*)>/i;
+  // Remove leading branding images (cabecera) — the wrapper header already shows the logo
+  // Handles: <img ...company-assets/.../branding/...> or <p><img ...></p>
+  html = html.replace(
+    /^\s*(<p[^>]*>\s*)?<img\b[^>]*src="[^"]*\/company-assets\/[^"]*\/branding\/[^"]*"[^>]*\/?>\s*(<\/p>)?\s*/i,
+    ''
+  );
 
-  if (!leadingHeaderImageRegex.test(html)) {
-    return html;
-  }
+  // Remove trailing branding images (zócalo/footer) at the end of content
+  html = html.replace(
+    /\s*(<p[^>]*>\s*)?<img\b[^>]*src="[^"]*\/company-assets\/[^"]*\/branding\/[^"]*"[^>]*\/?>\s*(<\/p>)?\s*$/i,
+    ''
+  );
 
-  return html.replace(leadingHeaderImageRegex, (_match, beforeSrc, src, afterSrc) => {
-    const mergedAttrs = `${beforeSrc ?? ""}${afterSrc ?? ""}`;
-    const withoutStyle = mergedAttrs.replace(/\sstyle="[^"]*"/gi, "");
-    const normalizedStyle = [
-      "display:block",
-      "width:100%",
-      "max-width:100%",
-      "height:auto",
-      "max-height:none",
-      "object-fit:contain",
-      "object-position:center center",
-      "margin:0 auto 12px auto",
-    ].join("; ");
-
-    return `<img${withoutStyle} src="${src}" style="${normalizedStyle}">`;
-  });
+  return html;
 }
 
 /**

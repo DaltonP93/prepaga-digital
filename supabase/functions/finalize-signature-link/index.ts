@@ -240,7 +240,7 @@ async function activateNextStep(
   // Activate step 2 links (contratada)
   let { data: step2Links } = await supabase
     .from('signature_links')
-    .select('id, recipient_email, recipient_phone, token')
+    .select('id, recipient_email, recipient_phone, recipient_name, token')
     .eq('sale_id', link.sale_id)
     .eq('step_order', 2)
     .eq('is_active', false)
@@ -272,6 +272,7 @@ async function activateNextStep(
             sale_id: link.sale_id,
             token: contratadaToken,
             recipient_type: 'contratada',
+            recipient_name: cs.contratada_signer_name || null,
             recipient_email: cs.contratada_signer_email,
             recipient_phone: cs.contratada_signer_phone || null,
             recipient_id: null,
@@ -280,7 +281,7 @@ async function activateNextStep(
             step_order: 2,
             is_active: true,
           })
-          .select('id, recipient_email, recipient_phone, token')
+          .select('id, recipient_email, recipient_phone, recipient_name, token')
           .single()
 
         if (newLink) {
@@ -312,6 +313,7 @@ async function activateNextStep(
           .single()
 
         const companyName = (sale?.companies as any)?.name || 'La empresa'
+        const signerName = s2Link.recipient_name || 'Representante Legal'
 
         await fetch(`${supabaseUrl}/functions/v1/send-whatsapp`, {
           method: 'POST',
@@ -323,7 +325,7 @@ async function activateNextStep(
             to: `595${s2Link.recipient_phone}`,
             templateName: 'signature_link',
             templateData: {
-              clientName: 'Representante Legal',
+              clientName: signerName,
               companyName,
               signatureUrl: getSignatureLinkUrl(s2Link.token),
               expirationDate: 'en 3 días',

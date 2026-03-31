@@ -136,6 +136,7 @@ export const useCreateAllSignatureLinks = () => {
             sale_id: saleId,
             token: contratadaToken,
             recipient_type: 'contratada',
+            recipient_name: companySettings.contratada_signer_name || null,
             recipient_email: companySettings.contratada_signer_email,
             recipient_phone: companySettings.contratada_signer_phone || null,
             recipient_id: null,

@@ -84,6 +84,7 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
         sale_id: saleId,
         token,
         recipient_type: isContratada ? 'contratada' : recipientType,
+        recipient_name: isContratada ? (contratadaConfig?.contratada_signer_name || null) : null,
         recipient_email: isContratada ? (contratadaConfig?.contratada_signer_email || null) : (clientEmail || null),
         recipient_phone: isContratada ? (contratadaConfig?.contratada_signer_phone || null) : (clientPhone || null),
         expires_at: expiresAt.toISOString(),
