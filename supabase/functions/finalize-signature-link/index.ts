@@ -325,7 +325,7 @@ async function activateNextStep(
             to: `595${s2Link.recipient_phone}`,
             templateName: 'signature_link',
             templateData: {
-              clientName: 'Representante Legal',
+              clientName: signerName,
               companyName,
               signatureUrl: getSignatureLinkUrl(s2Link.token),
               expirationDate: 'en 3 días',
