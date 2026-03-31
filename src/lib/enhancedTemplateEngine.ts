@@ -654,8 +654,8 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     '{{company_cuit}}': context.facturacion.ruc,
     '{{company_address}}': context.empresa.direccion,
     // Signature role aliases (representante = empresa, testigo)
-    '{{representante_nombre}}': context.empresa.nombre,
-    '{{representante_dni}}': context.facturacion.ruc,
+    '{{representante_nombre}}': companySettings?.contratada_signer_name || context.empresa.nombre,
+    '{{representante_dni}}': companySettings?.contratada_signer_dni || '',
     '{{testigo_nombre}}': context.venta.vendedor,
     '{{testigo_dni}}': '',
     // Global amount aliases (sale total, not plan base price)

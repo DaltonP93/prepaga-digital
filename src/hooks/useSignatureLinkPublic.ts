@@ -853,6 +853,9 @@ export const useSubmitSignatureLink = () => {
               token,
               clientIp,
               userAgent: navigator.userAgent,
+              identityVerificationId: variables.identityVerificationId || null,
+              consentRecordId: variables.consentRecordId || null,
+              skipEventInsert: true,
             }),
           }
         );
