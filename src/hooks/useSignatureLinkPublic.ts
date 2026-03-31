@@ -13,11 +13,11 @@ const _publicClient = SUPABASE_URL
     })
   : null;
 
-const _signatureClientCache = new Map<string, ReturnType<typeof createClient<Database>>>();
+const _signatureClientCache = new Map<string, any>();
 
-const getPublicClient = () => _publicClient!;
+const getPublicClient = (): any => _publicClient!;
 
-const getSignatureClient = (token: string) => {
+const getSignatureClient = (token: string): any => {
   if (!_signatureClientCache.has(token)) {
     _signatureClientCache.set(
       token,
@@ -29,10 +29,6 @@ const getSignatureClient = (token: string) => {
   }
   return _signatureClientCache.get(token)!;
 };
-
-// Helper type for bypassing strict type checks on operations
-// that use columns/tables not yet reflected in auto-generated types
-const asDb = (client: ReturnType<typeof createClient<Database>>) => client as any;
 
 interface SignatureLinkData {
   id: string;
