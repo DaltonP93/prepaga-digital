@@ -1,81 +1,44 @@
 
 
-# Security Hardening Plan - Full System Scan
+# Plan: Fix 3 Issues (WhatsApp Preview, Document Images, OTP)
 
-The scan found **12 findings**: 4 errors and 8 warnings. Here is the plan to fix them all via a single database migration.
+## Issue 1: WhatsApp link preview shows Lovable logo
 
----
+**Root cause**: `index.html` has `og:image` set to `/favicon.ico` (relative URL). WhatsApp's crawler needs an absolute URL. Since the app is deployed on `prepaga.saa.com.py` via custom domain but originated from Lovable, the relative URL may resolve to the wrong favicon, or WhatsApp may use Lovable's default preview.
 
-## Findings Summary & Actions
+**Fix**: Update `index.html` to use absolute URLs for all OG and Twitter meta tags pointing to `https://prepaga.saa.com.py`. Also add `og:url` meta tag. Use a proper PNG image for `og:image` instead of `.ico` (WhatsApp prefers at least 200x200 PNG/JPG). Generate an OG image from the existing `favicon.svg` or use the company logo stored in Supabase.
 
-### ERRORS (Critical - Must Fix)
-
-| # | Finding | Fix |
-|---|---------|-----|
-| 1 | **Realtime channel subscriptions** - no RLS on `realtime.messages` | **Ignore** - Already mitigated: all published tables have company-scoped RLS. Supabase enforces SELECT policies before delivering events. Cannot modify `realtime` schema. |
-| 2 | **OTP hashes readable via signature token** - public SELECT on `signature_identity_verification` exposes `otp_code_hash` | **Fix** - Restrict anonymous SELECT to exclude `otp_code_hash` by using column-level GRANT and replacing the public policy. |
-| 3 | **Auth attempts cross-company** - any admin can read all companies' login attempts | **Fix** - The table has no `company_id`. Add column, backfill from profiles, and scope the policy. |
-| 4 | **Gestors manage templates across companies** - no `company_id` scope | **Fix** - Add `company_id` check to the policy. |
-| 5 | **Public can DELETE documents by signature token** - unauthenticated deletion of legal documents | **Fix** - Remove the public DELETE policy entirely. Only authenticated admins/gestors should delete. |
-
-### WARNINGS (Should Fix)
-
-| # | Finding | Fix |
-|---|---------|-----|
-| 6 | **company_settings readable** | **Ignore** - Already restricted to admin-only ALL policy. No broader SELECT exists. |
-| 7 | **company_otp_policy policies on {public} role** | **Fix** - Change policies to target `authenticated` role. |
-| 8 | **password_reset_tokens on {public} role** | **Fix** - Change policy to target `authenticated` role. |
-| 9 | **Communication logs viewable by all company members** | **Fix** - Remove the broad "Users can view communication logs" policy; keep admin-only SELECT. |
-| 10 | **Beneficiary documents exclude supervisors/auditors** | **Fix** - Add `supervisor` and `auditor` roles to the policy. |
-| 11 | **Incidents with NULL company_id visible to all** | **Fix** - Remove the `company_id IS NULL` condition. |
-| 12 | **Storage documents bucket** - no signature-token file access | **Ignore** - The app uses the `get-document-download-url` Edge Function with signed URLs (1h expiry), so direct bucket access isn't needed for signers. |
+**Files**: `index.html`
 
 ---
 
-## Technical Implementation
+## Issue 2: Contract header/footer images broken in sale document viewer
 
-A single Supabase migration with the following SQL changes:
+**Root cause**: The `DocumentPreviewDialog` component renders document HTML content with `DOMPurify.sanitize()` but does NOT resolve expired Supabase Storage signed URLs for images (logos, headers, footers). The `DocumentPreview` component (used in the template viewer) DOES resolve signed URLs via `getAssetSignedUrl`, which is why templates look fine but sale documents don't.
 
-### 1. OTP Hash Protection (Finding 2)
-- Revoke all on `signature_identity_verification` from `anon`
-- Grant SELECT on specific columns only (excluding `otp_code_hash`) to `anon`
-- Recreate the public SELECT policy scoped to non-sensitive columns
+**Fix**: Add the same signed URL resolution logic from `DocumentPreview` to `DocumentPreviewDialog`. When content contains Supabase storage URLs or `data-storage-path` attributes, resolve them to fresh signed URLs before rendering.
 
-### 2. Auth Attempts Cross-Company (Finding 3)
-- Add `company_id` column to `auth_attempts`
-- Create index on `company_id`
-- Drop and recreate the SELECT policy scoped by `company_id` matching the admin's company
-
-### 3. Templates Cross-Company (Finding 4)
-- Drop "Gestors can manage templates" policy
-- Recreate with `company_id = get_user_company_id(auth.uid())` scope
-- Change role from `{public}` to `{authenticated}`
-
-### 4. Remove Public Document DELETE (Finding 5)
-- Drop "Public can delete documents by signature token" policy
-
-### 5. company_otp_policy Role Fix (Finding 7)
-- Drop and recreate "Admins can manage OTP policy" targeting `authenticated` role
-
-### 6. password_reset_tokens Role Fix (Finding 8)
-- Drop and recreate "Users can manage own reset tokens" targeting `authenticated` role
-
-### 7. Communication Logs (Finding 9)
-- Drop "Users can view communication logs" broad policy
-- Drop "Users can create communication logs" broad policy on `{public}`
-- Keep admin-only and authenticated-scoped policies
-
-### 8. Beneficiary Documents (Finding 10)
-- Drop and recreate both policies adding `supervisor` and `auditor` roles
-
-### 9. Incidents NULL company_id (Finding 11)
-- Drop and recreate `incidents_select` policy removing `OR (company_id IS NULL)` condition
+**Files**: `src/components/documents/DocumentPreviewDialog.tsx`
 
 ---
 
-## What Won't Change
-- No frontend code changes needed
-- No Edge Function changes needed
-- Existing admin workflows remain functional
-- Signature flow continues working (signed URLs for document access)
+## Issue 3: OTP via WhatsApp fails despite correct configuration
+
+**Root cause**: The `signature-otp` Edge Function's `sendViaWhatsApp` function reads the WhatsApp provider from `company_settings.whatsapp_provider`, which is set to `wame_fallback` (manual mode for signature links). However, the OTP configuration in `company_otp_policy` has separate columns (`otp_whatsapp_provider`, `otp_whatsapp_gateway_url`, `otp_use_signature_whatsapp`) that are designed to decouple OTP WhatsApp from signature WhatsApp. The Edge Function ignores these columns entirely - it always reads the main WhatsApp config, which is "wa.me (manual)" and cannot send OTP automatically.
+
+**Fix**: Modify the `sendViaWhatsApp` function in `signature-otp/index.ts` to check `company_otp_policy` columns first:
+- If `otp_use_signature_whatsapp` is true, use the main `company_settings` WhatsApp config
+- Otherwise, use `otp_whatsapp_provider` and `otp_whatsapp_gateway_url` from `company_otp_policy`
+- Pass the OTP policy data to `sendViaWhatsApp` so it can use the correct provider/gateway
+
+This way, the user can configure wa.me for signature links (manual) while using WAHA/QR session for OTP (automatic).
+
+**Files**: `supabase/functions/signature-otp/index.ts` (redeploy required)
+
+---
+
+## Implementation Order
+1. Fix `index.html` OG tags (quick)
+2. Fix `DocumentPreviewDialog` signed URL resolution
+3. Fix `signature-otp` Edge Function to use decoupled OTP WhatsApp config + redeploy
 
