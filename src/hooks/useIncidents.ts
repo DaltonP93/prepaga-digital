@@ -298,8 +298,22 @@ const fetchIncidentRelations = async (incidentId: string) => {
     throw commentsResult.error;
   }
 
+  // Resolve signed URLs for private incidents bucket
+  const rawAttachments = (attachmentsResult.data as IncidentAttachment[] | null) || [];
+  const attachmentsWithSignedUrls = await Promise.all(
+    rawAttachments.map(async (att) => {
+      // If file_url is already a full URL (legacy public data), keep it
+      if (att.file_url.startsWith('http')) return att;
+      // Generate signed URL (valid 1 hour)
+      const { data } = await supabase.storage
+        .from('incidents')
+        .createSignedUrl(att.file_url, 3600);
+      return { ...att, file_url: data?.signedUrl || att.file_url };
+    }),
+  );
+
   return {
-    incident_attachments: (attachmentsResult.data as IncidentAttachment[] | null) || [],
+    incident_attachments: attachmentsWithSignedUrls,
     incident_comments: (commentsResult.data as IncidentComment[] | null) || [],
   };
 };
