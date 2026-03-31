@@ -389,6 +389,16 @@ serve(async (req) => {
       });
     } catch { /* non-blocking */ }
 
+    return new Response(JSON.stringify({
+      success: whatsappResponse.success,
+      provider: 'meta',
+      messageId: whatsappResponse.messageId,
+      logId: messageLog?.id,
+      error: whatsappResponse.error,
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+
   } catch (error) {
     console.error('Error sending WhatsApp message:', error)
     return new Response(JSON.stringify({
