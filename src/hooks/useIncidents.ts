@@ -298,8 +298,22 @@ const fetchIncidentRelations = async (incidentId: string) => {
     throw commentsResult.error;
   }
 
+  // Resolve signed URLs for private incidents bucket
+  const rawAttachments = (attachmentsResult.data as IncidentAttachment[] | null) || [];
+  const attachmentsWithSignedUrls = await Promise.all(
+    rawAttachments.map(async (att) => {
+      // If file_url is already a full URL (legacy public data), keep it
+      if (att.file_url.startsWith('http')) return att;
+      // Generate signed URL (valid 1 hour)
+      const { data } = await supabase.storage
+        .from('incidents')
+        .createSignedUrl(att.file_url, 3600);
+      return { ...att, file_url: data?.signedUrl || att.file_url };
+    }),
+  );
+
   return {
-    incident_attachments: (attachmentsResult.data as IncidentAttachment[] | null) || [],
+    incident_attachments: attachmentsWithSignedUrls,
     incident_comments: (commentsResult.data as IncidentComment[] | null) || [],
   };
 };
@@ -562,16 +576,13 @@ export const useUploadAttachment = () => {
 
       if (uploadError) throw uploadError;
 
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from('incidents').getPublicUrl(path);
-
+      // Store the storage path (not public URL) since bucket is private
       const { data, error } = await supabase
         .from('incident_attachments')
         .insert({
           incident_id: incidentId,
           file_name: file.name,
-          file_url: publicUrl,
+          file_url: path,
           file_type: file.type,
           file_size: file.size,
           uploaded_by: user?.id,
