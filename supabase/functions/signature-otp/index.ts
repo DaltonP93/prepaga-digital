@@ -64,20 +64,37 @@ async function sendViaSMTPRelay(
 }
 
 // Send OTP via WhatsApp using the configured provider
+// Supports decoupled OTP WhatsApp config from company_otp_policy
 async function sendViaWhatsApp(
   phone: string,
   otp: string,
   supabase: any,
   companyId: string,
+  otpPolicy?: any,
 ): Promise<{ sent: boolean; provider_used: string; reason?: string }> {
   try {
-    const { data: settings } = await supabase
-      .from('company_settings')
-      .select('whatsapp_provider, whatsapp_api_key, whatsapp_phone_id, whatsapp_gateway_url, whatsapp_linked_phone, twilio_account_sid, twilio_auth_token, twilio_whatsapp_number')
-      .eq('company_id', companyId)
-      .single();
+    // Determine provider and gateway: use OTP-specific config unless otp_use_signature_whatsapp is true
+    let provider: string;
+    let gatewayUrl: string | null = null;
+    let settings: any = null;
 
-    const provider = settings?.whatsapp_provider || 'wame_fallback';
+    const useSignatureConfig = otpPolicy?.otp_use_signature_whatsapp === true;
+
+    if (!useSignatureConfig && otpPolicy?.otp_whatsapp_provider) {
+      // Use decoupled OTP-specific WhatsApp config
+      provider = otpPolicy.otp_whatsapp_provider;
+      gatewayUrl = otpPolicy.otp_whatsapp_gateway_url || null;
+    } else {
+      // Fallback to main company_settings WhatsApp config
+      const { data: s } = await supabase
+        .from('company_settings')
+        .select('whatsapp_provider, whatsapp_api_key, whatsapp_phone_id, whatsapp_gateway_url, whatsapp_linked_phone, twilio_account_sid, twilio_auth_token, twilio_whatsapp_number')
+        .eq('company_id', companyId)
+        .single();
+      settings = s;
+      provider = settings?.whatsapp_provider || 'wame_fallback';
+      gatewayUrl = settings?.whatsapp_gateway_url || null;
+    }
 
     if (provider === 'wame_fallback') {
       return { sent: false, provider_used: 'wame_fallback', reason: 'wa.me (manual) no puede enviar OTP automático' };
@@ -87,6 +104,15 @@ async function sendViaWhatsApp(
     const cleanPhone = phone.replace(/[^0-9]/g, '');
 
     if (provider === 'meta') {
+      // Need settings for meta API keys
+      if (!settings) {
+        const { data: s } = await supabase
+          .from('company_settings')
+          .select('whatsapp_api_key, whatsapp_phone_id')
+          .eq('company_id', companyId)
+          .single();
+        settings = s;
+      }
       if (!settings?.whatsapp_api_key || !settings?.whatsapp_phone_id) {
         return { sent: false, provider_used: 'meta', reason: 'Meta API no configurada (falta token o phone_id)' };
       }
@@ -115,6 +141,14 @@ async function sendViaWhatsApp(
     }
 
     if (provider === 'twilio') {
+      if (!settings) {
+        const { data: s } = await supabase
+          .from('company_settings')
+          .select('twilio_account_sid, twilio_auth_token, twilio_whatsapp_number')
+          .eq('company_id', companyId)
+          .single();
+        settings = s;
+      }
       if (!settings?.twilio_account_sid || !settings?.twilio_auth_token || !settings?.twilio_whatsapp_number) {
         return { sent: false, provider_used: 'twilio', reason: 'Twilio no configurado (falta SID, token o número)' };
       }
@@ -142,20 +176,18 @@ async function sendViaWhatsApp(
     }
 
     if (provider === 'qr_session') {
-      if (!settings?.whatsapp_gateway_url) {
+      if (!gatewayUrl) {
         return { sent: false, provider_used: 'qr_session', reason: 'Gateway URL no configurada' };
       }
-      const gatewayUrl = settings.whatsapp_gateway_url.replace(/\/$/, '');
-      // WAHA API format: POST /api/sendText with { chatId, text, session }
+      const cleanGatewayUrl = gatewayUrl.replace(/\/$/, '');
       const chatId = cleanPhone.includes('@') ? cleanPhone : `${cleanPhone}@c.us`;
       const wahaApiKey = Deno.env.get('WAHA_API_KEY');
       const wahaHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
       if (wahaApiKey) {
         wahaHeaders['X-Api-Key'] = wahaApiKey;
       }
-      // Use linked phone as session name if configured, otherwise 'default'
       const sessionName = 'default';
-      const res = await fetch(`${gatewayUrl}/api/sendText`, {
+      const res = await fetch(`${cleanGatewayUrl}/api/sendText`, {
         method: 'POST',
         headers: wahaHeaders,
         body: JSON.stringify({

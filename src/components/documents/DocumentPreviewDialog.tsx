@@ -162,7 +162,7 @@ export const DocumentPreviewDialog: React.FC<DocumentPreviewDialogProps> = ({
           {hasContent ? (
             <div
               className="prose prose-sm max-w-none p-4 bg-white rounded border text-slate-900 prose-headings:text-slate-900 prose-p:text-slate-800 prose-strong:text-slate-900 prose-li:text-slate-800 prose-table:text-slate-900 prose-th:text-slate-900 prose-td:text-slate-800 [&_*]:border-slate-300"
-              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(document.content || '') }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(resolvedContent || document.content || '', { ADD_ATTR: ['data-storage-path'] }) }}
             />
           ) : hasFileUrl ? (
             <div className="p-4">
