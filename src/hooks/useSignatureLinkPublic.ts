@@ -178,10 +178,14 @@ export const useSubmitSignatureLink = () => {
       linkId,
       token,
       signatureData,
+      identityVerificationId,
+      consentRecordId,
     }: {
       linkId: string;
       token: string;
       signatureData: string;
+      identityVerificationId?: string;
+      consentRecordId?: string;
     }) => {
       const signatureClient = getSignatureClient(token);
 
@@ -853,6 +857,9 @@ export const useSubmitSignatureLink = () => {
               token,
               clientIp,
               userAgent: navigator.userAgent,
+              identityVerificationId: identityVerificationId || null,
+              consentRecordId: consentRecordId || null,
+              skipEventInsert: true,
             }),
           }
         );

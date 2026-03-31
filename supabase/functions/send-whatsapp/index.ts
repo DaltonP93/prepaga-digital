@@ -219,6 +219,21 @@ serve(async (req) => {
         sent_at: twilioResult.success ? new Date().toISOString() : null,
       })
 
+      // Log to communication_logs
+      try {
+        await supabase.from('communication_logs').insert({
+          company_id: companyId || null,
+          sale_id: saleId || null,
+          client_id: null,
+          channel: 'whatsapp',
+          direction: 'outbound',
+          subject: messageType || 'whatsapp_message',
+          content: message?.substring(0, 500) || '',
+          status: twilioResult.success ? 'sent' : 'failed',
+          sent_at: new Date().toISOString(),
+        });
+      } catch { /* non-blocking */ }
+
       return new Response(JSON.stringify({
         success: twilioResult.success,
         provider: 'twilio',
@@ -269,6 +284,21 @@ serve(async (req) => {
         sent_at: wahaResult.success ? new Date().toISOString() : null,
       })
 
+      // Log to communication_logs
+      try {
+        await supabase.from('communication_logs').insert({
+          company_id: companyId || null,
+          sale_id: saleId || null,
+          client_id: null,
+          channel: 'whatsapp',
+          direction: 'outbound',
+          subject: messageType || 'whatsapp_message',
+          content: message?.substring(0, 500) || '',
+          status: wahaResult.success ? 'sent' : 'failed',
+          sent_at: new Date().toISOString(),
+        });
+      } catch { /* non-blocking */ }
+
       return new Response(JSON.stringify({
         success: wahaResult.success,
         provider: 'waha',
@@ -294,6 +324,21 @@ serve(async (req) => {
         status: 'manual',
         company_id: companyId,
       })
+
+      // Log to communication_logs
+      try {
+        await supabase.from('communication_logs').insert({
+          company_id: companyId || null,
+          sale_id: saleId || null,
+          client_id: null,
+          channel: 'whatsapp',
+          direction: 'outbound',
+          subject: messageType || 'whatsapp_message',
+          content: message?.substring(0, 500) || '',
+          status: 'manual',
+          sent_at: new Date().toISOString(),
+        });
+      } catch { /* non-blocking */ }
 
       return new Response(JSON.stringify({
         success: true,
@@ -328,6 +373,21 @@ serve(async (req) => {
       })
       .select()
       .single()
+
+    // Log to communication_logs
+    try {
+      await supabase.from('communication_logs').insert({
+        company_id: companyId || null,
+        sale_id: saleId || null,
+        client_id: null,
+        channel: 'whatsapp',
+        direction: 'outbound',
+        subject: messageType || 'whatsapp_message',
+        content: message?.substring(0, 500) || '',
+        status: whatsappResponse.success ? 'sent' : 'failed',
+        sent_at: new Date().toISOString(),
+      });
+    } catch { /* non-blocking */ }
 
     return new Response(JSON.stringify({
       success: whatsappResponse.success,

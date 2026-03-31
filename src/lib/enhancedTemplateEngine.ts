@@ -155,6 +155,10 @@ export interface EnhancedTemplateContext {
   beneficiarios: BeneficiaryContext[];
   beneficiarioPrincipal: BeneficiaryContext | null;
   respuestas: Record<string, any>;
+  representante: {
+    nombre: string;
+    dni: string;
+  };
 }
 
 /**
@@ -270,7 +274,8 @@ export function createEnhancedTemplateContext(
   sale: any,
   beneficiaries: any[] = [],
   signatureLink?: any,
-  responses?: Record<string, any>
+  responses?: Record<string, any>,
+  companySettings?: any
 ): EnhancedTemplateContext {
   const now = new Date();
   
@@ -419,6 +424,10 @@ export function createEnhancedTemplateContext(
     beneficiarios: sortedBeneficiaryContexts,
     beneficiarioPrincipal: primaryBeneficiary,
     respuestas: responses || {},
+    representante: {
+      nombre: companySettings?.contratada_signer_name || company?.name || '',
+      dni: companySettings?.contratada_signer_dni || '',
+    },
   };
 }
 
@@ -653,8 +662,8 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     '{{company_cuit}}': context.facturacion.ruc,
     '{{company_address}}': context.empresa.direccion,
     // Signature role aliases (representante = empresa, testigo)
-    '{{representante_nombre}}': context.empresa.nombre,
-    '{{representante_dni}}': context.facturacion.ruc,
+    '{{representante_nombre}}': context.representante.nombre,
+    '{{representante_dni}}': context.representante.dni,
     '{{testigo_nombre}}': context.venta.vendedor,
     '{{testigo_dni}}': '',
     // Global amount aliases (sale total, not plan base price)
