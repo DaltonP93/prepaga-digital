@@ -49,8 +49,6 @@ const Sales = () => {
       return map;
     },
     enabled: saleIds.length > 0,
-    staleTime: 1000 * 60 * 2,
-    refetchOnWindowFocus: false,
   });
 
   // Real-time subscription for sales changes
