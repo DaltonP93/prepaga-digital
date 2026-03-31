@@ -31,7 +31,7 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
   const applyFavicon = (url?: string) => {
     if (!url) return;
 
-    const rels = ['icon', 'shortcut icon', 'apple-touch-icon'];
+    const rels = ['icon', 'shortcut icon', 'apple-touch-icon', 'alternate icon'];
     rels.forEach((rel) => {
       let link = document.querySelector(`link[rel="${rel}"]`) as HTMLLinkElement | null;
       if (!link) {

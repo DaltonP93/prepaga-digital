@@ -344,7 +344,7 @@ const SignatureWorkflow = () => {
     }
     if (link.recipient_type === 'contratada') {
       const name = link.recipient_name
-        || (link.recipient_phone && !link.recipient_phone.includes('@') ? link.recipient_phone : null)
+        || companySettings?.contratada_signer_name
         || link.recipient_email
         || 'Representante Legal';
       return `Contratada: ${name}`;
