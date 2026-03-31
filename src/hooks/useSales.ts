@@ -115,8 +115,6 @@ export const useSales = () => {
       })) as unknown as ExtendedSale[];
     },
     enabled: !!user,
-    staleTime: 1000 * 60 * 5,
-    refetchOnWindowFocus: false,
   });
 };
 
