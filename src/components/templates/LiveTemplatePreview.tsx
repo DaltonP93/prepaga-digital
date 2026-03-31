@@ -131,6 +131,7 @@ const defaultSampleData = {
     status: 'pendiente',
   },
   responses: {} as Record<string, any>,
+  companySettings: undefined as any,
 };
 
 export const LiveTemplatePreview: React.FC<LiveTemplatePreviewProps> = ({
