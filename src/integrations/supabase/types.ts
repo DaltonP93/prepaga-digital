@@ -2674,6 +2674,7 @@ export type Database = {
           package_id: string | null
           recipient_email: string | null
           recipient_id: string | null
+          recipient_name: string | null
           recipient_phone: string | null
           recipient_type: string
           sale_id: string
@@ -2697,6 +2698,7 @@ export type Database = {
           package_id?: string | null
           recipient_email?: string | null
           recipient_id?: string | null
+          recipient_name?: string | null
           recipient_phone?: string | null
           recipient_type: string
           sale_id: string
@@ -2720,6 +2722,7 @@ export type Database = {
           package_id?: string | null
           recipient_email?: string | null
           recipient_id?: string | null
+          recipient_name?: string | null
           recipient_phone?: string | null
           recipient_type?: string
           sale_id?: string

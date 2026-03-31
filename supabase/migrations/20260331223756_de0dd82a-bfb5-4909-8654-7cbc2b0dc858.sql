@@ -1,0 +1,1 @@
+ALTER TABLE public.signature_links ADD COLUMN IF NOT EXISTS recipient_name text;
