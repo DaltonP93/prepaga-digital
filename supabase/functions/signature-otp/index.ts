@@ -73,17 +73,21 @@ async function sendViaWhatsApp(
   otpPolicy?: any,
 ): Promise<{ sent: boolean; provider_used: string; reason?: string }> {
   try {
-    // Determine provider and gateway: use OTP-specific config unless otp_use_signature_whatsapp is true
+    // Determine provider and gateway: prefer OTP-specific config when available.
+    // If signature config is forced but points to wa.me (manual), auto-fallback to OTP config.
     let provider: string;
     let gatewayUrl: string | null = null;
     let settings: any = null;
 
     const useSignatureConfig = otpPolicy?.otp_use_signature_whatsapp === true;
+    const hasOtpSpecificProvider = !!otpPolicy?.otp_whatsapp_provider;
+    const otpSpecificProvider = otpPolicy?.otp_whatsapp_provider;
+    const otpSpecificGateway = otpPolicy?.otp_whatsapp_gateway_url || null;
 
-    if (!useSignatureConfig && otpPolicy?.otp_whatsapp_provider) {
+    if (!useSignatureConfig && hasOtpSpecificProvider) {
       // Use decoupled OTP-specific WhatsApp config
-      provider = otpPolicy.otp_whatsapp_provider;
-      gatewayUrl = otpPolicy.otp_whatsapp_gateway_url || null;
+      provider = otpSpecificProvider;
+      gatewayUrl = otpSpecificGateway;
     } else {
       // Fallback to main company_settings WhatsApp config
       const { data: s } = await supabase
@@ -94,6 +98,13 @@ async function sendViaWhatsApp(
       settings = s;
       provider = settings?.whatsapp_provider || 'wame_fallback';
       gatewayUrl = settings?.whatsapp_gateway_url || null;
+
+      // Safety net: if signature config is wa.me (manual) but OTP-specific provider exists,
+      // switch to OTP-specific provider to keep OTP delivery automatic.
+      if (provider === 'wame_fallback' && hasOtpSpecificProvider && otpSpecificProvider !== 'wame_fallback') {
+        provider = otpSpecificProvider;
+        gatewayUrl = otpSpecificGateway;
+      }
     }
 
     if (provider === 'wame_fallback') {
@@ -616,7 +627,13 @@ Deno.serve(async (req) => {
         });
       }
 
-      const result = await sendViaWhatsApp(test_phone, '123456', supabase, testCompanyId);
+      const { data: otpPolicyForTest } = await supabase
+        .from('company_otp_policy')
+        .select('otp_use_signature_whatsapp, otp_whatsapp_provider, otp_whatsapp_gateway_url, whatsapp_otp_enabled')
+        .eq('company_id', testCompanyId)
+        .maybeSingle();
+
+      const result = await sendViaWhatsApp(test_phone, '123456', supabase, testCompanyId, otpPolicyForTest);
       return new Response(JSON.stringify({
         success: result.sent,
         provider_used: result.provider_used,
