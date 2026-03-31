@@ -49,8 +49,6 @@ const Sales = () => {
       return map;
     },
     enabled: saleIds.length > 0,
-    staleTime: 1000 * 60 * 2,
-    refetchOnWindowFocus: false,
   });
 
   // Real-time subscription for sales changes
@@ -253,7 +251,10 @@ const Sales = () => {
 
                           <TableCell>
                             {(() => {
-                              const progress = getProgress(sale.status || 'borrador');
+                              // Hybrid: if all signatures completed, show 100% regardless of status
+                              const progress = (sale as any).all_signatures_completed 
+                                ? 100 
+                                : getProgress(sale.status || 'borrador');
                               return (
                                 <div className="space-y-2">
                                   <div className="flex justify-between text-sm">

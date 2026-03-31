@@ -97,9 +97,10 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { hasError: bo
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutos
+      staleTime: 30 * 1000, // 30 segundos - datos frescos
       retry: 1,
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true, // Refrescar al volver a la pestaña
+      refetchOnReconnect: true,
     },
   },
 });

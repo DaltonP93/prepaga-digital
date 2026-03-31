@@ -176,6 +176,21 @@ export const useRealTimeNotifications = () => {
           scheduleInvalidate('sale-notes', ['sale-notes']);
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'company_settings' },
+        () => {
+          scheduleInvalidate('company-settings', ['company-settings']);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'company_ui_settings' },
+        () => {
+          scheduleInvalidate('company-ui-settings', ['company-ui-settings']);
+          scheduleInvalidate('sale-progress-config', ['sale-progress-config']);
+        }
+      )
       .subscribe((status) => {
         setIsConnected(status === 'SUBSCRIBED');
       });
