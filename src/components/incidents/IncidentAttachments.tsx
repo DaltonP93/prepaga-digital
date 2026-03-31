@@ -1,9 +1,18 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Download, Eye, FileText, ImageIcon, Loader2, Paperclip, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ImageLightbox } from '@/components/ui/image-lightbox';
 import { IncidentAttachment, useUploadAttachment } from '@/hooks/useIncidents';
+import { supabase } from '@/integrations/supabase/client';
+
+// Extract storage path from a legacy public URL or return the value as-is if already a path
+function extractStoragePath(fileUrl: string): string {
+  const marker = '/object/public/incidents/';
+  const idx = fileUrl.indexOf(marker);
+  if (idx !== -1) return fileUrl.slice(idx + marker.length);
+  return fileUrl;
+}
 
 interface Props {
   incidentId: string;
@@ -26,6 +35,26 @@ export const IncidentAttachments = ({ incidentId, attachments, canUpload = true 
   const upload = useUploadAttachment();
   const [isDragging, setIsDragging] = useState(false);
   const [selectedAttachment, setSelectedAttachment] = useState<IncidentAttachment | null>(null);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+
+  // Generate signed URLs for all attachments (bucket is private)
+  useEffect(() => {
+    if (attachments.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(
+        attachments.map(async (att) => {
+          const path = extractStoragePath(att.file_url);
+          const { data } = await supabase.storage
+            .from('incidents')
+            .createSignedUrl(path, 3600);
+          return [att.id, data?.signedUrl ?? ''] as const;
+        }),
+      );
+      if (!cancelled) setSignedUrls(Object.fromEntries(entries));
+    })();
+    return () => { cancelled = true; };
+  }, [attachments]);
 
   const orderedAttachments = useMemo(
     () =>
@@ -120,6 +149,7 @@ export const IncidentAttachments = ({ incidentId, attachments, canUpload = true 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {orderedAttachments.map((attachment) => {
             const image = isImage(attachment.file_type, attachment.file_name);
+            const displayUrl = signedUrls[attachment.id] ?? '';
 
             return (
               <div key={attachment.id} className="overflow-hidden rounded-2xl border border-border/60 bg-muted/20">
@@ -130,7 +160,7 @@ export const IncidentAttachments = ({ incidentId, attachments, canUpload = true 
                     onClick={() => setSelectedAttachment(attachment)}
                   >
                     <img
-                      src={attachment.file_url}
+                      src={displayUrl}
                       alt={attachment.file_name}
                       className="h-40 w-full object-cover transition-opacity hover:opacity-90"
                     />
@@ -165,8 +195,8 @@ export const IncidentAttachments = ({ incidentId, attachments, canUpload = true 
                       <Eye className="mr-2 h-3.5 w-3.5" />
                       Ver
                     </Button>
-                    <Button asChild size="sm" className="flex-1">
-                      <a href={attachment.file_url} target="_blank" rel="noreferrer">
+                    <Button asChild size="sm" className="flex-1" disabled={!displayUrl}>
+                      <a href={displayUrl} target="_blank" rel="noreferrer">
                         <Download className="mr-2 h-3.5 w-3.5" />
                         Abrir
                       </a>
@@ -185,7 +215,7 @@ export const IncidentAttachments = ({ incidentId, attachments, canUpload = true 
           onOpenChange={(open) => {
             if (!open) setSelectedAttachment(null);
           }}
-          src={selectedAttachment.file_url}
+          src={signedUrls[selectedAttachment.id] ?? ''}
           alt={selectedAttachment.file_name}
           fileName={selectedAttachment.file_name}
           fileType={selectedAttachment.file_type || undefined}

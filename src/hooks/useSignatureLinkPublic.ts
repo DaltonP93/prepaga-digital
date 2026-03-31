@@ -5,28 +5,28 @@ import { useToast } from '@/hooks/use-toast';
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || '').trim();
 const SUPABASE_PUBLISHABLE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '').trim();
 
-const createPublicClient = () =>
-  createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  });
+// Singleton clients — avoid multiple GoTrueClient instances warning
+const _publicClient = SUPABASE_URL
+  ? createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    })
+  : null;
 
-const createSignatureClient = (token: string) => {
-  return createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-    global: {
-      headers: {
-        'x-signature-token': token,
-      },
-    },
-  });
+const _signatureClientCache = new Map<string, ReturnType<typeof createClient>>();
+
+const getPublicClient = () => _publicClient!;
+
+const getSignatureClient = (token: string) => {
+  if (!_signatureClientCache.has(token)) {
+    _signatureClientCache.set(
+      token,
+      createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+        global: { headers: { 'x-signature-token': token } },
+      })
+    );
+  }
+  return _signatureClientCache.get(token)!;
 };
 
 interface SignatureLinkData {
@@ -84,7 +84,7 @@ export const useSignatureLinkByToken = (token: string) => {
     queryFn: async () => {
       if (!token) throw new Error('Token is required');
 
-      const signatureClient = createSignatureClient(token);
+      const signatureClient = getSignatureClient(token);
 
       const { data: linkData, error: linkError } = await signatureClient
         .from('signature_links')
@@ -182,7 +182,7 @@ export const useSubmitSignatureLink = () => {
       token: string;
       signatureData: string;
     }) => {
-      const signatureClient = createSignatureClient(token);
+      const signatureClient = getSignatureClient(token);
 
       let clientIp = 'unknown';
       try {
@@ -902,8 +902,8 @@ export const useSignatureLinkDocuments = (
 
       // Use token-authenticated client so RLS policies work
       const client = token 
-        ? createSignatureClient(token)
-        : createPublicClient();
+        ? getSignatureClient(token)
+        : getPublicClient();
 
       let query = client
         .from('documents')
@@ -996,8 +996,8 @@ export const useAllSignatureLinksPublic = (saleId: string | undefined, token?: s
     queryFn: async () => {
       if (!saleId) return [];
       const client = token
-        ? createSignatureClient(token)
-        : createPublicClient();
+        ? getSignatureClient(token)
+        : getPublicClient();
       const { data, error } = await client
         .from('signature_links')
         .select('id,sale_id,recipient_type,recipient_id,status,completed_at,created_at')
