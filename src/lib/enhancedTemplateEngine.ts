@@ -424,6 +424,10 @@ export function createEnhancedTemplateContext(
     beneficiarios: sortedBeneficiaryContexts,
     beneficiarioPrincipal: primaryBeneficiary,
     respuestas: responses || {},
+    representante: {
+      nombre: companySettings?.contratada_signer_name || company?.name || '',
+      dni: companySettings?.contratada_signer_dni || '',
+    },
   };
 }
 
