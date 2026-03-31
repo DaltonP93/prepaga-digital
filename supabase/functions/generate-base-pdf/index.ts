@@ -204,7 +204,7 @@ function normalizeLegacyContractHeader(html: string): string {
  */
 async function resolveContentImages(
   html: string,
-  supabaseAdmin: ReturnType<typeof createClient>,
+  supabaseAdmin: any,
   bucket: string
 ): Promise<string> {
   if (!html) return html;
