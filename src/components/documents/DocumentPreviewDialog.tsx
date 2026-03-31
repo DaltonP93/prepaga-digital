@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { FileText, User, Download, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { resolveStorageImages } from '@/lib/resolveStorageImages';
 
 interface DocumentPreviewDialogProps {
   open: boolean;
@@ -118,6 +119,20 @@ export const DocumentPreviewDialog: React.FC<DocumentPreviewDialogProps> = ({
   onOpenChange,
   document,
 }) => {
+  const [resolvedContent, setResolvedContent] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!document?.content?.trim()) {
+      setResolvedContent(null);
+      return;
+    }
+    let cancelled = false;
+    resolveStorageImages(document.content).then((html) => {
+      if (!cancelled) setResolvedContent(html);
+    });
+    return () => { cancelled = true; };
+  }, [document?.content]);
+
   if (!document) return null;
 
   const hasContent = !!document.content?.trim();
@@ -147,7 +162,7 @@ export const DocumentPreviewDialog: React.FC<DocumentPreviewDialogProps> = ({
           {hasContent ? (
             <div
               className="prose prose-sm max-w-none p-4 bg-white rounded border text-slate-900 prose-headings:text-slate-900 prose-p:text-slate-800 prose-strong:text-slate-900 prose-li:text-slate-800 prose-table:text-slate-900 prose-th:text-slate-900 prose-td:text-slate-800 [&_*]:border-slate-300"
-              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(document.content || '') }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(resolvedContent || document.content || '', { ADD_ATTR: ['data-storage-path'] }) }}
             />
           ) : hasFileUrl ? (
             <div className="p-4">
