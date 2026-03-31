@@ -260,7 +260,7 @@ async function resolveContentImages(
  */
 async function resolveLogoUrl(
   logoUrl: string | null,
-  supabaseAdmin: ReturnType<typeof createClient>
+  supabaseAdmin: any
 ): Promise<string | null> {
   if (!logoUrl) return null;
 

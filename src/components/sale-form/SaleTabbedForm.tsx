@@ -285,12 +285,8 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
 
                       recipientsError = rolesError;
                       if (!rolesError) {
-                        const legacyProfileIds = (companyProfiles || [])
-                          .filter((candidate: any) => candidate.role && auditRoles.has(candidate.role))
-                          .map((candidate: any) => candidate.id);
-
                         const userRoleIds = (roleRows || []).map((row) => row.user_id);
-                        const uniqueUserIds = Array.from(new Set([...legacyProfileIds, ...userRoleIds]));
+                        const uniqueUserIds = Array.from(new Set(userRoleIds));
                         auditRecipients = uniqueUserIds.map((userId) => ({ user_id: userId }));
                       }
                     }
