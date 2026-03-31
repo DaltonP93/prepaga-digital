@@ -281,7 +281,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                         .from('user_roles')
                         .select('user_id, role')
                         .in('user_id', candidateIds)
-                        .in('role', Array.from(auditRoles));
+                        .in('role', auditRoles);
 
                       recipientsError = rolesError;
                       if (!rolesError) {
