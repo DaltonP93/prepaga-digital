@@ -155,6 +155,10 @@ export interface EnhancedTemplateContext {
   beneficiarios: BeneficiaryContext[];
   beneficiarioPrincipal: BeneficiaryContext | null;
   respuestas: Record<string, any>;
+  representante: {
+    nombre: string;
+    dni: string;
+  };
 }
 
 /**
