@@ -270,7 +270,8 @@ export function createEnhancedTemplateContext(
   sale: any,
   beneficiaries: any[] = [],
   signatureLink?: any,
-  responses?: Record<string, any>
+  responses?: Record<string, any>,
+  companySettings?: any
 ): EnhancedTemplateContext {
   const now = new Date();
   
