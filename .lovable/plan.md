@@ -1,51 +1,68 @@
 
 
-# Plan: Fix Contratada Name Display + Contract PDF Issues
+# Plan: Fix Sale Progress, Caching, Real-Time Updates & Dynamic Notifications
 
-## Issue 1: Contratada shows phone number instead of name
+## Issue 1: Sale progress stuck at 80% when flow is complete
 
-**Root cause**: The `signature_links` table has no `recipient_name` column. When `finalize-signature-link` creates the contratada link, it stores `recipient_phone` and `recipient_email` but not the name. The UI in `SignatureWorkflow.tsx` (`getRecipientLabel`) falls back to `recipient_phone` since `recipient_name` is undefined. Similarly, the WhatsApp message hardcodes `'Representante Legal'` instead of using the actual configured name.
-
-**Fix**:
-
-1. **Add `recipient_name` column** to `signature_links` table via migration
-2. **Update `finalize-signature-link/index.ts`**:
-   - Store `cs.contratada_signer_name` in `recipient_name` when creating the contratada link
-   - Use `cs.contratada_signer_name` in the WhatsApp `templateData.clientName` instead of `'Representante Legal'`
-3. **Update `SignatureLinkGenerator.tsx`**: Store `contratadaConfig.contratada_signer_name` in `recipient_name` when manually generating contratada links
-4. **Update types.ts** to include the new column
-
-## Issue 2: "Descargar Documento Firmado" for contratada — missing signature + bad header/footer images
-
-**Root cause**: The `generate-base-pdf` function wraps document content with a fixed header (company logo) and footer (contact info). However, the document content itself ALSO contains embedded header/footer images from the template (cabecera/zócalo), resulting in duplicated or oversized headers. The header image in the template content gets `width: 100%` forced by CSS rules (lines 130-134), making it fill the entire content width with excessive spacing.
+**Root cause**: The progress bar uses `getProgress(sale.status)` which maps to `DEFAULT_PROGRESS_CONFIG` where `enviado = 80`. The DB trigger `auto_advance_sale_status` should update the status to `completado` (100%) when all signature links are completed, but it appears the trigger didn't fire or the sale status wasn't updated for this specific sale (2026-000044).
 
 **Fix**:
+1. Make progress bar **hybrid**: check `sale.status` AND `sale.all_signatures_completed`. If `all_signatures_completed === true` but status isn't `completado`, show 100% and trigger a status correction
+2. Add a one-time data fix query to update any sales stuck with `all_signatures_completed = true` but status != `completado`
+3. Ensure the `auto_advance_sale_status` trigger is correctly attached to `signature_links` table (verify via migration)
 
-1. **Update `generate-base-pdf/index.ts`**: Improve `normalizeLegacyContractHeader` to strip embedded header/footer images from template content when they duplicate the fixed header/footer (detect `company-assets/*/branding/` pattern images at start/end of content and remove them since the wrapper already adds proper header/footer)
-2. **Check signature merging**: Verify that when contratada signs, the signature block is correctly merged into the contract content before PDF generation
+**Files**: `src/pages/Sales.tsx`, new migration SQL
 
-## Issue 3: Missing contratada signature in downloaded PDF
+---
 
-**Root cause**: Need to verify the `pades-sign-document` function correctly includes the contratada signature block when generating the final signed PDF.
+## Issue 2: Browser caching prevents fresh data
 
-**Files to check/modify**:
-- `supabase/functions/pades-sign-document/index.ts` — verify signature merging for contratada role
+**Root cause**: `staleTime: 5 * 60 * 1000` (5 minutes) in QueryClient defaults + `refetchOnWindowFocus: false` means data can be stale for 5 minutes and won't refresh when user returns to tab.
+
+**Fix**:
+1. Reduce `staleTime` to `30 * 1000` (30 seconds) globally in `App.tsx`
+2. Enable `refetchOnWindowFocus: true` so data refreshes when user switches tabs
+3. Remove the aggressive `CacheManager` that clears localStorage (it can interfere with auth sessions)
+4. Add `Cache-Control: no-cache` meta tag to `index.html` to prevent browser caching of the SPA shell
+
+**Files**: `src/App.tsx`, `index.html`
+
+---
+
+## Issue 3: Real-time updates without page refresh
+
+**Root cause**: The real-time system is already well-implemented in `useRealTimeNotifications.ts` with Supabase Realtime channels. The main issue is the 5-minute staleTime preventing invalidated queries from actually refetching.
+
+**Fix**:
+1. With the reduced `staleTime` from Issue 2, invalidations from Realtime will trigger immediate refetches
+2. Add `company_settings` and `company_ui_settings` tables to the Realtime listener so config changes propagate instantly
+3. Ensure `useSalesList` query doesn't override global staleTime with its own longer value
+
+**Files**: `src/hooks/useRealTimeNotifications.ts`
+
+---
+
+## Issue 4: Social-media-style dynamic notifications
+
+**Current state**: `NotificationCenter.tsx` is a basic popover with a flat list. No grouping, no animations, no sound, no auto-dismiss toasts.
+
+**Enhancements**:
+1. **Toast notifications with slide-in animation**: When a new notification arrives via Realtime, show a floating toast that auto-dismisses (like Facebook's top-right notifications)
+2. **Group notifications by type/time**: Group notifications from the same hour or same type (e.g., "3 firmas completadas")
+3. **Unread indicator pulse animation**: Add a pulsing animation to the bell icon badge when new notifications arrive
+4. **Sound notification**: Play a subtle notification sound on new notifications (optional, respecting user preference)
+5. **"Just now" live timestamps**: Show relative times that update every minute
+6. **Click-to-navigate**: Clicking a notification navigates to the relevant sale/document (already partially implemented with `notification.link`)
+7. **Swipe to dismiss** on mobile (stretch goal)
+
+**Files**: `src/components/NotificationCenter.tsx`, `src/hooks/useRealTimeNotifications.ts`, `src/hooks/useNotifications.ts`
 
 ---
 
 ## Implementation Order
-1. Migration: add `recipient_name` to `signature_links`
-2. Update `finalize-signature-link` Edge Function (store name + use in WhatsApp)
-3. Update `SignatureLinkGenerator.tsx` (store name on manual creation)
-4. Fix `generate-base-pdf` header/footer duplication
-5. Verify contratada signature merging in `pades-sign-document`
-6. Redeploy affected Edge Functions
-
-## Files Modified
-- New migration SQL
-- `supabase/functions/finalize-signature-link/index.ts`
-- `src/components/signature/SignatureLinkGenerator.tsx`
-- `src/pages/SignatureWorkflow.tsx` (minor — label already handles `recipient_name`)
-- `supabase/functions/generate-base-pdf/index.ts`
-- `src/integrations/supabase/types.ts`
+1. Migration: fix stuck sales + verify trigger attachment
+2. Reduce staleTime + enable refetchOnWindowFocus in `App.tsx`
+3. Add cache-control headers to `index.html`
+4. Enhance Realtime listener with additional tables
+5. Upgrade NotificationCenter with animations, grouping, pulse badge, and sound
 
