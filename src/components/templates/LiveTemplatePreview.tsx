@@ -46,6 +46,7 @@ interface LiveTemplatePreviewProps {
     beneficiaries?: any[];
     signatureLink?: any;
     responses?: Record<string, any>;
+    companySettings?: any;
   };
   className?: string;
   onDownloadPDF?: () => void;
@@ -130,6 +131,7 @@ const defaultSampleData = {
     status: 'pendiente',
   },
   responses: {} as Record<string, any>,
+  companySettings: undefined as any,
 };
 
 export const LiveTemplatePreview: React.FC<LiveTemplatePreviewProps> = ({
@@ -208,7 +210,8 @@ export const LiveTemplatePreview: React.FC<LiveTemplatePreviewProps> = ({
       data.sale,
       data.beneficiaries,
       data.signatureLink,
-      data.responses
+      data.responses,
+      data.companySettings
     );
 
     let processed = interpolateEnhancedTemplate(content, ctx);
