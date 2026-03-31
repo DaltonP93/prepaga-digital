@@ -271,7 +271,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                     }
 
                     const candidateIds = (companyProfiles || []).map((candidate) => candidate.id);
-                    const auditRoles = new Set(['auditor', 'supervisor', 'admin', 'super_admin']);
+                    const auditRoles: Array<"admin" | "auditor" | "financiero" | "gestor" | "super_admin" | "supervisor" | "vendedor"> = ['auditor', 'supervisor', 'admin', 'super_admin'];
 
                     let auditRecipients: Array<{ user_id: string }> = [];
                     let recipientsError: any = null;
