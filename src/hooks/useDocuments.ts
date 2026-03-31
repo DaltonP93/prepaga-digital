@@ -40,8 +40,6 @@ export const useDocuments = () => {
       return data;
     },
     retry: 2,
-    refetchOnWindowFocus: false,
-    staleTime: 1000 * 60 * 5,
     enabled: !loading && !!user,
   });
 
