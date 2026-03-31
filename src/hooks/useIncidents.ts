@@ -562,16 +562,13 @@ export const useUploadAttachment = () => {
 
       if (uploadError) throw uploadError;
 
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from('incidents').getPublicUrl(path);
-
+      // Store the storage path (not public URL) since bucket is private
       const { data, error } = await supabase
         .from('incident_attachments')
         .insert({
           incident_id: incidentId,
           file_name: file.name,
-          file_url: publicUrl,
+          file_url: path,
           file_type: file.type,
           file_size: file.size,
           uploaded_by: user?.id,
