@@ -312,6 +312,7 @@ async function activateNextStep(
           .single()
 
         const companyName = (sale?.companies as any)?.name || 'La empresa'
+        const signerName = s2Link.recipient_name || companySettings?.contratada_signer_name || 'Representante Legal'
 
         await fetch(`${supabaseUrl}/functions/v1/send-whatsapp`, {
           method: 'POST',
