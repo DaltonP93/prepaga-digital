@@ -857,8 +857,8 @@ export const useSubmitSignatureLink = () => {
               token,
               clientIp,
               userAgent: navigator.userAgent,
-              identityVerificationId: variables.identityVerificationId || null,
-              consentRecordId: variables.consentRecordId || null,
+              identityVerificationId: identityVerificationId || null,
+              consentRecordId: consentRecordId || null,
               skipEventInsert: true,
             }),
           }
