@@ -257,7 +257,5 @@ export const useDocument = (documentId?: string | null) => {
       return data;
     },
     enabled: !loading && !!user && !!documentId,
-    refetchOnWindowFocus: false,
-    staleTime: 1000 * 60 * 5,
   });
 };

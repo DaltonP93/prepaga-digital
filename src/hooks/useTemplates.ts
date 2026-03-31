@@ -197,7 +197,5 @@ export const useTemplate = (templateId?: string) => {
       return data;
     },
     enabled: !!templateId,
-    staleTime: 1000 * 60 * 5,
-    refetchOnWindowFocus: false,
   });
 };

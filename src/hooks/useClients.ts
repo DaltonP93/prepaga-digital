@@ -89,8 +89,6 @@ export const useClientsLookup = (enabled = true) => {
       return data;
     },
     enabled: !!user && enabled,
-    staleTime: 1000 * 60 * 10,
-    refetchOnWindowFocus: false,
   });
 };
 

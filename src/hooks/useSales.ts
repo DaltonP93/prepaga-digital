@@ -182,8 +182,6 @@ export const useSalesLookup = (enabled = true) => {
       return data as unknown as ExtendedSale[];
     },
     enabled: !!user && enabled,
-    staleTime: 1000 * 60 * 10,
-    refetchOnWindowFocus: false,
   });
 };
 

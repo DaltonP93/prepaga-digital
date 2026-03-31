@@ -300,6 +300,5 @@ export const useCountries = () => {
       if (error) throw error;
       return data;
     },
-    staleTime: 10 * 60 * 1000,
   });
 };

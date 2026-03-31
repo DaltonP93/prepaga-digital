@@ -152,7 +152,6 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       return data || [];
     },
     enabled: !!saleId,
-    staleTime: 2 * 60 * 1000,
   });
 
   // Fetch annexes for all associated template IDs

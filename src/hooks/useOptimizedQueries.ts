@@ -119,6 +119,5 @@ export const useOptimizedSearch = (searchTerm: string, table: 'clients' | 'sales
       return [];
     },
     enabled: searchTerm.length >= 2,
-    staleTime: 2 * 60 * 1000, // Cache por 2 minutos
   });
 };
