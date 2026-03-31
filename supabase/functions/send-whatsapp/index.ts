@@ -374,15 +374,20 @@ serve(async (req) => {
       .select()
       .single()
 
-    return new Response(JSON.stringify({
-      success: whatsappResponse.success,
-      provider: 'meta',
-      messageId: whatsappResponse.messageId,
-      logId: messageLog?.id,
-      error: whatsappResponse.error,
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    // Log to communication_logs
+    try {
+      await supabase.from('communication_logs').insert({
+        company_id: companyId || null,
+        sale_id: saleId || null,
+        client_id: null,
+        channel: 'whatsapp',
+        direction: 'outbound',
+        subject: messageType || 'whatsapp_message',
+        content: message?.substring(0, 500) || '',
+        status: whatsappResponse.success ? 'sent' : 'failed',
+        sent_at: new Date().toISOString(),
+      });
+    } catch { /* non-blocking */ }
 
   } catch (error) {
     console.error('Error sending WhatsApp message:', error)
