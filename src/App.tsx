@@ -54,6 +54,11 @@ const Experience = lazyRetry(() => import("@/pages/Experience"));
 const Settings = lazyRetry(() => import("@/pages/Settings"));
 const SignatureView = lazyRetry(() => import("@/pages/SignatureView"));
 const SignaturePolicy = lazyRetry(() => import("@/pages/SignaturePolicy"));
+const Communications = lazyRetry(() => import("@/pages/Communications"));
+const FileManagement = lazyRetry(() => import("@/pages/FileManagement"));
+const PaymentSuccess = lazyRetry(() => import("@/pages/PaymentSuccess"));
+const PaymentCanceled = lazyRetry(() => import("@/pages/PaymentCanceled"));
+const QuestionnaireView = lazyRetry(() => import("@/pages/QuestionnaireView"));
 const NotFound = lazyRetry(() => import("@/pages/NotFound"));
 
 const PageLoader = () => (
