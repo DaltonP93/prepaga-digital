@@ -119,6 +119,20 @@ export const DocumentPreviewDialog: React.FC<DocumentPreviewDialogProps> = ({
   onOpenChange,
   document,
 }) => {
+  const [resolvedContent, setResolvedContent] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!document?.content?.trim()) {
+      setResolvedContent(null);
+      return;
+    }
+    let cancelled = false;
+    resolveStorageImages(document.content).then((html) => {
+      if (!cancelled) setResolvedContent(html);
+    });
+    return () => { cancelled = true; };
+  }, [document?.content]);
+
   if (!document) return null;
 
   const hasContent = !!document.content?.trim();
