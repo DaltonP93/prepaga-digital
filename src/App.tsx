@@ -179,7 +179,7 @@ const App = () => {
                   <Route path="questionnaire/:id" element={<QuestionnaireView />} />
                   <Route path="*" element={<NotFound />} />
                 </Route>
-                <Route path="/" element={<Navigate to="/login" replace />} />
+                <Route path="/" element={<SimpleLoginForm />} />
               </Routes>
               </Suspense>
             </BrowserRouter>
