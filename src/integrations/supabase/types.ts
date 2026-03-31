@@ -1488,6 +1488,7 @@ export type Database = {
           anchor_reference: string | null
           anchor_type: string
           anchored_at: string | null
+          created_at: string | null
           evidence_bundle_id: string
           hash_value: string
           id: string
@@ -1496,6 +1497,7 @@ export type Database = {
           anchor_reference?: string | null
           anchor_type?: string
           anchored_at?: string | null
+          created_at?: string | null
           evidence_bundle_id: string
           hash_value: string
           id?: string
@@ -1504,6 +1506,7 @@ export type Database = {
           anchor_reference?: string | null
           anchor_type?: string
           anchored_at?: string | null
+          created_at?: string | null
           evidence_bundle_id?: string
           hash_value?: string
           id?: string
@@ -2477,49 +2480,81 @@ export type Database = {
       signature_evidence_bundles: {
         Row: {
           bundle_hash: string
+          consent_record_id: string | null
           created_at: string | null
           document_hash: string
           document_id: string | null
           evidence_json: Json
           id: string
+          identity_verification_id: string | null
+          identity_verified: boolean | null
+          ip_address: string | null
           pdf_hash: string | null
           sale_id: string
           signature_event_id: string | null
           signature_link_id: string | null
+          signature_method: string | null
           storage_url: string | null
+          user_agent: string | null
         }
         Insert: {
           bundle_hash: string
+          consent_record_id?: string | null
           created_at?: string | null
           document_hash: string
           document_id?: string | null
           evidence_json: Json
           id?: string
+          identity_verification_id?: string | null
+          identity_verified?: boolean | null
+          ip_address?: string | null
           pdf_hash?: string | null
           sale_id: string
           signature_event_id?: string | null
           signature_link_id?: string | null
+          signature_method?: string | null
           storage_url?: string | null
+          user_agent?: string | null
         }
         Update: {
           bundle_hash?: string
+          consent_record_id?: string | null
           created_at?: string | null
           document_hash?: string
           document_id?: string | null
           evidence_json?: Json
           id?: string
+          identity_verification_id?: string | null
+          identity_verified?: boolean | null
+          ip_address?: string | null
           pdf_hash?: string | null
           sale_id?: string
           signature_event_id?: string | null
           signature_link_id?: string | null
+          signature_method?: string | null
           storage_url?: string | null
+          user_agent?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "signature_evidence_bundles_consent_record_id_fkey"
+            columns: ["consent_record_id"]
+            isOneToOne: false
+            referencedRelation: "signature_consent_records"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "signature_evidence_bundles_document_id_fkey"
             columns: ["document_id"]
             isOneToOne: false
             referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_evidence_bundles_identity_verification_id_fkey"
+            columns: ["identity_verification_id"]
+            isOneToOne: false
+            referencedRelation: "signature_identity_verification"
             referencedColumns: ["id"]
           },
           {
