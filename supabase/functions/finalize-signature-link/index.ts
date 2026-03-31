@@ -240,7 +240,7 @@ async function activateNextStep(
   // Activate step 2 links (contratada)
   let { data: step2Links } = await supabase
     .from('signature_links')
-    .select('id, recipient_email, recipient_phone, token')
+    .select('id, recipient_email, recipient_phone, recipient_name, token')
     .eq('sale_id', link.sale_id)
     .eq('step_order', 2)
     .eq('is_active', false)
