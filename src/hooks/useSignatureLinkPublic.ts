@@ -13,7 +13,7 @@ const _publicClient = SUPABASE_URL
     })
   : null;
 
-const _signatureClientCache = new Map<string, ReturnType<typeof createClient>>();
+const _signatureClientCache = new Map<string, ReturnType<typeof createClient<Database>>>();
 
 const getPublicClient = () => _publicClient!;
 
@@ -21,7 +21,7 @@ const getSignatureClient = (token: string) => {
   if (!_signatureClientCache.has(token)) {
     _signatureClientCache.set(
       token,
-      createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+      createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
         auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
         global: { headers: { 'x-signature-token': token } },
       })
