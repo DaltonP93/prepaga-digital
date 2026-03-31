@@ -359,7 +359,7 @@ Deno.serve(async (req) => {
           fallbackReason = 'No se proporcionó número de teléfono';
           channelUsed = 'email';
         } else {
-          const waResult = await sendViaWhatsApp(phone, otp, supabase, companyId);
+          const waResult = await sendViaWhatsApp(phone, otp, supabase, companyId, otpPolicy);
           providerUsed = waResult.provider_used;
           if (waResult.sent) {
             sendSuccess = true;
