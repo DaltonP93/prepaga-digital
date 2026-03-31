@@ -209,7 +209,8 @@ export const LiveTemplatePreview: React.FC<LiveTemplatePreviewProps> = ({
       data.sale,
       data.beneficiaries,
       data.signatureLink,
-      data.responses
+      data.responses,
+      data.companySettings
     );
 
     let processed = interpolateEnhancedTemplate(content, ctx);

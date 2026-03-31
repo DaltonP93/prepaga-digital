@@ -152,6 +152,7 @@ export const useEnhancedPDFGeneration = () => {
       beneficiaries?: any[];
       signatureLink?: any;
       responses?: Record<string, any>;
+      companySettings?: any;
     }
   ): string => {
     const context = createEnhancedTemplateContext(
@@ -161,7 +162,8 @@ export const useEnhancedPDFGeneration = () => {
       data.sale,
       data.beneficiaries || [],
       data.signatureLink,
-      data.responses
+      data.responses,
+      data.companySettings
     );
 
     return interpolateEnhancedTemplate(content, context);
