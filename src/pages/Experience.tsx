@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Smartphone, Palette, Wifi, Monitor, Globe, Bell, Upload, Trash2 } from 'lucide-react';
+import { Smartphone, Palette, Wifi, Monitor, Globe, Bell, Upload, Trash2, FileText } from 'lucide-react';
 import { useCompanyConfiguration } from '@/hooks/useCompanyConfiguration';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { toast } from 'sonner';
 import { uploadCompanyAsset } from '@/lib/companyAssetUpload';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Experience() {
   const { configuration, isLoading, updateConfiguration, isUpdating } = useCompanyConfiguration();
@@ -27,9 +28,18 @@ export default function Experience() {
   const [uploadingLoginLogo, setUploadingLoginLogo] = useState(false);
   const [uploadingBackground, setUploadingBackground] = useState(false);
 
+  // PDF branding state
+  const [pdfHeaderImageUrl, setPdfHeaderImageUrl] = useState('');
+  const [pdfFooterImageUrl, setPdfFooterImageUrl] = useState('');
+  const [uploadingPdfHeader, setUploadingPdfHeader] = useState(false);
+  const [uploadingPdfFooter, setUploadingPdfFooter] = useState(false);
+  const [savingPdfBranding, setSavingPdfBranding] = useState(false);
+
   const logoInputRef = useRef<HTMLInputElement>(null);
   const loginLogoInputRef = useRef<HTMLInputElement>(null);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
+  const pdfHeaderInputRef = useRef<HTMLInputElement>(null);
+  const pdfFooterInputRef = useRef<HTMLInputElement>(null);
 
   // Sync form with loaded configuration
   useEffect(() => {
