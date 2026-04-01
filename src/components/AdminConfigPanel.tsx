@@ -341,9 +341,12 @@ export const AdminConfigPanel: React.FC = () => {
                   Selecciona el proveedor para enviar mensajes de WhatsApp
                 </CardDescription>
               </div>
-              <Button onClick={handleApiSave} disabled={apiUpdating}>
-                {apiUpdating ? 'Guardando...' : 'Guardar'}
-              </Button>
+              <Button onClick={handleApiSave} disabled={apiUpdating} className="relative">
+                 {apiUpdating ? 'Guardando...' : 'Guardar'}
+                 {hasApiChanges(apiFormData, nextApiFormData) && (
+                   <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-destructive animate-pulse" />
+                 )}
+               </Button>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Info note */}

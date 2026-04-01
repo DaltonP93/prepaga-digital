@@ -658,7 +658,7 @@ Deno.serve(async (req) => {
   }
 });
 
-// Unified email sending: SMTP relay only (no Resend)
+// Unified email sending: SMTP relay → Resend API fallback
 async function sendEmailOTP(
   email: string,
   otp: string,
@@ -666,20 +666,50 @@ async function sendEmailOTP(
   companyId: string | null,
   supabase: any,
 ): Promise<{ sent: boolean; provider_used: string; reason?: string }> {
-  // Check for SMTP relay URL in OTP policy
   const smtpRelayUrl = otpPolicy.smtp_relay_url;
   const fromAddress = otpPolicy.smtp_from_address || 'noreply@prepagadigital.com';
   const fromName = otpPolicy.smtp_from_name || 'Prepaga Digital';
 
+  // 1) Try SMTP relay if configured
   if (smtpRelayUrl) {
     const sent = await sendViaSMTPRelay(email, otp, smtpRelayUrl, fromAddress, fromName);
-    return { sent, provider_used: 'smtp_relay', reason: sent ? undefined : 'SMTP relay falló al enviar' };
+    if (sent) return { sent: true, provider_used: 'smtp_relay' };
+    // SMTP relay failed, fall through to Resend
   }
 
-  // No SMTP relay configured - report clearly
+  // 2) Try Resend API as fallback
+  const resendApiKey = Deno.env.get('RESEND_API_KEY');
+  if (resendApiKey) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: `${fromName} <${fromAddress}>`,
+          to: [email],
+          subject: 'Código de verificación para firma electrónica',
+          html: buildOTPEmailHTML(otp),
+        }),
+      });
+      if (res.ok) {
+        return { sent: true, provider_used: 'resend' };
+      }
+      const errText = await res.text();
+      console.error('Resend API error:', errText);
+      return { sent: false, provider_used: 'resend', reason: `Resend error: ${errText.slice(0, 100)}` };
+    } catch (err) {
+      console.error('Resend send error:', err);
+      return { sent: false, provider_used: 'resend', reason: (err as Error).message };
+    }
+  }
+
+  // No email method available
   return { 
     sent: false, 
     provider_used: 'none', 
-    reason: 'SMTP relay no configurado. Configure smtp_relay_url en la Política OTP para habilitar email.' 
+    reason: 'No hay método de email configurado. Configure smtp_relay_url o RESEND_API_KEY.' 
   };
 }

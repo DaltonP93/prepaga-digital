@@ -131,9 +131,9 @@ const SimpleAuditDashboard = () => {
                     </span>
                     {getStatusBadge(sale.status)}
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    Plan: {sale.plans?.name} - {formatCurrency(Number(sale.plans?.price || 0))}
-                  </div>
+                    <div className="text-sm text-muted-foreground">
+                      Plan: {sale.plans?.name} - Total: {formatCurrency(Number(sale.total_amount || 0))}
+                    </div>
                 </div>
                 
                 <div className="flex gap-2">

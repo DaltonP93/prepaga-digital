@@ -8,15 +8,16 @@ export const useAuditProcesses = () => {
   return useQuery({
     queryKey: ['audit-processes'],
     queryFn: async () => {
-      // For now, return sales that need audit based on status
       const { data, error } = await supabase
         .from('sales')
         .select(`
           *,
-          clients:client_id(first_name, last_name, email),
-          plans:plan_id(name, price)
+          clients:client_id(first_name, last_name, email, phone, dni),
+          plans:plan_id(name, price),
+          beneficiaries(*),
+          salesperson:user_id(first_name, last_name)
         `)
-        .in('status', ['en_auditoria'])
+        .in('status', ['en_auditoria', 'borrador', 'enviado'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
