@@ -89,7 +89,7 @@ export const useSignatureLinkByToken = (token: string) => {
 
       const { data: linkData, error: linkError } = await signatureClient
         .from('signature_links')
-        .select('id,sale_id,package_id,recipient_type,recipient_id,recipient_email,recipient_phone,expires_at,accessed_at,access_count,status,completed_at,created_at,updated_at,signwell_signing_url,is_active,step_order')
+        .select('id,sale_id,package_id,recipient_type,recipient_id,recipient_email,recipient_phone,recipient_name,expires_at,accessed_at,access_count,status,completed_at,created_at,updated_at,signwell_signing_url,is_active,step_order')
         .eq('token', token)
         .gt('expires_at', new Date().toISOString())
         .single();
@@ -327,24 +327,12 @@ export const useSubmitSignatureLink = () => {
               const nowIso = new Date().toISOString();
               const safeSignedAt = new Date().toLocaleString('es-PY');
 
-              // Fetch company settings for contratada signer info
-              let companyInfo: any = null;
-              let companySettings: any = null;
+              // Fetch contratada signer info via SECURITY DEFINER RPC
+              let cInfo: any = null;
               try {
-                const { data: saleInfo } = await signatureClient
-                  .from('sales')
-                  .select('company_id, companies:company_id(name, tax_id)')
-                  .eq('id', data.sale_id)
-                  .single();
-                companyInfo = (saleInfo as any)?.companies || null;
-                if ((saleInfo as any)?.company_id) {
-                  const { data: cs } = await signatureClient
-                    .from('company_settings_public')
-                    .select('contratada_signer_name, contratada_signer_dni')
-                    .eq('company_id', (saleInfo as any).company_id)
-                    .single();
-                  companySettings = cs;
-                }
+                const { data: contratadaInfo } = await signatureClient
+                  .rpc('get_contratada_info_by_token', { p_token: token });
+                cInfo = Array.isArray(contratadaInfo) ? contratadaInfo[0] : contratadaInfo;
               } catch { /* ignore */ }
 
               let isElecSig = false;
@@ -353,8 +341,8 @@ export const useSubmitSignatureLink = () => {
                 if (parsed.type === 'electronica') isElecSig = true;
               } catch { /* not JSON */ }
 
-              const signerName = companySettings?.contratada_signer_name || companyInfo?.name || 'Representante';
-              const signerCI = companySettings?.contratada_signer_dni || companyInfo?.tax_id || '';
+              const signerName = cInfo?.signer_name || (data as any)?.recipient_name || 'Representante Legal';
+              const signerCI = cInfo?.signer_dni || '';
 
               let contratadaBlock: string;
               if (isElecSig) {
@@ -515,15 +503,19 @@ export const useSubmitSignatureLink = () => {
             saleClientInfo = (saleInfo as any)?.clients || null;
             saleBeneficiaries = (saleInfo as any)?.beneficiaries || [];
 
-            // Fetch contratada signer info from company_settings
-            if ((saleInfo as any)?.company_id) {
-              const { data: cs } = await signatureClient
-                .from('company_settings_public')
-                .select('contratada_signer_name, contratada_signer_dni, contratada_signer_email, contratada_signature_mode')
-                .eq('company_id', (saleInfo as any).company_id)
-                .single();
-              companySettings = cs;
-            }
+            // Fetch contratada signer info via SECURITY DEFINER RPC
+            try {
+              const { data: contratadaRpc } = await signatureClient
+                .rpc('get_contratada_info_by_token', { p_token: token });
+              const cRpc = Array.isArray(contratadaRpc) ? contratadaRpc[0] : contratadaRpc;
+              if (cRpc) {
+                companySettings = {
+                  contratada_signer_name: cRpc.signer_name,
+                  contratada_signer_dni: cRpc.signer_dni,
+                  contratada_signer_email: cRpc.signer_email,
+                };
+              }
+            } catch { /* ignore */ }
           } catch { /* ignore */ }
 
           // Check if the other party (contratante or contratada) already signed the contract
@@ -598,8 +590,8 @@ export const useSubmitSignatureLink = () => {
                 }
                 roleLabel = 'ADHERENTE';
               } else if (recipientType === 'contratada') {
-                signerName = companySettings?.contratada_signer_name || companyInfo?.name || 'Representante';
-                signerCI = companySettings?.contratada_signer_dni || companyInfo?.tax_id || '';
+                signerName = companySettings?.contratada_signer_name || (data as any)?.recipient_name || 'Representante Legal';
+                signerCI = companySettings?.contratada_signer_dni || '';
                 roleLabel = 'CONTRATADA';
               } else if (saleClientInfo) {
                 signerName = `${saleClientInfo.first_name || ''} ${saleClientInfo.last_name || ''}`.trim();

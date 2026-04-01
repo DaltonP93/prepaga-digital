@@ -737,8 +737,11 @@ export type Database = {
           email_provider: string | null
           id: string
           menu_config: Json | null
+          pdf_footer_base64: string | null
           pdf_footer_image_url: string | null
           pdf_header_image_url: string | null
+          pdf_logo_base64: string | null
+          pdf_tagline_base64: string | null
           signature_block_style: Json | null
           signwell_api_key: string | null
           signwell_enabled: boolean | null
@@ -768,8 +771,11 @@ export type Database = {
           email_provider?: string | null
           id?: string
           menu_config?: Json | null
+          pdf_footer_base64?: string | null
           pdf_footer_image_url?: string | null
           pdf_header_image_url?: string | null
+          pdf_logo_base64?: string | null
+          pdf_tagline_base64?: string | null
           signature_block_style?: Json | null
           signwell_api_key?: string | null
           signwell_enabled?: boolean | null
@@ -799,8 +805,11 @@ export type Database = {
           email_provider?: string | null
           id?: string
           menu_config?: Json | null
+          pdf_footer_base64?: string | null
           pdf_footer_image_url?: string | null
           pdf_header_image_url?: string | null
+          pdf_logo_base64?: string | null
+          pdf_tagline_base64?: string | null
           signature_block_style?: Json | null
           signwell_api_key?: string | null
           signwell_enabled?: boolean | null
@@ -3829,18 +3838,21 @@ export type Database = {
         Row: {
           company_id: string | null
           contratada_signature_mode: string | null
+          contratada_signer_dni: string | null
           contratada_signer_name: string | null
           signature_block_style: Json | null
         }
         Insert: {
           company_id?: string | null
           contratada_signature_mode?: string | null
+          contratada_signer_dni?: string | null
           contratada_signer_name?: string | null
           signature_block_style?: Json | null
         }
         Update: {
           company_id?: string | null
           contratada_signature_mode?: string | null
+          contratada_signer_dni?: string | null
           contratada_signer_name?: string | null
           signature_block_style?: Json | null
         }
@@ -3865,6 +3877,16 @@ export type Database = {
         Returns: Json
       }
       cleanup_rate_limit_log: { Args: never; Returns: undefined }
+      get_contratada_info_by_token: {
+        Args: { p_token: string }
+        Returns: {
+          company_name: string
+          signer_dni: string
+          signer_email: string
+          signer_name: string
+          signer_phone: string
+        }[]
+      }
       get_otp_policy_for_signature: {
         Args: { p_company_id: string }
         Returns: {
