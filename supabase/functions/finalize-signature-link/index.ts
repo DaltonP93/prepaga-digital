@@ -111,7 +111,9 @@ serve(async (req) => {
 
 /**
  * Trigger PAdES PDF signing based on document taxonomy:
- * - contrato: only signed when contratada completes (last signer)
+ * - contrato: ONLY signed when contratada completes (last signer).
+ *   When contratada signs, the base PDF is regenerated first to include
+ *   the contratada's signature block in the HTML content.
  * - ddjj_salud: signed immediately when the assigned individual finishes
  * - anexo: excluded from automatic PAdES signing
  */
@@ -143,19 +145,21 @@ async function triggerPadesSigning(
     const isContract = doc.document_type === 'contrato'
     const isDDJJ = doc.document_type === 'ddjj_salud'
 
-    // Contract: only sign when contratada finishes
-    if (isContract && link.recipient_type !== 'contratada') {
-      // Check if there's a pending contratada link
-      const { data: contratadaLinks } = await supabase
-        .from('signature_links')
-        .select('id, status')
-        .eq('sale_id', link.sale_id)
-        .eq('recipient_type', 'contratada')
-        .neq('status', 'revocado')
-
-      if (contratadaLinks && contratadaLinks.some((cl: any) => cl.status !== 'completado')) {
-        continue // Skip — contratada hasn't signed yet
+    // Contract: ONLY sign when contratada finishes (never when titular/adherente signs)
+    if (isContract) {
+      if (link.recipient_type !== 'contratada') {
+        // Non-contratada signers never trigger contract PAdES signing
+        console.log(`Skipping contract PAdES for doc ${doc.id}: signer is ${link.recipient_type}, waiting for contratada`)
+        continue
       }
+      // When contratada signs, force regenerate the base PDF to include contratada signature
+      // Clear existing base PDF so it gets regenerated with updated content
+      await supabase
+        .from('documents')
+        .update({ base_pdf_url: null, base_pdf_hash: null })
+        .eq('id', doc.id)
+      doc.base_pdf_url = null
+      console.log(`Contratada signing contract ${doc.id}: will regenerate base PDF with contratada signature`)
     }
 
     // DDJJ: adherente only signs their own
@@ -305,7 +309,6 @@ async function activateNextStep(
   for (const s2Link of step2Links) {
     if (s2Link.recipient_phone) {
       try {
-        // Get company info for the notification
         const { data: sale } = await supabase
           .from('sales')
           .select('company_id, companies:company_id(name)')
