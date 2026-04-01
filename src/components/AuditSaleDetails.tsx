@@ -131,12 +131,22 @@ export const AuditSaleDetails: React.FC<AuditSaleDetailsProps> = ({
               <p className="text-sm font-medium">{sale.plans?.name || 'No asignado'}</p>
             </div>
             <div>
-              <Label className="text-sm font-medium text-muted-foreground">Precio</Label>
-              <p className="text-sm">{formatCurrency(Number(sale.plans?.price || 0))}</p>
+              <Label className="text-sm font-medium text-muted-foreground">Precio Titular</Label>
+              <p className="text-sm">
+                {formatCurrency(Number(
+                  sale.beneficiaries?.find((b: any) => b.is_primary)?.amount || sale.plans?.price || 0
+                ))}
+              </p>
             </div>
             <div>
-              <Label className="text-sm font-medium text-muted-foreground">Descripción</Label>
-              <p className="text-sm">{sale.plans?.description || 'No especificada'}</p>
+              <Label className="text-sm font-medium text-muted-foreground">Monto Total</Label>
+              <p className="text-sm font-semibold">
+                {formatCurrency(Number(sale.total_amount || 0))}
+              </p>
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Contrato #</Label>
+              <p className="text-sm">{sale.contract_number || 'No asignado'}</p>
             </div>
             <div>
               <Label className="text-sm font-medium text-muted-foreground">Vendedor</Label>

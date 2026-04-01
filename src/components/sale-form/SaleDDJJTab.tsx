@@ -323,10 +323,36 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
       return { realId: beneficiaryId, wasVirtual: false };
     },
     onSuccess: async (result) => {
-      queryClient.invalidateQueries({ queryKey: ['beneficiaries'] });
-
-      const savedId = result.wasVirtual ? result.realId : result.realId;
       const d = getData(result.wasVirtual ? 'virtual-titular' : result.realId);
+
+      // Update health data immediately — keep virtual-titular key so isComplete works
+      // before beneficiaries refetch replaces the sorted list
+      if (result.wasVirtual) {
+        setHealthData(prev => {
+          const virtualData = prev['virtual-titular'];
+          const next = { ...prev };
+          // Keep virtual-titular marked as saved so stepper stays unlocked
+          if (virtualData) {
+            next['virtual-titular'] = { ...virtualData, saved: true };
+            next[result.realId] = { ...virtualData, saved: true };
+          }
+          return next;
+        });
+      } else {
+        setHealthData(prev => ({
+          ...prev,
+          [result.realId]: { ...prev[result.realId], saved: true },
+        }));
+      }
+
+      // Show toast immediately (before template sync which can fail silently)
+      toast.success('DDJJ de Salud guardada correctamente');
+
+      // Auto-advance to next beneficiary step
+      setCurrentStep(s => Math.min(s + 1, sortedBeneficiaries.length - 1));
+
+      // Invalidate queries to refetch beneficiaries
+      queryClient.invalidateQueries({ queryKey: ['beneficiaries'] });
 
       // Sync DDJJ answers to template_responses for template engine interpolation
       try {
@@ -345,77 +371,58 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
             .map((row: any) => row.template_id)
             .filter(Boolean);
 
-          if (ddjjTemplateIds.length === 0) {
-            return;
-          }
+          if (ddjjTemplateIds.length > 0) {
+            const { data: ddjiQuestions } = await supabase
+              .from('template_questions')
+              .select('id, template_id, placeholder_name, sort_order')
+              .in('template_id', ddjjTemplateIds)
+              .order('sort_order');
 
-          const { data: ddjiQuestions } = await supabase
-            .from('template_questions')
-            .select('id, template_id, placeholder_name, sort_order')
-            .in('template_id', ddjjTemplateIds)
-            .order('sort_order');
+            if (ddjiQuestions && ddjiQuestions.length > 0) {
+              const responseRows = ddjiQuestions.map((q: any) => {
+                const placeholderName = normalizeDDJJPlaceholder(q.placeholder_name);
+                let responseValue = '';
+                if (placeholderName.startsWith('ddjj_pregunta_')) {
+                  const idx = parseInt(placeholderName.replace('ddjj_pregunta_', '')) - 1;
+                  responseValue = d.answers[idx] === 'si'
+                    ? `Sí${d.details[idx] ? ': ' + d.details[idx] : ''}`
+                    : d.answers[idx] === 'no' ? 'No' : '';
+                } else if (placeholderName === 'ddjj_peso') {
+                  responseValue = d.peso || '';
+                } else if (placeholderName === 'ddjj_altura') {
+                  responseValue = d.altura || '';
+                } else if (placeholderName === 'ddjj_fuma') {
+                  responseValue = d.habits[0] ? 'Sí' : 'No';
+                } else if (placeholderName === 'ddjj_vapea') {
+                  responseValue = d.habits[1] ? 'Sí' : 'No';
+                } else if (placeholderName === 'ddjj_alcohol') {
+                  responseValue = d.habits[2] ? 'Sí' : 'No';
+                } else if (placeholderName === 'ddjj_menstruacion') {
+                  responseValue = d.lastMenstruation || 'N/A';
+                }
 
-          if (ddjiQuestions && ddjiQuestions.length > 0) {
-            const responseRows = ddjiQuestions.map((q: any) => {
-              const placeholderName = normalizeDDJJPlaceholder(q.placeholder_name);
-              let responseValue = '';
-              if (placeholderName.startsWith('ddjj_pregunta_')) {
-                const idx = parseInt(placeholderName.replace('ddjj_pregunta_', '')) - 1;
-                responseValue = d.answers[idx] === 'si'
-                  ? `Sí${d.details[idx] ? ': ' + d.details[idx] : ''}`
-                  : d.answers[idx] === 'no' ? 'No' : '';
-              } else if (placeholderName === 'ddjj_peso') {
-                responseValue = d.peso || '';
-              } else if (placeholderName === 'ddjj_altura') {
-                responseValue = d.altura || '';
-              } else if (placeholderName === 'ddjj_fuma') {
-                responseValue = d.habits[0] ? 'Sí' : 'No';
-              } else if (placeholderName === 'ddjj_vapea') {
-                responseValue = d.habits[1] ? 'Sí' : 'No';
-              } else if (placeholderName === 'ddjj_alcohol') {
-                responseValue = d.habits[2] ? 'Sí' : 'No';
-              } else if (placeholderName === 'ddjj_menstruacion') {
-                responseValue = d.lastMenstruation || 'N/A';
+                return {
+                  sale_id: saleId,
+                  template_id: (q as any).template_id,
+                  question_id: q.id,
+                  response_value: responseValue,
+                };
+              });
+
+              const { error: syncError } = await supabase.from('template_responses').upsert(
+                responseRows,
+                { onConflict: 'sale_id,template_id,question_id', ignoreDuplicates: false }
+              );
+
+              if (syncError && syncError.code !== '42501') {
+                console.error('Template sync error:', syncError);
               }
-
-              return {
-                sale_id: saleId,
-                template_id: (q as any).template_id,
-                question_id: q.id,
-                response_value: responseValue,
-              };
-            });
-
-            const { error: syncError } = await supabase.from('template_responses').upsert(
-              responseRows,
-              { onConflict: 'sale_id,template_id,question_id', ignoreDuplicates: false }
-            );
-
-            if (syncError && syncError.code !== '42501') {
-              throw syncError;
             }
           }
         }
       } catch (e) {
+        console.error('Template sync error:', e);
       }
-
-      if (result.wasVirtual) {
-        setHealthData(prev => {
-          const virtualData = prev['virtual-titular'];
-          const next = { ...prev };
-          delete next['virtual-titular'];
-          if (virtualData) {
-            next[result.realId] = { ...virtualData, saved: true };
-          }
-          return next;
-        });
-      } else {
-        setHealthData(prev => ({
-          ...prev,
-          [result.realId]: { ...prev[result.realId], saved: true },
-        }));
-      }
-      toast.success('DDJJ de Salud guardada correctamente');
     },
     onError: (e: any) => toast.error(e.message || 'Error al guardar'),
   });
