@@ -327,24 +327,12 @@ export const useSubmitSignatureLink = () => {
               const nowIso = new Date().toISOString();
               const safeSignedAt = new Date().toLocaleString('es-PY');
 
-              // Fetch company settings for contratada signer info
-              let companyInfo: any = null;
-              let companySettings: any = null;
+              // Fetch contratada signer info via SECURITY DEFINER RPC
+              let cInfo: any = null;
               try {
-                const { data: saleInfo } = await signatureClient
-                  .from('sales')
-                  .select('company_id, companies:company_id(name, tax_id)')
-                  .eq('id', data.sale_id)
-                  .single();
-                companyInfo = (saleInfo as any)?.companies || null;
-                if ((saleInfo as any)?.company_id) {
-                  const { data: cs } = await signatureClient
-                    .from('company_settings_public')
-                    .select('contratada_signer_name, contratada_signer_dni')
-                    .eq('company_id', (saleInfo as any).company_id)
-                    .single();
-                  companySettings = cs;
-                }
+                const { data: contratadaInfo } = await signatureClient
+                  .rpc('get_contratada_info_by_token', { p_token: token });
+                cInfo = Array.isArray(contratadaInfo) ? contratadaInfo[0] : contratadaInfo;
               } catch { /* ignore */ }
 
               let isElecSig = false;
@@ -353,8 +341,8 @@ export const useSubmitSignatureLink = () => {
                 if (parsed.type === 'electronica') isElecSig = true;
               } catch { /* not JSON */ }
 
-              const signerName = companySettings?.contratada_signer_name || companyInfo?.name || 'Representante';
-              const signerCI = companySettings?.contratada_signer_dni || companyInfo?.tax_id || '';
+              const signerName = cInfo?.signer_name || (data as any)?.recipient_name || 'Representante Legal';
+              const signerCI = cInfo?.signer_dni || '';
 
               let contratadaBlock: string;
               if (isElecSig) {
