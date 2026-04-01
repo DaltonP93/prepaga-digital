@@ -5,9 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Users, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, Users, AlertCircle, Pencil } from 'lucide-react';
 import { useBeneficiaries, useCreateBeneficiary, useDeleteBeneficiary, useUpdateBeneficiary } from '@/hooks/useBeneficiaries';
-import { BeneficiaryDocuments } from '@/components/beneficiaries/BeneficiaryDocuments';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 
@@ -16,6 +15,125 @@ interface SaleAdherentsTabProps {
   disabled?: boolean;
 }
 
+type BeneficiaryFormData = {
+  first_name: string;
+  last_name: string;
+  dni: string;
+  relationship: string;
+  birth_date: string;
+  phone: string;
+  email: string;
+  address: string;
+  barrio: string;
+  city: string;
+  amount: number;
+};
+
+const emptyForm: BeneficiaryFormData = {
+  first_name: '', last_name: '', dni: '', relationship: '', birth_date: '',
+  phone: '', email: '', address: '', barrio: '', city: '', amount: 0,
+};
+
+const formatAmountInput = (value: number) => {
+  if (!value) return '';
+  return value.toLocaleString('es-PY', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+};
+
+const parseAmountInput = (value: string) => {
+  const digitsOnly = value.replace(/\D/g, '');
+  return digitsOnly ? Number(digitsOnly) : 0;
+};
+
+const validateForm = (data: BeneficiaryFormData): boolean => {
+  if (!data.first_name || !data.last_name) {
+    toast.error('Nombre y apellido son obligatorios');
+    return false;
+  }
+  if (!data.phone) {
+    toast.error('El número de teléfono es obligatorio para el adherente');
+    return false;
+  }
+  return true;
+};
+
+interface BeneficiaryFormProps {
+  data: BeneficiaryFormData;
+  onChange: (data: BeneficiaryFormData) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  saving: boolean;
+  title: string;
+  saveLabel: string;
+}
+
+const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({ data, onChange, onSave, onCancel, saving, title, saveLabel }) => (
+  <Card>
+    <CardHeader>
+      <CardTitle className="text-base">{title}</CardTitle>
+    </CardHeader>
+    <CardContent className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Nombre *</Label>
+          <Input value={data.first_name} onChange={(e) => onChange({ ...data, first_name: e.target.value })} placeholder="Nombre" />
+        </div>
+        <div className="space-y-2">
+          <Label>Apellido *</Label>
+          <Input value={data.last_name} onChange={(e) => onChange({ ...data, last_name: e.target.value })} placeholder="Apellido" />
+        </div>
+        <div className="space-y-2">
+          <Label>C.I.</Label>
+          <Input value={data.dni} onChange={(e) => onChange({ ...data, dni: e.target.value })} placeholder="Nº Documento" />
+        </div>
+        <div className="space-y-2">
+          <Label>Parentesco</Label>
+          <Select value={data.relationship} onValueChange={(v) => onChange({ ...data, relationship: v })}>
+            <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="conyuge">Cónyuge</SelectItem>
+              <SelectItem value="hijo">Hijo/a</SelectItem>
+              <SelectItem value="padre">Padre/Madre</SelectItem>
+              <SelectItem value="hermano">Hermano/a</SelectItem>
+              <SelectItem value="otro">Otro</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Fecha de Nacimiento</Label>
+          <Input type="date" value={data.birth_date} onChange={(e) => onChange({ ...data, birth_date: e.target.value })} />
+        </div>
+        <div className="space-y-2">
+          <Label>Teléfono *</Label>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground whitespace-nowrap">+595</span>
+            <Input value={data.phone} onChange={(e) => onChange({ ...data, phone: e.target.value.replace(/\D/g, '') })} placeholder="981123456" />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label>Monto (Gs.)</Label>
+          <Input inputMode="numeric" value={formatAmountInput(data.amount)} onChange={(e) => onChange({ ...data, amount: parseAmountInput(e.target.value) })} placeholder="0" />
+        </div>
+        <div className="space-y-2">
+          <Label>Domicilio</Label>
+          <Input value={data.address} onChange={(e) => onChange({ ...data, address: e.target.value })} placeholder="Ej: Boquerón 123" />
+        </div>
+        <div className="space-y-2">
+          <Label>Barrio</Label>
+          <Input value={data.barrio} onChange={(e) => onChange({ ...data, barrio: e.target.value })} placeholder="Ej: Villa Morra" />
+        </div>
+        <div className="space-y-2">
+          <Label>Ciudad</Label>
+          <Input value={data.city} onChange={(e) => onChange({ ...data, city: e.target.value })} placeholder="Ciudad" />
+        </div>
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>
+        <Button type="button" onClick={onSave} disabled={saving}>{saveLabel}</Button>
+      </div>
+    </CardContent>
+  </Card>
+);
+
 const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled }) => {
   const { data: beneficiaries, isLoading } = useBeneficiaries(saleId || '');
   const createBeneficiary = useCreateBeneficiary();
@@ -23,33 +141,9 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
   const updateBeneficiary = useUpdateBeneficiary();
 
   const [showForm, setShowForm] = useState(false);
-  const [expandedDocIds, setExpandedDocIds] = useState<Set<string>>(new Set());
-  const [newBeneficiary, setNewBeneficiary] = useState({
-    first_name: '',
-    last_name: '',
-    dni: '',
-    relationship: '',
-    birth_date: '',
-    phone: '',
-    email: '',
-    address: '',
-    barrio: '',
-    city: '',
-    amount: 0,
-  });
-
-  const formatAmountInput = (value: number) => {
-    if (!value) return '';
-    return value.toLocaleString('es-PY', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    });
-  };
-
-  const parseAmountInput = (value: string) => {
-    const digitsOnly = value.replace(/\D/g, '');
-    return digitsOnly ? Number(digitsOnly) : 0;
-  };
+  const [newBeneficiary, setNewBeneficiary] = useState<BeneficiaryFormData>({ ...emptyForm });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editData, setEditData] = useState<BeneficiaryFormData>({ ...emptyForm });
 
   if (!saleId) {
     return (
@@ -64,19 +158,40 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
   }
 
   const handleAdd = async () => {
-    if (!newBeneficiary.first_name || !newBeneficiary.last_name) {
-      toast.error('Nombre y apellido son obligatorios');
-      return;
-    }
+    if (!validateForm(newBeneficiary)) return;
     try {
-      await createBeneficiary.mutateAsync({
-        ...newBeneficiary,
-        sale_id: saleId,
-      });
-      setNewBeneficiary({ first_name: '', last_name: '', dni: '', relationship: '', birth_date: '', phone: '', email: '', address: '', barrio: '', city: '', amount: 0 });
+      await createBeneficiary.mutateAsync({ ...newBeneficiary, sale_id: saleId });
+      setNewBeneficiary({ ...emptyForm });
       setShowForm(false);
     } catch (error) {
       console.error('Error adding beneficiary:', error);
+    }
+  };
+
+  const handleEdit = (b: any) => {
+    setEditingId(b.id);
+    setEditData({
+      first_name: b.first_name || '',
+      last_name: b.last_name || '',
+      dni: b.dni || '',
+      relationship: b.relationship || '',
+      birth_date: b.birth_date || '',
+      phone: b.phone || '',
+      email: b.email || '',
+      address: b.address || '',
+      barrio: b.barrio || '',
+      city: b.city || '',
+      amount: b.amount || 0,
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingId || !validateForm(editData)) return;
+    try {
+      await updateBeneficiary.mutateAsync({ id: editingId, ...editData });
+      setEditingId(null);
+    } catch (error) {
+      console.error('Error updating beneficiary:', error);
     }
   };
 
@@ -86,15 +201,6 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
     } catch (error) {
       console.error('Error deleting beneficiary:', error);
     }
-  };
-
-  const toggleDocs = (id: string) => {
-    setExpandedDocIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
   };
 
   return (
@@ -113,113 +219,15 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
       </div>
 
       {showForm && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Nuevo Adherente</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Nombre *</Label>
-                <Input
-                  value={newBeneficiary.first_name}
-                  onChange={(e) => setNewBeneficiary(prev => ({ ...prev, first_name: e.target.value }))}
-                  placeholder="Nombre"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Apellido *</Label>
-                <Input
-                  value={newBeneficiary.last_name}
-                  onChange={(e) => setNewBeneficiary(prev => ({ ...prev, last_name: e.target.value }))}
-                  placeholder="Apellido"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>C.I.</Label>
-                <Input
-                  value={newBeneficiary.dni}
-                  onChange={(e) => setNewBeneficiary(prev => ({ ...prev, dni: e.target.value }))}
-                  placeholder="Nº Documento"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Parentesco</Label>
-                <Select
-                  value={newBeneficiary.relationship}
-                  onValueChange={(v) => setNewBeneficiary(prev => ({ ...prev, relationship: v }))}
-                >
-                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="conyuge">Cónyuge</SelectItem>
-                    <SelectItem value="hijo">Hijo/a</SelectItem>
-                    <SelectItem value="padre">Padre/Madre</SelectItem>
-                    <SelectItem value="hermano">Hermano/a</SelectItem>
-                    <SelectItem value="otro">Otro</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Fecha de Nacimiento</Label>
-                <Input
-                  type="date"
-                  value={newBeneficiary.birth_date}
-                  onChange={(e) => setNewBeneficiary(prev => ({ ...prev, birth_date: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Teléfono *</Label>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground whitespace-nowrap">+595</span>
-                  <Input
-                    value={newBeneficiary.phone}
-                    onChange={(e) => setNewBeneficiary(prev => ({ ...prev, phone: e.target.value.replace(/\D/g, '') }))}
-                    placeholder="981123456"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Monto (Gs.)</Label>
-                <Input
-                  inputMode="numeric"
-                  value={formatAmountInput(newBeneficiary.amount)}
-                  onChange={(e) => setNewBeneficiary(prev => ({ ...prev, amount: parseAmountInput(e.target.value) }))}
-                  placeholder="0"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Domicilio</Label>
-                <Input
-                  value={newBeneficiary.address}
-                  onChange={(e) => setNewBeneficiary(prev => ({ ...prev, address: e.target.value }))}
-                  placeholder="Ej: Boquerón 123"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Barrio</Label>
-                <Input
-                  value={newBeneficiary.barrio}
-                  onChange={(e) => setNewBeneficiary(prev => ({ ...prev, barrio: e.target.value }))}
-                  placeholder="Ej: Villa Morra"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Ciudad</Label>
-                <Input
-                  value={newBeneficiary.city}
-                  onChange={(e) => setNewBeneficiary(prev => ({ ...prev, city: e.target.value }))}
-                  placeholder="Ciudad"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Cancelar</Button>
-              <Button type="button" onClick={handleAdd} disabled={createBeneficiary.isPending}>
-                Guardar Adherente
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <BeneficiaryForm
+          data={newBeneficiary}
+          onChange={setNewBeneficiary}
+          onSave={handleAdd}
+          onCancel={() => setShowForm(false)}
+          saving={createBeneficiary.isPending}
+          title="Nuevo Adherente"
+          saveLabel="Guardar Adherente"
+        />
       )}
 
       {isLoading ? (
@@ -227,8 +235,19 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
       ) : beneficiaries && beneficiaries.filter(b => !b.is_primary).length > 0 ? (
         <div className="space-y-2">
           {beneficiaries.filter(b => !b.is_primary).map((b) => (
-            <div key={b.id} className="space-y-2">
-              <Card>
+            editingId === b.id ? (
+              <BeneficiaryForm
+                key={b.id}
+                data={editData}
+                onChange={setEditData}
+                onSave={handleSaveEdit}
+                onCancel={() => setEditingId(null)}
+                saving={updateBeneficiary.isPending}
+                title="Editar Adherente"
+                saveLabel="Guardar Cambios"
+              />
+            ) : (
+              <Card key={b.id}>
                 <CardContent className="flex items-center justify-between py-3 px-4">
                   <div>
                     <div className="font-medium">{b.first_name} {b.last_name}</div>
@@ -238,31 +257,19 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
                       {b.amount ? ` • ${formatCurrency(Number(b.amount) || 0)}` : ''}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => toggleDocs(b.id)}
-                    >
-                      {expandedDocIds.has(b.id) ? <ChevronUp className="h-4 w-4 mr-1" /> : <ChevronDown className="h-4 w-4 mr-1" />}
-                      Documentos
-                    </Button>
-                    {!disabled && (
+                  {!disabled && (
+                    <div className="flex items-center gap-2">
+                      <Button type="button" variant="ghost" size="sm" onClick={() => handleEdit(b)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
                       <Button type="button" variant="ghost" size="sm" onClick={() => handleDelete(b.id)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
-              {expandedDocIds.has(b.id) && (
-                <BeneficiaryDocuments
-                  beneficiaryId={b.id}
-                  beneficiaryName={`${b.first_name} ${b.last_name}`}
-                />
-              )}
-            </div>
+            )
           ))}
         </div>
       ) : (
