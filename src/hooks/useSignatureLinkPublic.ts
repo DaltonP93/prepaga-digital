@@ -503,15 +503,19 @@ export const useSubmitSignatureLink = () => {
             saleClientInfo = (saleInfo as any)?.clients || null;
             saleBeneficiaries = (saleInfo as any)?.beneficiaries || [];
 
-            // Fetch contratada signer info from company_settings
-            if ((saleInfo as any)?.company_id) {
-              const { data: cs } = await signatureClient
-                .from('company_settings_public')
-                .select('contratada_signer_name, contratada_signer_dni, contratada_signer_email, contratada_signature_mode')
-                .eq('company_id', (saleInfo as any).company_id)
-                .single();
-              companySettings = cs;
-            }
+            // Fetch contratada signer info via SECURITY DEFINER RPC
+            try {
+              const { data: contratadaRpc } = await signatureClient
+                .rpc('get_contratada_info_by_token', { p_token: token });
+              const cRpc = Array.isArray(contratadaRpc) ? contratadaRpc[0] : contratadaRpc;
+              if (cRpc) {
+                companySettings = {
+                  contratada_signer_name: cRpc.signer_name,
+                  contratada_signer_dni: cRpc.signer_dni,
+                  contratada_signer_email: cRpc.signer_email,
+                };
+              }
+            } catch { /* ignore */ }
           } catch { /* ignore */ }
 
           // Check if the other party (contratante or contratada) already signed the contract
