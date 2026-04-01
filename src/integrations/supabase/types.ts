@@ -737,6 +737,8 @@ export type Database = {
           email_provider: string | null
           id: string
           menu_config: Json | null
+          pdf_footer_image_url: string | null
+          pdf_header_image_url: string | null
           signature_block_style: Json | null
           signwell_api_key: string | null
           signwell_enabled: boolean | null
@@ -766,6 +768,8 @@ export type Database = {
           email_provider?: string | null
           id?: string
           menu_config?: Json | null
+          pdf_footer_image_url?: string | null
+          pdf_header_image_url?: string | null
           signature_block_style?: Json | null
           signwell_api_key?: string | null
           signwell_enabled?: boolean | null
@@ -795,6 +799,8 @@ export type Database = {
           email_provider?: string | null
           id?: string
           menu_config?: Json | null
+          pdf_footer_image_url?: string | null
+          pdf_header_image_url?: string | null
           signature_block_style?: Json | null
           signwell_api_key?: string | null
           signwell_enabled?: boolean | null

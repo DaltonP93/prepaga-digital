@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Smartphone, Palette, Wifi, Monitor, Globe, Bell, Upload, Trash2 } from 'lucide-react';
+import { Smartphone, Palette, Wifi, Monitor, Globe, Bell, Upload, Trash2, FileText } from 'lucide-react';
 import { useCompanyConfiguration } from '@/hooks/useCompanyConfiguration';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { toast } from 'sonner';
 import { uploadCompanyAsset } from '@/lib/companyAssetUpload';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Experience() {
   const { configuration, isLoading, updateConfiguration, isUpdating } = useCompanyConfiguration();
@@ -27,9 +28,19 @@ export default function Experience() {
   const [uploadingLoginLogo, setUploadingLoginLogo] = useState(false);
   const [uploadingBackground, setUploadingBackground] = useState(false);
 
+  // PDF branding state
+  const [pdfHeaderImageUrl, setPdfHeaderImageUrl] = useState('');
+  const [pdfFooterImageUrl, setPdfFooterImageUrl] = useState('');
+  const [uploadingPdfHeader, setUploadingPdfHeader] = useState(false);
+  const [uploadingPdfFooter, setUploadingPdfFooter] = useState(false);
+  const [savingPdfBranding, setSavingPdfBranding] = useState(false);
+
   const logoInputRef = useRef<HTMLInputElement>(null);
   const loginLogoInputRef = useRef<HTMLInputElement>(null);
   const backgroundInputRef = useRef<HTMLInputElement>(null);
+  const pdfHeaderInputRef = useRef<HTMLInputElement>(null);
+  const pdfFooterInputRef = useRef<HTMLInputElement>(null);
+
 
   // Sync form with loaded configuration
   useEffect(() => {
@@ -43,6 +54,23 @@ export default function Experience() {
       setLoginBackgroundUrl(cfg.login_background_url || '');
     }
   }, [configuration]);
+
+  // Load PDF branding from company_settings
+  useEffect(() => {
+    const loadPdfBranding = async () => {
+      if (!profile?.company_id) return;
+      const { data } = await supabase
+        .from('company_settings')
+        .select('pdf_header_image_url, pdf_footer_image_url')
+        .eq('company_id', profile.company_id)
+        .single();
+      if (data) {
+        setPdfHeaderImageUrl((data as any).pdf_header_image_url || '');
+        setPdfFooterImageUrl((data as any).pdf_footer_image_url || '');
+      }
+    };
+    loadPdfBranding();
+  }, [profile?.company_id]);
 
   const uploadFile = async (
     file: File,
@@ -384,6 +412,121 @@ export default function Experience() {
                   </Button>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* PDF Branding - Header/Footer */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Encabezado y Zócalo de PDFs
+              </CardTitle>
+              <CardDescription>
+                Imágenes que aparecen en el encabezado y pie de página de los documentos PDF generados (contratos, DDJJ, etc.)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* PDF Header Image */}
+                <div className="space-y-3">
+                  <Label>Encabezado del PDF</Label>
+                  <p className="text-xs text-muted-foreground">Logo o banner que se muestra en la parte superior de cada página</p>
+                  {pdfHeaderImageUrl && (
+                    <div className="relative w-full h-20 bg-muted rounded-lg flex items-center justify-center overflow-hidden">
+                      <img src={pdfHeaderImageUrl} alt="PDF Header" className="max-h-16 max-w-full object-contain" />
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="absolute top-1 right-1 h-6 w-6 p-0"
+                        onClick={() => setPdfHeaderImageUrl('')}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                  <input
+                    ref={pdfHeaderInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) uploadFile(file, 'branding', setUploadingPdfHeader, setPdfHeaderImageUrl);
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    disabled={uploadingPdfHeader}
+                    onClick={() => pdfHeaderInputRef.current?.click()}
+                  >
+                    {uploadingPdfHeader ? 'Subiendo...' : 'Subir imagen de encabezado'}
+                  </Button>
+                </div>
+
+                {/* PDF Footer Image */}
+                <div className="space-y-3">
+                  <Label>Zócalo del PDF</Label>
+                  <p className="text-xs text-muted-foreground">Imagen con datos de contacto que se muestra al pie de cada página</p>
+                  {pdfFooterImageUrl && (
+                    <div className="relative w-full h-16 bg-muted rounded-lg flex items-center justify-center overflow-hidden">
+                      <img src={pdfFooterImageUrl} alt="PDF Footer" className="max-h-12 max-w-full object-contain" />
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="absolute top-1 right-1 h-6 w-6 p-0"
+                        onClick={() => setPdfFooterImageUrl('')}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                  <input
+                    ref={pdfFooterInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) uploadFile(file, 'branding', setUploadingPdfFooter, setPdfFooterImageUrl);
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    disabled={uploadingPdfFooter}
+                    onClick={() => pdfFooterInputRef.current?.click()}
+                  >
+                    {uploadingPdfFooter ? 'Subiendo...' : 'Subir imagen de zócalo'}
+                  </Button>
+                </div>
+              </div>
+
+              <Button
+                onClick={async () => {
+                  if (!profile?.company_id) return;
+                  setSavingPdfBranding(true);
+                  try {
+                    const { error } = await supabase
+                      .from('company_settings')
+                      .update({
+                        pdf_header_image_url: pdfHeaderImageUrl || null,
+                        pdf_footer_image_url: pdfFooterImageUrl || null,
+                      } as any)
+                      .eq('company_id', profile.company_id);
+                    if (error) throw error;
+                    toast.success('Imágenes de PDF guardadas');
+                  } catch (err: any) {
+                    toast.error(err.message || 'Error al guardar');
+                  } finally {
+                    setSavingPdfBranding(false);
+                  }
+                }}
+                disabled={savingPdfBranding}
+              >
+                {savingPdfBranding ? 'Guardando...' : 'Guardar imágenes de PDF'}
+              </Button>
             </CardContent>
           </Card>
 

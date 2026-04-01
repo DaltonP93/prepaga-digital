@@ -11,20 +11,43 @@ async function sha256Hex(data: Uint8Array): Promise<string> {
   return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+interface BrandingInfo {
+  companyName: string;
+  logoUrl: string | null;
+  phone: string | null;
+  address: string | null;
+  email: string | null;
+  headerImageUrl: string | null;
+  footerImageUrl: string | null;
+}
+
 function buildWrappedHtml(
   bodyContent: string,
-  company: { name: string; logo_url: string | null; phone: string | null; address: string | null; email: string | null },
+  branding: BrandingInfo,
   documentName: string
 ): string {
-  const logoHtml = company.logo_url
-    ? `<img src="${company.logo_url}" class="company-header-image" />`
-    : `<span style="font-weight:700;font-size:18px;">${company.name}</span>`;
+  // Header: If dedicated header image exists, use it centered. Otherwise fall back to logo.
+  let headerHtml: string;
+  if (branding.headerImageUrl) {
+    headerHtml = `<img src="${branding.headerImageUrl}" class="header-brand-image" />`;
+  } else if (branding.logoUrl) {
+    headerHtml = `<img src="${branding.logoUrl}" class="header-brand-image" />`;
+  } else {
+    headerHtml = `<span style="font-weight:700;font-size:18px;">${branding.companyName}</span>`;
+  }
 
-  const contactParts: string[] = [];
-  if (company.phone) contactParts.push(company.phone);
-  if (company.email) contactParts.push(company.email);
-  if (company.address) contactParts.push(company.address);
-  const contactLine = contactParts.join(" | ");
+  // Footer: If dedicated footer image exists, use it. Otherwise fall back to text contact line.
+  let footerHtml: string;
+  if (branding.footerImageUrl) {
+    footerHtml = `<img src="${branding.footerImageUrl}" class="footer-brand-image" />`;
+  } else {
+    const contactParts: string[] = [];
+    if (branding.address) contactParts.push(branding.address);
+    if (branding.phone) contactParts.push(branding.phone);
+    if (branding.email) contactParts.push(branding.email);
+    footerHtml = `<div class="contact">${contactParts.join(" | ")}</div>
+    <div class="page-number">Pág. </div>`;
+  }
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -33,7 +56,7 @@ function buildWrappedHtml(
 <style>
   @page {
     size: A4;
-    margin: 38mm 15mm 28mm 15mm;
+    margin: 32mm 15mm 22mm 15mm;
   }
 
   * { box-sizing: border-box; }
@@ -50,58 +73,45 @@ function buildWrappedHtml(
   /* ── Fixed header – repeats on every page ── */
   .page-header {
     position: fixed;
-    top: -33mm;
+    top: -28mm;
     left: 0;
     right: 0;
-    height: 30mm;
+    height: 24mm;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 6mm;
+    justify-content: center;
     padding: 2mm 0;
-    border-bottom: 1.5px solid #333;
   }
-  .page-header .logo-area {
-    display: flex;
-    align-items: center;
-    flex: 1;
-    min-width: 0;
-  }
-  .page-header .company-header-image {
+  .page-header .header-brand-image {
     display: block;
-    width: 100%;
-    max-width: 100%;
-    max-height: 24mm;
+    max-width: 55%;
+    max-height: 20mm;
     height: auto;
     object-fit: contain;
-    object-position: left center;
-  }
-  .page-header .doc-name {
-    font-size: 9px;
-    color: #555;
-    text-align: right;
-    max-width: 52mm;
-    min-width: 40mm;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex-shrink: 0;
+    object-position: center center;
   }
 
   /* ── Fixed footer – repeats on every page ── */
   .page-footer {
     position: fixed;
-    bottom: -23mm;
+    bottom: -18mm;
     left: 0;
     right: 0;
-    height: 18mm;
+    height: 14mm;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     padding: 0 2mm;
-    border-top: 1px solid #999;
     font-size: 8px;
     color: #777;
+  }
+  .page-footer .footer-brand-image {
+    display: block;
+    max-width: 90%;
+    max-height: 12mm;
+    height: auto;
+    object-fit: contain;
+    object-position: center center;
   }
   .page-footer .contact {
     max-width: 80%;
@@ -153,13 +163,11 @@ function buildWrappedHtml(
 </head>
 <body>
   <div class="page-header">
-    <div class="logo-area">${logoHtml}</div>
-    <div class="doc-name">${documentName}</div>
+    ${headerHtml}
   </div>
 
   <div class="page-footer">
-    <div class="contact">${contactLine}</div>
-    <div class="page-number">Pág. </div>
+    ${footerHtml}
   </div>
 
   <div class="content">
@@ -178,7 +186,6 @@ function normalizeLegacyContractHeader(html: string): string {
   if (!html) return html;
 
   // Remove leading branding images (cabecera) — the wrapper header already shows the logo
-  // Handles: <img ...company-assets/.../branding/...> or <p><img ...></p>
   html = html.replace(
     /^\s*(<p[^>]*>\s*)?<img\b[^>]*src="[^"]*\/company-assets\/[^"]*\/branding\/[^"]*"[^>]*\/?>\s*(<\/p>)?\s*/i,
     ''
@@ -195,8 +202,6 @@ function normalizeLegacyContractHeader(html: string): string {
 
 /**
  * Resolve expired Supabase Storage signed URLs in HTML content.
- * Scans for <img> with data-storage-path and refreshes src.
- * Also handles legacy images whose src contains a supabase storage URL.
  */
 async function resolveContentImages(
   html: string,
@@ -213,7 +218,6 @@ async function resolveContentImages(
   let result = html;
 
   for (const imgTag of matches) {
-    // Case 1: has data-storage-path
     const spMatch = imgTag.match(/data-storage-path="([^"]+)"/);
     if (spMatch) {
       const storagePath = spMatch[1];
@@ -227,7 +231,6 @@ async function resolveContentImages(
       continue;
     }
 
-    // Case 2: legacy — src contains supabase storage URL
     const srcMatch = imgTag.match(/src="([^"]+)"/);
     if (!srcMatch) continue;
     const src = srcMatch[1];
@@ -252,17 +255,19 @@ async function resolveContentImages(
 }
 
 /**
- * Resolve a company logo URL if it's a Supabase storage URL.
+ * Resolve a storage or public URL to a fresh signed URL.
  */
-async function resolveLogoUrl(
-  logoUrl: string | null,
+async function resolveStorageUrl(
+  url: string | null,
   supabaseAdmin: any
 ): Promise<string | null> {
-  if (!logoUrl) return null;
+  if (!url) return null;
 
-  // If it's a supabase storage URL, generate a fresh signed URL
-  if (logoUrl.includes('.supabase.co/storage/v1/')) {
-    const pathMatch = logoUrl.match(/\/storage\/v1\/object\/(?:sign|public)\/([^/]+)\/([^?]+)/);
+  if (url.includes('.supabase.co/storage/v1/')) {
+    // If it's a public URL, return as-is (public bucket)
+    if (url.includes('/object/public/')) return url;
+    
+    const pathMatch = url.match(/\/storage\/v1\/object\/(?:sign|public)\/([^/]+)\/([^?]+)/);
     if (pathMatch) {
       const bucket = pathMatch[1];
       const storagePath = decodeURIComponent(pathMatch[2]);
@@ -273,7 +278,7 @@ async function resolveLogoUrl(
     }
   }
 
-  return logoUrl;
+  return url;
 }
 
 Deno.serve(async (req) => {
@@ -282,7 +287,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Auth guard: require service-role key or valid JWT
+    // Auth guard
     const authHeader = req.headers.get("Authorization") || "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const isServiceCall = authHeader === `Bearer ${serviceKey}`;
@@ -334,7 +339,16 @@ Deno.serve(async (req) => {
     }
 
     // 2. Fetch company info via sale
-    let company = { name: "", logo_url: null as string | null, phone: null as string | null, address: null as string | null, email: null as string | null };
+    let branding: BrandingInfo = {
+      companyName: "",
+      logoUrl: null,
+      phone: null,
+      address: null,
+      email: null,
+      headerImageUrl: null,
+      footerImageUrl: null,
+    };
+
     const { data: sale } = await supabaseAdmin
       .from("sales")
       .select("company_id")
@@ -348,19 +362,37 @@ Deno.serve(async (req) => {
         .eq("id", sale.company_id)
         .single();
       if (comp) {
-        company = comp;
+        branding.companyName = comp.name;
+        branding.logoUrl = comp.logo_url;
+        branding.phone = comp.phone;
+        branding.address = comp.address;
+        branding.email = comp.email;
+      }
+
+      // Fetch dedicated PDF branding images from company_settings
+      const { data: settings } = await supabaseAdmin
+        .from("company_settings")
+        .select("pdf_header_image_url, pdf_footer_image_url")
+        .eq("company_id", sale.company_id)
+        .single();
+
+      if (settings) {
+        branding.headerImageUrl = settings.pdf_header_image_url || null;
+        branding.footerImageUrl = settings.pdf_footer_image_url || null;
       }
     }
 
-    // 2b. Resolve company logo URL
-    company.logo_url = await resolveLogoUrl(company.logo_url, supabaseAdmin);
+    // 2b. Resolve all branding URLs
+    branding.logoUrl = await resolveStorageUrl(branding.logoUrl, supabaseAdmin);
+    branding.headerImageUrl = await resolveStorageUrl(branding.headerImageUrl, supabaseAdmin);
+    branding.footerImageUrl = await resolveStorageUrl(branding.footerImageUrl, supabaseAdmin);
 
     // 2c. Resolve expired image URLs in document content
     const bucket = Deno.env.get("STORAGE_BUCKET") || "documents";
     const resolvedContent = await resolveContentImages(doc.content, supabaseAdmin, bucket);
 
     // 3. Build wrapped HTML with repeating header/footer
-    const wrappedHtml = buildWrappedHtml(resolvedContent, company, doc.name || "Documento");
+    const wrappedHtml = buildWrappedHtml(resolvedContent, branding, doc.name || "Documento");
 
     // 4. Call render service
     const renderUrl = Deno.env.get("RENDER_URL");
@@ -383,7 +415,7 @@ Deno.serve(async (req) => {
         options: {
           format: "A4",
           printBackground: true,
-          margin: { top: "35mm", right: "15mm", bottom: "28mm", left: "15mm" },
+          margin: { top: "30mm", right: "15mm", bottom: "22mm", left: "15mm" },
         },
       }),
     });
