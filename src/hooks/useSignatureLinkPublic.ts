@@ -590,8 +590,8 @@ export const useSubmitSignatureLink = () => {
                 }
                 roleLabel = 'ADHERENTE';
               } else if (recipientType === 'contratada') {
-                signerName = companySettings?.contratada_signer_name || companyInfo?.name || 'Representante';
-                signerCI = companySettings?.contratada_signer_dni || companyInfo?.tax_id || '';
+                signerName = companySettings?.contratada_signer_name || (data as any)?.recipient_name || 'Representante Legal';
+                signerCI = companySettings?.contratada_signer_dni || '';
                 roleLabel = 'CONTRATADA';
               } else if (saleClientInfo) {
                 signerName = `${saleClientInfo.first_name || ''} ${saleClientInfo.last_name || ''}`.trim();
