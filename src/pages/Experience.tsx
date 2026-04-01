@@ -41,6 +41,7 @@ export default function Experience() {
   const pdfHeaderInputRef = useRef<HTMLInputElement>(null);
   const pdfFooterInputRef = useRef<HTMLInputElement>(null);
 
+
   // Sync form with loaded configuration
   useEffect(() => {
     if (configuration) {
@@ -53,6 +54,23 @@ export default function Experience() {
       setLoginBackgroundUrl(cfg.login_background_url || '');
     }
   }, [configuration]);
+
+  // Load PDF branding from company_settings
+  useEffect(() => {
+    const loadPdfBranding = async () => {
+      if (!profile?.company_id) return;
+      const { data } = await supabase
+        .from('company_settings')
+        .select('pdf_header_image_url, pdf_footer_image_url')
+        .eq('company_id', profile.company_id)
+        .single();
+      if (data) {
+        setPdfHeaderImageUrl((data as any).pdf_header_image_url || '');
+        setPdfFooterImageUrl((data as any).pdf_footer_image_url || '');
+      }
+    };
+    loadPdfBranding();
+  }, [profile?.company_id]);
 
   const uploadFile = async (
     file: File,
