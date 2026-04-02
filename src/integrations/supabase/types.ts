@@ -3661,6 +3661,44 @@ export type Database = {
         }
         Relationships: []
       }
+      waha_health_logs: {
+        Row: {
+          checked_at: string
+          company_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          response_time_ms: number | null
+          session_status: string
+        }
+        Insert: {
+          checked_at?: string
+          company_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          response_time_ms?: number | null
+          session_status?: string
+        }
+        Update: {
+          checked_at?: string
+          company_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          response_time_ms?: number | null
+          session_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waha_health_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       whatsapp_messages: {
         Row: {
           company_id: string
@@ -3834,6 +3872,157 @@ export type Database = {
       }
     }
     Views: {
+      company_public_settings: {
+        Row: {
+          company_id: string | null
+          contratada_signature_mode: string | null
+          contratada_signer_dni: string | null
+          contratada_signer_email: string | null
+          contratada_signer_name: string | null
+          contratada_signer_phone: string | null
+          email_from_address: string | null
+          email_from_name: string | null
+          pdf_footer_image_url: string | null
+          pdf_header_image_url: string | null
+          signature_block_style: Json | null
+          whatsapp_gateway_url: string | null
+          whatsapp_linked_phone: string | null
+          whatsapp_provider: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          contratada_signature_mode?: string | null
+          contratada_signer_dni?: string | null
+          contratada_signer_email?: string | null
+          contratada_signer_name?: string | null
+          contratada_signer_phone?: string | null
+          email_from_address?: string | null
+          email_from_name?: string | null
+          pdf_footer_image_url?: string | null
+          pdf_header_image_url?: string | null
+          signature_block_style?: Json | null
+          whatsapp_gateway_url?: string | null
+          whatsapp_linked_phone?: string | null
+          whatsapp_provider?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          contratada_signature_mode?: string | null
+          contratada_signer_dni?: string | null
+          contratada_signer_email?: string | null
+          contratada_signer_name?: string | null
+          contratada_signer_phone?: string | null
+          email_from_address?: string | null
+          email_from_name?: string | null
+          pdf_footer_image_url?: string | null
+          pdf_header_image_url?: string | null
+          signature_block_style?: Json | null
+          whatsapp_gateway_url?: string | null
+          whatsapp_linked_phone?: string | null
+          whatsapp_provider?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_settings_admin_ui: {
+        Row: {
+          company_id: string | null
+          contratada_signature_mode: string | null
+          contratada_signer_dni: string | null
+          contratada_signer_email: string | null
+          contratada_signer_name: string | null
+          contratada_signer_phone: string | null
+          email_from_address: string | null
+          email_from_name: string | null
+          email_provider: string | null
+          has_email_api_key: boolean | null
+          has_signwell_api_key: boolean | null
+          has_sms_api_key: boolean | null
+          has_twilio_auth_token: boolean | null
+          has_whatsapp_api_key: boolean | null
+          menu_config: Json | null
+          pdf_footer_image_url: string | null
+          pdf_header_image_url: string | null
+          signature_block_style: Json | null
+          signwell_enabled: boolean | null
+          twilio_account_sid: string | null
+          twilio_whatsapp_number: string | null
+          whatsapp_gateway_url: string | null
+          whatsapp_linked_phone: string | null
+          whatsapp_phone_id: string | null
+          whatsapp_provider: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          contratada_signature_mode?: string | null
+          contratada_signer_dni?: string | null
+          contratada_signer_email?: string | null
+          contratada_signer_name?: string | null
+          contratada_signer_phone?: string | null
+          email_from_address?: string | null
+          email_from_name?: string | null
+          email_provider?: string | null
+          has_email_api_key?: never
+          has_signwell_api_key?: never
+          has_sms_api_key?: never
+          has_twilio_auth_token?: never
+          has_whatsapp_api_key?: never
+          menu_config?: Json | null
+          pdf_footer_image_url?: string | null
+          pdf_header_image_url?: string | null
+          signature_block_style?: Json | null
+          signwell_enabled?: boolean | null
+          twilio_account_sid?: string | null
+          twilio_whatsapp_number?: string | null
+          whatsapp_gateway_url?: string | null
+          whatsapp_linked_phone?: string | null
+          whatsapp_phone_id?: string | null
+          whatsapp_provider?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          contratada_signature_mode?: string | null
+          contratada_signer_dni?: string | null
+          contratada_signer_email?: string | null
+          contratada_signer_name?: string | null
+          contratada_signer_phone?: string | null
+          email_from_address?: string | null
+          email_from_name?: string | null
+          email_provider?: string | null
+          has_email_api_key?: never
+          has_signwell_api_key?: never
+          has_sms_api_key?: never
+          has_twilio_auth_token?: never
+          has_whatsapp_api_key?: never
+          menu_config?: Json | null
+          pdf_footer_image_url?: string | null
+          pdf_header_image_url?: string | null
+          signature_block_style?: Json | null
+          signwell_enabled?: boolean | null
+          twilio_account_sid?: string | null
+          twilio_whatsapp_number?: string | null
+          whatsapp_gateway_url?: string | null
+          whatsapp_linked_phone?: string | null
+          whatsapp_phone_id?: string | null
+          whatsapp_provider?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_settings_public: {
         Row: {
           company_id: string | null
