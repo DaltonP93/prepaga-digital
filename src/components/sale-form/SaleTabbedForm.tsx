@@ -320,6 +320,12 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
               Enviar a Auditoría
             </Button>
           )}
+          {isEditing && userIsPrivileged && (
+            <Button variant="outline" onClick={() => setShowStatusModal(true)}>
+              <Settings className="h-4 w-4 mr-2" />
+              Cambiar Estado
+            </Button>
+          )}
         </div>
       </div>
 
