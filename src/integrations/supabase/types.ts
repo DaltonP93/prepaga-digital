@@ -3868,6 +3868,15 @@ export type Database = {
       }
     }
     Functions: {
+      admin_change_sale_status: {
+        Args: {
+          p_new_audit_status?: string
+          p_new_status: string
+          p_reason?: string
+          p_sale_id: string
+        }
+        Returns: Json
+      }
       check_all_signatures_completed: {
         Args: { p_sale_id: string }
         Returns: boolean
