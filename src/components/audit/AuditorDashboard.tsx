@@ -180,8 +180,7 @@ export const AuditorDashboard: React.FC = () => {
       } else if (statusFilter === 'requiere_info') {
         query = query.eq('audit_status', 'requiere_info');
       } else {
-        // 'all' - show all sales
-        query = query.or('status.eq.pendiente,status.eq.en_auditoria,status.eq.borrador,audit_status.neq.null');
+        // 'all' - no filter, show everything
       }
 
       const { data, error } = await query;
