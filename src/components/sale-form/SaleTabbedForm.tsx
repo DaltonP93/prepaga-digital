@@ -38,6 +38,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('basico');
   const [tabErrors, setTabErrors] = useState<Record<string, string>>({});
+  const [showStatusModal, setShowStatusModal] = useState(false);
 
   // Fetch audit information requests for this sale (visible to vendor)
   const { data: infoRequests = [] } = useQuery({
