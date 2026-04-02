@@ -1,50 +1,44 @@
 
 
-# Plan: Implementar FIXes pendientes del prompt de auditoría
+# Plan: Health Check automático de WAHA con alertas
 
-## Estado actual
-
-| Fix | Estado | Detalle |
-|-----|--------|---------|
-| FIX 1 — Adherentes no guardan | ✅ Hecho | `useUpdateBeneficiary` funciona correctamente |
-| FIX 2 — Helper `isSaleLocked` | ❌ Pendiente | No existe helper centralizado |
-| FIX 3 — `disabled` prop correcto | ⚠️ Parcial | Solo `super_admin`/`admin` como privilegiados, falta `auditor`/`supervisor`/`gestor` |
-| FIX 4 — Banner bloqueado | ❌ Pendiente | No hay banner de venta bloqueada |
-| FIX 5 — Botón "Cambiar estado" | ❌ Pendiente | No existe modal ni integración con `admin_change_sale_status` |
-| FIX 6 — Historial auditor con tabs | ⚠️ Parcial | `AuditorDashboard` ya filtra por `audit_status`, pero puede no mostrar todas las ventas |
-| FIX 7 — Adherentes respetan disabled | ✅ Hecho | Botones edit/delete ocultos cuando `disabled=true` |
-| FIX 8 — Templates: regenerar siempre | ❌ Pendiente | Regenerar/descargar se bloquea junto con la edición |
+## Resumen
+Crear una Edge Function `waha-health-check` que verifique el estado de la sesión WAHA periódicamente, y un componente en el panel de administración que muestre el estado en tiempo real y permita ejecutar chequeos manuales. Cuando la sesión se caiga, se registra una alerta en la base de datos y se puede notificar por email.
 
 ## Cambios a implementar
 
-### 1. Crear helper `isSaleLocked` — nuevo archivo `src/lib/saleUtils.ts`
-- Función que recibe `sale` y `userRole` y retorna `boolean`
-- Roles privilegiados: `super_admin`, `admin`, `auditor`, `supervisor`, `gestor`
-- Bloqueado si `audit_status === 'aprobado'` o `status` es `completado`/`aprobado_para_templates`
+### 1. Tabla `waha_health_logs` (migración SQL)
+- Columnas: `id`, `company_id`, `session_status` (text: WORKING, STOPPED, FAILED, SCAN_QR_CODE, UNKNOWN), `response_time_ms`, `error_message`, `checked_at`, `created_at`
+- RLS: lectura para admin/super_admin de la misma empresa
 
-### 2. Usar `isSaleLocked` en `SaleTabbedForm.tsx`
-- Reemplazar lógica inline de `isAuditLocked` con el helper centralizado
-- Incluir todos los roles privilegiados
+### 2. Edge Function `waha-health-check`
+- Recibe `company_id` (opcional, si no se envía chequea todas las empresas con WAHA configurado)
+- Para cada empresa con provider `waha` o `qr_session`:
+  - Llama a `GET {gateway_url}/api/sessions/default` con el `X-Api-Key`
+  - Registra resultado en `waha_health_logs`
+  - Si el estado NO es `WORKING`, envía notificación por email al admin usando la Edge Function `send-notification` existente
+- Retorna resumen de estados chequeados
 
-### 3. Banner de venta bloqueada en `SaleTabbedForm.tsx`
-- Si `isLocked`, mostrar un banner con ícono de candado: "Venta aprobada — solo auditoría puede modificar"
-- Ubicarlo arriba de las pestañas
+### 3. Hook `useWahaHealthCheck`
+- Query que obtiene los últimos health checks de la empresa
+- Mutation para ejecutar un chequeo manual llamando a la Edge Function
+- Polling cada 5 minutos (configurable) usando `refetchInterval`
 
-### 4. Botón y modal "Cambiar estado" para admin/auditor
-- En `SaleTabbedForm.tsx`, si el usuario es privilegiado, mostrar botón "Cambiar estado"
-- Modal con: select de `status`, select de `audit_status`, textarea de motivo (obligatorio al revertir de aprobado)
-- Llamar a `supabase.rpc('admin_change_sale_status', {...})`
+### 4. Componente `WahaHealthStatus` en AdminConfigPanel
+- Indicador visual (badge verde/rojo/amarillo) del estado de la sesión WAHA
+- Último chequeo (timestamp relativo)
+- Botón "Verificar ahora" para chequeo manual
+- Historial breve de los últimos 5 chequeos
+- Solo visible cuando el proveedor seleccionado es `waha` o `qr_session`
 
-### 5. Templates: separar regenerar/descargar de edición
-- En `SaleTemplatesTab.tsx`, separar `canManageTemplates` (edición) de `canRegenerateDownload` (siempre true)
-- Botones "Regenerar documento" y "Descargar" siempre habilitados independientemente del bloqueo
+### 5. Registrar en `supabase/config.toml`
+- `[functions.waha-health-check]` con `verify_jwt = false`
 
-### 6. Verificar AuditorDashboard muestra todas las ventas
-- Revisar que el filtro "all" no excluya ventas completadas/aprobadas
-
-## Archivos a modificar
-- `src/lib/saleUtils.ts` (nuevo)
-- `src/components/sale-form/SaleTabbedForm.tsx`
-- `src/components/sale-form/SaleTemplatesTab.tsx`
-- `src/components/audit/AuditorDashboard.tsx` (si necesario)
+## Archivos a crear/modificar
+- **Nueva migración SQL**: tabla `waha_health_logs`
+- **Nuevo**: `supabase/functions/waha-health-check/index.ts`
+- **Nuevo**: `src/hooks/useWahaHealthCheck.ts`
+- **Nuevo**: `src/components/WahaHealthStatus.tsx`
+- **Modificar**: `src/components/AdminConfigPanel.tsx` (integrar componente)
+- **Modificar**: `supabase/config.toml` (agregar función)
 
