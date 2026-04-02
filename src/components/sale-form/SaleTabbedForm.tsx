@@ -60,18 +60,10 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
   const isEditAllowed = !isEditing || canEditState(currentStatus);
   const isAuditorOrAbove = role === 'auditor' || role === 'admin' || role === 'super_admin';
 
-  // After audit approval, core sale data is locked. Templates stay manageable while
-  // the sale is in `aprobado_para_templates`, because that state exists to let the
-  // vendor attach templates before sending the signature flow.
-  const CORE_DATA_LOCKED_STATUSES: SaleStatus[] = [
-    'aprobado_para_templates',
-    'listo_para_enviar',
-    'enviado',
-    'firmado_parcial',
-    'firmado',
-    'completado',
-    'expirado',
-  ];
+  // Centralized lock logic
+  const isAuditLocked = isSaleLocked(sale, role as any);
+  const userIsPrivileged = isPrivilegedRole(role as any);
+
   const TEMPLATE_LOCKED_STATUSES: SaleStatus[] = [
     'listo_para_enviar',
     'enviado',
@@ -81,11 +73,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
     'expirado',
     'cancelado',
   ];
-  const isPrivilegedRole = role === 'super_admin' || role === 'admin';
-  const isAuditLocked =
-    (sale?.audit_status === 'aprobado' || CORE_DATA_LOCKED_STATUSES.includes(currentStatus)) &&
-    !isPrivilegedRole;
-  const isTemplatesLocked = TEMPLATE_LOCKED_STATUSES.includes(currentStatus) && !isPrivilegedRole;
+  const isTemplatesLocked = TEMPLATE_LOCKED_STATUSES.includes(currentStatus) && !userIsPrivileged;
   const statusLabel = SALE_STATUS_LABELS[currentStatus] || currentStatus;
 
   const [formData, setFormData] = useState({
