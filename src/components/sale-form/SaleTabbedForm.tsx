@@ -449,6 +449,16 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           </Tabs>
         </CardContent>
       </Card>
+
+      {isEditing && userIsPrivileged && (
+        <ChangeStatusModal
+          open={showStatusModal}
+          onOpenChange={setShowStatusModal}
+          saleId={sale.id}
+          currentStatus={currentStatus}
+          currentAuditStatus={sale?.audit_status || null}
+        />
+      )}
     </div>
   );
 };
