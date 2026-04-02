@@ -136,8 +136,10 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
   const regenerateActionRef = useRef<HTMLDivElement | null>(null);
 
   const isApproved = auditStatus === 'aprobado' || auditStatus === 'aprobado_para_templates';
-  const isSaleLocked = saleStatus === 'completado' || saleStatus === 'cancelado';
-  const canManageTemplates = !disabled && !isSaleLocked;
+  const isSaleLockedStatus = saleStatus === 'completado' || saleStatus === 'cancelado';
+  const canManageTemplates = !disabled && !isSaleLockedStatus;
+  // Regenerate & download buttons are always available regardless of lock state
+  const canRegenerateDownload = !!saleId;
 
   // Fetch associated templates (no content — large base64 images; content is fetched on-demand at generation)
   const { data: saleTemplates, isLoading } = useQuery({
