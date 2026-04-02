@@ -652,6 +652,11 @@ export const AdminConfigPanel: React.FC = () => {
           </Card>
 
           {/* WhatsApp Templates Section */}
+          {/* WAHA Health Status - only for waha/qr_session providers */}
+          {(apiFormData.whatsapp_provider === 'waha' || apiFormData.whatsapp_provider === 'qr_session') && (
+            <WahaHealthStatus />
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>Plantillas de WhatsApp</CardTitle>
