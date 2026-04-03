@@ -126,7 +126,7 @@ export const AdminConfigPanel: React.FC = () => {
     twilio_whatsapp_number: apiConfig?.twilio_whatsapp_number || defaultApiFormData.twilio_whatsapp_number,
     sms_api_enabled: apiConfig?.sms_api_enabled || defaultApiFormData.sms_api_enabled,
     sms_api_key: apiConfig?.sms_api_key || defaultApiFormData.sms_api_key,
-    email_provider: apiConfig?.email_provider || defaultApiFormData.email_provider,
+    email_provider: apiConfig?.email_provider ?? defaultApiFormData.email_provider,
     email_api_enabled: apiConfig?.email_api_enabled || defaultApiFormData.email_api_enabled,
     email_api_key: apiConfig?.email_api_key || defaultApiFormData.email_api_key,
     email_from_address: apiConfig?.email_from_address || defaultApiFormData.email_from_address,
