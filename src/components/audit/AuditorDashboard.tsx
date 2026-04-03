@@ -164,7 +164,6 @@ export const AuditorDashboard: React.FC = () => {
           plans (*),
           beneficiaries (*),
           documents (*),
-          sale_documents (*)
         `)
         .order('created_at', { ascending: false });
 
