@@ -116,7 +116,7 @@ export const AdminConfigPanel: React.FC = () => {
   }), [uiConfig]);
 
   const nextApiFormData = useMemo(() => ({
-    whatsapp_provider: apiConfig?.whatsapp_provider || defaultApiFormData.whatsapp_provider,
+    whatsapp_provider: apiConfig?.whatsapp_provider ?? defaultApiFormData.whatsapp_provider,
     whatsapp_api_token: apiConfig?.whatsapp_api_token || defaultApiFormData.whatsapp_api_token,
     whatsapp_phone_number: apiConfig?.whatsapp_phone_number || defaultApiFormData.whatsapp_phone_number,
     whatsapp_gateway_url: apiConfig?.whatsapp_gateway_url || defaultApiFormData.whatsapp_gateway_url,
@@ -126,7 +126,7 @@ export const AdminConfigPanel: React.FC = () => {
     twilio_whatsapp_number: apiConfig?.twilio_whatsapp_number || defaultApiFormData.twilio_whatsapp_number,
     sms_api_enabled: apiConfig?.sms_api_enabled || defaultApiFormData.sms_api_enabled,
     sms_api_key: apiConfig?.sms_api_key || defaultApiFormData.sms_api_key,
-    email_provider: apiConfig?.email_provider || defaultApiFormData.email_provider,
+    email_provider: apiConfig?.email_provider ?? defaultApiFormData.email_provider,
     email_api_enabled: apiConfig?.email_api_enabled || defaultApiFormData.email_api_enabled,
     email_api_key: apiConfig?.email_api_key || defaultApiFormData.email_api_key,
     email_from_address: apiConfig?.email_from_address || defaultApiFormData.email_from_address,
