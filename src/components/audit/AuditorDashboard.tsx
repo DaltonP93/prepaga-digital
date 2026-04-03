@@ -577,8 +577,11 @@ export const AuditorDashboard: React.FC = () => {
                 {selectedSale.plans?.name}
               </div>
               <div>
-                <span className="font-medium">Precio: </span>
-                {formatCurrency(Number(selectedSale.plans?.price || 0))}
+                <span className="font-medium">Precio Titular: </span>
+                {formatCurrency(Number(
+                  selectedSale.beneficiaries?.find((b: any) => b.is_primary === true)?.amount || 
+                  selectedSale.total_amount || 0
+                ))}
               </div>
               <div>
                 <span className="font-medium">Monto Total: </span>
