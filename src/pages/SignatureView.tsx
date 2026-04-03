@@ -169,6 +169,17 @@ const SignatureView = () => {
       const ip = 'client-side'; // Will be captured server-side
       const ua = navigator.userAgent;
 
+      // Create a signature client with x-signature-token for RLS
+      const { createClient } = await import('@supabase/supabase-js');
+      const sigClient = createClient(
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        {
+          auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+          global: { headers: { 'x-signature-token': token! } },
+        }
+      );
+
       // Create signature events + evidence bundles for each document
       for (const doc of docsToSign) {
         const docHash = doc.content ? await generateDocumentHash(doc.content) : '';
@@ -184,7 +195,7 @@ const SignatureView = () => {
         });
 
         // Insert signature event
-        const { data: eventData } = await supabase.from('signature_events' as any).insert({
+        const { data: eventData } = await sigClient.from('signature_events' as any).insert({
           signature_link_id: linkData.id,
           sale_id: linkData.sale_id,
           document_id: doc.id,
@@ -200,7 +211,7 @@ const SignatureView = () => {
         }).select().single();
 
         // Insert evidence bundle (immutable chain of custody)
-        const { data: bundleData } = await supabase.from('signature_evidence_bundles' as any).insert({
+        const { data: bundleData } = await sigClient.from('signature_evidence_bundles' as any).insert({
           signature_link_id: linkData.id,
           signature_event_id: (eventData as any)?.id || null,
           sale_id: linkData.sale_id,
@@ -212,7 +223,7 @@ const SignatureView = () => {
 
         // Insert hash anchor (internal integrity proof)
         if (bundleData) {
-          await supabase.from('hash_anchors' as any).insert({
+          await sigClient.from('hash_anchors' as any).insert({
             evidence_bundle_id: (bundleData as any).id,
             hash_value: evidenceResult.hash,
             anchor_type: 'internal',
