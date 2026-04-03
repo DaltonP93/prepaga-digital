@@ -116,7 +116,7 @@ export const AdminConfigPanel: React.FC = () => {
   }), [uiConfig]);
 
   const nextApiFormData = useMemo(() => ({
-    whatsapp_provider: apiConfig?.whatsapp_provider || defaultApiFormData.whatsapp_provider,
+    whatsapp_provider: apiConfig?.whatsapp_provider ?? defaultApiFormData.whatsapp_provider,
     whatsapp_api_token: apiConfig?.whatsapp_api_token || defaultApiFormData.whatsapp_api_token,
     whatsapp_phone_number: apiConfig?.whatsapp_phone_number || defaultApiFormData.whatsapp_phone_number,
     whatsapp_gateway_url: apiConfig?.whatsapp_gateway_url || defaultApiFormData.whatsapp_gateway_url,
