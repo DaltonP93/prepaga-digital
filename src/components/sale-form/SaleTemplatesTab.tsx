@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { useBeneficiaries } from '@/hooks/useBeneficiaries';
 import { validateSaleTransition } from '@/lib/workflowValidator';
 import { DocumentPreviewDialog } from '@/components/documents/DocumentPreviewDialog';
+import { useRolePermissions } from '@/hooks/useRolePermissions';
 
 interface SaleTemplatesTabProps {
   saleId?: string;
@@ -124,9 +125,11 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
   const navigate = useNavigate();
   const { templates } = useTemplates();
   const queryClient = useQueryClient();
+  const { isAdmin, isSuperAdmin } = useRolePermissions();
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [sending, setSending] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  const [regenerandoPdf, setRegenerandoPdf] = useState<string | null>(null);
   const [showDocuments, setShowDocuments] = useState(true);
   const [previewDoc, setPreviewDoc] = useState<any>(null);
   const [needsRegeneration, setNeedsRegeneration] = useState(false);
@@ -134,6 +137,8 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
   const [annexSignedUrls, setAnnexSignedUrls] = useState<Record<string, string>>({});
   const [expandedAnnexes, setExpandedAnnexes] = useState<Record<string, boolean>>({});
   const regenerateActionRef = useRef<HTMLDivElement | null>(null);
+
+  const isPrivilegedRole = isAdmin || isSuperAdmin;
 
   const isApproved = auditStatus === 'aprobado' || auditStatus === 'aprobado_para_templates';
   const isSaleLockedStatus = saleStatus === 'completado' || saleStatus === 'cancelado';
@@ -203,16 +208,38 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
     queryFn: async () => {
       if (!saleId) return [];
       const { data, error } = await supabase
-        .from('documents')
-        .select('id, name, document_type, status, beneficiary_id, content, file_url, requires_signature, generated_from_template, created_at')
-        .eq('sale_id', saleId)
-        .neq('document_type', 'firma')
-        .order('created_at', { ascending: true });
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!saleId,
-  });
+          .from('documents')
+          .select('id, name, document_type, status, beneficiary_id, content, file_url, requires_signature, generated_from_template, is_final, created_at')
+          .eq('sale_id', saleId)
+          .neq('document_type', 'firma')
+          .order('created_at', { ascending: true });
+        if (error) throw error;
+        return data || [];
+      },
+      enabled: !!saleId,
+    });
+
+    const handleRegenerarPdf = async (documentId: string) => {
+      setRegenerandoPdf(documentId);
+      try {
+        const { error: baseErr } = await supabase.functions.invoke('generate-base-pdf', {
+          body: { document_id: documentId },
+        });
+        if (baseErr) throw new Error(`Error generando PDF base: ${baseErr.message}`);
+
+        const { error: padesErr } = await supabase.functions.invoke('pades-sign-document', {
+          body: { document_id: documentId },
+        });
+        if (padesErr) throw new Error(`Error aplicando firma: ${padesErr.message}`);
+
+        toast.success('PDF regenerado correctamente');
+        queryClient.invalidateQueries({ queryKey: ['sale-generated-documents', saleId] });
+      } catch (err: any) {
+        toast.error(err.message || 'Error al regenerar el PDF');
+      } finally {
+        setRegenerandoPdf(null);
+      }
+    };
 
   const addTemplate = useMutation({
     mutationFn: async (templateId: string) => {
@@ -1244,16 +1271,34 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
                             </div>
                           </div>
                         </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setPreviewDoc(doc)}
-                          className="gap-1"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          Ver
-                        </Button>
+                        <div className="flex gap-1">
+                          {isPrivilegedRole && doc.status === 'firmado' && doc.is_final && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={regenerandoPdf === doc.id}
+                              onClick={() => handleRegenerarPdf(doc.id)}
+                              className="gap-1"
+                            >
+                              {regenerandoPdf === doc.id ? (
+                                <><Loader2 className="h-3 w-3 animate-spin" /> Regenerando...</>
+                              ) : (
+                                <><RefreshCw className="h-3 w-3" /> Regenerar PDF</>
+                              )}
+                            </Button>
+                          )}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPreviewDoc(doc)}
+                            className="gap-1"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            Ver
+                          </Button>
+                        </div>
                       </CardContent>
                     </Card>
                   ))}
@@ -1283,16 +1328,34 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
                             </div>
                           </div>
                         </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setPreviewDoc(doc)}
-                          className="gap-1"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          Ver
-                        </Button>
+                        <div className="flex gap-1">
+                          {isPrivilegedRole && doc.status === 'firmado' && doc.is_final && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={regenerandoPdf === doc.id}
+                              onClick={() => handleRegenerarPdf(doc.id)}
+                              className="gap-1"
+                            >
+                              {regenerandoPdf === doc.id ? (
+                                <><Loader2 className="h-3 w-3 animate-spin" /> Regenerando...</>
+                              ) : (
+                                <><RefreshCw className="h-3 w-3" /> Regenerar PDF</>
+                              )}
+                            </Button>
+                          )}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPreviewDoc(doc)}
+                            className="gap-1"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            Ver
+                          </Button>
+                        </div>
                       </CardContent>
                     </Card>
                   ))}
