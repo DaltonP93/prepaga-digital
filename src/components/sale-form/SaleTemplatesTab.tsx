@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { useBeneficiaries } from '@/hooks/useBeneficiaries';
 import { validateSaleTransition } from '@/lib/workflowValidator';
 import { DocumentPreviewDialog } from '@/components/documents/DocumentPreviewDialog';
+import { useRolePermissions } from '@/hooks/useRolePermissions';
 
 interface SaleTemplatesTabProps {
   saleId?: string;
