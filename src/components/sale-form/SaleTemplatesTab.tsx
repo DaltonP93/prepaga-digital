@@ -1271,16 +1271,34 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
                             </div>
                           </div>
                         </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setPreviewDoc(doc)}
-                          className="gap-1"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          Ver
-                        </Button>
+                        <div className="flex gap-1">
+                          {isPrivilegedRole && doc.status === 'firmado' && doc.is_final && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={regenerandoPdf === doc.id}
+                              onClick={() => handleRegenerarPdf(doc.id)}
+                              className="gap-1"
+                            >
+                              {regenerandoPdf === doc.id ? (
+                                <><Loader2 className="h-3 w-3 animate-spin" /> Regenerando...</>
+                              ) : (
+                                <><RefreshCw className="h-3 w-3" /> Regenerar PDF</>
+                              )}
+                            </Button>
+                          )}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPreviewDoc(doc)}
+                            className="gap-1"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            Ver
+                          </Button>
+                        </div>
                       </CardContent>
                     </Card>
                   ))}
