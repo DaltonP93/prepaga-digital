@@ -208,16 +208,38 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
     queryFn: async () => {
       if (!saleId) return [];
       const { data, error } = await supabase
-        .from('documents')
-        .select('id, name, document_type, status, beneficiary_id, content, file_url, requires_signature, generated_from_template, created_at')
-        .eq('sale_id', saleId)
-        .neq('document_type', 'firma')
-        .order('created_at', { ascending: true });
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!saleId,
-  });
+          .from('documents')
+          .select('id, name, document_type, status, beneficiary_id, content, file_url, requires_signature, generated_from_template, is_final, created_at')
+          .eq('sale_id', saleId)
+          .neq('document_type', 'firma')
+          .order('created_at', { ascending: true });
+        if (error) throw error;
+        return data || [];
+      },
+      enabled: !!saleId,
+    });
+
+    const handleRegenerarPdf = async (documentId: string) => {
+      setRegenerandoPdf(documentId);
+      try {
+        const { error: baseErr } = await supabase.functions.invoke('generate-base-pdf', {
+          body: { document_id: documentId },
+        });
+        if (baseErr) throw new Error(`Error generando PDF base: ${baseErr.message}`);
+
+        const { error: padesErr } = await supabase.functions.invoke('pades-sign-document', {
+          body: { document_id: documentId },
+        });
+        if (padesErr) throw new Error(`Error aplicando firma: ${padesErr.message}`);
+
+        toast.success('PDF regenerado correctamente');
+        queryClient.invalidateQueries({ queryKey: ['sale-generated-documents', saleId] });
+      } catch (err: any) {
+        toast.error(err.message || 'Error al regenerar el PDF');
+      } finally {
+        setRegenerandoPdf(null);
+      }
+    };
 
   const addTemplate = useMutation({
     mutationFn: async (templateId: string) => {
