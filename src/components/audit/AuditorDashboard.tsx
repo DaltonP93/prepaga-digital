@@ -169,7 +169,10 @@ export const AuditorDashboard: React.FC = () => {
 
       // Filter by sale status for audit
       if (statusFilter === 'pending') {
-        query = query.in('status', ['pendiente', 'en_auditoria']);
+        query = query
+          .in('status', ['pendiente', 'en_auditoria', 'enviado', 'borrador'])
+          .neq('audit_status', 'aprobado')
+          .neq('audit_status', 'rechazado');
       } else if (statusFilter === 'borrador') {
         query = query.eq('status', 'borrador');
       } else if (statusFilter === 'aprobado') {
@@ -179,7 +182,7 @@ export const AuditorDashboard: React.FC = () => {
       } else if (statusFilter === 'requiere_info') {
         query = query.eq('audit_status', 'requiere_info');
       } else {
-        // 'all' - no filter, show everything
+        // 'all' - no filter, show everything (RLS already limits by company)
       }
 
       const { data, error } = await query;
