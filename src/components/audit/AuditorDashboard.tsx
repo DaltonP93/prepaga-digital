@@ -154,9 +154,9 @@ export const AuditorDashboard: React.FC = () => {
 
   // Fetch sales pending audit using auditor_sales_view
   const { data: sales = [], isLoading, refetch } = useQuery({
-    queryKey: ['auditor-sales', statusFilter],
+    queryKey: ['auditor-sales'],
     queryFn: async () => {
-      let query = supabase
+      const query = supabase
         .from('auditor_sales_view')
         .select(`
           *,
@@ -166,21 +166,6 @@ export const AuditorDashboard: React.FC = () => {
           documents (*)
         `)
         .order('created_at', { ascending: false });
-
-      // Filter by sale status for audit
-      if (statusFilter === 'pending') {
-        query = query
-          .in('status', ['pendiente', 'en_auditoria', 'enviado'])
-          .not('audit_status', 'in', '("aprobado","rechazado")');
-      } else if (statusFilter === 'aprobado') {
-        query = query.eq('audit_status', 'aprobado');
-      } else if (statusFilter === 'rechazado') {
-        query = query.eq('audit_status', 'rechazado');
-      } else if (statusFilter === 'requiere_info') {
-        query = query.eq('audit_status', 'requiere_info');
-      } else {
-        // 'all' - no filter, the view already excludes drafts
-      }
 
       const { data, error } = await query;
       if (error) throw error;
@@ -247,7 +232,7 @@ export const AuditorDashboard: React.FC = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [statusFilter, queryClient]);
+  }, [queryClient, refetch]);
 
   // Approve sale - changes status to 'aprobado_para_templates' (approved, ready for next steps)
   const approveSale = useMutation({
@@ -492,24 +477,41 @@ export const AuditorDashboard: React.FC = () => {
     }
   };
 
-  const filteredSales = sales.filter((sale: any) => {
-    if (!searchTerm) return true;
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      sale.clients?.first_name?.toLowerCase().includes(searchLower) ||
-      sale.clients?.last_name?.toLowerCase().includes(searchLower) ||
-      sale.contract_number?.toLowerCase().includes(searchLower) ||
-      sale.plans?.name?.toLowerCase().includes(searchLower)
-    );
-  });
-
-  // Stats
-  const stats = {
-    pending: sales.filter((s: any) => ['pendiente', 'en_auditoria', 'enviado'].includes(s.status) && s.audit_status !== 'aprobado' && s.audit_status !== 'rechazado').length,
-    approved: sales.filter((s: any) => s.audit_status === 'aprobado').length,
-    rejected: sales.filter((s: any) => s.audit_status === 'rechazado' || s.status === 'rechazado').length,
-    infoRequired: sales.filter((s: any) => s.audit_status === 'requiere_info').length,
+  // Classify each sale for filtering and stats
+  const classifySale = (sale: any): string => {
+    if (sale.audit_status === 'aprobado') return 'aprobado';
+    if (sale.audit_status === 'rechazado') return 'rechazado';
+    if (sale.audit_status === 'requiere_info') return 'requiere_info';
+    return 'pending';
   };
+
+  // Stats from ALL sales
+  const stats = {
+    pending: sales.filter((s: any) => classifySale(s) === 'pending').length,
+    approved: sales.filter((s: any) => classifySale(s) === 'aprobado').length,
+    rejected: sales.filter((s: any) => classifySale(s) === 'rechazado').length,
+    infoRequired: sales.filter((s: any) => classifySale(s) === 'requiere_info').length,
+  };
+
+  // Filter by status tab, then by search
+  const filteredSales = sales
+    .filter((sale: any) => {
+      if (statusFilter === 'pending') return classifySale(sale) === 'pending';
+      if (statusFilter === 'aprobado') return classifySale(sale) === 'aprobado';
+      if (statusFilter === 'rechazado') return classifySale(sale) === 'rechazado';
+      if (statusFilter === 'requiere_info') return classifySale(sale) === 'requiere_info';
+      return true; // 'all'
+    })
+    .filter((sale: any) => {
+      if (!searchTerm) return true;
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        sale.clients?.first_name?.toLowerCase().includes(searchLower) ||
+        sale.clients?.last_name?.toLowerCase().includes(searchLower) ||
+        sale.contract_number?.toLowerCase().includes(searchLower) ||
+        sale.plans?.name?.toLowerCase().includes(searchLower)
+      );
+    });
 
   const detailView = selectedSale ? (
       <div className="space-y-6">
@@ -892,7 +894,7 @@ export const AuditorDashboard: React.FC = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
+        <Card className={`cursor-pointer transition-shadow hover:shadow-md ${statusFilter === 'pending' ? 'ring-2 ring-yellow-500' : ''}`} onClick={() => setStatusFilter('pending')}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Clock className="h-4 w-4 text-yellow-500" />
@@ -903,7 +905,7 @@ export const AuditorDashboard: React.FC = () => {
             <div className="text-2xl font-bold">{stats.pending}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={`cursor-pointer transition-shadow hover:shadow-md ${statusFilter === 'aprobado' ? 'ring-2 ring-green-500' : ''}`} onClick={() => setStatusFilter('aprobado')}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-green-500" />
@@ -914,7 +916,7 @@ export const AuditorDashboard: React.FC = () => {
             <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={`cursor-pointer transition-shadow hover:shadow-md ${statusFilter === 'rechazado' ? 'ring-2 ring-red-500' : ''}`} onClick={() => setStatusFilter('rechazado')}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <XCircle className="h-4 w-4 text-red-500" />
@@ -925,7 +927,7 @@ export const AuditorDashboard: React.FC = () => {
             <div className="text-2xl font-bold text-destructive">{stats.rejected}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={`cursor-pointer transition-shadow hover:shadow-md ${statusFilter === 'requiere_info' ? 'ring-2 ring-orange-500' : ''}`} onClick={() => setStatusFilter('requiere_info')}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-orange-500" />
