@@ -232,7 +232,7 @@ export const AuditorDashboard: React.FC = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [statusFilter, queryClient]);
+  }, [queryClient, refetch]);
 
   // Approve sale - changes status to 'aprobado_para_templates' (approved, ready for next steps)
   const approveSale = useMutation({
