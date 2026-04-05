@@ -152,16 +152,16 @@ export const AuditorDashboard: React.FC = () => {
   const [lightboxType, setLightboxType] = useState('');
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
-  // Fetch sales pending audit
-  const { data: sales = [], isLoading } = useQuery({
-    queryKey: ['audit-sales', statusFilter],
+  // Fetch sales pending audit using auditor_sales_view
+  const { data: sales = [], isLoading, refetch } = useQuery({
+    queryKey: ['auditor-sales', statusFilter],
     queryFn: async () => {
       let query = supabase
-        .from('sales')
+        .from('auditor_sales_view')
         .select(`
           *,
-          clients (*),
-          plans (*),
+          clients:client_id (*),
+          plans:plan_id (*),
           beneficiaries (*),
           documents (*)
         `)
@@ -170,11 +170,8 @@ export const AuditorDashboard: React.FC = () => {
       // Filter by sale status for audit
       if (statusFilter === 'pending') {
         query = query
-          .in('status', ['pendiente', 'en_auditoria', 'enviado', 'borrador'])
-          .neq('audit_status', 'aprobado')
-          .neq('audit_status', 'rechazado');
-      } else if (statusFilter === 'borrador') {
-        query = query.eq('status', 'borrador');
+          .in('status', ['pendiente', 'en_auditoria', 'enviado'])
+          .not('audit_status', 'in', '("aprobado","rechazado")');
       } else if (statusFilter === 'aprobado') {
         query = query.eq('audit_status', 'aprobado');
       } else if (statusFilter === 'rechazado') {
@@ -182,7 +179,7 @@ export const AuditorDashboard: React.FC = () => {
       } else if (statusFilter === 'requiere_info') {
         query = query.eq('audit_status', 'requiere_info');
       } else {
-        // 'all' - no filter, show everything (RLS already limits by company)
+        // 'all' - no filter, the view already excludes drafts
       }
 
       const { data, error } = await query;
@@ -223,25 +220,34 @@ export const AuditorDashboard: React.FC = () => {
         })),
       }));
     },
+    refetchInterval: 30_000,
+    staleTime: 10_000,
   });
 
-  // Realtime: auto-refresh when any sale's status or audit_status changes
+  // Realtime: auto-refresh when sales, sale_documents or documents change
   useEffect(() => {
+    refetch();
+
     const channel = supabase
-      .channel('audit-sales-realtime')
-      .on(
-        'postgres_changes',
+      .channel('auditor-realtime')
+      .on('postgres_changes',
         { event: '*', schema: 'public', table: 'sales' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['audit-sales'] });
-        }
+        () => { queryClient.invalidateQueries({ queryKey: ['auditor-sales'] }); }
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'sale_documents' },
+        () => { queryClient.invalidateQueries({ queryKey: ['auditor-sales'] }); }
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'documents' },
+        () => { queryClient.invalidateQueries({ queryKey: ['auditor-sales'] }); }
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [statusFilter, queryClient]);
 
   // Approve sale - changes status to 'aprobado_para_templates' (approved, ready for next steps)
   const approveSale = useMutation({
@@ -499,7 +505,7 @@ export const AuditorDashboard: React.FC = () => {
 
   // Stats
   const stats = {
-    pending: sales.filter((s: any) => s.status === 'pendiente' || s.status === 'en_auditoria').length,
+    pending: sales.filter((s: any) => ['pendiente', 'en_auditoria', 'enviado'].includes(s.status) && s.audit_status !== 'aprobado' && s.audit_status !== 'rechazado').length,
     approved: sales.filter((s: any) => s.audit_status === 'aprobado').length,
     rejected: sales.filter((s: any) => s.audit_status === 'rechazado' || s.status === 'rechazado').length,
     infoRequired: sales.filter((s: any) => s.audit_status === 'requiere_info').length,
@@ -776,8 +782,48 @@ export const AuditorDashboard: React.FC = () => {
             </Card>
           )}
 
+          {/* Attached Documents (sale_documents from view) */}
+          {selectedSale.attached_documents?.length > 0 && (
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Documentos Adjuntos ({selectedSale.attached_docs_count || selectedSale.attached_documents.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {selectedSale.attached_documents.map((doc: any) => (
+                    <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span>{doc.file_name}</span>
+                        {doc.file_size && (
+                          <span className="text-xs text-muted-foreground">
+                            {(doc.file_size / 1024 / 1024).toFixed(2)} MB
+                          </span>
+                        )}
+                      </div>
+                      <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
+                        <Button variant="ghost" size="sm">
+                          <Eye className="h-3 w-3 mr-1" />
+                          Ver
+                        </Button>
+                      </a>
+                    </div>
+                  ))}
+                  {selectedSale.last_doc_uploaded_at && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Último documento: {new Date(selectedSale.last_doc_uploaded_at).toLocaleString('es-PY')}
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Show message if no documents at all */}
-          {(!selectedSale.documents?.length) && (
+          {(!selectedSale.documents?.length && !selectedSale.attached_documents?.length) && (
             <Card className="lg:col-span-2">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -915,7 +961,6 @@ export const AuditorDashboard: React.FC = () => {
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="pending">Pendientes</SelectItem>
-                <SelectItem value="borrador">Borradores</SelectItem>
                 <SelectItem value="aprobado">Aprobados</SelectItem>
                 <SelectItem value="rechazado">Rechazados</SelectItem>
                 <SelectItem value="requiere_info">Info Requerida</SelectItem>
