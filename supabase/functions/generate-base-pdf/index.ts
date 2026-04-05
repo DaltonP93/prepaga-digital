@@ -403,10 +403,21 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 2b. Resolve all branding URLs
+    // 2b. Resolve all branding URLs then convert to data URIs for reliable rendering
     branding.logoUrl = await resolveStorageUrl(branding.logoUrl, supabaseAdmin);
     branding.headerImageUrl = await resolveStorageUrl(branding.headerImageUrl, supabaseAdmin);
     branding.footerImageUrl = await resolveStorageUrl(branding.footerImageUrl, supabaseAdmin);
+
+    // Convert branding images to base64 data URIs to avoid network loading issues in renderer
+    if (branding.headerImageUrl) {
+      branding.headerImageUrl = await imageUrlToDataUri(branding.headerImageUrl);
+    }
+    if (branding.footerImageUrl) {
+      branding.footerImageUrl = await imageUrlToDataUri(branding.footerImageUrl);
+    }
+    if (branding.logoUrl) {
+      branding.logoUrl = await imageUrlToDataUri(branding.logoUrl);
+    }
 
     // 2c. Resolve expired image URLs in document content
     const bucket = Deno.env.get("STORAGE_BUCKET") || "documents";
