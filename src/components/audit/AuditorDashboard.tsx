@@ -894,7 +894,7 @@ export const AuditorDashboard: React.FC = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
+        <Card className={`cursor-pointer transition-shadow hover:shadow-md ${statusFilter === 'pending' ? 'ring-2 ring-yellow-500' : ''}`} onClick={() => setStatusFilter('pending')}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Clock className="h-4 w-4 text-yellow-500" />
@@ -905,7 +905,7 @@ export const AuditorDashboard: React.FC = () => {
             <div className="text-2xl font-bold">{stats.pending}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={`cursor-pointer transition-shadow hover:shadow-md ${statusFilter === 'aprobado' ? 'ring-2 ring-green-500' : ''}`} onClick={() => setStatusFilter('aprobado')}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-green-500" />
@@ -916,7 +916,7 @@ export const AuditorDashboard: React.FC = () => {
             <div className="text-2xl font-bold text-green-600">{stats.approved}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={`cursor-pointer transition-shadow hover:shadow-md ${statusFilter === 'rechazado' ? 'ring-2 ring-red-500' : ''}`} onClick={() => setStatusFilter('rechazado')}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <XCircle className="h-4 w-4 text-red-500" />
@@ -927,7 +927,7 @@ export const AuditorDashboard: React.FC = () => {
             <div className="text-2xl font-bold text-destructive">{stats.rejected}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className={`cursor-pointer transition-shadow hover:shadow-md ${statusFilter === 'requiere_info' ? 'ring-2 ring-orange-500' : ''}`} onClick={() => setStatusFilter('requiere_info')}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-orange-500" />
