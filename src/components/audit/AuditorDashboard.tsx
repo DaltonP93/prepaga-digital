@@ -782,8 +782,48 @@ export const AuditorDashboard: React.FC = () => {
             </Card>
           )}
 
+          {/* Attached Documents (sale_documents from view) */}
+          {selectedSale.attached_documents?.length > 0 && (
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Documentos Adjuntos ({selectedSale.attached_docs_count || selectedSale.attached_documents.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {selectedSale.attached_documents.map((doc: any) => (
+                    <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span>{doc.file_name}</span>
+                        {doc.file_size && (
+                          <span className="text-xs text-muted-foreground">
+                            {(doc.file_size / 1024 / 1024).toFixed(2)} MB
+                          </span>
+                        )}
+                      </div>
+                      <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
+                        <Button variant="ghost" size="sm">
+                          <Eye className="h-3 w-3 mr-1" />
+                          Ver
+                        </Button>
+                      </a>
+                    </div>
+                  ))}
+                  {selectedSale.last_doc_uploaded_at && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Último documento: {new Date(selectedSale.last_doc_uploaded_at).toLocaleString('es-PY')}
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Show message if no documents at all */}
-          {(!selectedSale.documents?.length) && (
+          {(!selectedSale.documents?.length && !selectedSale.attached_documents?.length) && (
             <Card className="lg:col-span-2">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
