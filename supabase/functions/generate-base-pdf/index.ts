@@ -255,6 +255,27 @@ async function resolveContentImages(
 }
 
 /**
+ * Fetch an image URL and return a base64 data URI for reliable rendering.
+ * Falls back to the original URL if fetching fails.
+ */
+async function imageUrlToDataUri(url: string): Promise<string> {
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) return url;
+    const contentType = resp.headers.get("content-type") || "image/png";
+    const buffer = new Uint8Array(await resp.arrayBuffer());
+    let binary = "";
+    for (let i = 0; i < buffer.length; i++) {
+      binary += String.fromCharCode(buffer[i]);
+    }
+    const b64 = btoa(binary);
+    return `data:${contentType};base64,${b64}`;
+  } catch {
+    return url;
+  }
+}
+
+/**
  * Resolve a storage or public URL to a fresh signed URL.
  */
 async function resolveStorageUrl(
