@@ -152,16 +152,16 @@ export const AuditorDashboard: React.FC = () => {
   const [lightboxType, setLightboxType] = useState('');
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
-  // Fetch sales pending audit
-  const { data: sales = [], isLoading } = useQuery({
-    queryKey: ['audit-sales', statusFilter],
+  // Fetch sales pending audit using auditor_sales_view
+  const { data: sales = [], isLoading, refetch } = useQuery({
+    queryKey: ['auditor-sales', statusFilter],
     queryFn: async () => {
       let query = supabase
-        .from('sales')
+        .from('auditor_sales_view')
         .select(`
           *,
-          clients (*),
-          plans (*),
+          clients:client_id (*),
+          plans:plan_id (*),
           beneficiaries (*),
           documents (*)
         `)
@@ -170,11 +170,8 @@ export const AuditorDashboard: React.FC = () => {
       // Filter by sale status for audit
       if (statusFilter === 'pending') {
         query = query
-          .in('status', ['pendiente', 'en_auditoria', 'enviado', 'borrador'])
-          .neq('audit_status', 'aprobado')
-          .neq('audit_status', 'rechazado');
-      } else if (statusFilter === 'borrador') {
-        query = query.eq('status', 'borrador');
+          .in('status', ['pendiente', 'en_auditoria', 'enviado'])
+          .not('audit_status', 'in', '("aprobado","rechazado")');
       } else if (statusFilter === 'aprobado') {
         query = query.eq('audit_status', 'aprobado');
       } else if (statusFilter === 'rechazado') {
@@ -182,7 +179,7 @@ export const AuditorDashboard: React.FC = () => {
       } else if (statusFilter === 'requiere_info') {
         query = query.eq('audit_status', 'requiere_info');
       } else {
-        // 'all' - no filter, show everything (RLS already limits by company)
+        // 'all' - no filter, the view already excludes drafts
       }
 
       const { data, error } = await query;
@@ -223,6 +220,8 @@ export const AuditorDashboard: React.FC = () => {
         })),
       }));
     },
+    refetchInterval: 30_000,
+    staleTime: 10_000,
   });
 
   // Realtime: auto-refresh when any sale's status or audit_status changes
