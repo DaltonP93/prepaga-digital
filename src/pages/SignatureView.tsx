@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import DOMPurify from 'dompurify';
 import { formatCurrency } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
 import { useSignatureVerification, generateDocumentHash, buildEvidenceBundle } from "@/hooks/useSignatureVerification";
 
 const SignatureView = () => {
@@ -108,8 +107,39 @@ const SignatureView = () => {
       }
     }
 
-    // Fallback: open HTML content for printing
+    // Try base PDF if available
+    if (doc.base_pdf_url) {
+      try {
+        const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+        const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        const response = await fetch(
+          `${SUPABASE_URL}/functions/v1/get-document-download-url`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_PUBLISHABLE_KEY,
+              'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+              'x-signature-token': token || '',
+            },
+            body: JSON.stringify({ document_id: doc.id, kind: 'base' }),
+          }
+        );
+        const result = await response.json();
+        if (result.url) {
+          window.open(result.url, '_blank');
+          return;
+        }
+      } catch (err) {
+      }
+    }
+
+    // Fallback: open HTML content for printing with branding
     if (!doc?.content) return;
+    const comp = linkData?.sale?.companies;
+    const logoUrl = comp?.logo_url || '';
+    const companyName = comp?.name || '';
+
     const htmlContent = `
       <!doctype html>
       <html lang="es">
@@ -118,15 +148,32 @@ const SignatureView = () => {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>${doc.name}</title>
         <style>
-          @page { size: A4; margin: 20mm; }
-          body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 12px; line-height: 1.6; color: #333; margin: 0; padding: 20px; }
+          @page { size: A4; margin: 32mm 15mm 22mm 15mm; }
+          body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 12px; line-height: 1.6; color: #333; margin: 0; padding: 0; }
           img { max-width: 280px; }
           table { width: 100%; border-collapse: collapse; }
           th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          .page-header {
+            position: fixed; top: -28mm; left: 0; right: 0; height: 24mm;
+            display: flex; align-items: center; justify-content: center; padding: 2mm 0;
+          }
+          .page-header img { max-width: 55%; max-height: 20mm; height: auto; object-fit: contain; }
+          .page-footer {
+            position: fixed; bottom: -18mm; left: 0; right: 0; height: 14mm;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 8px; color: #777;
+          }
+          .page-footer img { max-width: 90%; max-height: 12mm; height: auto; object-fit: contain; }
           @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
         </style>
       </head>
       <body>
+        <div class="page-header">
+          ${logoUrl ? `<img src="${logoUrl}" alt="${companyName}" />` : `<span style="font-weight:700;font-size:18px;">${companyName}</span>`}
+        </div>
+        <div class="page-footer">
+          <span>${companyName} ${(comp as any)?.phone ? '| ' + (comp as any).phone : ''} ${(comp as any)?.email ? '| ' + (comp as any).email : ''}</span>
+        </div>
         ${DOMPurify.sanitize(doc.content || '', { FORCE_BODY: true })}
       </body>
       </html>
@@ -686,11 +733,30 @@ const SignatureView = () => {
                               size="sm"
                               variant="outline"
                               onClick={async () => {
-                                const { data } = await supabase.storage
-                                  .from('documents')
-                                  .createSignedUrl(doc.file_url, 3600);
-                                if (data?.signedUrl) {
-                                  window.open(data.signedUrl, '_blank');
+                                try {
+                                  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+                                  const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+                                  const response = await fetch(
+                                    `${SUPABASE_URL}/functions/v1/get-document-download-url`,
+                                    {
+                                      method: 'POST',
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                        'apikey': SUPABASE_PUBLISHABLE_KEY,
+                                        'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+                                        'x-signature-token': token || '',
+                                      },
+                                      body: JSON.stringify({ document_id: doc.id, kind: 'file' }),
+                                    }
+                                  );
+                                  const result = await response.json();
+                                  if (result.url) {
+                                    window.open(result.url, '_blank');
+                                  } else {
+                                    console.error('Download error:', result.error);
+                                  }
+                                } catch (err) {
+                                  console.error('Download error:', err);
                                 }
                               }}
                             >
