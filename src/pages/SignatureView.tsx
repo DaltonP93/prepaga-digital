@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import DOMPurify from 'dompurify';
 import { formatCurrency } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
 import { useSignatureVerification, generateDocumentHash, buildEvidenceBundle } from "@/hooks/useSignatureVerification";
 
 const SignatureView = () => {
