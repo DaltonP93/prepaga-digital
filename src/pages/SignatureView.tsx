@@ -136,7 +136,7 @@ const SignatureView = () => {
 
     // Fallback: open HTML content for printing with branding
     if (!doc?.content) return;
-    const comp = sale?.companies;
+    const comp = linkData?.sale?.companies;
     const logoUrl = comp?.logo_url || '';
     const companyName = comp?.name || '';
 
