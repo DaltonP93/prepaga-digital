@@ -448,6 +448,7 @@ Deno.serve(async (req) => {
           format: "A4",
           printBackground: true,
           margin: { top: "30mm", right: "15mm", bottom: "22mm", left: "15mm" },
+          waitUntil: "networkidle0",
         },
       }),
     });
