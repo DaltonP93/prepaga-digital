@@ -961,7 +961,6 @@ export const AuditorDashboard: React.FC = () => {
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="pending">Pendientes</SelectItem>
-                <SelectItem value="borrador">Borradores</SelectItem>
                 <SelectItem value="aprobado">Aprobados</SelectItem>
                 <SelectItem value="rechazado">Rechazados</SelectItem>
                 <SelectItem value="requiere_info">Info Requerida</SelectItem>
