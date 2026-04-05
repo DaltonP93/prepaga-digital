@@ -416,11 +416,30 @@ const SignatureView = () => {
                             size="sm"
                             variant="outline"
                             onClick={async () => {
-                              const { data } = await supabase.storage
-                                .from('documents')
-                                .createSignedUrl(doc.file_url, 3600);
-                              if (data?.signedUrl) {
-                                window.open(data.signedUrl, '_blank');
+                              try {
+                                const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+                                const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+                                const response = await fetch(
+                                  `${SUPABASE_URL}/functions/v1/get-document-download-url`,
+                                  {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                      'apikey': SUPABASE_PUBLISHABLE_KEY,
+                                      'Authorization': `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+                                      'x-signature-token': token || '',
+                                    },
+                                    body: JSON.stringify({ document_id: doc.id, kind: 'file' }),
+                                  }
+                                );
+                                const result = await response.json();
+                                if (result.url) {
+                                  window.open(result.url, '_blank');
+                                } else {
+                                  console.error('Download error:', result.error);
+                                }
+                              } catch (err) {
+                                console.error('Download error:', err);
                               }
                             }}
                           >
