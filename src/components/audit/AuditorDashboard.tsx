@@ -224,23 +224,30 @@ export const AuditorDashboard: React.FC = () => {
     staleTime: 10_000,
   });
 
-  // Realtime: auto-refresh when any sale's status or audit_status changes
+  // Realtime: auto-refresh when sales, sale_documents or documents change
   useEffect(() => {
+    refetch();
+
     const channel = supabase
-      .channel('audit-sales-realtime')
-      .on(
-        'postgres_changes',
+      .channel('auditor-realtime')
+      .on('postgres_changes',
         { event: '*', schema: 'public', table: 'sales' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['audit-sales'] });
-        }
+        () => { queryClient.invalidateQueries({ queryKey: ['auditor-sales'] }); }
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'sale_documents' },
+        () => { queryClient.invalidateQueries({ queryKey: ['auditor-sales'] }); }
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'documents' },
+        () => { queryClient.invalidateQueries({ queryKey: ['auditor-sales'] }); }
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [statusFilter, queryClient]);
 
   // Approve sale - changes status to 'aprobado_para_templates' (approved, ready for next steps)
   const approveSale = useMutation({
