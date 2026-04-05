@@ -173,7 +173,7 @@ const SignatureView = () => {
           ${logoUrl ? `<img src="${logoUrl}" alt="${companyName}" />` : `<span style="font-weight:700;font-size:18px;">${companyName}</span>`}
         </div>
         <div class="page-footer">
-          <span>${companyName} ${comp?.phone ? '| ' + comp.phone : ''} ${comp?.email ? '| ' + comp.email : ''}</span>
+          <span>${companyName} ${(comp as any)?.phone ? '| ' + (comp as any).phone : ''} ${(comp as any)?.email ? '| ' + (comp as any).email : ''}</span>
         </div>
         ${DOMPurify.sanitize(doc.content || '', { FORCE_BODY: true })}
       </body>
