@@ -477,24 +477,41 @@ export const AuditorDashboard: React.FC = () => {
     }
   };
 
-  const filteredSales = sales.filter((sale: any) => {
-    if (!searchTerm) return true;
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      sale.clients?.first_name?.toLowerCase().includes(searchLower) ||
-      sale.clients?.last_name?.toLowerCase().includes(searchLower) ||
-      sale.contract_number?.toLowerCase().includes(searchLower) ||
-      sale.plans?.name?.toLowerCase().includes(searchLower)
-    );
-  });
-
-  // Stats
-  const stats = {
-    pending: sales.filter((s: any) => ['pendiente', 'en_auditoria', 'enviado'].includes(s.status) && s.audit_status !== 'aprobado' && s.audit_status !== 'rechazado').length,
-    approved: sales.filter((s: any) => s.audit_status === 'aprobado').length,
-    rejected: sales.filter((s: any) => s.audit_status === 'rechazado' || s.status === 'rechazado').length,
-    infoRequired: sales.filter((s: any) => s.audit_status === 'requiere_info').length,
+  // Classify each sale for filtering and stats
+  const classifySale = (sale: any): string => {
+    if (sale.audit_status === 'aprobado') return 'aprobado';
+    if (sale.audit_status === 'rechazado') return 'rechazado';
+    if (sale.audit_status === 'requiere_info') return 'requiere_info';
+    return 'pending';
   };
+
+  // Stats from ALL sales
+  const stats = {
+    pending: sales.filter((s: any) => classifySale(s) === 'pending').length,
+    approved: sales.filter((s: any) => classifySale(s) === 'aprobado').length,
+    rejected: sales.filter((s: any) => classifySale(s) === 'rechazado').length,
+    infoRequired: sales.filter((s: any) => classifySale(s) === 'requiere_info').length,
+  };
+
+  // Filter by status tab, then by search
+  const filteredSales = sales
+    .filter((sale: any) => {
+      if (statusFilter === 'pending') return classifySale(sale) === 'pending';
+      if (statusFilter === 'aprobado') return classifySale(sale) === 'aprobado';
+      if (statusFilter === 'rechazado') return classifySale(sale) === 'rechazado';
+      if (statusFilter === 'requiere_info') return classifySale(sale) === 'requiere_info';
+      return true; // 'all'
+    })
+    .filter((sale: any) => {
+      if (!searchTerm) return true;
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        sale.clients?.first_name?.toLowerCase().includes(searchLower) ||
+        sale.clients?.last_name?.toLowerCase().includes(searchLower) ||
+        sale.contract_number?.toLowerCase().includes(searchLower) ||
+        sale.plans?.name?.toLowerCase().includes(searchLower)
+      );
+    });
 
   const detailView = selectedSale ? (
       <div className="space-y-6">
