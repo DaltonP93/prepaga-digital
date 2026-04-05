@@ -154,9 +154,9 @@ export const AuditorDashboard: React.FC = () => {
 
   // Fetch sales pending audit using auditor_sales_view
   const { data: sales = [], isLoading, refetch } = useQuery({
-    queryKey: ['auditor-sales', statusFilter],
+    queryKey: ['auditor-sales'],
     queryFn: async () => {
-      let query = supabase
+      const query = supabase
         .from('auditor_sales_view')
         .select(`
           *,
@@ -166,21 +166,6 @@ export const AuditorDashboard: React.FC = () => {
           documents (*)
         `)
         .order('created_at', { ascending: false });
-
-      // Filter by sale status for audit
-      if (statusFilter === 'pending') {
-        query = query
-          .in('status', ['pendiente', 'en_auditoria', 'enviado'])
-          .not('audit_status', 'in', '("aprobado","rechazado")');
-      } else if (statusFilter === 'aprobado') {
-        query = query.eq('audit_status', 'aprobado');
-      } else if (statusFilter === 'rechazado') {
-        query = query.eq('audit_status', 'rechazado');
-      } else if (statusFilter === 'requiere_info') {
-        query = query.eq('audit_status', 'requiere_info');
-      } else {
-        // 'all' - no filter, the view already excludes drafts
-      }
 
       const { data, error } = await query;
       if (error) throw error;
