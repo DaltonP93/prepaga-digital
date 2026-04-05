@@ -505,7 +505,7 @@ export const AuditorDashboard: React.FC = () => {
 
   // Stats
   const stats = {
-    pending: sales.filter((s: any) => s.status === 'pendiente' || s.status === 'en_auditoria').length,
+    pending: sales.filter((s: any) => ['pendiente', 'en_auditoria', 'enviado'].includes(s.status) && s.audit_status !== 'aprobado' && s.audit_status !== 'rechazado').length,
     approved: sales.filter((s: any) => s.audit_status === 'aprobado').length,
     rejected: sales.filter((s: any) => s.audit_status === 'rechazado' || s.status === 'rechazado').length,
     infoRequired: sales.filter((s: any) => s.audit_status === 'requiere_info').length,
