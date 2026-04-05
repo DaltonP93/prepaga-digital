@@ -50,6 +50,13 @@ export type Database = {
             foreignKeyName: "audit_comments_sale_id_fkey"
             columns: ["sale_id"]
             isOneToOne: false
+            referencedRelation: "auditor_sales_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_comments_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
             referencedRelation: "sales"
             referencedColumns: ["id"]
           },
@@ -137,6 +144,13 @@ export type Database = {
           status?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "audit_processes_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "auditor_sales_view"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "audit_processes_sale_id_fkey"
             columns: ["sale_id"]
@@ -303,6 +317,13 @@ export type Database = {
           signature_required?: boolean | null
         }
         Relationships: [
+          {
+            foreignKeyName: "beneficiaries_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "auditor_sales_view"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "beneficiaries_sale_id_fkey"
             columns: ["sale_id"]
@@ -512,6 +533,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_logs_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "auditor_sales_view"
             referencedColumns: ["id"]
           },
           {
@@ -1188,6 +1216,13 @@ export type Database = {
             foreignKeyName: "document_packages_sale_id_fkey"
             columns: ["sale_id"]
             isOneToOne: false
+            referencedRelation: "auditor_sales_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_packages_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
             referencedRelation: "sales"
             referencedColumns: ["id"]
           },
@@ -1344,6 +1379,13 @@ export type Database = {
             columns: ["document_type_id"]
             isOneToOne: false
             referencedRelation: "document_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "auditor_sales_view"
             referencedColumns: ["id"]
           },
           {
@@ -1730,6 +1772,13 @@ export type Database = {
             foreignKeyName: "information_requests_sale_id_fkey"
             columns: ["sale_id"]
             isOneToOne: false
+            referencedRelation: "auditor_sales_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "information_requests_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
             referencedRelation: "sales"
             referencedColumns: ["id"]
           },
@@ -1772,6 +1821,13 @@ export type Database = {
             columns: ["document_id"]
             isOneToOne: false
             referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legal_evidence_certificates_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "auditor_sales_view"
             referencedColumns: ["id"]
           },
           {
@@ -1927,6 +1983,13 @@ export type Database = {
             foreignKeyName: "process_traces_sale_id_fkey"
             columns: ["sale_id"]
             isOneToOne: false
+            referencedRelation: "auditor_sales_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "process_traces_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
             referencedRelation: "sales"
             referencedColumns: ["id"]
           },
@@ -2039,6 +2102,13 @@ export type Database = {
             foreignKeyName: "sale_documents_sale_id_fkey"
             columns: ["sale_id"]
             isOneToOne: false
+            referencedRelation: "auditor_sales_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_documents_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
             referencedRelation: "sales"
             referencedColumns: ["id"]
           },
@@ -2070,6 +2140,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "sale_notes_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "auditor_sales_view"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sale_notes_sale_id_fkey"
             columns: ["sale_id"]
@@ -2112,6 +2189,13 @@ export type Database = {
             foreignKeyName: "sale_requirements_sale_id_fkey"
             columns: ["sale_id"]
             isOneToOne: false
+            referencedRelation: "auditor_sales_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_requirements_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
             referencedRelation: "sales"
             referencedColumns: ["id"]
           },
@@ -2137,6 +2221,13 @@ export type Database = {
           template_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "sale_templates_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "auditor_sales_view"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sale_templates_sale_id_fkey"
             columns: ["sale_id"]
@@ -2185,6 +2276,13 @@ export type Database = {
           sale_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "sale_workflow_states_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "auditor_sales_view"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sale_workflow_states_sale_id_fkey"
             columns: ["sale_id"]
@@ -2395,6 +2493,13 @@ export type Database = {
             foreignKeyName: "signature_consent_records_sale_id_fkey"
             columns: ["sale_id"]
             isOneToOne: false
+            referencedRelation: "auditor_sales_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_consent_records_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
             referencedRelation: "sales"
             referencedColumns: ["id"]
           },
@@ -2485,6 +2590,13 @@ export type Database = {
             columns: ["identity_verification_id"]
             isOneToOne: false
             referencedRelation: "signature_identity_verification"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_events_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "auditor_sales_view"
             referencedColumns: ["id"]
           },
           {
@@ -2587,6 +2699,13 @@ export type Database = {
             foreignKeyName: "signature_evidence_bundles_sale_id_fkey"
             columns: ["sale_id"]
             isOneToOne: false
+            referencedRelation: "auditor_sales_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_evidence_bundles_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
             referencedRelation: "sales"
             referencedColumns: ["id"]
           },
@@ -2659,6 +2778,13 @@ export type Database = {
           verified_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "signature_identity_verification_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "auditor_sales_view"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "signature_identity_verification_sale_id_fkey"
             columns: ["sale_id"]
@@ -2754,6 +2880,13 @@ export type Database = {
             columns: ["package_id"]
             isOneToOne: false
             referencedRelation: "document_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_links_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "auditor_sales_view"
             referencedColumns: ["id"]
           },
           {
@@ -2886,6 +3019,13 @@ export type Database = {
             columns: ["document_id"]
             isOneToOne: false
             referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signatures_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "auditor_sales_view"
             referencedColumns: ["id"]
           },
           {
@@ -3448,6 +3588,13 @@ export type Database = {
             foreignKeyName: "template_responses_sale_id_fkey"
             columns: ["sale_id"]
             isOneToOne: false
+            referencedRelation: "auditor_sales_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_responses_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
             referencedRelation: "sales"
             referencedColumns: ["id"]
           },
@@ -3763,6 +3910,13 @@ export type Database = {
             foreignKeyName: "whatsapp_messages_sale_id_fkey"
             columns: ["sale_id"]
             isOneToOne: false
+            referencedRelation: "auditor_sales_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
             referencedRelation: "sales"
             referencedColumns: ["id"]
           },
@@ -3821,6 +3975,13 @@ export type Database = {
             foreignKeyName: "whatsapp_notifications_sale_id_fkey"
             columns: ["sale_id"]
             isOneToOne: false
+            referencedRelation: "auditor_sales_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_notifications_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
             referencedRelation: "sales"
             referencedColumns: ["id"]
           },
@@ -3872,6 +4033,167 @@ export type Database = {
       }
     }
     Views: {
+      auditor_sales_view: {
+        Row: {
+          adherents_count: number | null
+          all_signatures_completed: boolean | null
+          attached_docs_count: number | null
+          attached_documents: Json | null
+          audit_notes: string | null
+          audit_status: string | null
+          audited_at: string | null
+          auditor_id: string | null
+          billing_email: string | null
+          billing_phone: string | null
+          billing_razon_social: string | null
+          billing_ruc: string | null
+          client_id: string | null
+          company_id: string | null
+          contract_number: string | null
+          contract_pdf_url: string | null
+          contract_start_date: string | null
+          created_at: string | null
+          id: string | null
+          immediate_coverage: boolean | null
+          last_doc_uploaded_at: string | null
+          notes: string | null
+          plan_id: string | null
+          request_number: string | null
+          requires_adherents: boolean | null
+          sale_date: string | null
+          sale_type: string | null
+          salesperson_id: string | null
+          signature_completed_at: string | null
+          signature_expires_at: string | null
+          signature_token: string | null
+          signed_at: string | null
+          signed_ip: string | null
+          signer_dni: string | null
+          signer_name: string | null
+          signer_relationship: string | null
+          signer_type: string | null
+          status: Database["public"]["Enums"]["sale_status"] | null
+          template_id: string | null
+          total_amount: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          adherents_count?: number | null
+          all_signatures_completed?: boolean | null
+          attached_docs_count?: never
+          attached_documents?: never
+          audit_notes?: string | null
+          audit_status?: string | null
+          audited_at?: string | null
+          auditor_id?: string | null
+          billing_email?: string | null
+          billing_phone?: string | null
+          billing_razon_social?: string | null
+          billing_ruc?: string | null
+          client_id?: string | null
+          company_id?: string | null
+          contract_number?: string | null
+          contract_pdf_url?: string | null
+          contract_start_date?: string | null
+          created_at?: string | null
+          id?: string | null
+          immediate_coverage?: boolean | null
+          last_doc_uploaded_at?: never
+          notes?: string | null
+          plan_id?: string | null
+          request_number?: string | null
+          requires_adherents?: boolean | null
+          sale_date?: string | null
+          sale_type?: string | null
+          salesperson_id?: string | null
+          signature_completed_at?: string | null
+          signature_expires_at?: string | null
+          signature_token?: string | null
+          signed_at?: string | null
+          signed_ip?: string | null
+          signer_dni?: string | null
+          signer_name?: string | null
+          signer_relationship?: string | null
+          signer_type?: string | null
+          status?: Database["public"]["Enums"]["sale_status"] | null
+          template_id?: string | null
+          total_amount?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          adherents_count?: number | null
+          all_signatures_completed?: boolean | null
+          attached_docs_count?: never
+          attached_documents?: never
+          audit_notes?: string | null
+          audit_status?: string | null
+          audited_at?: string | null
+          auditor_id?: string | null
+          billing_email?: string | null
+          billing_phone?: string | null
+          billing_razon_social?: string | null
+          billing_ruc?: string | null
+          client_id?: string | null
+          company_id?: string | null
+          contract_number?: string | null
+          contract_pdf_url?: string | null
+          contract_start_date?: string | null
+          created_at?: string | null
+          id?: string | null
+          immediate_coverage?: boolean | null
+          last_doc_uploaded_at?: never
+          notes?: string | null
+          plan_id?: string | null
+          request_number?: string | null
+          requires_adherents?: boolean | null
+          sale_date?: string | null
+          sale_type?: string | null
+          salesperson_id?: string | null
+          signature_completed_at?: string | null
+          signature_expires_at?: string | null
+          signature_token?: string | null
+          signed_at?: string | null
+          signed_ip?: string | null
+          signer_dni?: string | null
+          signer_name?: string | null
+          signer_relationship?: string | null
+          signer_type?: string | null
+          status?: Database["public"]["Enums"]["sale_status"] | null
+          template_id?: string | null
+          total_amount?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_public_settings: {
         Row: {
           company_id: string | null
