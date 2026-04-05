@@ -1,18 +1,50 @@
 
 
-# Fix: `whatsapp_provider` se sobreescribe con default al guardar
+# Fix: Auditor Dashboard query failing silently
 
-## Problema
-En `AdminConfigPanel.tsx` línea 119, `||` trata strings vacíos como falsy, causando que el proveedor real de la DB se pierda al guardar otros campos. Lo mismo aplica a `email_provider` (línea 129).
+## Root cause
 
-## Cambio
-En `src/components/AdminConfigPanel.tsx`, líneas 118-136, cambiar `||` por `??` en los campos enum (`whatsapp_provider`, `email_provider`) para preservar valores válidos de la DB:
+The Supabase select string on line 166 has a **trailing comma** after `documents (*)`:
 
-```typescript
-whatsapp_provider: apiConfig?.whatsapp_provider ?? defaultApiFormData.whatsapp_provider,
-// ... otros campos siguen con ||, está bien para strings vacíos
-email_provider: apiConfig?.email_provider ?? defaultApiFormData.email_provider,
+```
+select(`
+  *,
+  clients (*),
+  plans (*),
+  beneficiaries (*),
+  documents (*),     <-- trailing comma causes PostgREST 400 error
+`)
 ```
 
-Solo estos dos campos necesitan `??` porque son enums con valores que nunca deberían ser string vacío. Los demás campos (tokens, URLs, keys) usan `||` correctamente ya que un string vacío `''` equivale a "no configurado".
+PostgREST parses this and expects another column after the comma. When it finds only whitespace, it returns a **400 Bad Request**. The `queryFn` throws (line 189: `if (error) throw error`), react-query catches it, and the component falls back to the default `sales = []`, showing "0 Pendientes" and "No hay ventas".
+
+I verified in the database: sale `2026-000049` has `status: 'pendiente'` and `audit_status: 'pendiente'` — the filters are correct. There are also 3 other sales (`borrador`) that should appear. The data is there; the query is just failing.
+
+## Fix
+
+**File: `src/components/audit/AuditorDashboard.tsx`** (line 166)
+
+Remove the trailing comma from the select string:
+
+```typescript
+// BEFORE:
+.select(`
+  *,
+  clients (*),
+  plans (*),
+  beneficiaries (*),
+  documents (*),
+`)
+
+// AFTER:
+.select(`
+  *,
+  clients (*),
+  plans (*),
+  beneficiaries (*),
+  documents (*)
+`)
+```
+
+Single character change. This will unblock the entire audit dashboard.
 
