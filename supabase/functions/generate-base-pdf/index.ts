@@ -255,6 +255,27 @@ async function resolveContentImages(
 }
 
 /**
+ * Fetch an image URL and return a base64 data URI for reliable rendering.
+ * Falls back to the original URL if fetching fails.
+ */
+async function imageUrlToDataUri(url: string): Promise<string> {
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) return url;
+    const contentType = resp.headers.get("content-type") || "image/png";
+    const buffer = new Uint8Array(await resp.arrayBuffer());
+    let binary = "";
+    for (let i = 0; i < buffer.length; i++) {
+      binary += String.fromCharCode(buffer[i]);
+    }
+    const b64 = btoa(binary);
+    return `data:${contentType};base64,${b64}`;
+  } catch {
+    return url;
+  }
+}
+
+/**
  * Resolve a storage or public URL to a fresh signed URL.
  */
 async function resolveStorageUrl(
@@ -382,10 +403,21 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 2b. Resolve all branding URLs
+    // 2b. Resolve all branding URLs then convert to data URIs for reliable rendering
     branding.logoUrl = await resolveStorageUrl(branding.logoUrl, supabaseAdmin);
     branding.headerImageUrl = await resolveStorageUrl(branding.headerImageUrl, supabaseAdmin);
     branding.footerImageUrl = await resolveStorageUrl(branding.footerImageUrl, supabaseAdmin);
+
+    // Convert branding images to base64 data URIs to avoid network loading issues in renderer
+    if (branding.headerImageUrl) {
+      branding.headerImageUrl = await imageUrlToDataUri(branding.headerImageUrl);
+    }
+    if (branding.footerImageUrl) {
+      branding.footerImageUrl = await imageUrlToDataUri(branding.footerImageUrl);
+    }
+    if (branding.logoUrl) {
+      branding.logoUrl = await imageUrlToDataUri(branding.logoUrl);
+    }
 
     // 2c. Resolve expired image URLs in document content
     const bucket = Deno.env.get("STORAGE_BUCKET") || "documents";
@@ -416,6 +448,7 @@ Deno.serve(async (req) => {
           format: "A4",
           printBackground: true,
           margin: { top: "30mm", right: "15mm", bottom: "22mm", left: "15mm" },
+          waitUntil: "networkidle0",
         },
       }),
     });

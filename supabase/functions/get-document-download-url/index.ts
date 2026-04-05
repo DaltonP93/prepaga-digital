@@ -14,7 +14,7 @@ Deno.serve(async (req) => {
   try {
     const { document_id, kind } = await req.json();
     if (!document_id || !kind) {
-      return new Response(JSON.stringify({ error: "document_id and kind ('base'|'signed'|'evidence') are required" }), {
+      return new Response(JSON.stringify({ error: "document_id and kind ('base'|'signed'|'evidence'|'file') are required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -81,6 +81,7 @@ Deno.serve(async (req) => {
       signed: "signed_pdf_url",
       base: "base_pdf_url",
       evidence: "evidence_certificate_url",
+      file: "file_url",
     };
     const column = columnMap[kind] || "base_pdf_url";
 
@@ -99,7 +100,7 @@ Deno.serve(async (req) => {
 
     const storedUrl = (doc as any)[column];
     if (!storedUrl) {
-      return new Response(JSON.stringify({ error: `No ${kind} PDF available for this document` }), {
+      return new Response(JSON.stringify({ error: `No ${kind} file available for this document` }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -123,6 +124,7 @@ Deno.serve(async (req) => {
       .createSignedUrl(storagePath, expiresIn);
 
     if (urlErr || !signedUrlData) {
+      console.error("createSignedUrl error:", urlErr, "bucket:", bucket, "path:", storagePath);
       return new Response(JSON.stringify({ error: "Could not generate download URL" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
