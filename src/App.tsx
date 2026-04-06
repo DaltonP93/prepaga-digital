@@ -129,7 +129,7 @@ const App = () => {
                     </SimpleProtectedRoute>
                   } 
                 >
-                  <Route index element={<Navigate to="/dashboard" replace />} />
+                  <Route path="dashboard" element={<Dashboard />} />
                   <Route path="dashboard" element={<Dashboard />} />
                   <Route path="sales" element={<Sales />} />
                   <Route path="sales/new" element={<NewSale />} />
