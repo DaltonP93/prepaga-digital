@@ -117,6 +117,7 @@ const App = () => {
               <Suspense fallback={<PageLoader />}>
               <Routes>
                 {/* Public routes */}
+                <Route path="/" element={<SimpleLoginForm />} />
                 <Route path="/login" element={<SimpleLoginForm />} />
                 <Route path="/firmar/:token" element={<SignatureView />} />
                 <Route path="/politica-firma" element={<SignaturePolicy />} />
@@ -179,7 +180,6 @@ const App = () => {
                   <Route path="questionnaire/:id" element={<QuestionnaireView />} />
                   <Route path="*" element={<NotFound />} />
                 </Route>
-                <Route path="/" element={<SimpleLoginForm />} />
               </Routes>
               </Suspense>
             </BrowserRouter>
