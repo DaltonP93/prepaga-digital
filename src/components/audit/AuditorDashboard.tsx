@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { formatCurrency } from '@/lib/utils';
+import { getDocumentAccessUrl } from '@/lib/assetUrlHelper';
 import {
   CheckCircle, XCircle, Clock, AlertCircle, Eye, Search,
   FileText, User, DollarSign, Calendar, Filter, Download,
@@ -151,6 +152,29 @@ export const AuditorDashboard: React.FC = () => {
   const [lightboxName, setLightboxName] = useState('');
   const [lightboxType, setLightboxType] = useState('');
   const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  const openAttachedDocument = async (fileUrl: string | null | undefined) => {
+    if (!fileUrl) {
+      toast({
+        title: 'Documento sin archivo',
+        description: 'No se encontro un archivo para este documento.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const accessUrl = await getDocumentAccessUrl(fileUrl);
+    if (!accessUrl) {
+      toast({
+        title: 'Error',
+        description: 'No se pudo abrir el documento adjunto.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    window.open(accessUrl, '_blank', 'noopener,noreferrer');
+  };
 
   // Fetch sales pending audit using auditor_sales_view
   const { data: sales = [], isLoading, refetch } = useQuery({
@@ -806,12 +830,14 @@ export const AuditorDashboard: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-3 w-3 mr-1" />
-                          Ver
-                        </Button>
-                      </a>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void openAttachedDocument(doc.file_url)}
+                      >
+                        <Eye className="h-3 w-3 mr-1" />
+                        Ver
+                      </Button>
                     </div>
                   ))}
                   {selectedSale.last_doc_uploaded_at && (

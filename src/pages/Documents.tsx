@@ -17,6 +17,7 @@ import { AlertCircle } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DocumentPreview } from "@/components/DocumentPreview";
 import { useNavigate } from "react-router-dom";
+import { getDocumentAccessUrl } from "@/lib/assetUrlHelper";
 
 interface SaleGroup {
   saleId: string;
@@ -160,6 +161,29 @@ const Documents: React.FC = () => {
 
   const totalDocs = documentPage?.total || 0;
 
+  const openDocumentFile = async (fileUrl: string | null | undefined) => {
+    if (!fileUrl) {
+      toast({
+        title: "Documento sin archivo",
+        description: "Este documento no tiene un archivo descargable asociado.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const accessUrl = await getDocumentAccessUrl(fileUrl);
+    if (!accessUrl) {
+      toast({
+        title: "Error",
+        description: "No se pudo abrir el documento.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    window.open(accessUrl, "_blank", "noopener,noreferrer");
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -279,9 +303,9 @@ const Documents: React.FC = () => {
                                     variant="ghost"
                                     size="icon"
                                     className="h-7 w-7"
-                                    onClick={(e) => {
+                                    onClick={async (e) => {
                                       e.stopPropagation();
-                                      window.open(doc.file_url, "_blank");
+                                      await openDocumentFile(doc.file_url);
                                     }}
                                   >
                                     <Download className="h-3.5 w-3.5" />
@@ -390,7 +414,7 @@ const Documents: React.FC = () => {
                   {selectedDocument.file_url && (
                     <Button
                       className="w-full"
-                      onClick={() => window.open(selectedDocument.file_url, "_blank")}
+                      onClick={() => void openDocumentFile(selectedDocument.file_url)}
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Descargar Documento

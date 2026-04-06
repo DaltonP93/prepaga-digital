@@ -7,6 +7,9 @@ const urlCache = new Map<string, { url: string; expiresAt: number }>();
  * Caches URLs for 50 minutes (signed for 60 min).
  */
 export async function getAssetSignedUrl(filePath: string): Promise<string> {
+  if (!filePath) return "";
+  if (/^https?:\/\//i.test(filePath)) return filePath;
+
   const cached = urlCache.get(filePath);
   if (cached && cached.expiresAt > Date.now()) return cached.url;
 
@@ -30,4 +33,8 @@ export async function getAssetSignedUrl(filePath: string): Promise<string> {
 /** Clear the URL cache (e.g. on logout) */
 export function clearAssetUrlCache() {
   urlCache.clear();
+}
+
+export async function getDocumentAccessUrl(filePath: string): Promise<string> {
+  return getAssetSignedUrl(filePath);
 }

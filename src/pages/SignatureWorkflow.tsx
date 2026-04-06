@@ -16,6 +16,7 @@ import { useRolePermissions } from '@/hooks/useRolePermissions';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { getSignatureLinkUrl } from '@/lib/appUrls';
+import { getDocumentAccessUrl } from '@/lib/assetUrlHelper';
 import { toast } from 'sonner';
 import { useSale } from '@/hooks/useSale';
 
@@ -282,6 +283,21 @@ const SignatureWorkflow = () => {
     }
   };
 
+  const openDocumentFile = async (fileUrl: string | null | undefined) => {
+    if (!fileUrl) {
+      toast.error('Documento sin archivo disponible');
+      return;
+    }
+
+    const accessUrl = await getDocumentAccessUrl(fileUrl);
+    if (!accessUrl) {
+      toast.error('No se pudo abrir el documento');
+      return;
+    }
+
+    window.open(accessUrl, '_blank', 'noopener,noreferrer');
+  };
+
   const handleDownloadSignedDocs = async (link: any) => {
     // Find signed (final) documents for this recipient
     const recipientDocs = signedDocs.filter((doc: any) => {
@@ -330,7 +346,7 @@ const SignatureWorkflow = () => {
       }
       // Fallback
       if (doc.file_url) {
-        window.open(doc.file_url, '_blank');
+        await openDocumentFile(doc.file_url);
       } else if (doc.content) {
         handleDownloadContent(doc);
       }
@@ -889,9 +905,9 @@ const SignatureWorkflow = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => {
+                            onClick={async () => {
                               if (doc.file_url) {
-                                window.open(doc.file_url, '_blank');
+                                await openDocumentFile(doc.file_url);
                               } else {
                                 handleDownloadContent(doc);
                               }
