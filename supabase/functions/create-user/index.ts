@@ -38,35 +38,50 @@ serve(async (req) => {
       )
     }
 
-    const queryPromise = supabaseAdmin
-      .from('user_roles')
-      .select('id', { count: 'exact', head: true })
-      .eq('role', 'super_admin');
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('DB timeout')), 5000)
-    );
-    const { count: superAdminCount, error: superAdminCountError } = await Promise.race([
-      queryPromise,
-      timeoutPromise,
-    ]).catch(() => ({ count: null, error: new Error('DB timeout') }));
+    // Only run the super admin count query for bootstrap-related actions
+    if (requestBody.action === 'can_bootstrap_super_admin' || requestBody.action === 'bootstrap_super_admin') {
+      let superAdminCount: number | null = null;
+      let superAdminCountError: Error | null = null;
 
-    if (superAdminCountError) {
-      return new Response(
-        JSON.stringify({ error: 'No se pudo verificar el estado de super admin' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+      try {
+        const queryPromise = supabaseAdmin
+          .from('user_roles')
+          .select('id', { count: 'exact', head: true })
+          .eq('role', 'super_admin');
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('DB timeout')), 8000)
+        );
+        const result = await Promise.race([queryPromise, timeoutPromise]);
+        superAdminCount = result.count;
+        if (result.error) superAdminCountError = result.error;
+      } catch (e) {
+        superAdminCountError = e instanceof Error ? e : new Error(String(e));
+      }
 
-    const canBootstrap = (superAdminCount ?? 0) === 0;
+      if (requestBody.action === 'can_bootstrap_super_admin') {
+        // On error, gracefully return canBootstrap: false instead of 500
+        if (superAdminCountError) {
+          console.error('Bootstrap check failed (returning false):', superAdminCountError.message);
+          return new Response(
+            JSON.stringify({ success: true, canBootstrap: false }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+        return new Response(
+          JSON.stringify({ success: true, canBootstrap: (superAdminCount ?? 0) === 0 }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
 
-    if (requestBody.action === 'can_bootstrap_super_admin') {
-      return new Response(
-        JSON.stringify({ success: true, canBootstrap }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+      // bootstrap_super_admin action
+      if (superAdminCountError) {
+        return new Response(
+          JSON.stringify({ error: 'No se pudo verificar el estado de super admin' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
 
-    if (requestBody.action === 'bootstrap_super_admin') {
+      const canBootstrap = (superAdminCount ?? 0) === 0;
       if (!canBootstrap) {
         return new Response(
           JSON.stringify({ error: 'El super admin inicial ya fue creado' }),
