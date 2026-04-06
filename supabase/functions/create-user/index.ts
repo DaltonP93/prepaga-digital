@@ -38,10 +38,17 @@ serve(async (req) => {
       )
     }
 
-    const { count: superAdminCount, error: superAdminCountError } = await supabaseAdmin
+    const queryPromise = supabaseAdmin
       .from('user_roles')
       .select('id', { count: 'exact', head: true })
       .eq('role', 'super_admin');
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('DB timeout')), 5000)
+    );
+    const { count: superAdminCount, error: superAdminCountError } = await Promise.race([
+      queryPromise,
+      timeoutPromise,
+    ]).catch(() => ({ count: null, error: new Error('DB timeout') }));
 
     if (superAdminCountError) {
       return new Response(

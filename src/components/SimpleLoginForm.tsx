@@ -15,12 +15,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { sanitizeMediaUrl } from '@/lib/mediaUrl';
 
 export const SimpleLoginForm = () => {
+  const enableSuperAdminBootstrap =
+    import.meta.env.VITE_ENABLE_SUPER_ADMIN_BOOTSTRAP === 'true';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
-  const [isCheckingBootstrap, setIsCheckingBootstrap] = useState(true);
+  const [isCheckingBootstrap, setIsCheckingBootstrap] = useState(enableSuperAdminBootstrap);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
   const [canBootstrapSuperAdmin, setCanBootstrapSuperAdmin] = useState(false);
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() => getStoredThemePreference());
@@ -56,6 +58,12 @@ export const SimpleLoginForm = () => {
   }, [user, loading, navigate, location.state]);
 
   useEffect(() => {
+    if (!enableSuperAdminBootstrap) {
+      setIsCheckingBootstrap(false);
+      setCanBootstrapSuperAdmin(false);
+      return;
+    }
+
     const checkBootstrapStatus = async () => {
       setIsCheckingBootstrap(true);
       try {
@@ -79,7 +87,7 @@ export const SimpleLoginForm = () => {
     };
 
     checkBootstrapStatus();
-  }, []);
+  }, [enableSuperAdminBootstrap]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
