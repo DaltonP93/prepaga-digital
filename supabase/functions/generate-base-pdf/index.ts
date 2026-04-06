@@ -469,7 +469,74 @@ Deno.serve(async (req) => {
     // 5. Calculate SHA-256
     const hash = await sha256Hex(pdfBytes);
 
-    // 6. Upload to Storage
+    // 6. Determine mode: versioned print or standard base PDF
+    if (admin_regeneration) {
+      // === Versioned print mode ===
+      // Get next version number
+      const { data: lastVersion } = await supabaseAdmin
+        .from("document_print_versions")
+        .select("version_number")
+        .eq("document_id", document_id)
+        .order("version_number", { ascending: false })
+        .limit(1)
+        .single();
+
+      const nextVersion = (lastVersion?.version_number || 0) + 1;
+      const versionPath = `contracts/print-versions/${doc.sale_id}/${doc.id}/v${nextVersion}.pdf`;
+
+      const { error: uploadErr } = await supabaseAdmin.storage
+        .from(bucket)
+        .upload(versionPath, pdfBytes, {
+          contentType: "application/pdf",
+          upsert: true,
+        });
+
+      if (uploadErr) {
+        console.error("Storage upload error:", uploadErr);
+        return new Response(JSON.stringify({ error: "Storage upload failed", details: uploadErr.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Mark previous versions as not current
+      await supabaseAdmin
+        .from("document_print_versions")
+        .update({ is_current: false })
+        .eq("document_id", document_id);
+
+      // Insert new version record
+      const versionPdfUrl = `${bucket}:${versionPath}`;
+      const { error: insertErr } = await supabaseAdmin
+        .from("document_print_versions")
+        .insert({
+          document_id,
+          version_number: nextVersion,
+          pdf_url: versionPdfUrl,
+          pdf_hash: hash,
+          reason: reason || null,
+          generated_by: authenticatedUserId,
+          is_current: true,
+        });
+
+      if (insertErr) {
+        console.error("Version insert error:", insertErr);
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          mode: "versioned_print",
+          document_id,
+          version_number: nextVersion,
+          pdf_url: versionPdfUrl,
+          note: `Versión de impresión v${nextVersion} generada. El PDF firmado original no fue modificado.`,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // === Standard base PDF mode ===
     const storagePath = `contracts/base/${doc.sale_id}/${doc.id}.pdf`;
 
     const { error: uploadErr } = await supabaseAdmin.storage
