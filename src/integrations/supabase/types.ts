@@ -1228,6 +1228,67 @@ export type Database = {
           },
         ]
       }
+      document_print_versions: {
+        Row: {
+          created_at: string | null
+          document_id: string
+          generated_by: string | null
+          id: string
+          is_current: boolean
+          pdf_hash: string | null
+          pdf_url: string
+          reason: string | null
+          sale_id: string
+          version_number: number
+        }
+        Insert: {
+          created_at?: string | null
+          document_id: string
+          generated_by?: string | null
+          id?: string
+          is_current?: boolean
+          pdf_hash?: string | null
+          pdf_url: string
+          reason?: string | null
+          sale_id: string
+          version_number?: number
+        }
+        Update: {
+          created_at?: string | null
+          document_id?: string
+          generated_by?: string | null
+          id?: string
+          is_current?: boolean
+          pdf_hash?: string | null
+          pdf_url?: string
+          reason?: string | null
+          sale_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_print_versions_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_print_versions_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "auditor_sales_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_print_versions_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_types: {
         Row: {
           applies_to: string | null
@@ -1296,6 +1357,8 @@ export type Database = {
           generated_from_template: boolean | null
           id: string
           is_final: boolean | null
+          latest_print_pdf_at: string | null
+          latest_print_pdf_url: string | null
           name: string
           requires_signature: boolean | null
           sale_id: string
@@ -1324,6 +1387,8 @@ export type Database = {
           generated_from_template?: boolean | null
           id?: string
           is_final?: boolean | null
+          latest_print_pdf_at?: string | null
+          latest_print_pdf_url?: string | null
           name: string
           requires_signature?: boolean | null
           sale_id: string
@@ -1352,6 +1417,8 @@ export type Database = {
           generated_from_template?: boolean | null
           id?: string
           is_final?: boolean | null
+          latest_print_pdf_at?: string | null
+          latest_print_pdf_url?: string | null
           name?: string
           requires_signature?: boolean | null
           sale_id?: string
