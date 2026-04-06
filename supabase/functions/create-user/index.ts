@@ -181,7 +181,7 @@ serve(async (req) => {
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
-    }
+    } // end bootstrap_super_admin / can_bootstrap_super_admin block
 
     // Authenticate the caller - must be admin
     const authHeader = req.headers.get('Authorization')
