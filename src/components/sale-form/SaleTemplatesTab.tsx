@@ -126,7 +126,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
   const navigate = useNavigate();
   const { templates } = useTemplates();
   const queryClient = useQueryClient();
-  const { isAdmin, isSuperAdmin } = useRolePermissions();
+  const { isAdmin, isSuperAdmin, role } = useRolePermissions();
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [sending, setSending] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
@@ -140,6 +140,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
   const regenerateActionRef = useRef<HTMLDivElement | null>(null);
 
   const isPrivilegedRole = isAdmin || isSuperAdmin;
+  const canViewPrintVersions = isAdmin || isSuperAdmin || role === 'supervisor';
 
   const isApproved = auditStatus === 'aprobado' || auditStatus === 'aprobado_para_templates';
   const isSaleLockedStatus = saleStatus === 'completado' || saleStatus === 'cancelado';
