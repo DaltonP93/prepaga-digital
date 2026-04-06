@@ -28,15 +28,15 @@ export const SimpleLoginForm = () => {
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() => getStoredThemePreference());
 
   // Read branding from localStorage (persisted by CompanyBrandingProvider)
-  const brandingLogo = (() => {
+  const [brandingLogo, setBrandingLogo] = useState(() => {
     try { return localStorage.getItem('samap_branding_logo') || ''; } catch { return ''; }
-  })();
-  const brandingBackground = (() => {
+  });
+  const [brandingBackground, setBrandingBackground] = useState(() => {
     try { return localStorage.getItem('samap_branding_login_background') || ''; } catch { return ''; }
-  })();
-  const brandingName = (() => {
+  });
+  const [brandingName, setBrandingName] = useState(() => {
     try { return localStorage.getItem('samap_branding_name') || 'SAMAP Digital'; } catch { return 'SAMAP Digital'; }
-  })();
+  });
   const brandingSubtitle = (() => {
     try { return localStorage.getItem('samap_branding_login_subtitle') || 'Sistema de Firma Digital - Inicia sesión en tu cuenta'; } catch { return 'Sistema de Firma Digital - Inicia sesión en tu cuenta'; }
   })();
@@ -48,6 +48,23 @@ export const SimpleLoginForm = () => {
   const { user, loading, signIn } = useSimpleAuthContext();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Fetch public branding on mount if localStorage is empty (first visit, pre-auth)
+  useEffect(() => {
+    if (brandingLogo && brandingBackground) return;
+    supabase.rpc('get_public_branding').then(({ data }) => {
+      if (!data || data.length === 0) return;
+      const row = data[0];
+      const logo = row.login_logo_url || row.logo_url || '';
+      const bg = row.login_background_url || '';
+      const name = row.name || 'SAMAP Digital';
+      try {
+        if (logo) { localStorage.setItem('samap_branding_logo', logo); setBrandingLogo(logo); }
+        if (bg) { localStorage.setItem('samap_branding_login_background', bg); setBrandingBackground(bg); }
+        if (name) { localStorage.setItem('samap_branding_name', name); setBrandingName(name); }
+      } catch { /* ignore */ }
+    }).catch(() => { /* fail silently */ });
+  }, []);
 
   // Redirect user after successful login
   useEffect(() => {
