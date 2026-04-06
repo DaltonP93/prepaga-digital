@@ -1,11 +1,8 @@
 
-import { useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export const useSale = (saleId: string) => {
-  const queryClient = useQueryClient();
-
   const query = useQuery({
     queryKey: ['sale', saleId],
     queryFn: async () => {
@@ -23,48 +20,25 @@ export const useSale = (saleId: string) => {
 
       if (error) throw error;
 
-      // Fetch salesperson profile separately (no FK exists for salesperson_id)
-      let salesperson = null;
-      if (data.salesperson_id) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('first_name, last_name, email')
-          .eq('id', data.salesperson_id)
-          .single();
-        salesperson = profile;
-      }
+      const salespersonPromise = data.salesperson_id
+        ? supabase
+            .from('profiles')
+            .select('first_name, last_name, email')
+            .eq('id', data.salesperson_id)
+            .single()
+        : Promise.resolve({ data: null, error: null } as const);
+
+      const [{ data: salesperson, error: salespersonError }] = await Promise.all([salespersonPromise]);
+
+      if (salespersonError) throw salespersonError;
 
       return { ...data, salesperson, profiles: salesperson };
     },
     enabled: !!saleId,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
-
-  useEffect(() => {
-    if (!saleId) return;
-
-    const channel = supabase
-      .channel(`sale-detail-${saleId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'sales',
-          filter: `id=eq.${saleId}`,
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['sale', saleId] });
-          queryClient.invalidateQueries({ queryKey: ['sales'] });
-          queryClient.invalidateQueries({ queryKey: ['sales-list'] });
-          queryClient.invalidateQueries({ queryKey: ['sales-lookup'] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient, saleId]);
 
   return query;
 };

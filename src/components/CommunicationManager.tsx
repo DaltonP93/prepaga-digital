@@ -20,11 +20,17 @@ export const CommunicationManager = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const { data: clients } = useClients();
+  const [campaignsPage, setCampaignsPage] = useState(1);
+  const [smsPage, setSmsPage] = useState(1);
+  const [logsPage, setLogsPage] = useState(1);
   const {
     emailCampaigns,
     emailTemplates,
     smsCampaigns,
     communicationLogs,
+    emailCampaignsPage,
+    smsCampaignsPage,
+    communicationLogsPage,
     createEmailCampaign,
     sendEmailCampaign,
     createEmailTemplate,
@@ -34,7 +40,7 @@ export const CommunicationManager = () => {
     isSendingEmailCampaign,
     isCreatingSmsCampaign,
     isSendingSmsCampaign,
-  } = useCommunications();
+  } = useCommunications({ campaignsPage, smsPage, logsPage, pageSize: 25 });
 
   const [emailForm, setEmailForm] = useState({
     name: "",
@@ -440,6 +446,31 @@ export const CommunicationManager = () => {
                   ))}
                 </TableBody>
               </Table>
+              {emailCampaignsPage && emailCampaignsPage.totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Página {emailCampaignsPage.page} de {emailCampaignsPage.totalPages}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={emailCampaignsPage.page <= 1}
+                      onClick={() => setCampaignsPage((prev) => Math.max(prev - 1, 1))}
+                    >
+                      Anterior
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={emailCampaignsPage.page >= emailCampaignsPage.totalPages}
+                      onClick={() => setCampaignsPage((prev) => Math.min(prev + 1, emailCampaignsPage.totalPages))}
+                    >
+                      Siguiente
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -497,6 +528,31 @@ export const CommunicationManager = () => {
                   ))}
                 </TableBody>
               </Table>
+              {smsCampaignsPage && smsCampaignsPage.totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Página {smsCampaignsPage.page} de {smsCampaignsPage.totalPages}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={smsCampaignsPage.page <= 1}
+                      onClick={() => setSmsPage((prev) => Math.max(prev - 1, 1))}
+                    >
+                      Anterior
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={smsCampaignsPage.page >= smsCampaignsPage.totalPages}
+                      onClick={() => setSmsPage((prev) => Math.min(prev + 1, smsCampaignsPage.totalPages))}
+                    >
+                      Siguiente
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -543,6 +599,31 @@ export const CommunicationManager = () => {
                   ))}
                 </TableBody>
               </Table>
+              {communicationLogsPage && communicationLogsPage.totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Página {communicationLogsPage.page} de {communicationLogsPage.totalPages}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={communicationLogsPage.page <= 1}
+                      onClick={() => setLogsPage((prev) => Math.max(prev - 1, 1))}
+                    >
+                      Anterior
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={communicationLogsPage.page >= communicationLogsPage.totalPages}
+                      onClick={() => setLogsPage((prev) => Math.min(prev + 1, communicationLogsPage.totalPages))}
+                    >
+                      Siguiente
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

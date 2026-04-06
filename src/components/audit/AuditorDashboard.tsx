@@ -13,12 +13,15 @@ import { useToast } from '@/hooks/use-toast';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { formatCurrency } from '@/lib/utils';
 import { getDocumentAccessUrl } from '@/lib/assetUrlHelper';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   CheckCircle, XCircle, Clock, AlertCircle, Eye, Search,
   FileText, User, DollarSign, Calendar, Filter, Download,
   HeartPulse
 } from 'lucide-react';
 import { ImageLightbox } from '@/components/ui/image-lightbox';
+
+const AUDIT_PAGE_SIZE = 10;
 
 const HEALTH_QUESTIONS = [
   '1. ¿Padece alguna enfermedad crónica (diabetes, hipertensión, asma, EPOC, reumatológicas, tiroideas, insuficiencia renal u otras)?',
@@ -144,10 +147,11 @@ export const AuditorDashboard: React.FC = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { profile } = useSimpleAuthContext();
-  const [selectedSale, setSelectedSale] = useState<any>(null);
+  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const [auditNotes, setAuditNotes] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('pending');
+  const [currentPage, setCurrentPage] = useState(1);
   const [lightboxUrl, setLightboxUrl] = useState('');
   const [lightboxName, setLightboxName] = useState('');
   const [lightboxType, setLightboxType] = useState('');
@@ -176,18 +180,24 @@ export const AuditorDashboard: React.FC = () => {
     window.open(accessUrl, '_blank', 'noopener,noreferrer');
   };
 
-  // Fetch sales pending audit using auditor_sales_view
+  // Fetch sales for the audit list using a lightweight projection.
   const { data: sales = [], isLoading, refetch } = useQuery({
-    queryKey: ['auditor-sales'],
+    queryKey: ['auditor-sales-list'],
     queryFn: async () => {
       const query = supabase
         .from('auditor_sales_view')
         .select(`
-          *,
-          clients:client_id (*),
-          plans:plan_id (*),
-          beneficiaries (*),
-          documents (*)
+          id,
+          client_id,
+          plan_id,
+          salesperson_id,
+          status,
+          audit_status,
+          total_amount,
+          contract_number,
+          created_at,
+          clients:client_id (id, first_name, last_name),
+          plans:plan_id (id, name)
         `)
         .order('created_at', { ascending: false });
 
@@ -205,31 +215,109 @@ export const AuditorDashboard: React.FC = () => {
         profilesMap = (profiles || []).reduce((acc: any, p: any) => { acc[p.id] = p; return acc; }, {});
       }
 
-      // Fetch beneficiary documents for all beneficiaries
-      const allBeneficiaryIds = (data || []).flatMap((s: any) => (s.beneficiaries || []).map((b: any) => b.id));
-      let beneficiaryDocsMap: Record<string, any[]> = {};
-      if (allBeneficiaryIds.length > 0) {
-        const { data: benDocs } = await supabase
+      return (data || []).map((s: any) => ({
+        ...s,
+        profiles: profilesMap[s.salesperson_id] || null,
+      }));
+    },
+    refetchInterval: 30_000,
+    staleTime: 10_000,
+  });
+
+  const {
+    data: selectedSale,
+    isLoading: isLoadingSelectedSale,
+    isError: isSelectedSaleError,
+    error: selectedSaleError,
+  } = useQuery({
+    queryKey: ['auditor-sale-detail', selectedSaleId],
+    enabled: !!selectedSaleId,
+    queryFn: async () => {
+      const { data: sale, error } = await supabase
+        .from('sales')
+        .select(`
+          id,
+          client_id,
+          plan_id,
+          salesperson_id,
+          status,
+          audit_status,
+          total_amount,
+          contract_number,
+          immediate_coverage,
+          sale_type,
+          clients:client_id (id, first_name, last_name, email, phone, dni, birth_date, address, barrio, city),
+          plans:plan_id (id, name)
+        `)
+        .eq('id', selectedSaleId)
+        .single();
+
+      if (error) throw error;
+
+      const [
+        { data: salespersonProfile },
+        { data: beneficiaries, error: beneficiariesError },
+        { data: documents, error: documentsError },
+        { data: saleDocuments, error: saleDocumentsError },
+      ] = await Promise.all([
+        sale?.salesperson_id
+          ? supabase
+              .from('profiles')
+              .select('id, first_name, last_name, email')
+              .eq('id', sale.salesperson_id)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+        supabase
+          .from('beneficiaries')
+          .select('id, is_primary, first_name, last_name, relationship, dni, birth_date, email, phone, address, barrio, city, amount, preexisting_conditions_detail, has_preexisting_conditions')
+          .eq('sale_id', selectedSaleId)
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('documents')
+          .select('id, name, status, file_url')
+          .eq('sale_id', selectedSaleId)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('sale_documents')
+          .select('id, file_name, file_url, file_size, file_type, created_at')
+          .eq('sale_id', selectedSaleId)
+          .order('created_at', { ascending: false }),
+      ]);
+
+      if (beneficiariesError) throw beneficiariesError;
+      if (documentsError) throw documentsError;
+      if (saleDocumentsError) throw saleDocumentsError;
+
+      const beneficiaryIds = (beneficiaries || []).map((b: any) => b.id).filter(Boolean);
+      const beneficiaryDocsMap: Record<string, any[]> = {};
+      if (beneficiaryIds.length > 0) {
+        const { data: benDocs, error: benDocsError } = await supabase
           .from('beneficiary_documents')
           .select('*')
-          .in('beneficiary_id', allBeneficiaryIds)
+          .in('beneficiary_id', beneficiaryIds)
           .order('created_at', { ascending: false });
+
+        if (benDocsError) throw benDocsError;
+
         (benDocs || []).forEach((doc: any) => {
           if (!beneficiaryDocsMap[doc.beneficiary_id]) beneficiaryDocsMap[doc.beneficiary_id] = [];
           beneficiaryDocsMap[doc.beneficiary_id].push(doc);
         });
       }
 
-      return (data || []).map((s: any) => ({
-        ...s,
-        profiles: profilesMap[s.salesperson_id] || null,
-        beneficiaries: (s.beneficiaries || []).map((b: any) => ({
+      return {
+        ...sale,
+        profiles: salespersonProfile,
+        beneficiaries: (beneficiaries || []).map((b: any) => ({
           ...b,
           beneficiary_documents: beneficiaryDocsMap[b.id] || [],
         })),
-      }));
+        documents: documents || [],
+        attached_documents: saleDocuments || [],
+        attached_docs_count: saleDocuments?.length || 0,
+        last_doc_uploaded_at: saleDocuments?.[0]?.created_at || null,
+      };
     },
-    refetchInterval: 30_000,
     staleTime: 10_000,
   });
 
@@ -241,22 +329,35 @@ export const AuditorDashboard: React.FC = () => {
       .channel('auditor-realtime')
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'sales' },
-        () => { queryClient.invalidateQueries({ queryKey: ['auditor-sales'] }); }
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['auditor-sales-list'] });
+          if (selectedSaleId) {
+            queryClient.invalidateQueries({ queryKey: ['auditor-sale-detail', selectedSaleId] });
+          }
+        }
       )
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'sale_documents' },
-        () => { queryClient.invalidateQueries({ queryKey: ['auditor-sales'] }); }
+        () => {
+          if (selectedSaleId) {
+            queryClient.invalidateQueries({ queryKey: ['auditor-sale-detail', selectedSaleId] });
+          }
+        }
       )
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'documents' },
-        () => { queryClient.invalidateQueries({ queryKey: ['auditor-sales'] }); }
+        () => {
+          if (selectedSaleId) {
+            queryClient.invalidateQueries({ queryKey: ['auditor-sale-detail', selectedSaleId] });
+          }
+        }
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient, refetch]);
+  }, [queryClient, refetch, selectedSaleId]);
 
   // Approve sale - changes status to 'aprobado_para_templates' (approved, ready for next steps)
   const approveSale = useMutation({
@@ -315,7 +416,7 @@ export const AuditorDashboard: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['audit-sales'] });
       queryClient.invalidateQueries({ queryKey: ['sales'] });
-      setSelectedSale(null);
+      setSelectedSaleId(null);
       setAuditNotes('');
       toast({
         title: 'Venta aprobada',
@@ -385,7 +486,7 @@ export const AuditorDashboard: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['audit-sales'] });
       queryClient.invalidateQueries({ queryKey: ['sales'] });
-      setSelectedSale(null);
+      setSelectedSaleId(null);
       setAuditNotes('');
       toast({
         title: 'Venta rechazada',
@@ -465,7 +566,7 @@ export const AuditorDashboard: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['audit-sales'] });
       queryClient.invalidateQueries({ queryKey: ['sales'] });
-      setSelectedSale(null);
+      setSelectedSaleId(null);
       setAuditNotes('');
       toast({
         title: 'Solicitud enviada',
@@ -537,14 +638,80 @@ export const AuditorDashboard: React.FC = () => {
       );
     });
 
-  const detailView = selectedSale ? (
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredSales.length / AUDIT_PAGE_SIZE));
+  const currentPageSafe = Math.min(currentPage, totalPages);
+  const paginatedSales = filteredSales.slice(
+    (currentPageSafe - 1) * AUDIT_PAGE_SIZE,
+    currentPageSafe * AUDIT_PAGE_SIZE
+  );
+
+  const detailView = selectedSaleId ? (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold">Detalle de Auditoría</h2>
-          <Button variant="outline" onClick={() => setSelectedSale(null)}>
+          <Button variant="outline" onClick={() => setSelectedSaleId(null)}>
             ← Volver al listado
           </Button>
         </div>
+
+        {isLoadingSelectedSale ? (
+          <Card>
+            <CardContent className="py-8">
+              <div className="space-y-4">
+                <Skeleton className="h-6 w-48" />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <Skeleton className="h-48 w-full" />
+                  <Skeleton className="h-48 w-full" />
+                  <Skeleton className="h-56 w-full lg:col-span-2" />
+                  <Skeleton className="h-56 w-full lg:col-span-2" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : isSelectedSaleError ? (
+          <Card>
+            <CardContent className="py-8">
+              <div className="space-y-4 text-center">
+                <p className="text-base font-medium">No se pudo cargar el detalle de auditoría</p>
+                <p className="text-sm text-muted-foreground">
+                  {selectedSaleError instanceof Error
+                    ? selectedSaleError.message
+                    : 'Ocurrió un error al consultar la venta seleccionada.'}
+                </p>
+                <div className="flex items-center justify-center gap-2">
+                  <Button variant="outline" onClick={() => setSelectedSaleId(null)}>
+                    Volver al listado
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      queryClient.invalidateQueries({ queryKey: ['auditor-sale-detail', selectedSaleId] });
+                    }}
+                  >
+                    Reintentar
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : !selectedSale ? (
+          <Card>
+            <CardContent className="py-8">
+              <div className="space-y-4 text-center">
+                <p className="text-base font-medium">La venta seleccionada no está disponible</p>
+                <p className="text-sm text-muted-foreground">
+                  Puede haber cambiado de estado o ya no pertenecer al conjunto de auditoría.
+                </p>
+                <Button variant="outline" onClick={() => setSelectedSaleId(null)}>
+                  Volver al listado
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Sale Info */}
@@ -636,33 +803,15 @@ export const AuditorDashboard: React.FC = () => {
           </Card>
 
           {/* Información Laboral y Contractual */}
-          {(selectedSale.workplace || selectedSale.profession || selectedSale.work_phone || selectedSale.work_address || selectedSale.signature_modality) && (
+          {(selectedSale.immediate_coverage !== null && selectedSale.immediate_coverage !== undefined) || selectedSale.sale_type ? (
             <Card className="lg:col-span-2">
               <CardHeader>
                 <CardTitle>Información Adicional</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {selectedSale.workplace && (
-                    <div><span className="font-medium">Lugar de Trabajo: </span>{selectedSale.workplace}</div>
-                  )}
-                  {selectedSale.profession && (
-                    <div><span className="font-medium">Profesión: </span>{selectedSale.profession}</div>
-                  )}
-                  {selectedSale.work_phone && (
-                    <div><span className="font-medium">Tel. Laboral: </span>{selectedSale.work_phone}</div>
-                  )}
-                  {selectedSale.work_address && (
-                    <div><span className="font-medium">Dir. Laboral: </span>{selectedSale.work_address}</div>
-                  )}
-                  {selectedSale.signature_modality && (
-                    <div><span className="font-medium">Modalidad Firma: </span>{selectedSale.signature_modality}</div>
-                  )}
-                  {selectedSale.immediate_validity !== null && selectedSale.immediate_validity !== undefined && (
-                    <div><span className="font-medium">Vigencia Inmediata: </span>{selectedSale.immediate_validity ? 'Sí' : 'No'}</div>
-                  )}
-                  {selectedSale.maternity_bonus !== null && selectedSale.maternity_bonus !== undefined && (
-                    <div><span className="font-medium">Prima Maternidad: </span>{selectedSale.maternity_bonus ? 'Sí' : 'No'}</div>
+                  {selectedSale.immediate_coverage !== null && selectedSale.immediate_coverage !== undefined && (
+                    <div><span className="font-medium">Vigencia Inmediata: </span>{selectedSale.immediate_coverage ? 'Sí' : 'No'}</div>
                   )}
                   {selectedSale.sale_type && (
                     <div><span className="font-medium">Tipo de Venta: </span>{selectedSale.sale_type}</div>
@@ -670,7 +819,7 @@ export const AuditorDashboard: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
-          )}
+          ) : null}
 
           {/* Adherentes (excluye titular) */}
           {(() => {
@@ -909,6 +1058,7 @@ export const AuditorDashboard: React.FC = () => {
             </CardContent>
           </Card>
         </div>
+        )}
       </div>
   ) : null;
 
@@ -1008,9 +1158,9 @@ export const AuditorDashboard: React.FC = () => {
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
             </div>
-          ) : filteredSales.length > 0 ? (
+          ) : paginatedSales.length > 0 ? (
             <div className="space-y-3">
-              {filteredSales.map((sale: any) => (
+              {paginatedSales.map((sale: any) => (
                 <div
                   key={sale.id}
                   className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
@@ -1032,13 +1182,39 @@ export const AuditorDashboard: React.FC = () => {
                   </div>
                   <Button
                     variant="outline"
-                    onClick={() => setSelectedSale(sale)}
+                    onClick={() => setSelectedSaleId(sale.id)}
                   >
                     <Eye className="h-4 w-4 mr-2" />
                     Revisar
                   </Button>
                 </div>
               ))}
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-2">
+                  <p className="text-sm text-muted-foreground">
+                    Página {currentPageSafe} de {totalPages} · {filteredSales.length} ventas
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                      disabled={currentPageSafe === 1}
+                    >
+                      Anterior
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                      disabled={currentPageSafe === totalPages}
+                    >
+                      Siguiente
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
@@ -1052,7 +1228,7 @@ export const AuditorDashboard: React.FC = () => {
 
   return (
     <>
-      {selectedSale ? detailView : listView}
+      {selectedSaleId ? detailView : listView}
       <ImageLightbox
         open={lightboxOpen}
         onOpenChange={setLightboxOpen}

@@ -1,5 +1,5 @@
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
@@ -52,6 +52,22 @@ type ExtendedSale = Sale & {
   };
 };
 
+interface SalesListParams {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  status?: string;
+  enabled?: boolean;
+}
+
+interface PaginatedSalesResult {
+  sales: ExtendedSale[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 const invalidateSalesCaches = (queryClient: ReturnType<typeof useQueryClient>, saleId?: string) => {
   queryClient.invalidateQueries({ queryKey: ['sales'] });
   queryClient.invalidateQueries({ queryKey: ['sales-list'] });
@@ -68,7 +84,6 @@ export const useSales = () => {
   return useQuery({
     queryKey: ['sales', user?.id, userRole],
     queryFn: async () => {
-      // First, get sales with basic relations
       let query = supabase
         .from('sales')
         .select(`
@@ -90,24 +105,23 @@ export const useSales = () => {
       const { data: salesData, error: salesError } = await query;
       if (salesError) throw salesError;
 
-      // Get unique salesperson IDs
       const salespersonIds = [...new Set(salesData?.map(s => s.salesperson_id).filter(Boolean))];
-      
-      // Fetch salesperson profiles separately if there are any
-      let profilesMap: Record<string, any> = {};
-      if (salespersonIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, first_name, last_name, email')
-          .in('id', salespersonIds);
-        
-        profilesMap = (profiles || []).reduce((acc, p) => {
-          acc[p.id] = p;
-          return acc;
-        }, {} as Record<string, any>);
-      }
+      const profilesPromise = salespersonIds.length > 0
+        ? supabase
+            .from('profiles')
+            .select('id, first_name, last_name, email')
+            .in('id', salespersonIds)
+        : Promise.resolve({ data: [], error: null } as const);
 
-      // Merge salesperson data into sales
+      const [{ data: profiles, error: profilesError }] = await Promise.all([profilesPromise]);
+
+      if (profilesError) throw profilesError;
+
+      const profilesMap = (profiles || []).reduce((acc, p) => {
+        acc[p.id] = p;
+        return acc;
+      }, {} as Record<string, any>);
+
       return (salesData || []).map(sale => ({
         ...sale,
         salesperson: sale.salesperson_id ? profilesMap[sale.salesperson_id] : null,
@@ -115,17 +129,33 @@ export const useSales = () => {
       })) as unknown as ExtendedSale[];
     },
     enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 };
 
-export const useSalesList = (enabled = true) => {
+export function useSalesList(enabled?: boolean): UseQueryResult<ExtendedSale[]>;
+export function useSalesList(params: SalesListParams): UseQueryResult<PaginatedSalesResult>;
+export function useSalesList(paramsOrEnabled: SalesListParams | boolean = {}) {
   const { user, userRole } = useSimpleAuthContext();
   const isAdminRole = ADMIN_ROLES.includes(userRole || '');
+  const params = typeof paramsOrEnabled === 'boolean'
+    ? { enabled: paramsOrEnabled }
+    : paramsOrEnabled;
+  const {
+    page,
+    pageSize = 25,
+    search = '',
+    status,
+    enabled = true,
+  } = params;
+  const isPaginated = typeof page === 'number';
 
   return useQuery({
-    queryKey: ['sales-list', user?.id, userRole],
+    queryKey: ['sales-list', user?.id, userRole, page ?? 'all', pageSize, search, status ?? 'all'],
     queryFn: async () => {
-      let query = supabase
+      let salesQuery = supabase
         .from('sales')
         .select(`
           id,
@@ -140,16 +170,62 @@ export const useSalesList = (enabled = true) => {
           plans:plan_id(name)
         `)
         .order('created_at', { ascending: false });
+      let countQuery = supabase
+        .from('sales')
+        .select('id', { count: 'exact', head: true });
 
       if (!isAdminRole && user?.id) {
-        query = query.eq('salesperson_id', user.id);
+        salesQuery = salesQuery.eq('salesperson_id', user.id);
+        countQuery = countQuery.eq('salesperson_id', user.id);
       }
 
-      const { data, error } = await query;
+      if (status && status !== 'todos') {
+        salesQuery = salesQuery.eq('status', status as any);
+        countQuery = countQuery.eq('status', status as any);
+      }
+
+      if (search.trim()) {
+        const term = search.trim();
+        const pattern = `%${term}%`;
+        salesQuery = salesQuery.ilike('contract_number', pattern);
+        countQuery = countQuery.ilike('contract_number', pattern);
+      }
+
+      if (isPaginated) {
+        const from = Math.max(((page || 1) - 1) * pageSize, 0);
+        const to = from + pageSize - 1;
+        salesQuery = salesQuery.range(from, to);
+      }
+
+      const countPromise = isPaginated
+        ? countQuery
+        : Promise.resolve({ count: 0, error: null } as const);
+
+      const [{ data, error }, { count, error: countError }] = await Promise.all([
+        salesQuery,
+        countPromise,
+      ]);
+
       if (error) throw error;
-      return data as unknown as ExtendedSale[];
+      if (countError) throw countError;
+
+      if (!isPaginated) {
+        return data as unknown as ExtendedSale[];
+      }
+
+      return {
+        sales: (data || []) as unknown as ExtendedSale[],
+        total: count || 0,
+        page: page || 1,
+        pageSize,
+        totalPages: Math.max(Math.ceil((count || 0) / pageSize), 1),
+      } as PaginatedSalesResult;
     },
     enabled: !!user && enabled,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    placeholderData: isPaginated ? (previous) => previous : undefined,
   });
 };
 
@@ -178,6 +254,9 @@ export const useSalesLookup = (enabled = true) => {
       return data as unknown as ExtendedSale[];
     },
     enabled: !!user && enabled,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 };
 

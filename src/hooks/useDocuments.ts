@@ -41,6 +41,9 @@ export const useDocuments = () => {
     },
     retry: 2,
     enabled: !loading && !!user,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 
   const createDocumentMutation = useMutation({
@@ -227,6 +230,9 @@ export const useDocumentsList = ({
     retry: 2,
     placeholderData: (prev) => prev,
     enabled: !loading && !!user,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 };
 
@@ -257,5 +263,8 @@ export const useDocument = (documentId?: string | null) => {
       return data;
     },
     enabled: !loading && !!user && !!documentId,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 };

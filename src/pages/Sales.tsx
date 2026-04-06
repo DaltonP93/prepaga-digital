@@ -13,7 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/utils';
 import RequireAuth from '@/components/RequireAuth';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useStateTransition } from '@/hooks/useStateTransition';
 import { ALL_SALE_STATUSES, SALE_STATUS_LABELS, type SaleStatus } from '@/types/workflow';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
@@ -22,17 +22,27 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 const Sales = () => {
-  const { data: sales, isLoading } = useSalesList();
-  const queryClient = useQueryClient();
-  const deleteSale = useDeleteSale();
+  const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
+  const { data: salesPage, isLoading } = useSalesList({
+    page,
+    pageSize: 25,
+    status: statusFilter,
+  });
+  const queryClient = useQueryClient();
+  const deleteSale = useDeleteSale();
   const { canViewState, canEditState } = useStateTransition();
   const { profile } = useSimpleAuthContext();
   const { getProgress } = useSaleProgressConfig();
+  const sales = salesPage?.sales || [];
+
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, searchTerm]);
 
   // Fetch document counts per sale
-  const saleIds = (sales || []).map(s => s.id);
+  const saleIds = sales.map(s => s.id);
   const { data: documentCountsData } = useQuery({
     queryKey: ['sales-document-counts', saleIds],
     queryFn: async () => {
@@ -49,28 +59,13 @@ const Sales = () => {
       return map;
     },
     enabled: saleIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 
-  // Real-time subscription for sales changes
-  useEffect(() => {
-    const channel = supabase
-      .channel('sales-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['sales'] });
-        queryClient.invalidateQueries({ queryKey: ['sales-list'] });
-        queryClient.invalidateQueries({ queryKey: ['sales-lookup'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['sales-document-counts'] });
-      })
-      .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
-
-  const visibleSales = (sales || []).filter((sale) =>
+  const visibleSales = sales.filter((sale) =>
     canViewState((sale.status || 'borrador') as SaleStatus)
   );
 
@@ -371,6 +366,31 @@ const Sales = () => {
                   </TableBody>
                 </Table>
               </div>
+              {salesPage && salesPage.totalPages > 1 && (
+                <div className="flex items-center justify-between px-6 py-4 border-t">
+                  <p className="text-sm text-muted-foreground">
+                    Página {salesPage.page} de {salesPage.totalPages}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={salesPage.page <= 1}
+                      onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                    >
+                      Anterior
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={salesPage.page >= salesPage.totalPages}
+                      onClick={() => setPage((prev) => Math.min(prev + 1, salesPage.totalPages))}
+                    >
+                      Siguiente
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

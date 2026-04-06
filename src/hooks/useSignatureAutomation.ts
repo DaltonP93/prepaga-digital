@@ -72,6 +72,7 @@ export const useSignatureAutomation = () => {
         title: "Recordatorios enviados",
         description: `${data.successful} recordatorios enviados exitosamente. ${data.failed} fallaron.`
       });
+      queryClient.invalidateQueries({ queryKey: ['sales-list'] });
       queryClient.invalidateQueries({ queryKey: ['sales'] });
     },
     onError: (error: any) => {
@@ -149,6 +150,7 @@ export const useSignatureAutomation = () => {
         title: "Enlaces renovados",
         description: `${data.successful} enlaces de firma renovados y reenviados.`
       });
+      queryClient.invalidateQueries({ queryKey: ['sales-list'] });
       queryClient.invalidateQueries({ queryKey: ['sales'] });
     },
     onError: (error: any) => {

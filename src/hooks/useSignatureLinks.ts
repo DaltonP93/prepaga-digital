@@ -18,6 +18,9 @@ export const useSignatureLinks = (saleId: string) => {
       return data;
     },
     enabled: !!saleId,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 };
 
@@ -47,20 +50,48 @@ export const useSignatureLinkByToken = (token: string) => {
         throw new Error('Este enlace ha expirado');
       }
 
-      // Update access count
-      await supabase
-        .from('signature_links')
-        .update({
-          access_count: (data.access_count || 0) + 1,
-          accessed_at: new Date().toISOString(),
-          status: data.status === 'pendiente' ? 'visualizado' : data.status,
-        })
-        .eq('id', data.id);
-
       return data;
     },
     enabled: !!token,
     retry: false,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+  });
+};
+
+export const useMarkSignatureLinkAccessed = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      saleId,
+      accessCount,
+      status,
+    }: {
+      id: string;
+      saleId?: string;
+      accessCount?: number | null;
+      status?: string | null;
+    }) => {
+      const { error } = await supabase
+        .from('signature_links')
+        .update({
+          access_count: (accessCount || 0) + 1,
+          accessed_at: new Date().toISOString(),
+          status: status === 'pendiente' ? 'visualizado' : status,
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+      return saleId;
+    },
+    onSuccess: (saleId) => {
+      if (saleId) {
+        queryClient.invalidateQueries({ queryKey: ['signature-links', saleId] });
+      }
+    },
   });
 };
 

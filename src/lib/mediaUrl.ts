@@ -4,12 +4,20 @@ export function sanitizeMediaUrl(value?: string | null): string | undefined {
   const trimmed = value.trim();
   if (!trimmed) return undefined;
 
+  if (trimmed.startsWith('//')) {
+    if (trimmed.includes('.supabase.co/')) {
+      return `https:${trimmed}`;
+    }
+
+    return undefined;
+  }
+
   if (
     trimmed.startsWith('http://') ||
     trimmed.startsWith('https://') ||
     trimmed.startsWith('data:') ||
     trimmed.startsWith('blob:') ||
-    trimmed.startsWith('/')
+    (trimmed.startsWith('/') && !trimmed.startsWith('//'))
   ) {
     return trimmed;
   }

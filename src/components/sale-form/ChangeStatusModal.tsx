@@ -75,9 +75,9 @@ export const ChangeStatusModal: React.FC<ChangeStatusModalProps> = ({
 
       toast.success('Estado actualizado correctamente');
       queryClient.invalidateQueries({ queryKey: ['sale', saleId] });
-      queryClient.invalidateQueries({ queryKey: ['sales'] });
       queryClient.invalidateQueries({ queryKey: ['sales-list'] });
       queryClient.invalidateQueries({ queryKey: ['audit-sales'] });
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
       onOpenChange(false);
     } catch (err: any) {
       toast.error(err.message || 'Error al cambiar estado');

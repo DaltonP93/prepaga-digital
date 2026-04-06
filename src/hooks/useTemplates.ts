@@ -56,6 +56,9 @@ export const useTemplates = () => {
         question_count: template.template_questions?.length || 0,
       }));
     },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 
   return { templates, isLoading, error };
@@ -195,5 +198,8 @@ export const useTemplate = (templateId?: string) => {
       return data;
     },
     enabled: !!templateId,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 };

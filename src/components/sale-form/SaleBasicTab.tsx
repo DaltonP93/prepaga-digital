@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -64,14 +64,18 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
     }
   }, [clients, prevClientCount, onChange]);
 
-  const filteredClients = clients?.filter(client =>
-    `${client.first_name} ${client.last_name}`.toLowerCase().includes(searchClient.toLowerCase()) ||
-    client.email?.toLowerCase().includes(searchClient.toLowerCase())
-  ) || [];
+  const filteredClients = useMemo(() => (
+    clients?.filter(client =>
+      `${client.first_name} ${client.last_name}`.toLowerCase().includes(searchClient.toLowerCase()) ||
+      client.email?.toLowerCase().includes(searchClient.toLowerCase())
+    ) || []
+  ), [clients, searchClient]);
 
-  const filteredPlans = plans?.filter(plan =>
-    plan.name.toLowerCase().includes(searchPlan.toLowerCase())
-  ) || [];
+  const filteredPlans = useMemo(() => (
+    plans?.filter(plan =>
+      plan.name.toLowerCase().includes(searchPlan.toLowerCase())
+    ) || []
+  ), [plans, searchPlan]);
 
   const formatAmountInput = (value: number) => {
     if (!Number.isFinite(value) || value === 0) return '';

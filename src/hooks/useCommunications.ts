@@ -9,22 +9,65 @@ type EmailTemplateRow = Database['public']['Tables']['email_templates']['Row'];
 type CommunicationLogRow = Database['public']['Tables']['communication_logs']['Row'];
 type SmsCampaignRow = Database['public']['Tables']['sms_campaigns']['Row'];
 
-export const useCommunications = () => {
+interface UseCommunicationsParams {
+  campaignsPage?: number;
+  smsPage?: number;
+  logsPage?: number;
+  pageSize?: number;
+}
+
+interface PaginatedResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export const useCommunications = ({
+  campaignsPage = 1,
+  smsPage = 1,
+  logsPage = 1,
+  pageSize = 25,
+}: UseCommunicationsParams = {}) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const buildRange = (page: number) => {
+    const from = Math.max((page - 1) * pageSize, 0);
+    return { from, to: from + pageSize - 1 };
+  };
+
   // Email Campaigns
   const { data: emailCampaigns, isLoading: isLoadingCampaigns } = useQuery({
-    queryKey: ['email-campaigns'],
+    queryKey: ['email-campaigns', campaignsPage, pageSize],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('email_campaigns')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
+      const { from, to } = buildRange(campaignsPage);
+      const [{ data, error }, { count, error: countError }] = await Promise.all([
+        supabase
+          .from('email_campaigns')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(from, to),
+        supabase
+          .from('email_campaigns')
+          .select('id', { count: 'exact', head: true }),
+      ]);
+
       if (error) throw error;
-      return data || [];
+      if (countError) throw countError;
+      return {
+        items: data || [],
+        total: count || 0,
+        page: campaignsPage,
+        pageSize,
+        totalPages: Math.max(Math.ceil((count || 0) / pageSize), 1),
+      } satisfies PaginatedResult<EmailCampaignRow>;
     },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    placeholderData: (previous) => previous,
   });
 
   // Email Templates
@@ -39,35 +82,73 @@ export const useCommunications = () => {
       if (error) throw error;
       return data || [];
     },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 
   // SMS Campaigns
   const { data: smsCampaigns, isLoading: isLoadingSmsCampaigns } = useQuery({
-    queryKey: ['sms-campaigns'],
+    queryKey: ['sms-campaigns', smsPage, pageSize],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('sms_campaigns')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
+      const { from, to } = buildRange(smsPage);
+      const [{ data, error }, { count, error: countError }] = await Promise.all([
+        supabase
+          .from('sms_campaigns')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(from, to),
+        supabase
+          .from('sms_campaigns')
+          .select('id', { count: 'exact', head: true }),
+      ]);
+
       if (error) throw error;
-      return data || [];
+      if (countError) throw countError;
+      return {
+        items: data || [],
+        total: count || 0,
+        page: smsPage,
+        pageSize,
+        totalPages: Math.max(Math.ceil((count || 0) / pageSize), 1),
+      } satisfies PaginatedResult<SmsCampaignRow>;
     },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    placeholderData: (previous) => previous,
   });
 
   // Communication Logs
   const { data: communicationLogs, isLoading: isLoadingLogs } = useQuery({
-    queryKey: ['communication-logs'],
+    queryKey: ['communication-logs', logsPage, pageSize],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('communication_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
-      
+      const { from, to } = buildRange(logsPage);
+      const [{ data, error }, { count, error: countError }] = await Promise.all([
+        supabase
+          .from('communication_logs')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(from, to),
+        supabase
+          .from('communication_logs')
+          .select('id', { count: 'exact', head: true }),
+      ]);
+
       if (error) throw error;
-      return data || [];
+      if (countError) throw countError;
+      return {
+        items: data || [],
+        total: count || 0,
+        page: logsPage,
+        pageSize,
+        totalPages: Math.max(Math.ceil((count || 0) / pageSize), 1),
+      } satisfies PaginatedResult<CommunicationLogRow>;
     },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    placeholderData: (previous) => previous,
   });
 
   // Crear campaña de email
@@ -319,10 +400,13 @@ export const useCommunications = () => {
 
   return {
     // Data
-    emailCampaigns,
+    emailCampaigns: emailCampaigns?.items || [],
     emailTemplates,
-    smsCampaigns,
-    communicationLogs,
+    smsCampaigns: smsCampaigns?.items || [],
+    communicationLogs: communicationLogs?.items || [],
+    emailCampaignsPage: emailCampaigns,
+    smsCampaignsPage: smsCampaigns,
+    communicationLogsPage: communicationLogs,
 
     // Loading states
     isLoadingCampaigns,

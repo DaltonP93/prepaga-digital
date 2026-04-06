@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useCompanyConfiguration } from '@/hooks/useCompanyConfiguration';
 import { useSimpleAuthContext } from './SimpleAuthProvider';
 import { sanitizeMediaUrl } from '@/lib/mediaUrl';
+import { resolveCompanyAssetUrl } from '@/lib/companyAssetUrl';
 
 interface BrandingContextType {
   primaryColor: string;
@@ -47,7 +48,7 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
     primaryColor: configuration?.primary_color || '#1e3a5f',
     secondaryColor: configuration?.secondary_color || '#334155',
     accentColor: configuration?.accent_color || '#3b82f6',
-    logoUrl: sanitizeMediaUrl(configuration?.logo_url),
+    logoUrl: resolveCompanyAssetUrl(configuration?.logo_url),
     companyName: configuration?.name || 'Sistema Digital',
     isLoading,
   };
@@ -108,8 +109,8 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
       // Actualizar favicon si existe
       const faviconUrl =
         sanitizeMediaUrl((configuration as any).favicon) ||
-        sanitizeMediaUrl(configuration.login_logo_url) ||
-        sanitizeMediaUrl(configuration.logo_url);
+        resolveCompanyAssetUrl(configuration.login_logo_url) ||
+        resolveCompanyAssetUrl(configuration.logo_url);
       if (faviconUrl) {
         applyFavicon(faviconUrl);
       }
@@ -124,12 +125,12 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
 
         const loginFavicon =
           sanitizeMediaUrl((configuration as any).favicon) ||
-          sanitizeMediaUrl(configuration.login_logo_url) ||
-          sanitizeMediaUrl(configuration.logo_url) ||
+          resolveCompanyAssetUrl(configuration.login_logo_url) ||
+          resolveCompanyAssetUrl(configuration.logo_url) ||
           currentFavicon ||
           '';
-        const loginLogo = sanitizeMediaUrl(configuration.login_logo_url) || currentLogo || brandingData.logoUrl || '';
-        const loginBackground = sanitizeMediaUrl(configuration.login_background_url) || currentBackground || '';
+        const loginLogo = resolveCompanyAssetUrl(configuration.login_logo_url) || currentLogo || brandingData.logoUrl || '';
+        const loginBackground = resolveCompanyAssetUrl(configuration.login_background_url) || currentBackground || '';
         const loginTitle = (configuration as any).login_title || currentTitle || brandingData.companyName || '';
         const loginSubtitle = (configuration as any).login_subtitle || currentSubtitle || 'Sistema de Firma Digital - Inicia sesión en tu cuenta';
 

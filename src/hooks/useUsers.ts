@@ -61,10 +61,14 @@ export const useUsers = () => {
 
       // Fetch roles separately since there's no direct FK
       const userIds = profiles.map(p => p.id);
-      const { data: roles } = await supabase
-        .from('user_roles')
-        .select('user_id, role')
-        .in('user_id', userIds);
+      const { data: roles, error: rolesError } = userIds.length > 0
+        ? await supabase
+            .from('user_roles')
+            .select('user_id, role')
+            .in('user_id', userIds)
+        : { data: [], error: null };
+
+      if (rolesError) throw rolesError;
 
       const groupedRoles = new Map<string, string[]>();
       roles?.forEach((r) => {
@@ -80,6 +84,9 @@ export const useUsers = () => {
           : null,
       })) as UserWithRole[];
     },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 };
 
@@ -300,5 +307,8 @@ export const useCountries = () => {
       if (error) throw error;
       return data;
     },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 };

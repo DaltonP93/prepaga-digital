@@ -14,6 +14,7 @@ import { ThemePreference, getStoredThemePreference, setThemePreference } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { sanitizeMediaUrl } from '@/lib/mediaUrl';
 import { getSingleCompany } from '@/lib/singleCompany';
+import { resolveCompanyAssetUrl } from '@/lib/companyAssetUrl';
 
 export const SimpleLoginForm = () => {
   const enableSuperAdminBootstrap =
@@ -37,10 +38,10 @@ export const SimpleLoginForm = () => {
 
   // Read branding from localStorage (persisted by CompanyBrandingProvider)
   const [brandingLogo, setBrandingLogo] = useState(() => {
-    try { return localStorage.getItem('samap_branding_logo') || ''; } catch { return ''; }
+    try { return resolveCompanyAssetUrl(localStorage.getItem('samap_branding_logo')) || ''; } catch { return ''; }
   });
   const [brandingBackground, setBrandingBackground] = useState(() => {
-    try { return localStorage.getItem('samap_branding_login_background') || ''; } catch { return ''; }
+    try { return resolveCompanyAssetUrl(localStorage.getItem('samap_branding_login_background')) || ''; } catch { return ''; }
   });
   const [brandingName, setBrandingName] = useState(() => {
     try { return localStorage.getItem('samap_branding_name') || 'SAMAP Digital'; } catch { return 'SAMAP Digital'; }
@@ -53,6 +54,25 @@ export const SimpleLoginForm = () => {
   const { user, loading, signIn } = useSimpleAuthContext();
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    try {
+      const cachedLogo = localStorage.getItem('samap_branding_logo');
+      const cachedBackground = localStorage.getItem('samap_branding_login_background');
+
+      if (cachedLogo && !resolveCompanyAssetUrl(cachedLogo)) {
+        localStorage.removeItem('samap_branding_logo');
+        setBrandingLogo('');
+      }
+
+      if (cachedBackground && !resolveCompanyAssetUrl(cachedBackground)) {
+        localStorage.removeItem('samap_branding_login_background');
+        setBrandingBackground('');
+      }
+    } catch {
+      // ignore storage failures
+    }
+  }, []);
 
   // Refresh branding from the single public company on every login visit.
   useEffect(() => {
@@ -77,8 +97,8 @@ export const SimpleLoginForm = () => {
 
       if (!company || cancelled) return;
 
-      const logo = sanitizeMediaUrl(company.login_logo_url || company.logo_url || '');
-      const background = sanitizeMediaUrl(company.login_background_url || '');
+      const logo = resolveCompanyAssetUrl(company.login_logo_url || company.logo_url || '') || '';
+      const background = resolveCompanyAssetUrl(company.login_background_url || '') || '';
       const title = company.name || 'SAMAP Digital';
       const subtitle = 'Sistema de Firma Digital - Inicia sesión en tu cuenta';
 
@@ -268,7 +288,19 @@ export const SimpleLoginForm = () => {
           </div>
           <div className="flex justify-center">
             {loginLogoUrl ? (
-              <img src={loginLogoUrl} alt={brandingName} className="h-16 max-w-[200px] object-contain" />
+              <img
+                src={loginLogoUrl}
+                alt={brandingName}
+                className="h-16 max-w-[200px] object-contain"
+                onError={() => {
+                  setBrandingLogo('');
+                  try {
+                    localStorage.removeItem('samap_branding_logo');
+                  } catch {
+                    // ignore storage failures
+                  }
+                }}
+              />
             ) : (
               <div className="p-3 rounded-full bg-primary/10">
                 <Shield className="h-8 w-8 text-primary" />

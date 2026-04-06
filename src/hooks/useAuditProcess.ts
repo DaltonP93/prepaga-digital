@@ -44,6 +44,9 @@ export const useAuditProcesses = () => {
       if (error) throw error;
       return data || [];
     },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 };
 
@@ -89,10 +92,12 @@ export const useCreateAuditProcess = () => {
           details: { audit_process_id: data.id }
         });
 
-      return data;
+      return { process: data, saleId };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['audit-processes'] });
+      queryClient.invalidateQueries({ queryKey: ['sale', result.saleId] });
+      queryClient.invalidateQueries({ queryKey: ['sales-list'] });
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       toast.success('Proceso de auditoría iniciado');
     },
@@ -161,10 +166,12 @@ export const useUpdateAuditProcess = () => {
           details: { notes }
         });
 
-      return data;
+      return { process: data, saleId: auditProcess.sale_id };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['audit-processes'] });
+      queryClient.invalidateQueries({ queryKey: ['sale', result.saleId] });
+      queryClient.invalidateQueries({ queryKey: ['sales-list'] });
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       toast.success('Proceso de auditoría actualizado');
     },

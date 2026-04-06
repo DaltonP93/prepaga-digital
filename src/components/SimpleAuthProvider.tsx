@@ -66,10 +66,9 @@ const resolveHighestRole = (roles: string[]): AppRole => {
 
 const fetchProfileData = async (userId: string): Promise<{ profile: ProfileWithRole | null; role: string | null }> => {
   try {
-    const [profileResult, roleResult, rpcRoleResult] = await Promise.all([
+    const [profileResult, roleResult] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
       supabase.from('user_roles').select('role').eq('user_id', userId),
-      supabase.rpc('get_user_role', { _user_id: userId }),
     ]);
 
     if (profileResult.error) {
@@ -81,11 +80,6 @@ const fetchProfileData = async (userId: string): Promise<{ profile: ProfileWithR
       .map((entry: any) => entry?.role)
       .filter((role: any): role is string => typeof role === 'string' && role.length > 0);
 
-    const rpcRole =
-      typeof rpcRoleResult.data === 'string' && rpcRoleResult.data.length > 0
-        ? (rpcRoleResult.data as AppRole)
-        : null;
-
     const legacyProfileRole =
       typeof (profileResult.data as any)?.role === 'string' && (profileResult.data as any)?.role.length > 0
         ? ((profileResult.data as any).role as AppRole)
@@ -93,7 +87,7 @@ const fetchProfileData = async (userId: string): Promise<{ profile: ProfileWithR
 
     const role = roleList.length > 0
       ? resolveHighestRole(roleList)
-      : rpcRole || legacyProfileRole || null;
+      : legacyProfileRole || null;
 
     const profile: ProfileWithRole | null = profileResult.data
       ? { ...profileResult.data, role: role as ProfileWithRole['role'] }

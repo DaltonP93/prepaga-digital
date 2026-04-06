@@ -62,6 +62,9 @@ export const useClients = () => {
       return data;
     },
     enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 };
 
@@ -89,6 +92,9 @@ export const useClientsLookup = (enabled = true) => {
       return data;
     },
     enabled: !!user && enabled,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 };
 

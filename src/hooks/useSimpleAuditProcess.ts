@@ -23,6 +23,9 @@ export const useAuditProcesses = () => {
       if (error) throw error;
       return data || [];
     },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 };
 
@@ -46,8 +49,10 @@ export const useUpdateSaleStatus = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['audit-processes'] });
+      queryClient.invalidateQueries({ queryKey: ['sale', data.id] });
+      queryClient.invalidateQueries({ queryKey: ['sales-list'] });
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       toast({
         title: "Estado actualizado",

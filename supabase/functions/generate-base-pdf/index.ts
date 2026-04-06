@@ -21,107 +21,47 @@ interface BrandingInfo {
   footerImageUrl: string | null;
 }
 
+/**
+ * Build the header/footer templates for Puppeteer's displayHeaderFooter feature.
+ * These render natively on every PDF page — no CSS tricks needed.
+ */
+function buildPuppeteerTemplates(branding: BrandingInfo): { headerTemplate: string; footerTemplate: string } {
+  // Use only the dedicated PDF header/footer images from company_settings.
+  // No fallback to the company logo — if not configured, show empty space.
+  const imgStyle = "display:block;width:auto;height:auto;max-width:100%;max-height:100%;object-fit:contain;object-position:center;";
+
+  const headerTemplate = branding.headerImageUrl
+    ? `<div style="width:100%;height:100%;padding:2mm 15mm;display:flex;align-items:center;justify-content:center;"><img src="${branding.headerImageUrl}" style="${imgStyle}" /></div>`
+    : `<div style="width:100%;height:100%;"></div>`;
+
+  const footerTemplate = branding.footerImageUrl
+    ? `<div style="width:100%;height:100%;padding:1mm 15mm;display:flex;align-items:center;justify-content:center;"><img src="${branding.footerImageUrl}" style="${imgStyle}" /></div>`
+    : `<div style="width:100%;height:100%;"></div>`;
+
+  return { headerTemplate, footerTemplate };
+}
+
 function buildWrappedHtml(
   bodyContent: string,
-  branding: BrandingInfo,
-  documentName: string
+  _branding: BrandingInfo,
+  _documentName: string
 ): string {
-  // Header: If dedicated header image exists, use it centered. Otherwise fall back to logo.
-  let headerHtml: string;
-  if (branding.headerImageUrl) {
-    headerHtml = `<img src="${branding.headerImageUrl}" class="header-brand-image" />`;
-  } else if (branding.logoUrl) {
-    headerHtml = `<img src="${branding.logoUrl}" class="header-brand-image" />`;
-  } else {
-    headerHtml = `<span style="font-weight:700;font-size:18px;">${branding.companyName}</span>`;
-  }
-
-  // Footer: If dedicated footer image exists, use it. Otherwise fall back to text contact line.
-  let footerHtml: string;
-  if (branding.footerImageUrl) {
-    footerHtml = `<img src="${branding.footerImageUrl}" class="footer-brand-image" />`;
-  } else {
-    const contactParts: string[] = [];
-    if (branding.address) contactParts.push(branding.address);
-    if (branding.phone) contactParts.push(branding.phone);
-    if (branding.email) contactParts.push(branding.email);
-    footerHtml = `<div class="contact">${contactParts.join(" | ")}</div>
-    <div class="page-number">Pág. </div>`;
-  }
-
+  // Header/footer are handled via Puppeteer's displayHeaderFooter + headerTemplate/footerTemplate.
+  // This function only wraps the body content with styling.
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
 <style>
-  @page {
-    size: A4;
-    margin: 0;
-  }
-
+  @page { size: A4; }
   * { box-sizing: border-box; }
 
   body {
     margin: 0;
-    padding: 30mm 15mm 20mm 15mm;
+    padding: 0;
     font-family: Arial, Helvetica, sans-serif;
     font-size: 12px;
     color: #222;
-    width: 100%;
-  }
-
-  /* ── Fixed header – repeats on every page ── */
-  .page-header {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 26mm;
-    background: white;
-    z-index: 10;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2mm 15mm;
-  }
-  .page-header .header-brand-image {
-    display: block;
-    max-width: 55%;
-    max-height: 22mm;
-    height: auto;
-    object-fit: contain;
-    object-position: center center;
-  }
-
-  /* ── Fixed footer – repeats on every page ── */
-  .page-footer {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 16mm;
-    background: white;
-    z-index: 10;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 15mm;
-    font-size: 8px;
-    color: #777;
-  }
-  .page-footer .footer-brand-image {
-    display: block;
-    max-width: 90%;
-    max-height: 13mm;
-    height: auto;
-    object-fit: contain;
-    object-position: center center;
-  }
-  .page-footer .contact {
-    max-width: 80%;
-  }
-  .page-footer .page-number::after {
-    content: counter(page);
   }
 
   /* ── Main content ── */
@@ -166,14 +106,6 @@ function buildWrappedHtml(
 </style>
 </head>
 <body>
-  <div class="page-header">
-    ${headerHtml}
-  </div>
-
-  <div class="page-footer">
-    ${footerHtml}
-  </div>
-
   <div class="content">
     ${bodyContent}
   </div>
@@ -429,8 +361,9 @@ Deno.serve(async (req) => {
     const bucket = Deno.env.get("STORAGE_BUCKET") || "documents";
     const resolvedContent = await resolveContentImages(doc.content, supabaseAdmin, bucket);
 
-    // 3. Build wrapped HTML with repeating header/footer
+    // 3. Build wrapped HTML and Puppeteer header/footer templates
     const wrappedHtml = buildWrappedHtml(resolvedContent, branding, doc.name || "Documento");
+    const { headerTemplate, footerTemplate } = buildPuppeteerTemplates(branding);
 
     // 4. Call render service
     const renderUrl = Deno.env.get("RENDER_URL");
@@ -453,7 +386,10 @@ Deno.serve(async (req) => {
         options: {
           format: "A4",
           printBackground: true,
-          margin: { top: "0", right: "0", bottom: "0", left: "0" },
+          displayHeaderFooter: true,
+          headerTemplate,
+          footerTemplate,
+          margin: { top: "28mm", right: "15mm", bottom: "20mm", left: "15mm" },
           waitUntil: "networkidle0",
         },
       }),

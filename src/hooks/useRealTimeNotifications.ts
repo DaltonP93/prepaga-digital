@@ -61,6 +61,7 @@ export const useRealTimeNotifications = () => {
           const documentId = doc?.id;
           scheduleInvalidate('documents', ['documents']);
           scheduleInvalidate('documents-list', ['documents-list']);
+          scheduleInvalidate('sales-document-counts', ['sales-document-counts']);
           queryClient.invalidateQueries({ queryKey: ['sale-generated-documents'], exact: false });
           if (doc?.sale_id) {
             queryClient.invalidateQueries({ queryKey: ['sale-generated-documents', doc.sale_id] });

@@ -47,7 +47,7 @@ const Documents: React.FC = () => {
     data: documentPage,
     isLoading,
     error: documentsError,
-  } = useDocumentsList({ page, pageSize: 24, search });
+  } = useDocumentsList({ page, pageSize: 25, search });
   const { createDocument, deleteDocument } = useDocuments();
   const { data: sales } = useSalesLookup(showCreateForm);
   const {

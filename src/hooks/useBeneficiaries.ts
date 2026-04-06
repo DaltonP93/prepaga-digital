@@ -26,6 +26,16 @@ async function recalculateSaleTotalAmount(saleId: string) {
     .eq('id', saleId);
 }
 
+const invalidateBeneficiaryRelatedQueries = (
+  queryClient: ReturnType<typeof useQueryClient>,
+  saleId: string,
+) => {
+  queryClient.invalidateQueries({ queryKey: ['beneficiaries', saleId] });
+  queryClient.invalidateQueries({ queryKey: ['sale', saleId] });
+  queryClient.invalidateQueries({ queryKey: ['sales-list'] });
+  queryClient.invalidateQueries({ queryKey: ['sales'] });
+};
+
 export const useBeneficiaries = (saleId: string) => {
   return useQuery({
     queryKey: ['beneficiaries', saleId],
@@ -59,11 +69,8 @@ export const useCreateBeneficiary = () => {
       return data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['beneficiaries', data.sale_id] });
-      queryClient.invalidateQueries({ queryKey: ['sales'] });
       recalculateSaleTotalAmount(data.sale_id).then(() => {
-        queryClient.invalidateQueries({ queryKey: ['sales'] });
-        queryClient.invalidateQueries({ queryKey: ['sale', data.sale_id] });
+        invalidateBeneficiaryRelatedQueries(queryClient, data.sale_id);
       });
       toast({
         title: "Beneficiario creado",
@@ -97,10 +104,8 @@ export const useUpdateBeneficiary = () => {
       return data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['beneficiaries', data.sale_id] });
       recalculateSaleTotalAmount(data.sale_id).then(() => {
-        queryClient.invalidateQueries({ queryKey: ['sales'] });
-        queryClient.invalidateQueries({ queryKey: ['sale', data.sale_id] });
+        invalidateBeneficiaryRelatedQueries(queryClient, data.sale_id);
       });
       toast({
         title: "Beneficiario actualizado",
@@ -139,10 +144,8 @@ export const useDeleteBeneficiary = () => {
     },
     onSuccess: (saleId) => {
       if (saleId) {
-        queryClient.invalidateQueries({ queryKey: ['beneficiaries', saleId] });
         recalculateSaleTotalAmount(saleId).then(() => {
-          queryClient.invalidateQueries({ queryKey: ['sales'] });
-          queryClient.invalidateQueries({ queryKey: ['sale', saleId] });
+          invalidateBeneficiaryRelatedQueries(queryClient, saleId);
         });
       }
       toast({

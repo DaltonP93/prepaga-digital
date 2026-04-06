@@ -658,6 +658,8 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         .update({ status: 'enviado' } as any)
         .eq('id', saleId);
 
+      queryClient.invalidateQueries({ queryKey: ['sale', saleId] });
+      queryClient.invalidateQueries({ queryKey: ['sales-list'] });
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       queryClient.invalidateQueries({ queryKey: ['sale-generated-documents', saleId] });
       queryClient.invalidateQueries({ queryKey: ['signature-links', saleId] });

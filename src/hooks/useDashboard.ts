@@ -219,5 +219,8 @@ export const useDashboardStats = () => {
     },
     enabled: !!user,
     retry: 1,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 };
