@@ -312,6 +312,7 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("Authorization") || "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const isServiceCall = authHeader === `Bearer ${serviceKey}`;
+    let authenticatedUserId: string | null = null;
     if (!isServiceCall) {
       const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
       const userClient = createClient(Deno.env.get("SUPABASE_URL")!, anonKey, {
@@ -323,9 +324,10 @@ Deno.serve(async (req) => {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      authenticatedUserId = data.user.id;
     }
 
-    const { document_id } = await req.json();
+    const { document_id, admin_regeneration, reason } = await req.json();
     if (!document_id) {
       return new Response(JSON.stringify({ error: "document_id is required" }), {
         status: 400,
