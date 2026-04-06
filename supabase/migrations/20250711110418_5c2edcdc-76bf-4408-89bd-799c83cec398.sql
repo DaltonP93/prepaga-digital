@@ -2,22 +2,22 @@
 -- Crear bucket para documentos
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
-  'documents', 
-  'documents', 
-  true, 
+  'documents',
+  'documents',
+  true,
   52428800, -- 50MB limit
   ARRAY['application/pdf', 'image/jpeg', 'image/png', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
-);
+) ON CONFLICT (id) DO NOTHING;
 
 -- Crear bucket para avatares
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
-  'avatars', 
-  'avatars', 
-  true, 
+  'avatars',
+  'avatars',
+  true,
   10485760, -- 10MB limit
   ARRAY['image/jpeg', 'image/png', 'image/gif', 'image/webp']
-);
+) ON CONFLICT (id) DO NOTHING;
 
 -- Políticas para bucket de documentos
 CREATE POLICY "Company users can upload documents" ON storage.objects
