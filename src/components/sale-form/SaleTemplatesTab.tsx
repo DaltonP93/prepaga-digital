@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertCircle, FileSignature, Plus, Trash2, Lock, Send, Loader2, Eye, FileText, User, ChevronDown, ChevronUp, Paperclip, ExternalLink, RefreshCw } from 'lucide-react';
+import { PrintVersionsPanel } from '@/components/documents/PrintVersionsPanel';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTemplates } from '@/hooks/useTemplates';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -125,7 +126,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
   const navigate = useNavigate();
   const { templates } = useTemplates();
   const queryClient = useQueryClient();
-  const { isAdmin, isSuperAdmin } = useRolePermissions();
+  const { isAdmin, isSuperAdmin, role } = useRolePermissions();
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [sending, setSending] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
@@ -139,6 +140,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
   const regenerateActionRef = useRef<HTMLDivElement | null>(null);
 
   const isPrivilegedRole = isAdmin || isSuperAdmin;
+  const canViewPrintVersions = isAdmin || isSuperAdmin || role === 'supervisor';
 
   const isApproved = auditStatus === 'aprobado' || auditStatus === 'aprobado_para_templates';
   const isSaleLockedStatus = saleStatus === 'completado' || saleStatus === 'cancelado';
@@ -1257,48 +1259,55 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
                   <p className="text-sm font-medium text-muted-foreground">Documentos del Titular</p>
                   {titularDocs.map((doc) => (
                     <Card key={doc.id} className="hover:border-primary/30 transition-colors">
-                      <CardContent className="flex items-center justify-between py-3 px-4">
-                        <div className="flex items-center gap-3">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <div className="font-medium text-sm flex items-center gap-2">
-                              {doc.name}
-                              {getTemplateTypeBadge(doc.document_type || doc.name)}
-                              {getDocStatusBadge(doc.status)}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {new Date(doc.created_at).toLocaleString('es-PY')}
+                      <CardContent className="py-3 px-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                            <div>
+                              <div className="font-medium text-sm flex items-center gap-2">
+                                {doc.name}
+                                {getTemplateTypeBadge(doc.document_type || doc.name)}
+                                {getDocStatusBadge(doc.status)}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {new Date(doc.created_at).toLocaleString('es-PY')}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="flex gap-1">
-                          {isPrivilegedRole && doc.status === 'firmado' && doc.is_final && (
+                          <div className="flex gap-1">
+                            {isPrivilegedRole && doc.status === 'firmado' && doc.is_final && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={regenerandoPdf === doc.id}
+                                onClick={() => handleRegenerarPdf(doc.id)}
+                                className="gap-1"
+                              >
+                                {regenerandoPdf === doc.id ? (
+                                  <><Loader2 className="h-3 w-3 animate-spin" /> Regenerando...</>
+                                ) : (
+                                  <><RefreshCw className="h-3 w-3" /> Regenerar PDF</>
+                                )}
+                              </Button>
+                            )}
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
-                              disabled={regenerandoPdf === doc.id}
-                              onClick={() => handleRegenerarPdf(doc.id)}
+                              onClick={() => setPreviewDoc(doc)}
                               className="gap-1"
                             >
-                              {regenerandoPdf === doc.id ? (
-                                <><Loader2 className="h-3 w-3 animate-spin" /> Regenerando...</>
-                              ) : (
-                                <><RefreshCw className="h-3 w-3" /> Regenerar PDF</>
-                              )}
+                              <Eye className="h-3.5 w-3.5" />
+                              Ver
                             </Button>
-                          )}
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setPreviewDoc(doc)}
-                            className="gap-1"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                            Ver
-                          </Button>
+                          </div>
                         </div>
+                        {canViewPrintVersions && doc.status === 'firmado' && doc.is_final && (
+                          <div className="border-t pt-3">
+                            <PrintVersionsPanel documentId={doc.id} documentName={doc.name} />
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   ))}
@@ -1314,48 +1323,55 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
                   </p>
                   {adherentDocs.map((doc) => (
                     <Card key={doc.id} className="hover:border-primary/30 transition-colors">
-                      <CardContent className="flex items-center justify-between py-3 px-4">
-                        <div className="flex items-center gap-3">
-                          <User className="h-4 w-4 text-purple-500" />
-                          <div>
-                            <div className="font-medium text-sm flex items-center gap-2">
-                              {doc.name}
-                              {getTemplateTypeBadge(doc.document_type || doc.name)}
-                              {getDocStatusBadge(doc.status)}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {new Date(doc.created_at).toLocaleString('es-PY')}
+                      <CardContent className="py-3 px-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <User className="h-4 w-4 text-purple-500" />
+                            <div>
+                              <div className="font-medium text-sm flex items-center gap-2">
+                                {doc.name}
+                                {getTemplateTypeBadge(doc.document_type || doc.name)}
+                                {getDocStatusBadge(doc.status)}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {new Date(doc.created_at).toLocaleString('es-PY')}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="flex gap-1">
-                          {isPrivilegedRole && doc.status === 'firmado' && doc.is_final && (
+                          <div className="flex gap-1">
+                            {isPrivilegedRole && doc.status === 'firmado' && doc.is_final && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={regenerandoPdf === doc.id}
+                                onClick={() => handleRegenerarPdf(doc.id)}
+                                className="gap-1"
+                              >
+                                {regenerandoPdf === doc.id ? (
+                                  <><Loader2 className="h-3 w-3 animate-spin" /> Regenerando...</>
+                                ) : (
+                                  <><RefreshCw className="h-3 w-3" /> Regenerar PDF</>
+                                )}
+                              </Button>
+                            )}
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
-                              disabled={regenerandoPdf === doc.id}
-                              onClick={() => handleRegenerarPdf(doc.id)}
+                              onClick={() => setPreviewDoc(doc)}
                               className="gap-1"
                             >
-                              {regenerandoPdf === doc.id ? (
-                                <><Loader2 className="h-3 w-3 animate-spin" /> Regenerando...</>
-                              ) : (
-                                <><RefreshCw className="h-3 w-3" /> Regenerar PDF</>
-                              )}
+                              <Eye className="h-3.5 w-3.5" />
+                              Ver
                             </Button>
-                          )}
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setPreviewDoc(doc)}
-                            className="gap-1"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                            Ver
-                          </Button>
+                          </div>
                         </div>
+                        {canViewPrintVersions && doc.status === 'firmado' && doc.is_final && (
+                          <div className="border-t pt-3">
+                            <PrintVersionsPanel documentId={doc.id} documentName={doc.name} />
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   ))}
