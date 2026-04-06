@@ -4486,6 +4486,18 @@ export type Database = {
           whatsapp_otp_enabled: boolean
         }[]
       }
+      get_public_branding: {
+        Args: never
+        Returns: {
+          accent_color: string
+          login_background_url: string
+          login_logo_url: string
+          logo_url: string
+          name: string
+          primary_color: string
+          secondary_color: string
+        }[]
+      }
       get_sale_id_from_signature_token: { Args: never; Returns: string }
       get_signature_link_id_from_token: { Args: never; Returns: string }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }

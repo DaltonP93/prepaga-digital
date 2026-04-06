@@ -52,18 +52,22 @@ export const SimpleLoginForm = () => {
   // Fetch public branding on mount if localStorage is empty (first visit, pre-auth)
   useEffect(() => {
     if (brandingLogo && brandingBackground) return;
-    supabase.rpc('get_public_branding').then(({ data }) => {
-      if (!data || data.length === 0) return;
-      const row = data[0];
-      const logo = row.login_logo_url || row.logo_url || '';
-      const bg = row.login_background_url || '';
-      const name = row.name || 'SAMAP Digital';
+    const fetchBranding = async () => {
       try {
-        if (logo) { localStorage.setItem('samap_branding_logo', logo); setBrandingLogo(logo); }
-        if (bg) { localStorage.setItem('samap_branding_login_background', bg); setBrandingBackground(bg); }
-        if (name) { localStorage.setItem('samap_branding_name', name); setBrandingName(name); }
-      } catch { /* ignore */ }
-    }).catch(() => { /* fail silently */ });
+        const { data } = await supabase.rpc('get_public_branding' as any);
+        if (!data || (data as any[]).length === 0) return;
+        const row = (data as any[])[0];
+        const logo = row.login_logo_url || row.logo_url || '';
+        const bg = row.login_background_url || '';
+        const name = row.name || 'SAMAP Digital';
+        try {
+          if (logo) { localStorage.setItem('samap_branding_logo', logo); setBrandingLogo(logo); }
+          if (bg) { localStorage.setItem('samap_branding_login_background', bg); setBrandingBackground(bg); }
+          if (name) { localStorage.setItem('samap_branding_name', name); setBrandingName(name); }
+        } catch { /* ignore */ }
+      } catch { /* fail silently */ }
+    };
+    fetchBranding();
   }, []);
 
   // Redirect user after successful login
