@@ -115,6 +115,7 @@ const SignatureWorkflow = () => {
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [detailLink, setDetailLink] = useState<any>(null);
+  const [regeneratingLinkId, setRegeneratingLinkId] = useState<string | null>(null);
 
   const selectedSaleCompanyId = selectedSale?.company_id;
 
@@ -350,6 +351,76 @@ const SignatureWorkflow = () => {
       } else if (doc.content) {
         handleDownloadContent(doc);
       }
+    }
+  };
+
+  const handleRegenerateAndDownload = async (link: any) => {
+    const recipientDocs = signedDocs.filter((doc: any) => {
+      if (doc.document_type === 'firma') return false;
+      if (!doc.is_final) return false;
+      if (link.recipient_type === 'adherente' && link.recipient_id) {
+        return doc.beneficiary_id === link.recipient_id;
+      }
+      if (link.recipient_type === 'contratada') {
+        return doc.document_type === 'contrato' && !doc.beneficiary_id;
+      }
+      return !doc.beneficiary_id;
+    });
+
+    if (recipientDocs.length === 0) {
+      toast.error('No se encontraron documentos firmados');
+      return;
+    }
+
+    setRegeneratingLinkId(link.id);
+    try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const session = (await supabase.auth.getSession()).data.session;
+      const token = session?.access_token || SUPABASE_KEY;
+
+      for (const doc of recipientDocs) {
+        const genResp = await fetch(`${SUPABASE_URL}/functions/v1/generate-base-pdf`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            document_id: doc.id,
+            admin_regeneration: true,
+            reason: 'Regeneración de encabezado',
+          }),
+        });
+
+        if (!genResp.ok) {
+          const err = await genResp.json().catch(() => ({}));
+          toast.error(`Error al regenerar "${doc.name}": ${err.error || genResp.status}`);
+          continue;
+        }
+
+        // Now download the newly created print version
+        const dlResp = await fetch(`${SUPABASE_URL}/functions/v1/get-document-download-url`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ document_id: doc.id, kind: 'signed' }),
+        });
+
+        const dlResult = await dlResp.json();
+        if (dlResult.url) {
+          window.open(dlResult.url, '_blank');
+        }
+      }
+      toast.success('Documentos regenerados con encabezado');
+    } catch (err: any) {
+      toast.error(err.message || 'Error al regenerar documentos');
+    } finally {
+      setRegeneratingLinkId(null);
     }
   };
 
@@ -676,6 +747,18 @@ const SignatureWorkflow = () => {
                     <Download className="h-4 w-4 mr-1" />
                     Descargar Documento Firmado
                   </Button>
+                  {['admin', 'super_admin'].includes(effectiveRole) && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => handleRegenerateAndDownload(link)}
+                      disabled={regeneratingLinkId === link.id}
+                      title="Regenera el PDF con encabezado y lo descarga"
+                    >
+                      <RefreshCw className={`h-4 w-4 mr-1 ${regeneratingLinkId === link.id ? 'animate-spin' : ''}`} />
+                      {regeneratingLinkId === link.id ? 'Regenerando...' : 'Regenerar con Encabezado'}
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"

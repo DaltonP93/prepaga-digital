@@ -56,14 +56,14 @@ function buildWrappedHtml(
 <style>
   @page {
     size: A4;
-    margin: 32mm 15mm 22mm 15mm;
+    margin: 0;
   }
 
   * { box-sizing: border-box; }
 
   body {
     margin: 0;
-    padding: 0;
+    padding: 30mm 15mm 20mm 15mm;
     font-family: Arial, Helvetica, sans-serif;
     font-size: 12px;
     color: #222;
@@ -73,19 +73,21 @@ function buildWrappedHtml(
   /* ── Fixed header – repeats on every page ── */
   .page-header {
     position: fixed;
-    top: -28mm;
+    top: 0;
     left: 0;
     right: 0;
-    height: 24mm;
+    height: 26mm;
+    background: white;
+    z-index: 10;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 2mm 0;
+    padding: 2mm 15mm;
   }
   .page-header .header-brand-image {
     display: block;
     max-width: 55%;
-    max-height: 20mm;
+    max-height: 22mm;
     height: auto;
     object-fit: contain;
     object-position: center center;
@@ -94,21 +96,23 @@ function buildWrappedHtml(
   /* ── Fixed footer – repeats on every page ── */
   .page-footer {
     position: fixed;
-    bottom: -18mm;
+    bottom: 0;
     left: 0;
     right: 0;
-    height: 14mm;
+    height: 16mm;
+    background: white;
+    z-index: 10;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0 2mm;
+    padding: 0 15mm;
     font-size: 8px;
     color: #777;
   }
   .page-footer .footer-brand-image {
     display: block;
     max-width: 90%;
-    max-height: 12mm;
+    max-height: 13mm;
     height: auto;
     object-fit: contain;
     object-position: center center;
@@ -449,7 +453,7 @@ Deno.serve(async (req) => {
         options: {
           format: "A4",
           printBackground: true,
-          margin: { top: "30mm", right: "15mm", bottom: "22mm", left: "15mm" },
+          margin: { top: "0", right: "0", bottom: "0", left: "0" },
           waitUntil: "networkidle0",
         },
       }),

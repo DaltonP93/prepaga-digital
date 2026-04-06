@@ -77,6 +77,44 @@ Deno.serve(async (req) => {
     // --- Authorized: generate signed URL ---
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
+    // For 'signed' kind: prefer a current print version (branded) if one exists
+    if (kind === "signed") {
+      const { data: printVersion } = await supabaseAdmin
+        .from("document_print_versions")
+        .select("pdf_url")
+        .eq("document_id", document_id)
+        .eq("is_current", true)
+        .single();
+
+      if (printVersion?.pdf_url) {
+        const pvUrl = printVersion.pdf_url as string;
+        let pvBucket: string;
+        let pvPath: string;
+        if (pvUrl.includes(":")) {
+          const colonIdx = pvUrl.indexOf(":");
+          pvBucket = pvUrl.substring(0, colonIdx);
+          pvPath = pvUrl.substring(colonIdx + 1);
+        } else {
+          pvBucket = Deno.env.get("STORAGE_BUCKET") || "documents";
+          pvPath = pvUrl;
+        }
+        const expiresIn = 3600;
+        const { data: pvSignedData, error: pvErr } = await supabaseAdmin.storage
+          .from(pvBucket)
+          .createSignedUrl(pvPath, expiresIn);
+        if (!pvErr && pvSignedData) {
+          return new Response(
+            JSON.stringify({
+              url: pvSignedData.signedUrl,
+              expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
+              source: "print_version",
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+    }
+
     const columnMap: Record<string, string> = {
       signed: "signed_pdf_url",
       base: "base_pdf_url",

@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom';
 import { ThemePreference, getStoredThemePreference, setThemePreference } from '@/lib/theme';
 import { supabase } from '@/integrations/supabase/client';
 import { sanitizeMediaUrl } from '@/lib/mediaUrl';
+import { getSingleCompany } from '@/lib/singleCompany';
 
 export const SimpleLoginForm = () => {
   const enableSuperAdminBootstrap =
@@ -26,6 +27,13 @@ export const SimpleLoginForm = () => {
   const [isBootstrapping, setIsBootstrapping] = useState(false);
   const [canBootstrapSuperAdmin, setCanBootstrapSuperAdmin] = useState(false);
   const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() => getStoredThemePreference());
+  const [brandingSubtitle, setBrandingSubtitle] = useState(() => {
+    try {
+      return localStorage.getItem('samap_branding_login_subtitle') || 'Sistema de Firma Digital - Inicia sesión en tu cuenta';
+    } catch {
+      return 'Sistema de Firma Digital - Inicia sesión en tu cuenta';
+    }
+  });
 
   // Read branding from localStorage (persisted by CompanyBrandingProvider)
   const [brandingLogo, setBrandingLogo] = useState(() => {
@@ -37,9 +45,6 @@ export const SimpleLoginForm = () => {
   const [brandingName, setBrandingName] = useState(() => {
     try { return localStorage.getItem('samap_branding_name') || 'SAMAP Digital'; } catch { return 'SAMAP Digital'; }
   });
-  const brandingSubtitle = (() => {
-    try { return localStorage.getItem('samap_branding_login_subtitle') || 'Sistema de Firma Digital - Inicia sesión en tu cuenta'; } catch { return 'Sistema de Firma Digital - Inicia sesión en tu cuenta'; }
-  })();
   const loginBackgroundUrl = sanitizeMediaUrl(brandingBackground);
   const loginLogoUrl = sanitizeMediaUrl(brandingLogo);
   const backgroundStyle = loginBackgroundUrl
@@ -49,25 +54,53 @@ export const SimpleLoginForm = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Fetch public branding on mount if localStorage is empty (first visit, pre-auth)
+  // Refresh branding from the single public company on every login visit.
   useEffect(() => {
-    if (brandingLogo && brandingBackground) return;
-    const fetchBranding = async () => {
+    let cancelled = false;
+
+    const loadPublicBranding = async () => {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id, name, logo_url, login_logo_url, login_background_url, is_active')
+        .in('name', ['SAMAP Prepaga Digital', 'Prepaga Digital', 'SAMAP']);
+
+      if (error || !data?.length) return;
+
+      const company = getSingleCompany(data as Array<{
+        id: string;
+        name: string;
+        logo_url?: string | null;
+        login_logo_url?: string | null;
+        login_background_url?: string | null;
+        is_active?: boolean | null;
+      }>);
+
+      if (!company || cancelled) return;
+
+      const logo = sanitizeMediaUrl(company.login_logo_url || company.logo_url || '');
+      const background = sanitizeMediaUrl(company.login_background_url || '');
+      const title = company.name || 'SAMAP Digital';
+      const subtitle = 'Sistema de Firma Digital - Inicia sesión en tu cuenta';
+
+      setBrandingLogo(logo);
+      setBrandingBackground(background);
+      setBrandingName(title);
+      setBrandingSubtitle(subtitle);
+
       try {
-        const { data } = await supabase.rpc('get_public_branding' as any);
-        if (!data || (data as any[]).length === 0) return;
-        const row = (data as any[])[0];
-        const logo = row.login_logo_url || row.logo_url || '';
-        const bg = row.login_background_url || '';
-        const name = row.name || 'SAMAP Digital';
-        try {
-          if (logo) { localStorage.setItem('samap_branding_logo', logo); setBrandingLogo(logo); }
-          if (bg) { localStorage.setItem('samap_branding_login_background', bg); setBrandingBackground(bg); }
-          if (name) { localStorage.setItem('samap_branding_name', name); setBrandingName(name); }
-        } catch { /* ignore */ }
-      } catch { /* fail silently */ }
+        localStorage.setItem('samap_branding_logo', logo);
+        localStorage.setItem('samap_branding_login_background', background);
+        localStorage.setItem('samap_branding_name', title);
+        localStorage.setItem('samap_branding_login_subtitle', subtitle);
+      } catch {
+        // ignore storage failures
+      }
     };
-    fetchBranding();
+
+    void loadPublicBranding();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Redirect user after successful login
