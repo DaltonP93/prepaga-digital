@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ProfileWithRole } from '@/types/auth';
 import type { AppRole } from '@/types/roles';
@@ -124,6 +125,7 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [profile, setProfile] = useState<ProfileWithRole | null>(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     let isMounted = true;
@@ -159,6 +161,7 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             });
         } else if (event === 'SIGNED_OUT') {
           clearAuthState(setUser, setProfile, setUserRole);
+          queryClient.clear();
           preserveBrandingStorage();
           sessionStorage.clear();
         } else if (event === 'TOKEN_REFRESHED' && session?.user) {
@@ -231,6 +234,7 @@ export const SimpleAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       preserveBrandingStorage();
       sessionStorage.clear();
+      queryClient.clear();
       await supabase.auth.signOut();
     } catch (error) {
       console.error('❌ Sign out error:', error);
