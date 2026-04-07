@@ -238,6 +238,17 @@ async function resolveStorageUrl(
   return url;
 }
 
+function isMissingPrintVersionsTable(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  const message = error.message || "";
+  return (
+    error.code === "42P01" ||
+    error.code === "PGRST205" ||
+    message.includes('relation "document_print_versions" does not exist') ||
+    message.includes("Could not find the table")
+  );
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -413,13 +424,24 @@ Deno.serve(async (req) => {
     if (admin_regeneration) {
       // === Versioned print mode ===
       // Get next version number
-      const { data: lastVersion } = await supabaseAdmin
+      const { data: lastVersion, error: lastVersionError } = await supabaseAdmin
         .from("document_print_versions")
         .select("version_number")
         .eq("document_id", document_id)
         .order("version_number", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
+
+      if (lastVersionError) {
+        const details = isMissingPrintVersionsTable(lastVersionError)
+          ? "document_print_versions table is missing in this environment"
+          : lastVersionError.message;
+
+        return new Response(JSON.stringify({ error: "Print version infrastructure is not available", details }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
       const nextVersion = (lastVersion?.version_number || 0) + 1;
       const versionPath = `contracts/print-versions/${doc.sale_id}/${doc.id}/v${nextVersion}.pdf`;
@@ -440,10 +462,21 @@ Deno.serve(async (req) => {
       }
 
       // Mark previous versions as not current
-      await supabaseAdmin
+      const { error: resetVersionsError } = await supabaseAdmin
         .from("document_print_versions")
         .update({ is_current: false })
         .eq("document_id", document_id);
+
+      if (resetVersionsError) {
+        const details = isMissingPrintVersionsTable(resetVersionsError)
+          ? "document_print_versions table is missing in this environment"
+          : resetVersionsError.message;
+
+        return new Response(JSON.stringify({ error: "Could not update previous print versions", details }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
       // Insert new version record
       const versionPdfUrl = `${bucket}:${versionPath}`;
@@ -451,6 +484,7 @@ Deno.serve(async (req) => {
         .from("document_print_versions")
         .insert({
           document_id,
+          sale_id: doc.sale_id,
           version_number: nextVersion,
           pdf_url: versionPdfUrl,
           pdf_hash: hash,
@@ -460,7 +494,14 @@ Deno.serve(async (req) => {
         });
 
       if (insertErr) {
-        console.error("Version insert error:", insertErr);
+        const details = isMissingPrintVersionsTable(insertErr)
+          ? "document_print_versions table is missing in this environment"
+          : insertErr.message;
+
+        return new Response(JSON.stringify({ error: "Could not persist the print version", details }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       return new Response(

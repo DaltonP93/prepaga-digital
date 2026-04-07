@@ -74,30 +74,52 @@ Deno.serve(async (req) => {
       });
     }
 
+    const isMissingPrintVersionsTable = (error: { code?: string; message?: string } | null) => {
+      if (!error) return false;
+      const message = error.message || "";
+      return (
+        error.code === "42P01" ||
+        error.code === "PGRST205" ||
+        message.includes('relation "document_print_versions" does not exist') ||
+        message.includes("Could not find the table") ||
+        message.includes("document_print_versions")
+      );
+    };
+
+    const parseStorageReference = (storedUrl: string) => {
+      if (storedUrl.includes(":")) {
+        const colonIdx = storedUrl.indexOf(":");
+        return {
+          bucket: storedUrl.substring(0, colonIdx),
+          storagePath: storedUrl.substring(colonIdx + 1),
+        };
+      }
+
+      return {
+        bucket: Deno.env.get("STORAGE_BUCKET") || "documents",
+        storagePath: storedUrl,
+      };
+    };
+
     // --- Authorized: generate signed URL ---
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     // For 'signed' kind: prefer a current print version (branded) if one exists
     if (kind === "signed") {
-      const { data: printVersion } = await supabaseAdmin
+      const { data: printVersion, error: printVersionError } = await supabaseAdmin
         .from("document_print_versions")
         .select("pdf_url")
         .eq("document_id", document_id)
         .eq("is_current", true)
-        .single();
+        .maybeSingle();
+
+      if (printVersionError && !isMissingPrintVersionsTable(printVersionError)) {
+        console.error("document_print_versions lookup error:", printVersionError);
+      }
 
       if (printVersion?.pdf_url) {
         const pvUrl = printVersion.pdf_url as string;
-        let pvBucket: string;
-        let pvPath: string;
-        if (pvUrl.includes(":")) {
-          const colonIdx = pvUrl.indexOf(":");
-          pvBucket = pvUrl.substring(0, colonIdx);
-          pvPath = pvUrl.substring(colonIdx + 1);
-        } else {
-          pvBucket = Deno.env.get("STORAGE_BUCKET") || "documents";
-          pvPath = pvUrl;
-        }
+        const { bucket: pvBucket, storagePath: pvPath } = parseStorageReference(pvUrl);
         const expiresIn = 3600;
         const { data: pvSignedData, error: pvErr } = await supabaseAdmin.storage
           .from(pvBucket)
@@ -122,10 +144,14 @@ Deno.serve(async (req) => {
       file: "file_url",
     };
     const column = columnMap[kind] || "base_pdf_url";
+    const documentSelect =
+      kind === "signed"
+        ? "id, signed_pdf_url, base_pdf_url"
+        : `id, ${column}`;
 
     const { data: doc, error: docErr } = await supabaseAdmin
       .from("documents")
-      .select(`id, ${column}`)
+      .select(documentSelect)
       .eq("id", document_id)
       .single();
 
@@ -136,7 +162,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const storedUrl = (doc as any)[column];
+    const storedUrl =
+      kind === "signed"
+        ? (doc as any).signed_pdf_url || (doc as any).base_pdf_url
+        : (doc as any)[column];
     if (!storedUrl) {
       return new Response(JSON.stringify({ error: `No ${kind} file available for this document` }), {
         status: 404,
@@ -144,17 +173,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    let bucket: string;
-    let storagePath: string;
-
-    if (storedUrl.includes(":")) {
-      const colonIdx = storedUrl.indexOf(":");
-      bucket = storedUrl.substring(0, colonIdx);
-      storagePath = storedUrl.substring(colonIdx + 1);
-    } else {
-      bucket = Deno.env.get("STORAGE_BUCKET") || "documents";
-      storagePath = storedUrl;
-    }
+    const { bucket, storagePath } = parseStorageReference(storedUrl);
 
     const expiresIn = 3600;
     const { data: signedUrlData, error: urlErr } = await supabaseAdmin.storage
