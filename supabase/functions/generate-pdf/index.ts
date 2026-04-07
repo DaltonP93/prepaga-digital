@@ -57,8 +57,33 @@ serve(async (req) => {
       })
     }
 
+    const userId = claimsData.claims.sub as string
+
     // Use service role for data access
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Fetch user's company_id and branding settings
+    let headerImageUrl: string | null = null
+    let footerImageUrl: string | null = null
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('id', userId)
+      .single()
+
+    if (profile?.company_id) {
+      const { data: settings } = await supabase
+        .from('company_settings')
+        .select('pdf_header_image_url, pdf_footer_image_url')
+        .eq('company_id', profile.company_id)
+        .single()
+
+      if (settings) {
+        headerImageUrl = settings.pdf_header_image_url || null
+        footerImageUrl = settings.pdf_footer_image_url || null
+      }
+    }
 
     const { 
       templateId, 
@@ -163,6 +188,8 @@ serve(async (req) => {
       title: filename,
       documentType,
       includeSignatureFields,
+      headerImageUrl,
+      footerImageUrl,
     })
 
     return new Response(JSON.stringify({
@@ -260,6 +287,8 @@ function generatePDFHtml(content: string, options: {
   title: string;
   documentType: string;
   includeSignatureFields: boolean;
+  headerImageUrl?: string | null;
+  footerImageUrl?: string | null;
 }): string {
   const signatureSection = options.includeSignatureFields ? `
     <div style="margin-top: 60px; page-break-inside: avoid;">
@@ -280,6 +309,54 @@ function generatePDFHtml(content: string, options: {
     </div>
   ` : ''
 
+  const hasHeader = !!options.headerImageUrl
+  const hasFooter = !!options.footerImageUrl
+  const topMargin = hasHeader ? '28mm' : '20mm'
+  const bottomMargin = hasFooter ? '25mm' : '20mm'
+
+  const headerHtml = hasHeader ? `
+    <div class="pdf-header-branding">
+      <img src="${options.headerImageUrl}" alt="Encabezado" />
+    </div>
+  ` : ''
+
+  const footerHtml = hasFooter ? `
+    <div class="pdf-footer-branding">
+      <img src="${options.footerImageUrl}" alt="Zócalo" />
+    </div>
+  ` : ''
+
+  const brandingStyles = `
+    .pdf-header-branding {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 22mm;
+      text-align: center;
+      z-index: 1000;
+    }
+    .pdf-header-branding img {
+      max-width: 100%;
+      max-height: 22mm;
+      object-fit: contain;
+    }
+    .pdf-footer-branding {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 18mm;
+      text-align: center;
+      z-index: 1000;
+    }
+    .pdf-footer-branding img {
+      max-width: 100%;
+      max-height: 18mm;
+      object-fit: contain;
+    }
+  `
+
   return `
     <!DOCTYPE html>
     <html lang="es">
@@ -288,10 +365,10 @@ function generatePDFHtml(content: string, options: {
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>${options.title}</title>
       <style>
-        @page { size: A4; margin: 20mm; }
+        @page { size: A4; margin: ${topMargin} 20mm ${bottomMargin} 20mm; }
         * { box-sizing: border-box; }
         body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 12px; line-height: 1.6; color: #333; margin: 0; padding: 0; }
-        .document-container { max-width: 210mm; margin: 0 auto; padding: 20px; }
+        .document-container { max-width: 210mm; margin: 0 auto; padding: ${hasHeader ? '25mm' : '20px'} 20px ${hasFooter ? '20mm' : '20px'} 20px; }
         h1 { font-size: 24px; margin-bottom: 20px; color: #1a1a1a; }
         h2 { font-size: 18px; margin-top: 24px; margin-bottom: 12px; color: #333; }
         h3 { font-size: 14px; margin-top: 16px; margin-bottom: 8px; color: #444; }
@@ -303,9 +380,12 @@ function generatePDFHtml(content: string, options: {
         .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 10px; color: #666; text-align: center; }
         .page-break { page-break-before: always; }
         @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+        ${brandingStyles}
       </style>
     </head>
     <body>
+      ${headerHtml}
+      ${footerHtml}
       <div class="document-container">
         ${content}
         ${signatureSection}
