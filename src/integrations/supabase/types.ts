@@ -4483,6 +4483,13 @@ export type Database = {
           whatsapp_otp_enabled: boolean
         }[]
       }
+      get_pdf_branding_by_token: {
+        Args: { p_token: string }
+        Returns: {
+          pdf_footer_image_url: string
+          pdf_header_image_url: string
+        }[]
+      }
       get_public_branding: {
         Args: never
         Returns: {
