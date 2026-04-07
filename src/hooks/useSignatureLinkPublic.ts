@@ -155,11 +155,21 @@ export const useSignatureLinkByToken = (token: string) => {
         throw new Error('No se pudo cargar la información de la venta');
       }
 
+      // Fetch PDF branding images for HTML fallback rendering
+      let pdfBranding: { pdf_header_image_url?: string; pdf_footer_image_url?: string } = {};
+      try {
+        const { data: brandingData } = await signatureClient
+          .rpc('get_pdf_branding_by_token', { p_token: token });
+        const row = Array.isArray(brandingData) ? brandingData[0] : brandingData;
+        if (row) pdfBranding = row;
+      } catch { /* ignore */ }
+
       const result = {
         ...linkData,
         sale: saleData as any,
         isActive: (linkData as any).is_active !== false,
-      } as SignatureLinkData;
+        pdfBranding,
+      } as SignatureLinkData & { pdfBranding: typeof pdfBranding };
 
       return result;
     },

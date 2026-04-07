@@ -137,8 +137,11 @@ const SignatureView = () => {
     // Fallback: open HTML content for printing with branding
     if (!doc?.content) return;
     const comp = linkData?.sale?.companies;
-    const logoUrl = comp?.logo_url || '';
     const companyName = comp?.name || '';
+    const branding = (linkData as any)?.pdfBranding || {};
+    const headerImg = branding.pdf_header_image_url || '';
+    const footerImg = branding.pdf_footer_image_url || '';
+    const logoUrl = comp?.logo_url || '';
 
     const htmlContent = `
       <!doctype html>
@@ -148,7 +151,7 @@ const SignatureView = () => {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>${doc.name}</title>
         <style>
-          @page { size: A4; margin: 32mm 15mm 22mm 15mm; }
+          @page { size: A4; margin: 28mm 15mm 25mm 15mm; }
           body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 12px; line-height: 1.6; color: #333; margin: 0; padding: 0; }
           img { max-width: 280px; }
           table { width: 100%; border-collapse: collapse; }
@@ -157,22 +160,21 @@ const SignatureView = () => {
             position: fixed; top: -28mm; left: 0; right: 0; height: 24mm;
             display: flex; align-items: center; justify-content: center; padding: 2mm 0;
           }
-          .page-header img { max-width: 55%; max-height: 20mm; height: auto; object-fit: contain; }
+          .page-header img { max-width: 100%; max-height: 22mm; height: auto; object-fit: contain; }
           .page-footer {
-            position: fixed; bottom: -18mm; left: 0; right: 0; height: 14mm;
+            position: fixed; bottom: -22mm; left: 0; right: 0; height: 18mm;
             display: flex; align-items: center; justify-content: center;
-            font-size: 8px; color: #777;
           }
-          .page-footer img { max-width: 90%; max-height: 12mm; height: auto; object-fit: contain; }
+          .page-footer img { max-width: 100%; max-height: 16mm; height: auto; object-fit: contain; }
           @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
         </style>
       </head>
       <body>
         <div class="page-header">
-          ${logoUrl ? `<img src="${logoUrl}" alt="${companyName}" />` : `<span style="font-weight:700;font-size:18px;">${companyName}</span>`}
+          ${headerImg ? `<img src="${headerImg}" alt="${companyName}" />` : logoUrl ? `<img src="${logoUrl}" alt="${companyName}" />` : `<span style="font-weight:700;font-size:18px;">${companyName}</span>`}
         </div>
         <div class="page-footer">
-          <span>${companyName} ${(comp as any)?.phone ? '| ' + (comp as any).phone : ''} ${(comp as any)?.email ? '| ' + (comp as any).email : ''}</span>
+          ${footerImg ? `<img src="${footerImg}" alt="${companyName}" />` : `<span style="font-size:8px;color:#777;">${companyName} ${(comp as any)?.phone ? '| ' + (comp as any).phone : ''} ${(comp as any)?.email ? '| ' + (comp as any).email : ''}</span>`}
         </div>
         ${DOMPurify.sanitize(doc.content || '', { FORCE_BODY: true })}
       </body>
