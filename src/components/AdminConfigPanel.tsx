@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { ContratadaSignatureConfigInner } from '@/components/ContratadaSignatureConfig';
 import { SignatureBlockStyleCard } from '@/components/SignatureBlockStyleCard';
-import { WahaHealthStatus } from '@/components/WahaHealthStatus';
+import { WahaConnectPanel } from '@/components/WahaConnectPanel';
 import { useCompanyConfiguration } from '@/hooks/useCompanyConfiguration';
 import { useCompanyApiConfiguration, WhatsAppProvider, EmailProvider } from '@/hooks/useCompanyApiConfiguration';
 import { useWhatsAppTemplates } from '@/hooks/useWhatsAppTemplates';
@@ -652,9 +652,15 @@ export const AdminConfigPanel: React.FC = () => {
           </Card>
 
           {/* WhatsApp Templates Section */}
-          {/* WAHA Health Status - only for waha/qr_session providers */}
+          {/* WAHA Connect Panel - session management for waha/qr_session providers */}
           {(apiFormData.whatsapp_provider === 'waha' || apiFormData.whatsapp_provider === 'qr_session') && (
-            <WahaHealthStatus />
+            <WahaConnectPanel
+              sessionName="default"
+              linkedPhone={apiFormData.whatsapp_linked_phone}
+              onLinked={({ phone }) => {
+                handleApiInputChange('whatsapp_linked_phone', phone);
+              }}
+            />
           )}
 
           <Card>

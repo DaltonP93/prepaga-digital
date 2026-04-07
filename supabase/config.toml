@@ -78,5 +78,8 @@ verify_jwt = false
 [functions.waha-health-check]
 verify_jwt = false
 
+[functions.waha-proxy]
+verify_jwt = false
+
 [functions.whatsapp-webhook]
 verify_jwt = false
