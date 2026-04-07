@@ -28,7 +28,7 @@ export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) =>
     queryFn: async () => {
       const { data, error } = await supabase
         .from('documents')
-        .select('id, name, document_type, created_at, file_url')
+        .select('id, name, document_type, created_at, file_url, content, is_final, signed_pdf_url')
         .eq('sale_id', saleId)
         .order('created_at', { ascending: false });
 
@@ -124,30 +124,67 @@ export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) =>
     }
   };
 
-  const handleDownload = async (document: { file_url: string | null; name: string }) => {
-    if (!document.file_url) {
-      toast({
-        title: 'Documento sin archivo',
-        description: 'Este documento no tiene un archivo descargable asociado.',
-        variant: 'destructive',
-      });
+  const openHtmlContentWindow = (htmlContent: string, title: string) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({ title: 'Error', description: 'No se pudo abrir la ventana. Verifica que los pop-ups estén habilitados.', variant: 'destructive' });
+      return;
+    }
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html><head><meta charset="utf-8"><title>${title}</title>
+      <style>
+        @page { size: A4; margin: 28mm 15mm 25mm 15mm; }
+        body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 20px; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        table { width: 100%; border-collapse: collapse; }
+        td, th { border: 1px solid #ccc; padding: 6px 8px; font-size: 11px; }
+        h1,h2,h3 { margin: 8px 0; }
+      </style></head>
+      <body>${htmlContent}</body></html>
+    `);
+    printWindow.document.close();
+  };
+
+  const handleDownload = async (document: { id: string; file_url: string | null; name: string; content?: string | null; signed_pdf_url?: string | null }) => {
+    // Tier 1: signed PDF via edge function
+    if (document.signed_pdf_url) {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (token) {
+          const res = await supabase.functions.invoke('get-document-download-url', {
+            body: { document_id: document.id, kind: 'signed' },
+          });
+          if (res.data?.url) {
+            window.open(res.data.url, '_blank', 'noopener,noreferrer');
+            return;
+          }
+        }
+      } catch {}
+    }
+
+    // Tier 2: file_url from storage
+    if (document.file_url) {
+      const { data, error } = await supabase.storage
+        .from('documents')
+        .createSignedUrl(document.file_url, 3600);
+      if (!error && data?.signedUrl) {
+        window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+    }
+
+    // Tier 3: HTML content
+    if (document.content) {
+      openHtmlContentWindow(document.content, document.name);
       return;
     }
 
-    const { data, error } = await supabase.storage
-      .from('documents')
-      .createSignedUrl(document.file_url, 3600);
-
-    if (error || !data?.signedUrl) {
-      toast({
-        title: 'Error',
-        description: 'No se pudo generar el enlace de descarga.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+    toast({
+      title: 'Documento sin archivo',
+      description: 'Este documento no tiene un archivo descargable asociado.',
+      variant: 'destructive',
+    });
   };
 
   if (isLoading) {
@@ -226,7 +263,13 @@ export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) =>
                   </TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
-                      <Button variant="outline" size="sm" onClick={() => setPreviewDocument(document)}>
+                      <Button variant="outline" size="sm" onClick={() => {
+                        if (!document.file_url && document.content) {
+                          openHtmlContentWindow(document.content, document.name);
+                        } else {
+                          setPreviewDocument(document);
+                        }
+                      }}>
                         <Eye className="h-4 w-4" />
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => handleDownload(document)}>
