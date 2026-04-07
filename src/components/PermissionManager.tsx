@@ -20,16 +20,20 @@ export function PermissionManager({ userId, userName }: PermissionManagerProps) 
 
   const [selectedPermissions, setSelectedPermissions] = useState<{ [key: string]: boolean }>({});
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const userPermissionsKey = JSON.stringify(userPermissions);
   useEffect(() => {
-    if (Array.isArray(userPermissions)) {
+    if (Array.isArray(userPermissions) && userPermissions.length > 0) {
       const permissionMap = userPermissions.reduce((acc, perm) => {
         acc[perm.permission_key] = perm.granted;
         return acc;
       }, {} as { [key: string]: boolean });
-      
       setSelectedPermissions(permissionMap);
     }
-  }, [userPermissions]);
+  // userPermissionsKey is a stable string derived from userPermissions — avoids infinite loop
+  // when the hook returns a new array reference with identical content on each render
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userPermissionsKey]);
 
   const handlePermissionChange = (permissionKey: string, granted: boolean) => {
     setSelectedPermissions(prev => ({

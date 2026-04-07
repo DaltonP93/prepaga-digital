@@ -110,7 +110,20 @@ export const useCreateUser = () => {
       if (error) {
         const context = (error as any)?.context;
         let errorMsg = 'Error al crear usuario';
-        if (context?.body) {
+        if (context instanceof Response) {
+          try {
+            const body = await context.clone().json();
+            errorMsg = body?.error || body?.details || errorMsg;
+          } catch {
+            try {
+              const text = await context.clone().text();
+              if (text) {
+                const body = JSON.parse(text);
+                errorMsg = body?.error || body?.details || errorMsg;
+              }
+            } catch {}
+          }
+        } else if (context?.body) {
           try {
             const body = typeof context.body === 'string' ? JSON.parse(context.body) : context.body;
             errorMsg = body?.error || body?.details || errorMsg;

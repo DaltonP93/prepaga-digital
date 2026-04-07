@@ -274,13 +274,17 @@ serve(async (req) => {
     }
 
     // Original create user flow
-    const email = requestBody.email;
+    const email = typeof requestBody.email === 'string' ? requestBody.email.trim().toLowerCase() : '';
     const password = requestBody.password;
-    const firstName = requestBody.firstName || requestBody.first_name;
-    const lastName = requestBody.lastName || requestBody.last_name;
+    const firstName = typeof (requestBody.firstName || requestBody.first_name) === 'string'
+      ? String(requestBody.firstName || requestBody.first_name).trim()
+      : '';
+    const lastName = typeof (requestBody.lastName || requestBody.last_name) === 'string'
+      ? String(requestBody.lastName || requestBody.last_name).trim()
+      : '';
     const phone = requestBody.phone || null;
     const role = requestBody.role || 'vendedor';
-    const companyId = requestBody.companyId || requestBody.company_id || null;
+    const requestedCompanyId = requestBody.companyId || requestBody.company_id || null;
 
     if (!email || !password || !firstName || !lastName) {
       return new Response(
@@ -297,6 +301,64 @@ serve(async (req) => {
       );
     }
 
+    if (password.length < 8) {
+      return new Response(
+        JSON.stringify({ error: 'La contraseña debe tener al menos 8 caracteres' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (role === 'super_admin' && callerRole !== 'super_admin') {
+      return new Response(
+        JSON.stringify({ error: 'Solo un super admin puede asignar el rol super_admin' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { data: callerProfile, error: callerProfileError } = await supabaseAdmin
+      .from('profiles')
+      .select('company_id')
+      .eq('id', caller.id)
+      .single();
+
+    if (callerProfileError) {
+      return new Response(
+        JSON.stringify({ error: 'No se pudo resolver la empresa del usuario actual', details: callerProfileError.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const companyId = callerRole === 'super_admin'
+      ? (requestedCompanyId || null)
+      : (callerProfile?.company_id || requestedCompanyId || null);
+
+    if (role !== 'super_admin' && !companyId) {
+      return new Response(
+        JSON.stringify({ error: 'No se pudo determinar la empresa del nuevo usuario' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { data: existingProfile, error: existingProfileError } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (existingProfileError && existingProfileError.code !== 'PGRST116') {
+      return new Response(
+        JSON.stringify({ error: 'No se pudo verificar si el email ya existe', details: existingProfileError.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (existingProfile?.id) {
+      return new Response(
+        JSON.stringify({ error: 'Ya existe un usuario con ese email' }),
+        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Create auth user
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -310,9 +372,20 @@ serve(async (req) => {
     });
 
     if (authError) {
+      const normalizedMessage = authError.message || 'Failed to create user account';
+      const lowerMessage = normalizedMessage.toLowerCase();
+      const duplicateEmail =
+        lowerMessage.includes('already been registered') ||
+        lowerMessage.includes('already registered') ||
+        lowerMessage.includes('already exists') ||
+        lowerMessage.includes('duplicate');
+
       return new Response(
-        JSON.stringify({ error: 'Failed to create user account', details: authError.message }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({
+          error: duplicateEmail ? 'Ya existe un usuario con ese email' : 'No se pudo crear la cuenta de usuario',
+          details: normalizedMessage,
+        }),
+        { status: duplicateEmail ? 409 : 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -326,21 +399,21 @@ serve(async (req) => {
     const userId = authData.user.id;
 
     try {
-      // Update profile (trigger already created it)
+      // Upsert profile (works whether trigger created it or not)
       const { error: profileError } = await supabaseAdmin
         .from('profiles')
-        .update({
+        .upsert({
+          id: userId,
           email: email,
           first_name: firstName,
           last_name: lastName,
           phone: phone,
           company_id: companyId,
           is_active: true,
-        })
-        .eq('id', userId);
+        }, { onConflict: 'id' });
 
       if (profileError) {
-        console.error('Profile update error:', profileError);
+        console.error('Profile upsert error:', profileError);
         throw profileError;
       }
 

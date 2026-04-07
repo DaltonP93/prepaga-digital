@@ -67,6 +67,7 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
   const selectedCompanyId = watch("company_id");
 
   useEffect(() => {
+    if (!open) return;
     if (user) {
       reset({
         email: user.email || "",
@@ -77,8 +78,19 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
         company_id: user.company_id || "",
         is_active: user.is_active ?? true,
       });
+    } else {
+      reset({
+        email: "",
+        password: "",
+        first_name: "",
+        last_name: "",
+        phone: "",
+        role: "vendedor",
+        company_id: singleCompany?.id || "",
+        is_active: true,
+      });
     }
-  }, [user, reset]);
+  }, [open, user, reset, singleCompany?.id]);
 
   useEffect(() => {
     if (singleCompany && selectedCompanyId !== singleCompany.id) {
@@ -124,8 +136,10 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
           toast.error('La contraseña es requerida');
           return;
         }
+        const resolvedCompanyId = data.company_id || singleCompany?.id || "";
         await createUser.mutateAsync({
           ...data,
+          company_id: resolvedCompanyId,
           password: data.password
         });
       }
