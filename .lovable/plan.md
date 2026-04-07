@@ -1,59 +1,45 @@
 
 
-# Fix: Auditor Dashboard shows 0 in all stats and filters don't work
+## Plan: Add branding header/footer to the `generate-pdf` edge function
 
-## Root Cause
+### Problem
+The `generate-pdf` edge function returns HTML without any header/footer branding images. The `generatePDFHtml()` function at line 259 produces a plain document with no company branding. Only the separate `generate-base-pdf` function (Puppeteer-based) fetches `pdf_header_image_url` and `pdf_footer_image_url` from `company_settings`.
 
-The query fetches sales **filtered by `statusFilter`** (lines 171-183), but the stats (lines 507-512) are computed from that same already-filtered `sales` array. So when viewing "Pendientes", stats for Aprobados/Rechazados will always be 0, and vice versa.
+### Solution
+Modify the `generate-pdf` edge function to:
+1. Fetch the authenticated user's `company_id` from their profile
+2. Query `company_settings` for `pdf_header_image_url` and `pdf_footer_image_url`
+3. Include those images in the generated HTML output (header at top, footer at bottom of each page using CSS `position: fixed` for print)
 
-Additionally, the `auditor_sales_view` excludes `status = 'borrador'` but approved sales have `status = 'aprobado_para_templates'` -- the "pending" filter only looks for `['pendiente', 'en_auditoria', 'enviado']`, which is correct, but the "aprobado" filter needs to also match `status = 'aprobado_para_templates'` or `'completado'` since approved sales move to those statuses.
+### Changes
 
-## Solution
+**File: `supabase/functions/generate-pdf/index.ts`**
 
-**File: `src/components/audit/AuditorDashboard.tsx`**
+1. After authenticating the user (line ~58), fetch their profile to get `company_id`, then query `company_settings` for the PDF branding image URLs.
 
-1. **Fetch ALL sales once** (remove server-side status filtering from the query). The view already scopes by company. Then filter client-side for both stats and the displayed list.
+2. Pass the branding URLs to `generatePDFHtml()`.
 
-2. **Add a separate `useQuery` for stats** -- or simpler: fetch all sales with no status filter, compute stats from the full set, and filter `filteredSales` client-side by `statusFilter`.
+3. Update `generatePDFHtml()` to accept branding options and render:
+   - A fixed-position header with the header image (if configured)
+   - A fixed-position footer with the footer image (if configured)
+   - Adjusted `@page` margins to accommodate the header/footer space (top: 28mm, bottom: 20mm — matching `generate-base-pdf`)
 
-### Concrete changes:
+### Technical Details
 
-**Remove status filter from query** (lines 170-183): Remove the `if/else` block that applies `.in('status', ...)` and `.eq('audit_status', ...)`. Just fetch all sales from the view, ordered by date.
+The branding images will be embedded directly in the HTML using `<img>` tags with the Supabase storage URLs. Since this HTML is opened in a new browser window (not rendered by Puppeteer), the browser will fetch the images directly. CSS `@media print` rules will ensure header/footer repeat on every printed page.
 
-**Add client-side filtering** after the search filter (around line 495):
-
-```typescript
-// Classify each sale
-const classifySale = (sale: any) => {
-  if (sale.audit_status === 'aprobado') return 'aprobado';
-  if (sale.audit_status === 'rechazado') return 'rechazado';
-  if (sale.audit_status === 'requiere_info') return 'requiere_info';
-  return 'pending'; // everything else is pending
-};
-
-// Stats from ALL sales
-const stats = {
-  pending: sales.filter(s => classifySale(s) === 'pending').length,
-  approved: sales.filter(s => classifySale(s) === 'aprobado').length,
-  rejected: sales.filter(s => classifySale(s) === 'rechazado').length,
-  infoRequired: sales.filter(s => classifySale(s) === 'requiere_info').length,
-};
-
-// Filter for display
-const filteredSales = sales
-  .filter(sale => {
-    if (statusFilter === 'pending') return classifySale(sale) === 'pending';
-    if (statusFilter === 'aprobado') return classifySale(sale) === 'aprobado';
-    if (statusFilter === 'rechazado') return classifySale(sale) === 'rechazado';
-    if (statusFilter === 'requiere_info') return classifySale(sale) === 'requiere_info';
-    return true; // 'all'
-  })
-  .filter(sale => { /* existing search filter */ });
+```text
+┌──────────────────────────┐
+│  [Header Image]          │  ← position: fixed; top: 0
+├──────────────────────────┤
+│                          │
+│  Document Content        │  ← padding-top accounts for header
+│                          │
+├──────────────────────────┤
+│  [Footer Image]          │  ← position: fixed; bottom: 0
+└──────────────────────────┘
 ```
 
-**Update queryKey**: Remove `statusFilter` from queryKey since we fetch all now: `queryKey: ['auditor-sales']`.
-
-**Make stat cards clickable**: Each stat card sets `statusFilter` on click so the user can click "Aprobados: 3" to see approved sales.
-
-3 areas to edit, all in the same file. Stats will always reflect the real totals regardless of which filter tab is active.
+### Testing
+After deployment, generate a test contract from the app to verify both header and footer images render correctly in the preview and print dialog.
 
