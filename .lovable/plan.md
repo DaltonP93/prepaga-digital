@@ -1,45 +1,29 @@
 
 
-## Plan: Add branding header/footer to the `generate-pdf` edge function
+## Plan: Fix document download in the "Documentos" tab of SaleDetail
 
 ### Problem
-The `generate-pdf` edge function returns HTML without any header/footer branding images. The `generatePDFHtml()` function at line 259 produces a plain document with no company branding. Only the separate `generate-base-pdf` function (Puppeteer-based) fetches `pdf_header_image_url` and `pdf_footer_image_url` from `company_settings`.
+In the SaleDetail page "Documentos" tab, clicking "Descargar" on generated documents (Contrato, DDJJ Salud) shows "Documento sin archivo" because these documents store HTML in the `content` field and have `file_url = null`. The current `handleDownload` only works with `file_url`.
+
+Meanwhile, the "Descargar Documento Firmado" button in SignatureWorkflow works correctly because it falls back to opening the HTML content in a print window.
 
 ### Solution
-Modify the `generate-pdf` edge function to:
-1. Fetch the authenticated user's `company_id` from their profile
-2. Query `company_settings` for `pdf_header_image_url` and `pdf_footer_image_url`
-3. Include those images in the generated HTML output (header at top, footer at bottom of each page using CSS `position: fixed` for print)
+Update `DocumentsManager.tsx` to:
+1. Include `content` in the database query
+2. When downloading, try `signed_pdf_url` via the `get-document-download-url` edge function first, then fall back to `file_url` (storage signed URL), then fall back to opening the HTML `content` in a new print-ready window (matching the branding-aware format used in SignatureWorkflow)
 
 ### Changes
 
-**File: `supabase/functions/generate-pdf/index.ts`**
+**File: `src/components/DocumentsManager.tsx`**
 
-1. After authenticating the user (line ~58), fetch their profile to get `company_id`, then query `company_settings` for the PDF branding image URLs.
-
-2. Pass the branding URLs to `generatePDFHtml()`.
-
-3. Update `generatePDFHtml()` to accept branding options and render:
-   - A fixed-position header with the header image (if configured)
-   - A fixed-position footer with the footer image (if configured)
-   - Adjusted `@page` margins to accommodate the header/footer space (top: 28mm, bottom: 20mm — matching `generate-base-pdf`)
+1. Add `content`, `is_final`, and `signed_pdf_url` to the select query (line 31)
+2. Update `handleDownload` to implement the three-tier fallback:
+   - First: try `get-document-download-url` edge function for signed PDFs (if `signed_pdf_url` exists)
+   - Second: try storage signed URL (if `file_url` exists)
+   - Third: open HTML content in a print-ready window with proper styling and branding margins (if `content` exists)
+3. Apply the same fix to the Eye/preview button flow so it can also render HTML content documents
 
 ### Technical Details
 
-The branding images will be embedded directly in the HTML using `<img>` tags with the Supabase storage URLs. Since this HTML is opened in a new browser window (not rendered by Puppeteer), the browser will fetch the images directly. CSS `@media print` rules will ensure header/footer repeat on every printed page.
-
-```text
-┌──────────────────────────┐
-│  [Header Image]          │  ← position: fixed; top: 0
-├──────────────────────────┤
-│                          │
-│  Document Content        │  ← padding-top accounts for header
-│                          │
-├──────────────────────────┤
-│  [Footer Image]          │  ← position: fixed; bottom: 0
-└──────────────────────────┘
-```
-
-### Testing
-After deployment, generate a test contract from the app to verify both header and footer images render correctly in the preview and print dialog.
+The HTML print window will use the same CSS as `SignatureWorkflow.handleDownloadContent`: A4 page size, 20mm margins, proper font sizing, and `print-color-adjust: exact` for branding images. This ensures the branding header/footer added to `generate-pdf` renders correctly when printing.
 
