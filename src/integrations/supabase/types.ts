@@ -4105,7 +4105,6 @@ export type Database = {
           adherents_count: number | null
           all_signatures_completed: boolean | null
           attached_docs_count: number | null
-          attached_documents: Json | null
           audit_notes: string | null
           audit_status: string | null
           audited_at: string | null
@@ -4148,7 +4147,6 @@ export type Database = {
           adherents_count?: number | null
           all_signatures_completed?: boolean | null
           attached_docs_count?: never
-          attached_documents?: never
           audit_notes?: string | null
           audit_status?: string | null
           audited_at?: string | null
@@ -4191,7 +4189,6 @@ export type Database = {
           adherents_count?: number | null
           all_signatures_completed?: boolean | null
           attached_docs_count?: never
-          attached_documents?: never
           audit_notes?: string | null
           audit_status?: string | null
           audited_at?: string | null
