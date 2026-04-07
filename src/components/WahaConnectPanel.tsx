@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,12 +45,63 @@ export const WahaConnectPanel: React.FC<WahaConnectPanelProps> = ({
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const invoke = useCallback(async (action: string) => {
-    const { data, error: fnError } = await supabase.functions.invoke('waha-proxy', {
-      body: { action, session_name: sessionName },
-    });
-    if (fnError) throw new Error(fnError.message || 'Edge function error');
-    if (data?.error) throw new Error(data.error);
-    return data;
+    const callEdgeFunction = async (accessToken: string) => {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/waha-proxy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ action, session_name: sessionName }),
+      });
+
+      const responseText = await response.text();
+      let data: any = null;
+
+      try {
+        data = responseText ? JSON.parse(responseText) : null;
+      } catch {
+        data = { error: responseText || `Edge function error (${response.status})` };
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.error || data?.message || `Edge function error (${response.status})`);
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      return data;
+    };
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    let accessToken = sessionData.session?.access_token;
+
+    if (!accessToken) {
+      const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+      accessToken = refreshed.session?.access_token;
+      if (refreshError || !accessToken) {
+        throw new Error('Tu sesión expiró. Volvé a iniciar sesión.');
+      }
+    }
+
+    try {
+      return await callEdgeFunction(accessToken);
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.includes('Unauthorized')) {
+        throw error;
+      }
+
+      const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+      const refreshedToken = refreshed.session?.access_token;
+      if (refreshError || !refreshedToken) {
+        throw new Error('Tu sesión expiró. Volvé a iniciar sesión.');
+      }
+
+      return callEdgeFunction(refreshedToken);
+    }
   }, [sessionName]);
 
   const extractPhone = (meData: any): string => {
