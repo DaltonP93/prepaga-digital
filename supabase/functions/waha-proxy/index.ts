@@ -156,7 +156,7 @@ Deno.serve(async (req) => {
         wahaPath = `/api/sessions/${encodeURIComponent(sessionName)}/me`;
         break;
       case "get_messages":
-        wahaPath = `/api/messages?session=${encodeURIComponent(sessionName)}&limit=20`;
+        wahaPath = `/api/sessions/${encodeURIComponent(sessionName)}/chats`;
         break;
       default:
         return new Response(JSON.stringify({ error: "Unknown action" }), {
