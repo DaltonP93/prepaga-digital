@@ -23,6 +23,23 @@ export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) =>
   const [file, setFile] = useState<File | null>(null);
   const [previewDocument, setPreviewDocument] = useState<any>(null);
 
+  // Fetch PDF branding images for HTML fallback rendering
+  const { data: pdfBranding } = useQuery({
+    queryKey: ['pdf-branding-settings', saleId],
+    queryFn: async () => {
+      // Get company_id from the sale, then fetch branding from company_settings
+      const { data: sale } = await supabase.from('sales').select('company_id').eq('id', saleId).single();
+      if (!sale?.company_id) return null;
+      const { data } = await supabase
+        .from('company_settings')
+        .select('pdf_header_image_url, pdf_footer_image_url')
+        .eq('company_id', sale.company_id)
+        .single();
+      return data || null;
+    },
+    enabled: !!saleId,
+  });
+
   const { data: documents = [], isLoading } = useQuery({
     queryKey: ['sale-detail-documents', saleId],
     queryFn: async () => {
@@ -130,17 +147,27 @@ export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) =>
       toast({ title: 'Error', description: 'No se pudo abrir la ventana. Verifica que los pop-ups estén habilitados.', variant: 'destructive' });
       return;
     }
+    const headerImg = pdfBranding?.pdf_header_image_url || '';
+    const footerImg = pdfBranding?.pdf_footer_image_url || '';
     printWindow.document.write(`
       <!DOCTYPE html>
       <html><head><meta charset="utf-8"><title>${title}</title>
       <style>
         @page { size: A4; margin: 28mm 15mm 25mm 15mm; }
-        body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 20px; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 0; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
         table { width: 100%; border-collapse: collapse; }
         td, th { border: 1px solid #ccc; padding: 6px 8px; font-size: 11px; }
         h1,h2,h3 { margin: 8px 0; }
+        .page-header { position: fixed; top: -28mm; left: 0; right: 0; height: 24mm; display: flex; align-items: center; justify-content: center; padding: 2mm 0; }
+        .page-header img { max-width: 100%; max-height: 22mm; height: auto; object-fit: contain; }
+        .page-footer { position: fixed; bottom: -22mm; left: 0; right: 0; height: 18mm; display: flex; align-items: center; justify-content: center; }
+        .page-footer img { max-width: 100%; max-height: 16mm; height: auto; object-fit: contain; }
       </style></head>
-      <body>${htmlContent}</body></html>
+      <body>
+        ${headerImg ? `<div class="page-header"><img src="${headerImg}" alt="Header" /></div>` : ''}
+        ${footerImg ? `<div class="page-footer"><img src="${footerImg}" alt="Footer" /></div>` : ''}
+        ${htmlContent}
+      </body></html>
     `);
     printWindow.document.close();
   };
