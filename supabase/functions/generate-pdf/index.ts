@@ -188,6 +188,8 @@ serve(async (req) => {
       title: filename,
       documentType,
       includeSignatureFields,
+      headerImageUrl,
+      footerImageUrl,
     })
 
     return new Response(JSON.stringify({
