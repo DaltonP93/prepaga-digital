@@ -57,8 +57,33 @@ serve(async (req) => {
       })
     }
 
+    const userId = claimsData.claims.sub as string
+
     // Use service role for data access
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Fetch user's company_id and branding settings
+    let headerImageUrl: string | null = null
+    let footerImageUrl: string | null = null
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('id', userId)
+      .single()
+
+    if (profile?.company_id) {
+      const { data: settings } = await supabase
+        .from('company_settings')
+        .select('pdf_header_image_url, pdf_footer_image_url')
+        .eq('company_id', profile.company_id)
+        .single()
+
+      if (settings) {
+        headerImageUrl = settings.pdf_header_image_url || null
+        footerImageUrl = settings.pdf_footer_image_url || null
+      }
+    }
 
     const { 
       templateId, 
