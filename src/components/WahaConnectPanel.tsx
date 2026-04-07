@@ -302,17 +302,23 @@ export const WahaConnectPanel: React.FC<WahaConnectPanelProps> = ({
               <p className="text-sm text-muted-foreground text-center py-4">No hay mensajes recientes</p>
             ) : (
               <div className="space-y-2">
-                {messages.map((msg, i) => (
-                  <div key={msg.id || i} className="text-xs p-2 rounded bg-muted/50">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium">{msg.from || 'Desconocido'}</span>
-                      <span className="text-muted-foreground">
-                        {msg.timestamp ? new Date(msg.timestamp * 1000).toLocaleTimeString() : ''}
-                      </span>
+                {messages.map((msg, i) => {
+                  const chatName = msg.name || msg.contact?.name || msg.id?.replace(/@.*$/, '') || 'Desconocido';
+                  const lastMsg = msg.lastMessage || msg.last_message || {};
+                  const body = lastMsg.body || lastMsg.text || msg.body || msg.text || '(sin texto)';
+                  const ts = lastMsg.timestamp || msg.conversationTimestamp || msg.timestamp;
+                  return (
+                    <div key={msg.id || i} className="text-xs p-2 rounded bg-muted/50">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium truncate max-w-[200px]">{chatName}</span>
+                        <span className="text-muted-foreground whitespace-nowrap ml-2">
+                          {ts ? new Date(ts * 1000).toLocaleTimeString() : ''}
+                        </span>
+                      </div>
+                      <p className="text-muted-foreground truncate">{body}</p>
                     </div>
-                    <p className="text-muted-foreground">{msg.body || msg.text || '(sin texto)'}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
             <div className="flex justify-center mt-2">
