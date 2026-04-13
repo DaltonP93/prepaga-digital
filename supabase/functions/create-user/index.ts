@@ -261,8 +261,17 @@ serve(async (req) => {
       );
 
       if (updateError) {
+        console.error('updateUserById error:', JSON.stringify(updateError));
+        const details = updateError.message || JSON.stringify(updateError);
+        // Map common Supabase Auth error messages to Spanish
+        let userMessage = details;
+        if (details.toLowerCase().includes('password') && details.toLowerCase().includes('characters')) {
+          userMessage = 'La contraseña es demasiado corta o no cumple los requisitos mínimos';
+        } else if (details.toLowerCase().includes('weak') || details.toLowerCase().includes('strength') || details.toLowerCase().includes('pwned') || details.toLowerCase().includes('breached')) {
+          userMessage = 'La contraseña es demasiado común o débil. Por favor usá una contraseña más segura (mezcla letras, números y símbolos)';
+        }
         return new Response(
-          JSON.stringify({ error: 'Failed to update password', details: updateError.message }),
+          JSON.stringify({ error: userMessage, details }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }

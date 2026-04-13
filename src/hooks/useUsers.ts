@@ -281,14 +281,14 @@ export const useResetUserPassword = () => {
       });
 
       if (error) {
-        const context = (error as any)?.context;
         let errorMsg = 'Error al cambiar contraseña';
-        if (context?.body) {
-          try {
-            const body = typeof context.body === 'string' ? JSON.parse(context.body) : context.body;
-            errorMsg = body?.error || body?.details || errorMsg;
-          } catch {}
-        }
+        try {
+          const context = (error as any)?.context;
+          if (context && typeof context.json === 'function') {
+            const body = await context.json();
+            errorMsg = body?.details || body?.error || errorMsg;
+          }
+        } catch {}
         throw new Error(errorMsg);
       }
 

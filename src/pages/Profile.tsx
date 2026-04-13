@@ -70,7 +70,7 @@ const Profile = () => {
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ["profile"],
+    queryKey: ["profile", user?.id],
     queryFn: async () => {
       if (!user) return null;
 
