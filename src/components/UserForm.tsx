@@ -294,25 +294,30 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
                     </Button>
                   </div>
                   {showPasswordReset && (
-                    <div className="flex gap-2">
-                      <Input
-                        type="password"
-                        placeholder="Nueva contraseña (mín. 6 caracteres)"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                      />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        disabled={newPassword.length < 6 || resetPassword.isPending}
-                        onClick={async () => {
-                          await resetPassword.mutateAsync({ userId: user.id, newPassword });
-                          setNewPassword("");
-                          setShowPasswordReset(false);
-                        }}
-                      >
-                        {resetPassword.isPending ? "..." : "Aplicar"}
-                      </Button>
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Input
+                          type="password"
+                          placeholder="Nueva contraseña"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          disabled={newPassword.length < 8 || resetPassword.isPending}
+                          onClick={async () => {
+                            await resetPassword.mutateAsync({ userId: user.id, newPassword });
+                            setNewPassword("");
+                            setShowPasswordReset(false);
+                          }}
+                        >
+                          {resetPassword.isPending ? "..." : "Aplicar"}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Debe incluir mayúsculas, minúsculas, números y símbolos (!@#$...). Mín. 8 caracteres.
+                      </p>
                     </div>
                   )}
                 </div>

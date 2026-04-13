@@ -286,7 +286,7 @@ export const useResetUserPassword = () => {
           const context = (error as any)?.context;
           if (context && typeof context.json === 'function') {
             const body = await context.json();
-            errorMsg = body?.details || body?.error || errorMsg;
+            errorMsg = body?.error || body?.details || errorMsg;
           }
         } catch {}
         throw new Error(errorMsg);
