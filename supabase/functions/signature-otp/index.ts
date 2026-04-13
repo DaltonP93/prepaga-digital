@@ -210,7 +210,14 @@ async function sendViaWhatsApp(
       if (!res.ok) {
         const errText = await res.text();
         console.error('QR Gateway error:', errText);
-        return { sent: false, provider_used: 'qr_session', reason: `Gateway error: ${errText.slice(0, 100)}` };
+        let reason = 'WhatsApp no disponible. La sesión puede estar desconectada.';
+        try {
+          const parsed = JSON.parse(errText);
+          if (parsed?.error?.toLowerCase().includes('session')) {
+            reason = 'La sesión de WhatsApp está desconectada. El administrador debe reconectarla desde el panel WAHA.';
+          }
+        } catch {}
+        return { sent: false, provider_used: 'qr_session', reason };
       }
       return { sent: true, provider_used: 'qr_session' };
     }
@@ -699,7 +706,14 @@ async function sendEmailOTP(
       }
       const errText = await res.text();
       console.error('Resend API error:', errText);
-      return { sent: false, provider_used: 'resend', reason: `Resend error: ${errText.slice(0, 100)}` };
+      let resendReason = 'Servicio de email no disponible.';
+      try {
+        const parsed = JSON.parse(errText);
+        if (res.status === 401 || parsed?.name === 'validation_error') {
+          resendReason = 'Servicio de email no configurado correctamente (clave API inválida).';
+        }
+      } catch {}
+      return { sent: false, provider_used: 'resend', reason: resendReason };
     } catch (err) {
       console.error('Resend send error:', err);
       return { sent: false, provider_used: 'resend', reason: (err as Error).message };

@@ -88,10 +88,12 @@ export const useSignatureVerification = () => {
 
       if (!wasSent) {
         // OTP was NOT sent - show error, don't proceed to awaiting_code
+        const channelLabel = attemptedChannel === 'whatsapp' ? 'WhatsApp' : 'Email';
+        const userError = `No se pudo enviar el código de verificación por ${channelLabel}. Por favor contactá al administrador para resolver el problema de comunicaciones.`;
         setState(prev => ({
           ...prev,
           step: 'error',
-          error: data.fallback_reason || 'No se pudo enviar el código de verificación. Verifique la configuración de comunicaciones.',
+          error: userError,
           attemptedChannel,
           channelUsed,
           fallbackUsed,
@@ -99,9 +101,10 @@ export const useSignatureVerification = () => {
           providerUsed: data.provider_used || null,
           sent: false,
         }));
+        console.error('[OTP send failed]', data.fallback_reason);
         toast({
           title: 'Error al enviar código',
-          description: data.fallback_reason || 'No se pudo enviar el código. Contacte al administrador.',
+          description: userError,
           variant: 'destructive',
         });
         return;
