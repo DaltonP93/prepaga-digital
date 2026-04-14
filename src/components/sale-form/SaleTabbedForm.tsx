@@ -141,7 +141,6 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           client_id: formData.client_id,
           plan_id: formData.plan_id,
           company_id: formData.company_id,
-          total_amount: formData.titular_amount,
           titular_amount: formData.titular_amount,
           notes: formData.notes,
           requires_adherents: formData.requires_adherents,
@@ -158,6 +157,18 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           immediate_coverage: formData.immediate_coverage,
           sale_type: formData.sale_type,
         } as any);
+        // Recalculate total_amount = titular_amount + sum(adherentes) after save
+        const { data: adherentes } = await supabase
+          .from('beneficiaries')
+          .select('amount, is_primary')
+          .eq('sale_id', sale.id);
+        const adherentesSum = (adherentes || [])
+          .filter((b: any) => !b.is_primary)
+          .reduce((sum: number, b: any) => sum + (Number(b.amount) || 0), 0);
+        await supabase
+          .from('sales')
+          .update({ total_amount: formData.titular_amount + adherentesSum })
+          .eq('id', sale.id);
         toast.success('Venta actualizada');
       } else {
         const result = await createSale.mutateAsync({
