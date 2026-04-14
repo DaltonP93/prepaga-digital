@@ -33,7 +33,7 @@ const DEFAULT_CONFIG: MenuConfigMap = {
   documents: { admin: true, supervisor: true, auditor: false, gestor: true, vendedor: true },
   templates: { admin: true, supervisor: true, auditor: false, gestor: true, vendedor: true },
   'signature-workflow': { admin: true, supervisor: true, auditor: false, gestor: true, vendedor: true },
-  audit: { admin: true, supervisor: true, auditor: true, gestor: false, vendedor: false },
+  audit: { admin: true, supervisor: true, auditor: true, gestor: false, vendedor: true },
   analytics: { admin: true, supervisor: true, auditor: true, gestor: false, vendedor: false },
   profile: { admin: true, supervisor: true, auditor: true, gestor: true, vendedor: true },
   users: { admin: true, supervisor: false, auditor: false, gestor: false, vendedor: false },

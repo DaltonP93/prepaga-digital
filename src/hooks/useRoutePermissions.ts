@@ -21,7 +21,7 @@ export const useRoutePermissions = () => {
     canViewAnalytics: permissions.analytics.viewDashboard || isSuperAdmin || isAdmin || isSupervisor || isFinanciero,
     canViewUsers: permissions.users.read || isSuperAdmin,
     canViewCompanies: isSuperAdmin,
-    canViewAudit: (permissions.audit.access || isSuperAdmin || isAdmin || isSupervisor || isAuditor || isLoadingRole) && !isFinanciero,
+    canViewAudit: (permissions.audit.access || isSuperAdmin || isAdmin || isSupervisor || isAuditor || role === 'vendedor' || isLoadingRole) && !isFinanciero,
     canViewSettings: !isFinanciero,
     canViewExperience: (permissions.settings.ui || isSuperAdmin || isAdmin) && !isFinanciero,
     isSuperAdmin,
