@@ -15,7 +15,7 @@ interface SaleBasicTabProps {
     client_id: string;
     plan_id: string;
     company_id: string;
-    total_amount: number;
+    titular_amount: number;
     notes: string;
     requires_adherents: boolean;
     signer_type: string;
@@ -216,8 +216,8 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
         <Label>Monto Titular / Plan (Gs.) *</Label>
         <Input
           inputMode="decimal"
-          value={formatAmountInput(Number(formData.total_amount) || 0)}
-          onChange={(e) => onChange('total_amount', parseAmountInput(e.target.value))}
+          value={formatAmountInput(Number(formData.titular_amount) || 0)}
+          onChange={(e) => onChange('titular_amount', parseAmountInput(e.target.value))}
           placeholder="0"
         />
       </div>
