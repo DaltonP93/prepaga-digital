@@ -211,7 +211,7 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
 
       {/* Total Amount */}
       <div className="space-y-2">
-        <Label>Monto Total (Gs.) *</Label>
+        <Label>Monto Titular / Plan (Gs.) *</Label>
         <Input
           inputMode="decimal"
           value={formatAmountInput(Number(formData.total_amount) || 0)}

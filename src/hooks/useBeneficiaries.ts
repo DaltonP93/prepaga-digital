@@ -8,22 +8,39 @@ type Beneficiary = Database['public']['Tables']['beneficiaries']['Row'];
 type BeneficiaryInsert = Database['public']['Tables']['beneficiaries']['Insert'];
 type BeneficiaryUpdate = Database['public']['Tables']['beneficiaries']['Update'];
 
-// Recalculates sales.total_amount = plan.price + sum of adherent amounts
+// Recalculates sales.total_amount = titular_amount (base plan price) + sum(adherentes amounts)
 async function recalculateSaleTotalAmount(saleId: string) {
-  // Fetch all beneficiaries for this sale
+  // Fetch sale's titular_amount (base price for the primary/plan)
+  const { data: sale } = await supabase
+    .from('sales')
+    .select('titular_amount')
+    .eq('id', saleId)
+    .single();
+
+  // Fetch all beneficiaries
   const { data: beneficiaries } = await supabase
     .from('beneficiaries')
-    .select('amount, relationship, is_primary')
+    .select('amount, is_primary')
     .eq('sale_id', saleId);
 
-  // Sum ALL beneficiaries (titular amount = plan.price, adherents = their own amount)
-  const totalAmount = (beneficiaries || [])
-    .reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
+  const hasPrimary = (beneficiaries || []).some((b: any) => b.is_primary);
 
-  await supabase
-    .from('sales')
-    .update({ total_amount: totalAmount })
-    .eq('id', saleId);
+  if (hasPrimary) {
+    // If a primary beneficiary exists, use ALL beneficiary amounts (primary + adherentes)
+    const totalAmount = (beneficiaries || []).reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
+    // Also sync titular_amount with primary beneficiary's amount
+    const primaryAmount = (beneficiaries || []).find((b: any) => b.is_primary)?.amount || 0;
+    await supabase.from('sales').update({
+      titular_amount: primaryAmount,
+      total_amount: totalAmount,
+    }).eq('id', saleId);
+  } else {
+    // No primary: use titular_amount as base + sum of adherentes
+    const titularBase = Number((sale as any)?.titular_amount || 0);
+    const adherentesSum = (beneficiaries || []).reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
+    const totalAmount = titularBase + adherentesSum;
+    await supabase.from('sales').update({ total_amount: totalAmount }).eq('id', saleId);
+  }
 }
 
 const invalidateBeneficiaryRelatedQueries = (
