@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
@@ -36,7 +36,7 @@ const SALE_STATUSES = [
 ];
 
 const AUDIT_STATUSES = [
-  { value: '', label: 'Sin estado' },
+  { value: 'none', label: 'Sin estado' },
   { value: 'pendiente', label: 'Pendiente' },
   { value: 'aprobado', label: 'Aprobado' },
   { value: 'rechazado', label: 'Rechazado' },
@@ -48,11 +48,19 @@ export const ChangeStatusModal: React.FC<ChangeStatusModalProps> = ({
 }) => {
   const queryClient = useQueryClient();
   const [newStatus, setNewStatus] = useState(currentStatus);
-  const [newAuditStatus, setNewAuditStatus] = useState(currentAuditStatus || '');
+  const [newAuditStatus, setNewAuditStatus] = useState(currentAuditStatus || 'none');
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const isRevertingFromApproved = currentAuditStatus === 'aprobado' && newAuditStatus !== 'aprobado';
+  useEffect(() => {
+    if (!open) return;
+    setNewStatus(currentStatus || 'borrador');
+    setNewAuditStatus(currentAuditStatus || 'none');
+    setReason('');
+  }, [open, currentStatus, currentAuditStatus]);
+
+  const isRevertingFromApproved =
+    currentAuditStatus === 'aprobado' && newAuditStatus !== 'aprobado';
 
   const handleSubmit = async () => {
     if (isRevertingFromApproved && !reason.trim()) {
@@ -65,7 +73,7 @@ export const ChangeStatusModal: React.FC<ChangeStatusModalProps> = ({
       const { data, error } = await supabase.rpc('admin_change_sale_status', {
         p_sale_id: saleId,
         p_new_status: newStatus,
-        p_new_audit_status: newAuditStatus || null,
+        p_new_audit_status: newAuditStatus === 'none' ? null : newAuditStatus,
         p_reason: reason || null,
       });
 
@@ -119,7 +127,7 @@ export const ChangeStatusModal: React.FC<ChangeStatusModalProps> = ({
               </SelectTrigger>
               <SelectContent>
                 {AUDIT_STATUSES.map(s => (
-                  <SelectItem key={s.value || '_none'} value={s.value}>{s.label}</SelectItem>
+                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
