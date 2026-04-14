@@ -25,7 +25,7 @@ export const AuditCommentsPanel: React.FC<AuditCommentsPanelProps> = ({ saleId, 
   const { role } = useRolePermissions();
   const [newComment, setNewComment] = useState('');
 
-  const canAddComment = role === 'auditor' || role === 'admin' || role === 'super_admin';
+  const canAddComment = role === 'auditor' || role === 'admin' || role === 'super_admin' || role === 'vendedor';
 
   const handleSubmit = async () => {
     if (!newComment.trim()) return;

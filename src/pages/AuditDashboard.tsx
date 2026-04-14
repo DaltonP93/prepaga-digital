@@ -9,7 +9,7 @@ const AuditDashboardPage = () => {
   const { permissions, isAdmin, role } = useRolePermissions();
 
   // Check if user can view audit
-  const canViewAudit = isAdmin || role === 'auditor' || role === 'supervisor';
+  const canViewAudit = isAdmin || role === 'auditor' || role === 'supervisor' || role === 'vendedor';
 
   if (!canViewAudit) {
     return (

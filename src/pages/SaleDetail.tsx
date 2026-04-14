@@ -27,7 +27,7 @@ export default function SaleDetail() {
   const { role } = useRolePermissions();
   const [activeTab, setActiveTab] = useState('details');
   const [viewMode, setViewMode] = useState<'display' | 'steps'>('display');
-  const showAuditPanel = role === 'auditor' || role === 'admin' || role === 'super_admin';
+  const showAuditPanel = role === 'auditor' || role === 'admin' || role === 'super_admin' || role === 'vendedor';
 
   if (isLoading) {
     return (

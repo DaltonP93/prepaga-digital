@@ -620,10 +620,10 @@ export const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
       sign: false,
     },
     audit: {
-      access: false,
-      approve: false,
-      reject: false,
-      viewAll: false,
+      access: true,
+      approve: true,
+      reject: true,
+      viewAll: false, // solo sus propias ventas
       assignAuditor: false,
     },
     communications: {

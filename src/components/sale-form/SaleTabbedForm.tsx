@@ -58,7 +58,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
   const isEditing = !!sale?.id;
   const currentStatus = (sale?.status || 'borrador') as SaleStatus;
   const isEditAllowed = !isEditing || canEditState(currentStatus);
-  const isAuditorOrAbove = role === 'auditor' || role === 'admin' || role === 'super_admin';
+  const isAuditorOrAbove = role === 'auditor' || role === 'admin' || role === 'super_admin' || role === 'vendedor';
 
   // Centralized lock logic
   const isAuditLocked = isSaleLocked(sale, role as any);
