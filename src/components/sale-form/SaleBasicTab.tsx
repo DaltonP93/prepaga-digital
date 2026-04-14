@@ -22,6 +22,8 @@ interface SaleBasicTabProps {
     signer_name: string;
     signer_dni: string;
     signer_relationship: string;
+    signer_email: string;
+    signer_phone: string;
     billing_razon_social: string;
     billing_ruc: string;
     billing_email: string;
@@ -258,6 +260,28 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
                 onChange={(e) => onChange('signer_relationship', e.target.value)}
                 placeholder="Ej: Padre, Madre, Tutor legal"
               />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Correo electrónico *</Label>
+                <Input
+                  type="email"
+                  value={formData.signer_email || ''}
+                  onChange={(e) => onChange('signer_email', e.target.value)}
+                  placeholder="correo@ejemplo.com"
+                />
+                <p className="text-xs text-muted-foreground">Recibirá el enlace de firma por este email.</p>
+              </div>
+              <div className="space-y-1">
+                <Label>Teléfono / WhatsApp</Label>
+                <Input
+                  type="tel"
+                  value={formData.signer_phone || ''}
+                  onChange={(e) => onChange('signer_phone', e.target.value)}
+                  placeholder="Ej: 0981000000"
+                />
+                <p className="text-xs text-muted-foreground">Recibirá el código OTP por WhatsApp.</p>
+              </div>
             </div>
           </div>
         )}

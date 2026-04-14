@@ -42,8 +42,20 @@ export const useCreateAllSignatureLinks = () => {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 1); // 24 horas
 
-      // 2. Generar enlace para titular
+      // 2. Generar enlace para el firmante principal (titular o responsable de pago)
       const titularToken = generateUUID();
+      const isResponsablePago = (sale as any).signer_type === 'responsable_pago';
+
+      // Si hay responsable de pago, el link va a esa persona; si no, al titular/cliente
+      const signerEmail = isResponsablePago
+        ? ((sale as any).signer_email || sale.clients.email || '')
+        : (sale.clients.email || '');
+      const signerPhone = isResponsablePago
+        ? ((sale as any).signer_phone || sale.clients.phone || null)
+        : (sale.clients.phone || null);
+      const signerName = isResponsablePago
+        ? ((sale as any).signer_name || `${sale.clients.first_name} ${sale.clients.last_name}`)
+        : `${sale.clients.first_name} ${sale.clients.last_name}`;
 
       const { data: titularLink, error: titularError } = await supabase
         .from('signature_links')
@@ -51,9 +63,10 @@ export const useCreateAllSignatureLinks = () => {
           sale_id: saleId,
           token: titularToken,
           recipient_type: 'titular',
-          recipient_email: sale.clients.email || '',
-          recipient_phone: sale.clients.phone || null,
-          recipient_id: sale.client_id,
+          recipient_name: isResponsablePago ? (sale as any).signer_name || null : null,
+          recipient_email: signerEmail,
+          recipient_phone: signerPhone,
+          recipient_id: isResponsablePago ? null : sale.client_id,
           expires_at: expiresAt.toISOString(),
           status: 'pendiente',
           step_order: 1,
@@ -67,8 +80,8 @@ export const useCreateAllSignatureLinks = () => {
       } else if (titularLink) {
         results.push({
           type: 'titular',
-          name: `${sale.clients.first_name} ${sale.clients.last_name}`,
-          email: sale.clients.email || '',
+          name: signerName,
+          email: signerEmail,
           token: titularLink.token,
           expires_at: titularLink.expires_at,
         });
