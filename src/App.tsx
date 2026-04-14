@@ -166,7 +166,7 @@ const App = () => {
                   <Route
                     path="audit"
                     element={
-                      <RoleProtectedRoute allowedRoles={['super_admin', 'admin', 'supervisor', 'auditor']}>
+                      <RoleProtectedRoute allowedRoles={['super_admin', 'admin', 'supervisor', 'auditor', 'vendedor']}>
                         <AuditDashboard />
                       </RoleProtectedRoute>
                     }
