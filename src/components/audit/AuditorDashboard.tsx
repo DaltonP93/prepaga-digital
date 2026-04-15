@@ -146,7 +146,8 @@ const BeneficiaryHealthView: React.FC<{ beneficiary: any }> = ({ beneficiary }) 
 export const AuditorDashboard: React.FC = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { profile } = useSimpleAuthContext();
+  const { profile, userRole, user } = useSimpleAuthContext();
+  const isVendedor = userRole === 'vendedor';
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const [auditNotes, setAuditNotes] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -182,10 +183,10 @@ export const AuditorDashboard: React.FC = () => {
 
   // Fetch sales for the audit list using a lightweight projection.
   const { data: sales = [], isLoading, refetch } = useQuery({
-    queryKey: ['auditor-sales-list'],
+    queryKey: ['auditor-sales-list', user?.id, isVendedor],
     queryFn: async () => {
-      const query = supabase
-        .from('auditor_sales_view')
+      let query = supabase
+        .from('sales')
         .select(`
           id,
           client_id,
@@ -200,6 +201,11 @@ export const AuditorDashboard: React.FC = () => {
           plans:plan_id (id, name)
         `)
         .order('created_at', { ascending: false });
+
+      // Vendedores solo ven sus propias ventas en auditoría
+      if (isVendedor && user?.id) {
+        query = query.eq('salesperson_id', user.id);
+      }
 
       const { data, error } = await query;
       if (error) throw error;
