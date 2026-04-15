@@ -99,7 +99,7 @@ function ContratadaSignatureConfigInner() {
             <div>
               <p className="text-sm font-medium">Envío automático por WhatsApp</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Enviar el link de firma al representante vía WhatsApp cuando el titular y los adherentes completen sus firmas.
+                Enviar los documentos firmados al cliente por WhatsApp cuando todos los firmantes completen el proceso (incluida la contratada).
               </p>
             </div>
             <Switch

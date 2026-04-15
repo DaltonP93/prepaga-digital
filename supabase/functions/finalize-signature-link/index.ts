@@ -80,6 +80,15 @@ serve(async (req) => {
       console.error('Activation error (non-blocking):', activateErr)
     }
 
+    // 3b. If contratada just signed (step 2), send signed documents to client via WhatsApp
+    if (link.recipient_type === 'contratada') {
+      try {
+        await sendSignedDocumentsToClient(supabase, link, supabaseUrl, serviceKey)
+      } catch (sendErr) {
+        console.error('Send signed documents error (non-blocking):', sendErr)
+      }
+    }
+
     // 4. Log process trace
     try {
       await supabase.from('process_traces').insert({
@@ -357,4 +366,143 @@ async function activateNextStep(
   }
 
   return true
+}
+
+/**
+ * After contratada signs (all done), send signed PDFs to the client via WhatsApp.
+ * Only runs when contratada_auto_whatsapp = true in company_settings.
+ */
+async function sendSignedDocumentsToClient(
+  supabase: any,
+  link: any,
+  supabaseUrl: string,
+  serviceKey: string
+): Promise<void> {
+  // Get sale + client phone + company settings
+  const { data: sale } = await supabase
+    .from('sales')
+    .select('company_id, signer_type, signer_phone, clients:client_id(first_name, last_name, phone, email)')
+    .eq('id', link.sale_id)
+    .single()
+
+  if (!sale) return
+
+  const { data: cs } = await supabase
+    .from('company_settings')
+    .select('contratada_auto_whatsapp, whatsapp_provider, whatsapp_gateway_url, whatsapp_api_key')
+    .eq('company_id', sale.company_id)
+    .single()
+
+  if (!cs?.contratada_auto_whatsapp) return
+
+  // Determine client phone: if responsable de pago, use signer_phone; else client phone
+  const client = sale.clients as any
+  const recipientPhone = sale.signer_type === 'responsable_pago'
+    ? (sale.signer_phone || client?.phone)
+    : client?.phone
+
+  if (!recipientPhone) {
+    console.log('No recipient phone found, skipping document send')
+    return
+  }
+
+  const clientName = `${client?.first_name || ''} ${client?.last_name || ''}`.trim() || 'Cliente'
+
+  // Get signed PDFs for this sale (exclude ddjj_salud to keep it simple — only contratos)
+  const { data: docs } = await supabase
+    .from('documents')
+    .select('id, name, signed_pdf_url, document_type')
+    .eq('sale_id', link.sale_id)
+    .eq('is_final', true)
+    .eq('document_type', 'contrato')
+    .not('signed_pdf_url', 'is', null)
+
+  if (!docs || docs.length === 0) {
+    console.log('No signed contract PDFs found, skipping document send')
+    return
+  }
+
+  const provider = cs.whatsapp_provider || 'wame_fallback'
+
+  for (const doc of docs) {
+    try {
+      // Generate a signed URL for 24h access
+      let fileUrl = doc.signed_pdf_url as string
+
+      // If it's a storage path (not a full URL), generate a signed URL
+      if (!fileUrl.startsWith('http')) {
+        const { data: signedData } = await supabase.storage
+          .from('documents')
+          .createSignedUrl(fileUrl, 86400) // 24h
+        if (signedData?.signedUrl) {
+          fileUrl = signedData.signedUrl
+        }
+      }
+
+      const docName = doc.name || 'Contrato firmado'
+
+      if (provider === 'waha' || provider === 'qr_session') {
+        const gatewayUrl = cs.whatsapp_gateway_url
+        const apiToken = cs.whatsapp_api_key || Deno.env.get('WAHA_API_KEY') || ''
+        if (!gatewayUrl) continue
+
+        let formattedPhone = recipientPhone.replace(/[\s+\-()]/g, '')
+        if (formattedPhone.startsWith('0')) formattedPhone = '595' + formattedPhone.substring(1)
+        else if (formattedPhone.length <= 10 && !formattedPhone.startsWith('595')) formattedPhone = '595' + formattedPhone
+        const chatId = `${formattedPhone}@c.us`
+
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+        if (apiToken) headers['X-Api-Key'] = apiToken
+
+        const baseUrl = gatewayUrl.replace(/\/+$/, '')
+
+        // Send a text first to give context
+        await fetch(`${baseUrl}/api/sendText`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            chatId,
+            text: `Hola ${clientName}, aquí te enviamos tu documentación firmada. ✅`,
+            session: 'default',
+          }),
+        })
+
+        // Then send the PDF file
+        await fetch(`${baseUrl}/api/sendFile`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            chatId,
+            file: {
+              mimetype: 'application/pdf',
+              filename: `${docName}.pdf`,
+              url: fileUrl,
+            },
+            caption: docName,
+            session: 'default',
+          }),
+        })
+
+        console.log(`Sent document "${docName}" to ${chatId} via WAHA`)
+      } else {
+        // For other providers (Meta, Twilio, fallback): send a text message with the download URL
+        const message = `Hola ${clientName}, tu documentación está completamente firmada. ✅\n\nPodés descargar tu contrato aquí:\n${fileUrl}\n\n(El enlace expira en 24 horas)`
+
+        await fetch(`${supabaseUrl}/functions/v1/send-whatsapp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
+          body: JSON.stringify({
+            to: `595${recipientPhone}`,
+            templateName: 'general',
+            templateData: { clientName, message },
+            companyId: sale.company_id,
+            saleId: link.sale_id,
+            messageType: 'general',
+          }),
+        })
+      }
+    } catch (docErr) {
+      console.error(`Error sending doc ${doc.id} to client:`, docErr)
+    }
+  }
 }
