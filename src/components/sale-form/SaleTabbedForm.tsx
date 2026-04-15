@@ -266,20 +266,26 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                     .from('sales')
                     .update({ total_amount: formData.titular_amount + adherentesSumAudit })
                     .eq('id', sale.id);
-                  // Log workflow state
-                  await supabase.from('sale_workflow_states').insert({
+                  // Auxiliary workflow tracking is best-effort because production RLS may block direct inserts.
+                  const { error: workflowError } = await supabase.from('sale_workflow_states').insert({
                     sale_id: sale.id,
                     previous_status: currentStatus,
                     new_status: 'pendiente',
                     changed_by: profile?.id,
                     change_reason: currentStatus === 'rechazado' ? 'Reenviado a auditoría tras correcciones' : 'Enviado a auditoría por el vendedor',
                   });
-                  await supabase.from('process_traces').insert({
+                  if (workflowError) {
+                    console.error('Best-effort insert failed for sale_workflow_states:', workflowError);
+                  }
+                  const { error: traceError } = await supabase.from('process_traces').insert({
                     sale_id: sale.id,
                     action: 'status_change',
                     user_id: profile?.id,
                     details: { previous_status: currentStatus, new_status: 'pendiente', reason: currentStatus === 'rechazado' ? 'Reenviado tras correcciones' : 'Enviado a auditoría' },
                   });
+                  if (traceError) {
+                    console.error('Best-effort insert failed for process_traces:', traceError);
+                  }
 
                   if (profile?.company_id) {
                     const { data: companyProfiles, error: profilesError } = await supabase
@@ -332,7 +338,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                           .insert(recipientRows as any);
 
                         if (notificationError) {
-                          console.error('Error creating audit notifications:', notificationError);
+                          console.error('Best-effort insert failed for notifications:', notificationError);
                         }
                       }
                     }
