@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PenTool, Save, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,6 +15,7 @@ function ContratadaSignatureConfigInner() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [mode, setMode] = useState<string>('auto');
+  const [autoWhatsapp, setAutoWhatsapp] = useState(true);
   const [signerName, setSignerName] = useState('');
   const [signerEmail, setSignerEmail] = useState('');
   const [signerDni, setSignerDni] = useState('');
@@ -27,12 +29,13 @@ function ContratadaSignatureConfigInner() {
     try {
       const { data } = await supabase
         .from('company_settings')
-        .select('contratada_signature_mode, contratada_signer_name, contratada_signer_email, contratada_signer_dni, contratada_signer_phone')
+        .select('contratada_signature_mode, contratada_signer_name, contratada_signer_email, contratada_signer_dni, contratada_signer_phone, contratada_auto_whatsapp')
         .eq('company_id', profile!.company_id!)
         .single();
 
       if (data) {
         setMode(data.contratada_signature_mode || 'auto');
+        setAutoWhatsapp((data as any).contratada_auto_whatsapp ?? true);
         setSignerName(data.contratada_signer_name || '');
         setSignerEmail(data.contratada_signer_email || '');
         setSignerDni(data.contratada_signer_dni || '');
@@ -53,11 +56,12 @@ function ContratadaSignatureConfigInner() {
         .from('company_settings')
         .update({
           contratada_signature_mode: mode,
+          contratada_auto_whatsapp: autoWhatsapp,
           contratada_signer_name: signerName || null,
           contratada_signer_email: signerEmail || null,
           contratada_signer_dni: signerDni || null,
           contratada_signer_phone: signerPhone || null,
-        })
+        } as any)
         .eq('company_id', profile.company_id);
 
       if (error) throw error;
@@ -89,6 +93,22 @@ function ContratadaSignatureConfigInner() {
             ? 'La firma se completa automáticamente con los datos del representante configurado.'
             : 'Se genera un enlace de firma y se envía al email del representante legal.'}
         </p>
+
+        {mode === 'link' && (
+          <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/20 px-4 py-3 mt-1">
+            <div>
+              <p className="text-sm font-medium">Envío automático por WhatsApp</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Enviar el link de firma al representante vía WhatsApp cuando el titular y los adherentes completen sus firmas.
+              </p>
+            </div>
+            <Switch
+              checked={autoWhatsapp}
+              onCheckedChange={setAutoWhatsapp}
+              className="ml-4 shrink-0"
+            />
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

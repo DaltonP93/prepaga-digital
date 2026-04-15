@@ -261,7 +261,7 @@ async function activateNextStep(
     if (sale) {
       const { data: cs } = await supabase
         .from('company_settings')
-        .select('contratada_signature_mode, contratada_signer_email, contratada_signer_phone, contratada_signer_name')
+        .select('contratada_signature_mode, contratada_signer_email, contratada_signer_phone, contratada_signer_name, contratada_auto_whatsapp')
         .eq('company_id', sale.company_id)
         .single()
 
@@ -305,7 +305,7 @@ async function activateNextStep(
     .eq('step_order', 2)
     .eq('is_active', false)
 
-  // Send WhatsApp notification to contratada
+  // Send WhatsApp notification to contratada (only if auto-send is enabled)
   for (const s2Link of step2Links) {
     if (s2Link.recipient_phone) {
       try {
@@ -314,6 +314,19 @@ async function activateNextStep(
           .select('company_id, companies:company_id(name)')
           .eq('id', link.sale_id)
           .single()
+
+        // Check auto-send toggle
+        const { data: cs } = await supabase
+          .from('company_settings')
+          .select('contratada_auto_whatsapp')
+          .eq('company_id', sale?.company_id)
+          .single()
+
+        const autoWhatsapp = cs?.contratada_auto_whatsapp ?? true
+        if (!autoWhatsapp) {
+          console.log('contratada_auto_whatsapp is disabled — skipping WhatsApp send')
+          continue
+        }
 
         const companyName = (sale?.companies as any)?.name || 'La empresa'
         const signerName = s2Link.recipient_name || 'Representante Legal'
