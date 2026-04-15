@@ -245,8 +245,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                     client_id: formData.client_id,
                     plan_id: formData.plan_id,
                     company_id: formData.company_id,
-                    total_amount: formData.total_amount,
-                    titular_amount: formData.total_amount,
+                    titular_amount: formData.titular_amount,
                     notes: formData.notes,
                     requires_adherents: formData.requires_adherents,
                     status: 'pendiente' as any,
@@ -255,6 +254,18 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                     billing_email: formData.billing_email || null,
                     billing_phone: formData.billing_phone || null,
                   } as any);
+                  // Recalculate total_amount = titular_amount + sum(adherentes) after save
+                  const { data: adherentesAudit } = await supabase
+                    .from('beneficiaries')
+                    .select('amount, is_primary')
+                    .eq('sale_id', sale.id);
+                  const adherentesSumAudit = (adherentesAudit || [])
+                    .filter((b: any) => !b.is_primary)
+                    .reduce((sum: number, b: any) => sum + (Number(b.amount) || 0), 0);
+                  await supabase
+                    .from('sales')
+                    .update({ total_amount: formData.titular_amount + adherentesSumAudit })
+                    .eq('id', sale.id);
                   // Log workflow state
                   await supabase.from('sale_workflow_states').insert({
                     sale_id: sale.id,
