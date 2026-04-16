@@ -155,7 +155,7 @@ const SignatureWorkflow = () => {
         .from('company_settings')
         .select('contratada_signature_mode, contratada_signer_name, contratada_signer_email, contratada_signer_dni, contratada_signer_phone')
         .eq('company_id', selectedSaleCompanyId)
-        .single();
+        .maybeSingle();
       if (error) return null;
       return data;
     },
