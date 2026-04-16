@@ -59,7 +59,7 @@ const buildDescription = (values: FormData) =>
     .join('\n');
 
 export const IncidentForm = ({ onSuccess, onCancel }: Props) => {
-  const { companyId } = useSimpleAuthContext() as { companyId?: string | null };
+  const { profile } = useSimpleAuthContext();
   const createIncident = useCreateIncident();
   const uploadAttachment = useUploadAttachment();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -136,7 +136,7 @@ export const IncidentForm = ({ onSuccess, onCancel }: Props) => {
       module: data.module,
       priority: data.priority as IncidentPriority,
       description: buildDescription(data),
-      company_id: companyId || undefined,
+      company_id: profile?.company_id || undefined,
     });
 
     const uploadResults = await Promise.allSettled(
@@ -155,9 +155,9 @@ export const IncidentForm = ({ onSuccess, onCancel }: Props) => {
   const isLoading = createIncident.isPending || uploadAttachment.isPending;
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-[minmax(0,1.2fr)_220px_220px]">
-        <div className="space-y-1.5">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.2fr)_220px_220px]">
+        <div className="space-y-1.5 sm:col-span-2 xl:col-span-1">
           <Label htmlFor="title">Título de la incidencia</Label>
           <Input id="title" placeholder="Ej: Error al generar PDF en ventas" {...register('title')} />
           {errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}
@@ -259,7 +259,7 @@ export const IncidentForm = ({ onSuccess, onCancel }: Props) => {
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <Label>Capturas y archivos adjuntos</Label>
@@ -303,7 +303,7 @@ export const IncidentForm = ({ onSuccess, onCancel }: Props) => {
           </button>
 
           {pendingFiles.length > 0 && (
-            <div className="grid gap-2 md:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               {pendingFiles.map((file, index) => (
                 <div key={`${file.name}-${index}`} className="rounded-xl border border-border/60 bg-muted/20 p-3">
                   <div className="flex items-start justify-between gap-3">
@@ -333,7 +333,7 @@ export const IncidentForm = ({ onSuccess, onCancel }: Props) => {
         </div>
       </div>
 
-      <div className="flex justify-end gap-3 pt-2">
+      <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
         {onCancel && (
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancelar

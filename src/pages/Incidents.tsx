@@ -86,7 +86,7 @@ export default function Incidents() {
   }, [incidents]);
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-4 sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-2">
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs text-primary">
@@ -101,7 +101,7 @@ export default function Incidents() {
           </div>
         </div>
 
-        <Button onClick={() => setShowCreate(true)} className="min-w-44">
+        <Button onClick={() => setShowCreate(true)} className="w-full sm:w-auto sm:min-w-44">
           <Plus className="mr-2 h-4 w-4" />
           Nueva incidencia
         </Button>
@@ -258,7 +258,7 @@ export default function Incidents() {
       )}
 
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-5xl overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Nueva incidencia</DialogTitle>
             <DialogDescription>
