@@ -14,7 +14,8 @@ import { SignatureLinkGenerator } from '@/components/signature/SignatureLinkGene
 import { DocumentPackageSelector } from '@/components/documents/DocumentPackageSelector';
 import { AuditCommentsPanel } from '@/components/audit/AuditCommentsPanel';
 import { SaleWorkflowSteps } from '@/components/SaleWorkflowSteps';
-import { Loader2, FileText, User, Users, MessageSquare, PenTool, Package, ClipboardCheck, LayoutDashboard, ListOrdered, ArrowLeft } from 'lucide-react';
+import { SaleAddendumsPanel } from '@/components/sale-addendums/SaleAddendumsPanel';
+import { Loader2, FileText, User, Users, MessageSquare, PenTool, Package, ClipboardCheck, LayoutDashboard, ListOrdered, ArrowLeft, FilePlus2 } from 'lucide-react';
 import { useStateTransition } from '@/hooks/useStateTransition';
 import { useRolePermissions } from '@/hooks/useRolePermissions';
 import type { SaleStatus } from '@/types/workflow';
@@ -118,6 +119,10 @@ export default function SaleDetail() {
               <Users className="h-4 w-4" />
               Beneficiarios
             </TabsTrigger>
+            <TabsTrigger value="addendums" className="flex items-center gap-1.5">
+              <FilePlus2 className="h-4 w-4" />
+              Anexos
+            </TabsTrigger>
             <TabsTrigger value="documents" className="flex items-center gap-1.5">
               <FileText className="h-4 w-4" />
               Documentos
@@ -154,6 +159,10 @@ export default function SaleDetail() {
 
           <TabsContent value="beneficiaries">
             <BeneficiariesManager saleId={id!} />
+          </TabsContent>
+
+          <TabsContent value="addendums">
+            <SaleAddendumsPanel sale={sale} />
           </TabsContent>
 
           <TabsContent value="documents">

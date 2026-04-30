@@ -144,6 +144,10 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
   const [newBeneficiary, setNewBeneficiary] = useState<BeneficiaryFormData>({ ...emptyForm });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<BeneficiaryFormData>({ ...emptyForm });
+  const activeAdherents = (beneficiaries || []).filter(
+    (b: any) => !b.is_primary && String(b.relationship || '').toLowerCase() !== 'titular' && (b.status ?? 'active') === 'active'
+  );
+  const isFromAddendum = (beneficiary: any) => Boolean(beneficiary.source_addendum_id);
 
   if (!saleId) {
     return (
@@ -169,6 +173,10 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
   };
 
   const handleEdit = (b: any) => {
+    if (isFromAddendum(b)) {
+      toast.error('Este adherente se gestiona desde su anexo');
+      return;
+    }
     setEditingId(b.id);
     setEditData({
       first_name: b.first_name || '',
@@ -196,6 +204,11 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
   };
 
   const handleDelete = async (id: string) => {
+    const beneficiary = activeAdherents.find((item: any) => item.id === id);
+    if (beneficiary && isFromAddendum(beneficiary)) {
+      toast.error('Este adherente se gestiona desde su anexo');
+      return;
+    }
     try {
       await deleteBeneficiary.mutateAsync(id);
     } catch (error) {
@@ -208,7 +221,7 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Users className="h-5 w-5" />
-          <h3 className="text-lg font-semibold">Adherentes ({beneficiaries?.filter(b => !b.is_primary).length || 0})</h3>
+          <h3 className="text-lg font-semibold">Adherentes ({activeAdherents.length})</h3>
         </div>
         {!disabled && (
           <Button type="button" size="sm" onClick={() => setShowForm(!showForm)}>
@@ -232,9 +245,9 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
 
       {isLoading ? (
         <div className="text-center py-8 text-muted-foreground">Cargando adherentes...</div>
-      ) : beneficiaries && beneficiaries.filter(b => !b.is_primary).length > 0 ? (
+      ) : activeAdherents.length > 0 ? (
         <div className="space-y-2">
-          {beneficiaries.filter(b => !b.is_primary).map((b) => (
+          {activeAdherents.map((b: any) => (
             editingId === b.id ? (
               <BeneficiaryForm
                 key={b.id}
@@ -255,14 +268,29 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
                       {b.dni && `C.I.: ${b.dni}`} {b.relationship && `• ${b.relationship}`}
                       {b.phone && ` • Tel: +595${b.phone}`}
                       {b.amount ? ` • ${formatCurrency(Number(b.amount) || 0)}` : ''}
+                      {isFromAddendum(b) ? ' • Alta por anexo' : ''}
                     </div>
                   </div>
                   {!disabled && (
                     <div className="flex items-center gap-2">
-                      <Button type="button" variant="ghost" size="sm" onClick={() => handleEdit(b)}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={isFromAddendum(b)}
+                        title={isFromAddendum(b) ? 'Este adherente se gestiona desde su anexo' : 'Editar adherente'}
+                        onClick={() => handleEdit(b)}
+                      >
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button type="button" variant="ghost" size="sm" onClick={() => handleDelete(b.id)}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={isFromAddendum(b)}
+                        title={isFromAddendum(b) ? 'Este adherente se gestiona desde su anexo' : 'Eliminar adherente'}
+                        onClick={() => handleDelete(b.id)}
+                      >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>

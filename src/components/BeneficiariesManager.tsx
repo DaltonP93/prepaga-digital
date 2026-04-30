@@ -28,10 +28,15 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
 
   // Filter out the titular — only show adherentes
   const beneficiaries = allBeneficiaries.filter(
-    (b: any) => b.relationship !== 'titular' && !b.is_primary
+    (b: any) => String(b.relationship || '').toLowerCase() !== 'titular' && !b.is_primary && (b.status ?? 'active') === 'active'
   );
 
+  const isFromAddendum = (beneficiary: any) => Boolean((beneficiary as any).source_addendum_id);
+
   const handleEdit = (beneficiary: any) => {
+    if (isFromAddendum(beneficiary)) {
+      return;
+    }
     setEditingBeneficiary(beneficiary);
     setShowForm(true);
   };
@@ -87,9 +92,12 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
     setEditingBeneficiary(null);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = (beneficiary: any) => {
+    if (isFromAddendum(beneficiary)) {
+      return;
+    }
     if (confirm('¿Está seguro de que desea eliminar este beneficiario?')) {
-      deleteBeneficiary.mutate(id);
+      deleteBeneficiary.mutate(beneficiary.id);
     }
   };
 
@@ -121,7 +129,7 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
           </div>
           <Button onClick={() => setShowForm(true)} disabled={showForm}>
             <Plus className="h-4 w-4 mr-2" />
-            Agregar Beneficiario
+            Agregar adherente
           </Button>
         </div>
       </CardHeader>
@@ -129,7 +137,7 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
         {showForm && (
           <div className="border p-4 rounded-lg bg-muted/50">
             <h3 className="font-semibold mb-4">
-              {editingBeneficiary ? 'Editar' : 'Nuevo'} Beneficiario
+              {editingBeneficiary ? 'Editar' : 'Nuevo'} adherente
             </h3>
             <BeneficiaryForm
               defaultValues={editingBeneficiary || {}}
@@ -175,6 +183,11 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
                                 Preexistencias
                               </Badge>
                             )}
+                            {(beneficiary as any).source_addendum_id && (
+                              <Badge variant="outline" className="text-xs text-blue-600">
+                                Alta por anexo
+                              </Badge>
+                            )}
                           </div>
                           <div className="text-sm text-muted-foreground">
                             {beneficiary.relationship && (
@@ -197,6 +210,8 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
                           <Button
                             variant="ghost"
                             size="sm"
+                            disabled={isFromAddendum(beneficiary)}
+                            title={isFromAddendum(beneficiary) ? 'Este adherente se gestiona desde su anexo' : 'Editar adherente'}
                             onClick={() => handleEdit(beneficiary)}
                           >
                             <Edit2 className="h-4 w-4" />
@@ -204,7 +219,9 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDelete(beneficiary.id)}
+                            disabled={isFromAddendum(beneficiary)}
+                            title={isFromAddendum(beneficiary) ? 'Este adherente se gestiona desde su anexo' : 'Eliminar adherente'}
+                            onClick={() => handleDelete(beneficiary)}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
@@ -295,7 +312,7 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
           </div>
         ) : (
           <p className="text-muted-foreground text-center py-8">
-            No hay beneficiarios agregados. Haz clic en "Agregar Beneficiario" para comenzar.
+            No hay adherentes agregados. Haga clic en "Agregar adherente" para comenzar.
           </p>
         )}
       </CardContent>

@@ -30,6 +30,24 @@ const getSignatureClient = (token: string): any => {
   return _signatureClientCache.get(token)!;
 };
 
+const completeSaleAddendumForLink = async (
+  signatureClient: any,
+  linkData: { id: string; sale_addendum_id?: string | null }
+): Promise<boolean> => {
+  if (!linkData.sale_addendum_id) return false;
+
+  const { data, error } = await signatureClient.rpc('try_complete_sale_addendum_for_link' as any, {
+    p_signature_link_id: linkData.id,
+  });
+
+  if (error) {
+    console.error('Error completing sale addendum:', error);
+    throw new Error('La firma fue registrada, pero no se pudo completar el anexo. Contacte a la empresa para revisar el alta.');
+  }
+
+  return data === true;
+};
+
 interface SignatureLinkData {
   id: string;
   sale_id: string;
@@ -37,6 +55,8 @@ interface SignatureLinkData {
   recipient_type: string;
   recipient_email?: string;
   recipient_id: string | null;
+  sale_addendum_id?: string | null;
+  sale_addendum_beneficiary_id?: string | null;
   expires_at: string;
   accessed_at: string | null;
   access_count: number;
@@ -89,7 +109,7 @@ export const useSignatureLinkByToken = (token: string) => {
 
       const { data: linkData, error: linkError } = await signatureClient
         .from('signature_links')
-        .select('id,sale_id,package_id,recipient_type,recipient_id,recipient_email,recipient_phone,recipient_name,expires_at,accessed_at,access_count,status,completed_at,created_at,updated_at,signwell_signing_url,is_active,step_order')
+        .select('id,sale_id,package_id,recipient_type,recipient_id,recipient_email,recipient_phone,recipient_name,expires_at,accessed_at,access_count,status,completed_at,created_at,updated_at,signwell_signing_url,is_active,step_order,sale_addendum_id,sale_addendum_beneficiary_id')
         .eq('token', token)
         .gt('expires_at', new Date().toISOString())
         .single();
@@ -132,11 +152,7 @@ export const useSignatureLinkByToken = (token: string) => {
           companies:company_id (
             name,
             logo_url,
-            primary_color,
-            tax_id,
-            address,
-            phone,
-            email
+            primary_color
           ),
           beneficiaries (
             id,
@@ -213,7 +229,7 @@ export const useSubmitSignatureLink = () => {
           completed_at: new Date().toISOString(),
         })
         .eq('id', linkId)
-        .select('id,sale_id,recipient_type,recipient_id,status,completed_at')
+        .select('id,sale_id,recipient_type,recipient_id,recipient_name,status,completed_at,sale_addendum_id,sale_addendum_beneficiary_id')
         .single();
 
       if (error) {
@@ -281,7 +297,8 @@ export const useSubmitSignatureLink = () => {
             });
         } catch (traceErr) {
         }
-        return data;
+        const addendumCompleted = await completeSaleAddendumForLink(signatureClient, data as any);
+        return { ...data, addendum_completed: addendumCompleted };
       }
 
       // Detect if this is an electronic signature (JSON string) vs canvas (base64 image)
@@ -498,18 +515,16 @@ export const useSubmitSignatureLink = () => {
           const nowIso = new Date().toISOString();
           const safeSignedAt = new Date().toLocaleString('es-PY');
 
-          // Fetch company info + client/beneficiary data + company settings for signature blocks
-          let companyInfo: any = null;
+          // Fetch only signer data needed for signature blocks.
           let saleClientInfo: any = null;
           let saleBeneficiaries: any[] = [];
           let companySettings: any = null;
           try {
             const { data: saleInfo } = await signatureClient
               .from('sales')
-              .select('company_id, companies:company_id(name, tax_id, address, phone, email), clients:client_id(first_name, last_name, dni), beneficiaries(id, first_name, last_name, dni)')
+              .select('company_id, clients:client_id(first_name, last_name, dni), beneficiaries(id, first_name, last_name, dni)')
               .eq('id', data.sale_id)
               .single();
-            companyInfo = (saleInfo as any)?.companies || null;
             saleClientInfo = (saleInfo as any)?.clients || null;
             saleBeneficiaries = (saleInfo as any)?.beneficiaries || [];
 
@@ -844,6 +859,7 @@ export const useSubmitSignatureLink = () => {
       }
 
       // --- POST FIRMA: delegar todo al backend ---
+      let finalizeResult: any = null;
       try {
         const finalizeResponse = await fetch(
           `${SUPABASE_URL}/functions/v1/finalize-signature-link`,
@@ -864,14 +880,27 @@ export const useSubmitSignatureLink = () => {
             }),
           }
         );
-        const finalizeResult = await finalizeResponse.json();
-        if (!finalizeResult.ok) {
+        finalizeResult = await finalizeResponse.json();
+        if (!finalizeResponse.ok || !finalizeResult.ok) {
+          if ((data as any).sale_addendum_id) {
+            throw new Error('La firma fue registrada, pero no se pudo completar el anexo. Contacte a la empresa para revisar el alta.');
+          }
         }
       } catch (finalizeErr) {
-        // No bloquear la firma si falla el pipeline backend
+        if ((data as any).sale_addendum_id) {
+          throw finalizeErr instanceof Error
+            ? finalizeErr
+            : new Error('La firma fue registrada, pero no se pudo completar el anexo. Contacte a la empresa para revisar el alta.');
+        }
+        // No bloquear la firma del contrato si falla el pipeline backend
       }
 
-      return data;
+      let addendumCompleted = finalizeResult?.addendum_completed === true;
+      if ((data as any).sale_addendum_id && !addendumCompleted) {
+        addendumCompleted = await completeSaleAddendumForLink(signatureClient, data as any);
+      }
+
+      return { ...data, addendum_completed: addendumCompleted };
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['signature-link-public', variables.token] });
@@ -916,7 +945,7 @@ export const useSignatureLinkDocuments = (
 
       let query = client
         .from('documents')
-        .select('*')
+        .select('id,sale_id,beneficiary_id,name,document_type,document_type_id,generated_from_template,requires_signature,is_final,status,signed_at,signed_by,signature_data,file_url,content,version,created_at,updated_at,base_pdf_url,signed_pdf_url')
         .eq('sale_id', saleId)
         .neq('document_type', 'firma') // Exclude signature images
         .order('created_at', { ascending: true });
@@ -1011,6 +1040,7 @@ export const useAllSignatureLinksPublic = (saleId: string | undefined, token?: s
         .from('signature_links')
         .select('id,sale_id,recipient_type,recipient_id,status,completed_at,created_at')
         .eq('sale_id', saleId)
+        .is('sale_addendum_id', null)
         .order('created_at', { ascending: true });
       if (error) throw error;
       return data || [];

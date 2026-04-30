@@ -37,7 +37,7 @@ serve(async (req) => {
     // 1. Validate token and get signature link
     const { data: link, error: linkError } = await supabase
       .from('signature_links')
-      .select('id, sale_id, recipient_type, recipient_id, status, step_order')
+      .select('id, sale_id, recipient_type, recipient_id, status, step_order, sale_addendum_id, sale_addendum_beneficiary_id')
       .eq('token', token)
       .gt('expires_at', new Date().toISOString())
       .neq('status', 'revocado')
@@ -54,6 +54,7 @@ serve(async (req) => {
       ok: true,
       signed_documents: 0,
       activated_contratada: false,
+      addendum_completed: false,
     }
 
     // 2. Trigger PAdES signing for appropriate documents
@@ -80,20 +81,37 @@ serve(async (req) => {
       }
     }
 
-    // 3. Sequential activation: if titular/adherentes completed, activate contratada
-    try {
-      const activated = await activateNextStep(supabase, link, supabaseUrl, serviceKey)
-      result.activated_contratada = activated
-    } catch (activateErr) {
-      console.error('Activation error (non-blocking):', activateErr)
-    }
-
-    // 3b. If contratada just signed (step 2), send signed documents to client via WhatsApp
-    if (link.recipient_type === 'contratada') {
+    // 3. Addendum links are independent from the parent contract sequential flow.
+    if (link.sale_addendum_id) {
       try {
-        await sendSignedDocumentsToClient(supabase, link, supabaseUrl, serviceKey)
-      } catch (sendErr) {
-        console.error('Send signed documents error (non-blocking):', sendErr)
+        result.addendum_completed = await completeSaleAddendumForLink(supabase, link.id)
+      } catch (addendumErr) {
+        console.error('Addendum completion error:', addendumErr)
+        result.ok = false
+        result.error = 'ADDENDUM_COMPLETION_FAILED'
+        result.addendum_error = String(addendumErr)
+
+        return new Response(JSON.stringify(result), {
+          status: 409,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+    } else {
+      // Sequential activation: if titular/adherentes completed, activate contratada
+      try {
+        const activated = await activateNextStep(supabase, link, supabaseUrl, serviceKey)
+        result.activated_contratada = activated
+      } catch (activateErr) {
+        console.error('Activation error (non-blocking):', activateErr)
+      }
+
+      // If contratada just signed (step 2), send signed documents to client via WhatsApp
+      if (link.recipient_type === 'contratada') {
+        try {
+          await sendSignedDocumentsToClient(supabase, link, supabaseUrl, serviceKey)
+        } catch (sendErr) {
+          console.error('Send signed documents error (non-blocking):', sendErr)
+        }
       }
     }
 
@@ -109,6 +127,9 @@ serve(async (req) => {
           user_agent: userAgent?.substring(0, 200),
           signed_documents: result.signed_documents,
           activated_contratada: result.activated_contratada,
+          sale_addendum_id: link.sale_addendum_id,
+          sale_addendum_beneficiary_id: link.sale_addendum_beneficiary_id,
+          addendum_completed: result.addendum_completed,
         },
       })
     } catch { /* non-blocking */ }
@@ -132,7 +153,8 @@ serve(async (req) => {
  *   When contratada signs, the base PDF is regenerated first to include
  *   the contratada's signature block in the HTML content.
  * - ddjj_salud: signed immediately when the assigned individual finishes
- * - anexo: excluded from automatic PAdES signing
+ * - anexo_alta_adherente: signed only by its addendum link, never by the
+ *   parent contract sequence.
  */
 async function triggerPadesSigning(
   supabase: any,
@@ -140,8 +162,21 @@ async function triggerPadesSigning(
   supabaseUrl: string,
   serviceKey: string
 ): Promise<{ count: number; docIds: string[] }> {
-  let signedCount = 0
-  const signedDocIds: string[] = []
+  if (link.sale_addendum_id) {
+    if (!link.recipient_id) return { count: 0, docIds: [] }
+
+    const { data: addendumDocs } = await supabase
+      .from('documents')
+      .select('id, document_type, beneficiary_id, base_pdf_url, signed_pdf_url, is_final, content, name, sale_id')
+      .eq('sale_id', link.sale_id)
+      .eq('beneficiary_id', link.recipient_id)
+      .in('document_type', ['ddjj_salud', 'anexo_alta_adherente'])
+      .ilike('name', 'Anexo de Alta - %')
+
+    if (!addendumDocs || addendumDocs.length === 0) return { count: 0, docIds: [] }
+
+    return signDocuments(supabase, addendumDocs, link, supabaseUrl, serviceKey)
+  }
 
   // Get documents for this sale.
   // For adherentes: also fetch their DDJJ even if is_final is null (it gets set during signing).
@@ -161,10 +196,23 @@ async function triggerPadesSigning(
 
   if (!docs || docs.length === 0) return { count: 0, docIds: [] }
 
+  return signDocuments(supabase, docs, link, supabaseUrl, serviceKey)
+}
+
+async function signDocuments(
+  supabase: any,
+  docs: any[],
+  link: any,
+  supabaseUrl: string,
+  serviceKey: string
+): Promise<{ count: number; docIds: string[] }> {
+  let signedCount = 0
+  const signedDocIds: string[] = []
+
   for (const doc of docs) {
     // Skip if already has signed PDF
     if (doc.signed_pdf_url) continue
-    // Skip anexos
+    // Legacy anexos are excluded unless routed through the explicit V2 type.
     if (doc.document_type === 'anexo') continue
 
     const isContract = doc.document_type === 'contrato'
@@ -244,6 +292,18 @@ async function triggerPadesSigning(
   return { count: signedCount, docIds: signedDocIds }
 }
 
+async function completeSaleAddendumForLink(
+  supabase: any,
+  signatureLinkId: string
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc('try_complete_sale_addendum_for_link', {
+    p_signature_link_id: signatureLinkId,
+  })
+
+  if (error) throw error
+  return data === true
+}
+
 /**
  * Activate next step in sequential signing flow.
  * When all step_order=1 links are completed, activate step_order=2 (contratada).
@@ -254,6 +314,8 @@ async function activateNextStep(
   supabaseUrl: string,
   serviceKey: string
 ): Promise<boolean> {
+  if (link.sale_addendum_id) return false
+
   // Only check if the completing link is step 1
   if (link.step_order !== 1) return false
 
@@ -263,6 +325,7 @@ async function activateNextStep(
     .select('id, status')
     .eq('sale_id', link.sale_id)
     .eq('step_order', 1)
+    .is('sale_addendum_id', null)
     .neq('status', 'revocado')
 
   if (!step1Links) return false
@@ -276,6 +339,7 @@ async function activateNextStep(
     .select('id, recipient_email, recipient_phone, recipient_name, token')
     .eq('sale_id', link.sale_id)
     .eq('step_order', 2)
+    .is('sale_addendum_id', null)
     .eq('is_active', false)
     .neq('status', 'revocado')
 
@@ -332,6 +396,7 @@ async function activateNextStep(
     .update({ is_active: true })
     .eq('sale_id', link.sale_id)
     .eq('step_order', 2)
+    .is('sale_addendum_id', null)
     .eq('is_active', false)
 
   // Send WhatsApp notification to contratada (only if auto-send is enabled)

@@ -206,6 +206,8 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
             <SelectContent>
               <SelectItem value="venta_nueva">Venta Nueva</SelectItem>
               <SelectItem value="reingreso">Reingreso</SelectItem>
+              <SelectItem value="empresarial">Empresarial</SelectItem>
+              <SelectItem value="unipersonal">Unipersonal</SelectItem>
             </SelectContent>
           </Select>
         </div>
