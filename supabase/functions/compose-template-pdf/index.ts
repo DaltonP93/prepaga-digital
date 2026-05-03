@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument } from "https://esm.sh/pdf-lib@1.17.1";
 
 const corsHeaders = {
@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
     for (const block of blocks) {
       if (!block.is_visible) continue;
 
-      const content = block.content as Record<string, any>;
+      const content = block.content as Record<string, unknown>;
 
       switch (block.block_type) {
         case "pdf_embed": {
@@ -116,12 +116,12 @@ Deno.serve(async (req) => {
           const sourcePdf = await PDFDocument.load(sourceBytes);
 
           // Determine which pages to include
-          const selectedPages: number[] = content.page_selection?.pages ||
+          const selectedPages: number[] = (content.page_selection as { pages?: number[] } | undefined)?.pages ||
             Array.from({ length: sourcePdf.getPageCount() }, (_, i) => i + 1);
 
           // Copy pages (pdf-lib uses 0-based indices)
-          const pageIndices = selectedPages.map((p: number) => p - 1).filter(
-            (i: number) => i >= 0 && i < sourcePdf.getPageCount()
+          const pageIndices = selectedPages.map((p) => p - 1).filter(
+            (i) => i >= 0 && i < sourcePdf.getPageCount()
           );
 
           const copiedPages = await outputPdf.copyPages(sourcePdf, pageIndices);
@@ -191,7 +191,7 @@ Deno.serve(async (req) => {
           } else if (block.block_type === "signature_block") {
             text = `[Firma: ${content.label || "Firma"} — ${content.signer_role || "titular"}]`;
           } else if (block.block_type === "table") {
-            text = `[Tabla: ${(content.columns || []).map((c: any) => c.label).join(" | ")}]`;
+            text = `[Tabla: ${(content.columns as Array<{ label?: string }> | undefined || []).map((c) => c.label).join(" | ")}]`;
           } else if (block.block_type === "placeholder_chip") {
             const key = content.placeholder_key || "variable";
             text = saleData[key] || `{{${key}}}`;
@@ -224,7 +224,7 @@ Deno.serve(async (req) => {
     if (fields && fields.length > 0) {
       const pages = outputPdf.getPages();
       for (const field of fields) {
-        const meta = field.meta as Record<string, any>;
+        const meta = field.meta as Record<string, unknown>;
         const pageNum = (meta?.sourcePageNumber || field.page || 1) - 1;
         if (pageNum < 0 || pageNum >= pages.length) continue;
 
@@ -290,10 +290,11 @@ Deno.serve(async (req) => {
         "Content-Disposition": `attachment; filename="composed-template-${template_id}.pdf"`,
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("compose-template-pdf error:", err);
+    const message = err instanceof Error ? err.message : "Internal error";
     return new Response(
-      JSON.stringify({ error: err.message || "Internal error" }),
+      JSON.stringify({ error: message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
@@ -309,37 +310,38 @@ function resolvePlaceholders(text: string, data: Record<string, string>): string
   return text.replace(/\{\{(\w+)\}\}/g, (_, key) => data[key] || `{{${key}}}`);
 }
 
-function flattenSaleData(sale: any): Record<string, string> {
+function flattenSaleData(sale: unknown): Record<string, string> {
+  const saleRecord = sale as Record<string, unknown> | null | undefined;
   const result: Record<string, string> = {};
 
   // Sale fields
-  if (sale) {
-    result["contract_number"] = sale.contract_number || "";
-    result["sale_date"] = sale.created_at ? new Date(sale.created_at).toLocaleDateString("es-AR") : "";
-    result["status"] = sale.status || "";
-    result["total_amount"] = sale.total_amount?.toString() || "";
+  if (saleRecord) {
+    result["contract_number"] = String(saleRecord.contract_number || "");
+    result["sale_date"] = saleRecord.created_at ? new Date(String(saleRecord.created_at)).toLocaleDateString("es-AR") : "";
+    result["status"] = String(saleRecord.status || "");
+    result["total_amount"] = String((saleRecord.total_amount as number | undefined)?.toString() || "");
   }
 
   // Client fields
-  const client = sale?.clients;
+  const client = saleRecord?.clients as Record<string, unknown> | undefined;
   if (client) {
-    result["client_first_name"] = client.first_name || "";
-    result["client_last_name"] = client.last_name || "";
-    result["client_full_name"] = `${client.first_name || ""} ${client.last_name || ""}`.trim();
-    result["client_dni"] = client.dni || "";
-    result["client_email"] = client.email || "";
-    result["client_phone"] = client.phone || "";
-    result["client_address"] = client.address || "";
-    result["client_city"] = client.city || "";
-    result["client_province"] = client.province || "";
+    result["client_first_name"] = String(client.first_name || "");
+    result["client_last_name"] = String(client.last_name || "");
+    result["client_full_name"] = `${String(client.first_name || "")} ${String(client.last_name || "")}`.trim();
+    result["client_dni"] = String(client.dni || "");
+    result["client_email"] = String(client.email || "");
+    result["client_phone"] = String(client.phone || "");
+    result["client_address"] = String(client.address || "");
+    result["client_city"] = String(client.city || "");
+    result["client_province"] = String(client.province || "");
   }
 
   // Plan fields
-  const plan = sale?.plans;
+  const plan = saleRecord?.plans as Record<string, unknown> | undefined;
   if (plan) {
-    result["plan_name"] = plan.name || "";
-    result["plan_price"] = plan.price?.toString() || "";
-    result["plan_description"] = plan.description || "";
+    result["plan_name"] = String(plan.name || "");
+    result["plan_price"] = String((plan.price as number | undefined)?.toString() || "");
+    result["plan_description"] = String(plan.description || "");
   }
 
   return result;

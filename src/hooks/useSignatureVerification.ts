@@ -134,11 +134,12 @@ export const useSignatureVerification = () => {
         title: 'Código enviado',
         description,
       });
-    } catch (err: any) {
-      setState(prev => ({ ...prev, step: 'error', error: err.message }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setState(prev => ({ ...prev, step: 'error', error: message }));
       toast({
         title: 'Error',
-        description: err.message || 'No se pudo enviar el código',
+        description: message || 'No se pudo enviar el código',
         variant: 'destructive',
       });
     }
@@ -186,8 +187,9 @@ export const useSignatureVerification = () => {
         description: 'Su identidad ha sido verificada exitosamente.',
       });
       return true;
-    } catch (err: any) {
-      setState(prev => ({ ...prev, step: 'error', error: err.message }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setState(prev => ({ ...prev, step: 'error', error: message }));
       return false;
     }
   };
@@ -317,7 +319,7 @@ export async function buildEvidenceBundle(params: {
   ip: string;
   userAgent: string;
   timestamp: string;
-}): Promise<{ bundle: any; hash: string }> {
+}): Promise<{ bundle: Record<string, unknown>; hash: string }> {
   const bundle = {
     schema_version: '1.0',
     timestamp: params.timestamp,

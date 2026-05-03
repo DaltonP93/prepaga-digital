@@ -29,7 +29,7 @@ export const useDashboardStats = () => {
             query = query.eq('salesperson_id', salespersonFilter.salesperson_id);
           }
           if (status) {
-            query = query.eq('status', status as any);
+            query = query.eq('status', status);
           }
           if (dateFrom) {
             query = query.gte('created_at', dateFrom);
@@ -59,7 +59,7 @@ export const useDashboardStats = () => {
           .order('created_at', { ascending: false })
           .limit(5);
 
-        let recentClientsQuery = supabase
+        const recentClientsQuery = supabase
           .from('clients')
           .select('id, first_name, last_name, email, created_at')
           .order('created_at', { ascending: false })

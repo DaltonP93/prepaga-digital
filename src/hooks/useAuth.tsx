@@ -132,6 +132,7 @@ export const useAuth = (): AuthContextType => {
                 }
               }
             } else {
+              // intentional empty else: no user, profile stays null
             }
             
             setLoadingProgress(100);

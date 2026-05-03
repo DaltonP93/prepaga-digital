@@ -60,7 +60,7 @@ export const useAvailablePermissions = () => {
     queryKey: ['available-permissions'],
     queryFn: async (): Promise<Permission[]> => {
       try {
-        const { data, error } = await (supabase as any)
+        const { data, error } = await supabase
           .from('available_permissions')
           .select('id, permission_key, permission_name, description, category, is_active')
           .eq('is_active', true)
@@ -68,7 +68,7 @@ export const useAvailablePermissions = () => {
           .order('permission_name', { ascending: true });
 
         if (error || !data || data.length === 0) return FALLBACK_PERMISSIONS;
-        return data as Permission[];
+        return (data as unknown as Permission[]) || FALLBACK_PERMISSIONS;
       } catch {
         return FALLBACK_PERMISSIONS;
       }
@@ -98,10 +98,10 @@ export const useUserPermissionsWithDetails = (userId?: string) => {
     queryFn: async (): Promise<UserPermissionWithDetails[]> => {
       if (!userId) return [];
 
-      const { data, error } = await (supabase.rpc as any)('get_user_permissions', { _user_id: userId });
+      const { data, error } = await supabase.rpc('get_user_permissions', { _user_id: userId });
       if (error) throw error;
 
-      return ((data as any[]) || []).map((row: any, index) => ({
+      return ((data as unknown[]) || []).map((row: Record<string, unknown>, index) => ({
         id: row.id || `${userId}-${row.permission_key}-${index}`,
         user_id: userId,
         permission_key: row.permission_key,
@@ -131,7 +131,7 @@ export const useUpdateUserPermissions = () => {
       const { data: currentUser } = await supabase.auth.getUser();
       const grantedBy = currentUser.user?.id || null;
 
-      const { error: deleteError } = await (supabase as any)
+      const { error: deleteError } = await supabase
         .from('user_permissions')
         .delete()
         .eq('user_id', userId);
@@ -149,7 +149,7 @@ export const useUpdateUserPermissions = () => {
         granted_by: grantedBy,
       }));
 
-      const { error: insertError } = await (supabase as any)
+      const { error: insertError } = await supabase
         .from('user_permissions')
         .insert(rows);
 
@@ -161,8 +161,8 @@ export const useUpdateUserPermissions = () => {
       queryClient.invalidateQueries({ queryKey: ['user-permissions-details', variables.userId] });
       toast.success('Permisos actualizados exitosamente');
     },
-    onError: (error: any) => {
-      toast.error('Error al actualizar permisos: ' + error.message);
+    onError: (error: unknown) => {
+      toast.error('Error al actualizar permisos: ' + (error instanceof Error ? error.message : 'Error desconocido'));
     },
   });
 };

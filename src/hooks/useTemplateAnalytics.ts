@@ -161,14 +161,19 @@ export const useCompanyAnalytics = () => {
   });
 
   // Calculate aggregated stats
-  const templateStats = companyAnalytics?.map((item) => ({
-    template_id: item.template_id,
-    template_name: (item.templates as any)?.name || "Unknown",
-    views: item.views_count || 0,
-    completions: item.completions_count || 0,
-    avg_completion_time: item.avg_completion_time,
-    last_used_at: item.last_used_at,
-  })) || [];
+  const templateStats = companyAnalytics?.map((item) => {
+    const relatedTemplate = Array.isArray(item.templates)
+      ? item.templates[0]
+      : item.templates;
+    return {
+      template_id: item.template_id,
+      template_name: (relatedTemplate as unknown as { name?: string } | null | undefined)?.name || "Unknown",
+      views: item.views_count || 0,
+      completions: item.completions_count || 0,
+      avg_completion_time: item.avg_completion_time,
+      last_used_at: item.last_used_at,
+    };
+  }) || [];
 
   return {
     companyAnalytics,

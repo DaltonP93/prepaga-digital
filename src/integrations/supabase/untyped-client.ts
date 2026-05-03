@@ -13,5 +13,6 @@
 import { supabase } from './client';
 
 export function fromAnyTable(table: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- pre-existing debt: helper for tables not yet in generated types
   return (supabase as any).from(table);
 }

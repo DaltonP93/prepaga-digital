@@ -53,9 +53,10 @@ export const CombinedRequestForm = ({ onComplete }: { onComplete?: () => void })
 
   const validateTab = (tab: string): boolean => {
     switch (tab) {
-      case 'personal':
+      case 'personal': {
         const { first_name, last_name, email, dni } = formData.personal;
         return !!(first_name && last_name && email && dni);
+      }
       case 'health':
         return questions?.every(q => q.is_required ? formData.health[q.id] : true) ?? true;
       case 'plan':

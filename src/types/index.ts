@@ -3,7 +3,7 @@ import { LucideIcon } from 'lucide-react';
 export interface MainNavItem {
   title: string;
   url: string;
-  icon: any;
+  icon: LucideIcon;
   visible?: boolean;
 }
 

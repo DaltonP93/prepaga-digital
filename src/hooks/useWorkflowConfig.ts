@@ -18,7 +18,7 @@ export const useWorkflowConfig = (companyId: string | undefined) => {
     queryKey: ['workflow-config', companyId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('company_workflow_config' as any)
+        .from('company_workflow_config')
         .select('*')
         .eq('company_id', companyId!)
         .maybeSingle();
@@ -46,11 +46,11 @@ export const useUpsertWorkflowConfig = () => {
       const { data: user } = await supabase.auth.getUser();
 
       const { data, error } = await supabase
-        .from('company_workflow_config' as any)
+        .from('company_workflow_config')
         .upsert(
           {
             company_id: companyId,
-            workflow_config: workflowConfig as any,
+            workflow_config: workflowConfig as unknown,
             is_active: isActive,
             updated_by: user?.user?.id || null,
           },
@@ -66,8 +66,8 @@ export const useUpsertWorkflowConfig = () => {
       queryClient.invalidateQueries({ queryKey: ['workflow-config', variables.companyId] });
       toast.success('Configuracion de flujo actualizada');
     },
-    onError: (error: any) => {
-      toast.error('Error al guardar configuracion: ' + error.message);
+    onError: (error: unknown) => {
+      toast.error('Error al guardar configuracion: ' + (error instanceof Error ? error.message : 'Error desconocido'));
     },
   });
 };

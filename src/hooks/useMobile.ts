@@ -9,8 +9,8 @@ import { StatusBar, Style } from '@capacitor/status-bar';
 
 export const useMobile = () => {
   const [isMobile, setIsMobile] = useState(false);
-  const [deviceInfo, setDeviceInfo] = useState<any>(null);
-  const [networkStatus, setNetworkStatus] = useState<any>(null);
+  const [deviceInfo, setDeviceInfo] = useState<unknown>(null);
+  const [networkStatus, setNetworkStatus] = useState<unknown>(null);
 
   useEffect(() => {
     checkMobileEnvironment();

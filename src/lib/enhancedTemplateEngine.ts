@@ -154,7 +154,7 @@ export interface EnhancedTemplateContext {
   };
   beneficiarios: BeneficiaryContext[];
   beneficiarioPrincipal: BeneficiaryContext | null;
-  respuestas: Record<string, any>;
+  respuestas: Record<string, unknown>;
   representante: {
     nombre: string;
     dni: string;
@@ -240,7 +240,7 @@ function normalizeContractHeaderHtml(html: string): string {
 /**
  * Create beneficiary context from database record
  */
-function createBeneficiaryContext(beneficiary: any): BeneficiaryContext {
+function createBeneficiaryContext(beneficiary: Record<string, unknown>): BeneficiaryContext {
   return {
     nombre: beneficiary.first_name || '',
     apellido: beneficiary.last_name || '',
@@ -273,25 +273,25 @@ function createBeneficiaryContext(beneficiary: any): BeneficiaryContext {
  * Create enhanced template context from sale data
  */
 export function createEnhancedTemplateContext(
-  client: any,
-  plan: any,
-  company: any,
-  sale: any,
-  beneficiaries: any[] = [],
-  signatureLink?: any,
-  responses?: Record<string, any>,
-  companySettings?: any
+  client: Record<string, unknown>,
+  plan: Record<string, unknown>,
+  company: Record<string, unknown>,
+  sale: Record<string, unknown>,
+  beneficiaries: Record<string, unknown>[] = [],
+  signatureLink?: Record<string, unknown>,
+  responses?: Record<string, unknown>,
+  companySettings?: Record<string, unknown>
 ): EnhancedTemplateContext {
   const now = new Date();
   
   // Create beneficiary contexts (always include titular first for contract tables)
   const normalizedBeneficiaries = Array.isArray(beneficiaries) ? beneficiaries : [];
-  const hasPrimaryBeneficiary = normalizedBeneficiaries.some((b: any) => b?.is_primary === true);
+  const hasPrimaryBeneficiary = normalizedBeneficiaries.some((b) => b?.is_primary === true);
 
   // Calculate titular's individual share: total minus sum of adherent amounts
   const adherentSum = normalizedBeneficiaries
-    .filter((b: any) => !b?.is_primary)
-    .reduce((sum: number, b: any) => sum + (b?.amount || 0), 0);
+    .filter((b) => !b?.is_primary)
+    .reduce((sum: number, b) => sum + ((b?.amount as number | undefined) || 0), 0);
   const titularAmount = (sale?.total_amount || 0) - adherentSum;
   const effectiveTitularAmount = titularAmount > 0 ? titularAmount : (sale?.total_amount || plan?.price || 0);
 
@@ -307,7 +307,7 @@ export function createEnhancedTemplateContext(
         address: client?.address || '',
         city: client?.city || '',
         province: client?.province || '',
-        barrio: (client as any)?.barrio || '',
+        barrio: (client?.barrio as string | undefined) || '',
         postal_code: client?.postal_code || '',
         gender: '',
         relationship: 'Titular',
@@ -357,8 +357,8 @@ export function createEnhancedTemplateContext(
       ciudad: client?.city || '',
       provincia: client?.province || '',
       departamento: client?.province || '',
-      barrio: (client as any)?.barrio || '',
-      codigoPostal: client?.postal_code || '',
+        barrio: (client?.barrio as string | undefined) || '',
+        codigoPostal: (client?.postal_code as string | undefined) || '',
       fechaNacimiento: formatDate(client?.birth_date),
       edad: calculateAge(client?.birth_date),
     },
@@ -443,7 +443,7 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
   let result = normalizeContractHeaderHtml(template);
 
   // Helper to replace nested variables
-  const replaceNestedVariables = (obj: any, prefix: string) => {
+  const replaceNestedVariables = (obj: Record<string, unknown>, prefix: string) => {
     if (!obj || typeof obj !== 'object') return;
     
     Object.keys(obj).forEach(key => {
@@ -526,17 +526,17 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
       return '';
     }
     beneficiaryLoopHadContent = true;
-    return context.beneficiarios.map((beneficiary, index) => {
-      let itemResult = content;
-      // Replace beneficiary-specific placeholders (Spanish names from BeneficiaryContext)
-      Object.keys(beneficiary).forEach(key => {
-        const value = (beneficiary as any)[key];
-        const placeholder = `{{${key}}}`;
-        const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-        if (value !== null && value !== undefined && typeof value !== 'object') {
-          itemResult = itemResult.replace(regex, String(value));
-        }
-      });
+      return context.beneficiarios.map((beneficiary, index) => {
+        let itemResult = content;
+        // Replace beneficiary-specific placeholders (Spanish names from BeneficiaryContext)
+        Object.keys(beneficiary).forEach(key => {
+          const value = (beneficiary as Record<string, unknown>)[key];
+          const placeholder = `{{${key}}}`;
+          const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+          if (value !== null && value !== undefined && typeof value !== 'object') {
+            itemResult = itemResult.replace(regex, String(value));
+          }
+        });
       // English aliases
       itemResult = applyBenAliases(itemResult, buildBenAliases(beneficiary, index));
       return itemResult;

@@ -9,10 +9,10 @@ interface AutomationRule {
   id: string;
   name: string;
   trigger: 'sale_created' | 'signature_expired' | 'signature_pending' | 'daily_reminder';
-  conditions: any;
+  conditions: Record<string, unknown>;
   actions: Array<{
     type: 'send_email' | 'send_sms' | 'generate_document' | 'create_reminder';
-    config: any;
+    config: Record<string, unknown>;
   }>;
   active: boolean;
   created_at: string;
@@ -75,10 +75,11 @@ export const useSignatureAutomation = () => {
       queryClient.invalidateQueries({ queryKey: ['sales-list'] });
       queryClient.invalidateQueries({ queryKey: ['sales'] });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error enviando recordatorios",
-        description: error.message,
+        description: message,
         variant: "destructive"
       });
     },
@@ -153,10 +154,11 @@ export const useSignatureAutomation = () => {
       queryClient.invalidateQueries({ queryKey: ['sales-list'] });
       queryClient.invalidateQueries({ queryKey: ['sales'] });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error renovando enlaces",
-        description: error.message,
+        description: message,
         variant: "destructive"
       });
     },
@@ -249,10 +251,11 @@ export const useSignatureAutomation = () => {
         description: `${data.successful} documentos generados exitosamente.`
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error generando documentos",
-        description: error.message,
+        description: message,
         variant: "destructive"
       });
     },

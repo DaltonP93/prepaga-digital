@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const companyId = (asset as any).templates?.company_id;
+    const companyId = ((asset as Record<string, unknown>).templates as Record<string, unknown> | undefined)?.company_id as string | undefined;
 
     // Verify user belongs to same company
     const { data: profile } = await adminClient
@@ -123,8 +123,8 @@ Deno.serve(async (req) => {
       if (oldPages && oldPages.length > 0) {
         // Delete old preview PNGs from storage
         const previewPaths = oldPages
-          .map((p: any) => p.preview_image_url)
-          .filter((url: string | null) => url && url.length > 0);
+          .map((p: Record<string, unknown>) => p.preview_image_url as string | null)
+          .filter((url: string | null): url is string => !!url && url.length > 0);
 
         if (previewPaths.length > 0) {
           await adminClient.storage.from("documents").remove(previewPaths);
@@ -196,23 +196,25 @@ Deno.serve(async (req) => {
         JSON.stringify({ asset: updatedAsset, pages: assetPages || [] }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-    } catch (processErr: any) {
+    } catch (processErr: unknown) {
       console.error("PDF processing error:", processErr);
+      const procMsg = processErr instanceof Error ? processErr.message : "Unknown error";
 
       await adminClient
         .from("template_assets")
-        .update({ status: "failed", processing_error: processErr.message || "Unknown error" })
+        .update({ status: "failed", processing_error: procMsg })
         .eq("id", asset_id);
 
       return new Response(
-        JSON.stringify({ error: `Processing failed: ${processErr.message}` }),
+        JSON.stringify({ error: `Processing failed: ${procMsg}` }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Unexpected error:", err);
+    const msg = err instanceof Error ? err.message : "Internal server error";
     return new Response(
-      JSON.stringify({ error: err.message || "Internal server error" }),
+      JSON.stringify({ error: msg }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

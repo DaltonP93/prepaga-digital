@@ -5,9 +5,9 @@ interface AuditLogParams {
   entity_type: string;
   action: string;
   entity_id?: string;
-  old_values?: any;
-  new_values?: any;
-  metadata?: any;
+  old_values?: unknown;
+  new_values?: unknown;
+  metadata?: unknown;
 }
 
 export const useAuditLogger = () => {
@@ -50,7 +50,7 @@ export const useAuditLogger = () => {
     });
   };
 
-  const logSaleCreated = (saleId: string, saleData: any) => {
+  const logSaleCreated = (saleId: string, saleData: unknown) => {
     logAudit.mutate({
       entity_type: 'sales',
       action: 'CREATE',
@@ -59,7 +59,7 @@ export const useAuditLogger = () => {
     });
   };
 
-  const logSaleUpdated = (saleId: string, oldData: any, newData: any) => {
+  const logSaleUpdated = (saleId: string, oldData: unknown, newData: unknown) => {
     logAudit.mutate({
       entity_type: 'sales',
       action: 'UPDATE',
@@ -69,7 +69,7 @@ export const useAuditLogger = () => {
     });
   };
 
-  const logDocumentSigned = (saleId: string, documentData: any) => {
+  const logDocumentSigned = (saleId: string, documentData: unknown) => {
     logAudit.mutate({
       entity_type: 'signatures',
       action: 'SIGN',

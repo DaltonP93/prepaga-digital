@@ -4,7 +4,7 @@ import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 
 interface ExportData {
-  data: any[];
+  data: Record<string, unknown>[];
   filename: string;
   type: 'csv' | 'excel' | 'pdf' | 'json' | 'html';
   headers?: string[];
@@ -63,10 +63,10 @@ export const useExport = () => {
         description: `Archivo ${result.filename} descargado correctamente.`,
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error en exportación",
-        description: error.message || "No se pudo exportar los datos.",
+        description: error instanceof Error ? error.message : "No se pudo exportar los datos.",
         variant: "destructive",
       });
     }
@@ -80,7 +80,7 @@ export const useExport = () => {
 };
 
 // Función para generar CSV
-const generateCSV = (data: any[], headers?: string[]): string => {
+const generateCSV = (data: Record<string, unknown>[], headers?: string[]): string => {
   if (!data.length) return '';
 
   // Si no se proporcionan headers, usar las claves del primer objeto
@@ -96,12 +96,12 @@ const generateCSV = (data: any[], headers?: string[]): string => {
       
       // Manejar valores anidados
       const keys = header.split('.');
-      let currentValue = row;
+      let currentValue: unknown = row;
       for (const key of keys) {
-        currentValue = currentValue?.[key];
+        currentValue = (currentValue as Record<string, unknown>)?.[key];
       }
       
-      value = currentValue?.toString() || '';
+      value = currentValue != null ? String(currentValue) : '';
       
       // Escapar comillas dobles
       value = value.replace(/"/g, '""');
@@ -115,7 +115,7 @@ const generateCSV = (data: any[], headers?: string[]): string => {
 
 // Función para generar HTML (para PDF)
 const generateHTML = (
-  data: any[], 
+  data: Record<string, unknown>[], 
   options: { title?: string; description?: string; headers?: string[] }
 ): string => {
   const { title = 'Reporte', description, headers } = options;
@@ -237,9 +237,9 @@ const generateHTML = (
                 ${tableHeaders.map(header => {
                   // Manejar valores anidados
                   const keys = header.split('.');
-                  let value = row;
+                  let value: unknown = row;
                   for (const key of keys) {
-                    value = value?.[key];
+                    value = (value as Record<string, unknown>)?.[key];
                   }
                   
                   // Formatear valores especiales
@@ -251,7 +251,7 @@ const generateHTML = (
                     value = value ? 'Sí' : 'No';
                   }
                   
-                  return `<td>${value || '-'}</td>`;
+                  return `<td>${value != null ? String(value) : '-'}</td>`;
                 }).join('')}
               </tr>
             `).join('')}

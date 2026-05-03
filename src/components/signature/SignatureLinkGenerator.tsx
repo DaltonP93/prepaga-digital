@@ -14,6 +14,7 @@ import { useCreateAllSignatureLinks } from '@/hooks/useCreateAllSignatureLinks';
 import { useBeneficiaries } from '@/hooks/useBeneficiaries';
 import { generateUUID } from '@/lib/utils';
 import { getSignatureLinkPath, getSignatureLinkUrl } from '@/lib/appUrls';
+import { Database } from '@/integrations/supabase/types';
 
 interface SignatureLinkGeneratorProps {
   saleId: string;
@@ -80,7 +81,7 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
 
       const isContratada = recipientType === 'contratada';
 
-      const insertData: Record<string, any> = {
+      const insertData: Database['public']['Tables']['signature_links']['Insert'] = {
         sale_id: saleId,
         token,
         recipient_type: isContratada ? 'contratada' : recipientType,
@@ -95,7 +96,7 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
 
       const { data, error } = await supabase
         .from('signature_links')
-        .insert(insertData as any)
+        .insert(insertData)
         .select()
         .single();
 
@@ -104,7 +105,7 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['signature-links', saleId] });
-      const isContratada = (data as any).recipient_type === 'contratada';
+      const isContratada = data?.recipient_type === 'contratada';
       toast({
         title: isContratada ? 'Enlace para Contratada generado' : 'Enlace generado',
         description: isContratada
@@ -112,10 +113,11 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
           : 'El enlace de firma ha sido creado exitosamente.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'No se pudo generar el enlace.';
       toast({
         title: 'Error',
-        description: error.message || 'No se pudo generar el enlace.',
+        description: message,
         variant: 'destructive',
       });
     },
@@ -126,7 +128,7 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
     mutationFn: async (linkId: string) => {
       const { error } = await supabase
         .from('signature_links')
-        .update({ is_active: true } as any)
+        .update({ is_active: true })
         .eq('id', linkId);
       if (error) throw error;
     },
@@ -147,7 +149,7 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
 
   // Resend notification
   const resendNotification = useMutation({
-    mutationFn: async (linkData: any) => {
+    mutationFn: async (linkData: Database['public']['Tables']['signature_links']['Row']) => {
       const { data: { user } } = await supabase.auth.getUser();
       const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user?.id).single();
       if (!profile?.company_id) throw new Error('No company found');
@@ -196,8 +198,9 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
     onSuccess: () => {
       toast({ title: 'Notificación enviada', description: 'Se ha enviado el recordatorio por WhatsApp.' });
     },
-    onError: (error: any) => {
-      toast({ title: 'Error', description: error.message || 'No se pudo enviar la notificación.', variant: 'destructive' });
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'No se pudo enviar la notificación.';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     },
   });
 
@@ -240,7 +243,7 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
     });
   };
 
-  const hasContratadaLink = signatureLinks.some((l: any) => l.recipient_type === 'contratada');
+  const hasContratadaLink = signatureLinks.some((l) => l.recipient_type === 'contratada');
   const hasAnyLinks = signatureLinks.length > 0;
   const showContratadaButton = contratadaConfig?.contratada_signature_mode === 'link'
     && contratadaConfig?.contratada_signer_email
@@ -249,8 +252,8 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
   const hasBeneficiaries = beneficiaries.length > 0;
   const showGenerateAllButton = !hasAnyLinks;
   const allStep1Completed = signatureLinks
-    .filter((l: any) => l.step_order === 1 && l.status !== 'revocado')
-    .every((l: any) => l.status === 'completado') && signatureLinks.some((l: any) => l.step_order === 1);
+    .filter((l) => l.step_order === 1 && l.status !== 'revocado')
+    .every((l) => l.status === 'completado') && signatureLinks.some((l) => l.step_order === 1);
 
   return (
     <Card>
@@ -344,7 +347,7 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
         ) : signatureLinks.length > 0 ? (
           <div className="space-y-3">
             <h4 className="font-medium">Enlaces generados ({signatureLinks.length})</h4>
-            {signatureLinks.map((link: any) => {
+            {signatureLinks.map((link) => {
               const isInactive = link.is_active === false && link.status === 'pendiente';
 
               return (

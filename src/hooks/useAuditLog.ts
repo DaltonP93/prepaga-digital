@@ -29,8 +29,8 @@ export const useCreateAuditLog = () => {
       entity_type: string;
       action: string;
       entity_id?: string;
-      old_values?: any;
-      new_values?: any;
+      old_values?: unknown;
+      new_values?: unknown;
       ip_address?: string;
       user_agent?: string;
     }) => {
@@ -64,7 +64,7 @@ export const useCreateAuditLog = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['auditLogs'] });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Error creating audit log:', error);
     },
   });

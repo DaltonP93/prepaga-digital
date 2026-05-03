@@ -9,6 +9,9 @@ import { Plus, Trash2, Users, AlertCircle, Pencil } from 'lucide-react';
 import { useBeneficiaries, useCreateBeneficiary, useDeleteBeneficiary, useUpdateBeneficiary } from '@/hooks/useBeneficiaries';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
+import { Database } from '@/integrations/supabase/types';
+
+type Beneficiary = Database['public']['Tables']['beneficiaries']['Row'];
 
 interface SaleAdherentsTabProps {
   saleId?: string;
@@ -145,9 +148,9 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<BeneficiaryFormData>({ ...emptyForm });
   const activeAdherents = (beneficiaries || []).filter(
-    (b: any) => !b.is_primary && String(b.relationship || '').toLowerCase() !== 'titular' && (b.status ?? 'active') === 'active'
+    (b) => !b.is_primary && String(b.relationship || '').toLowerCase() !== 'titular' && (b.status ?? 'active') === 'active'
   );
-  const isFromAddendum = (beneficiary: any) => Boolean(beneficiary.source_addendum_id);
+  const isFromAddendum = (beneficiary: Beneficiary) => Boolean(beneficiary.source_addendum_id);
 
   if (!saleId) {
     return (
@@ -172,7 +175,7 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
     }
   };
 
-  const handleEdit = (b: any) => {
+  const handleEdit = (b: Beneficiary) => {
     if (isFromAddendum(b)) {
       toast.error('Este adherente se gestiona desde su anexo');
       return;
@@ -204,7 +207,7 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
   };
 
   const handleDelete = async (id: string) => {
-    const beneficiary = activeAdherents.find((item: any) => item.id === id);
+    const beneficiary = activeAdherents.find((item) => item.id === id);
     if (beneficiary && isFromAddendum(beneficiary)) {
       toast.error('Este adherente se gestiona desde su anexo');
       return;
@@ -247,7 +250,7 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
         <div className="text-center py-8 text-muted-foreground">Cargando adherentes...</div>
       ) : activeAdherents.length > 0 ? (
         <div className="space-y-2">
-          {activeAdherents.map((b: any) => (
+          {activeAdherents.map((b) => (
             editingId === b.id ? (
               <BeneficiaryForm
                 key={b.id}

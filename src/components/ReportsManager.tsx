@@ -186,7 +186,7 @@ const ReportsManager = () => {
     return data || [];
   };
 
-  const downloadReport = (data: any[], config: ReportConfig) => {
+  const downloadReport = (data: unknown[], config: ReportConfig) => {
     let content = '';
     let mimeType = '';
     let extension = '';
@@ -222,23 +222,30 @@ const ReportsManager = () => {
     URL.revokeObjectURL(url);
   };
 
-  const generateCSV = (data: any[], fields: string[]) => {
+  const generateCSV = (data: unknown[], fields: string[]) => {
     const headers = fields.join(',');
     const rows = data.map(row => {
+      const r = row as Record<string, unknown>;
       return fields.map(field => {
         let value = '';
         switch (field) {
-          case 'client_name':
-            value = `${row.clients?.first_name || ''} ${row.clients?.last_name || ''}`.trim();
+          case 'client_name': {
+            const clients = r.clients as Record<string, string> | undefined;
+            value = `${clients?.first_name || ''} ${clients?.last_name || ''}`.trim();
             break;
-          case 'plan_name':
-            value = row.plans?.name || '';
+          }
+          case 'plan_name': {
+            const plans = r.plans as Record<string, string> | undefined;
+            value = plans?.name || '';
             break;
-          case 'company_name':
-            value = row.companies?.name || '';
+          }
+          case 'company_name': {
+            const companies = r.companies as Record<string, string> | undefined;
+            value = companies?.name || '';
             break;
+          }
           default:
-            value = row[field] || '';
+            value = String(r[field] ?? '');
         }
         return `"${value}"`;
       }).join(',');
@@ -247,7 +254,7 @@ const ReportsManager = () => {
     return [headers, ...rows].join('\n');
   };
 
-  const generateHTML = (data: any[], config: ReportConfig) => {
+  const generateHTML = (data: unknown[], config: ReportConfig) => {
     return `
       <!DOCTYPE html>
       <html>
@@ -277,27 +284,35 @@ const ReportsManager = () => {
               </tr>
             </thead>
             <tbody>
-              ${data.map(row => `
+              ${data.map(row => {
+                const r = row as Record<string, unknown>;
+                return `
                 <tr>
                   ${config.fields.map(field => {
                     let value = '';
                     switch (field) {
-                      case 'client_name':
-                        value = `${row.clients?.first_name || ''} ${row.clients?.last_name || ''}`.trim();
+                      case 'client_name': {
+                        const clients = r.clients as Record<string, string> | undefined;
+                        value = `${clients?.first_name || ''} ${clients?.last_name || ''}`.trim();
                         break;
-                      case 'plan_name':
-                        value = row.plans?.name || '';
+                      }
+                      case 'plan_name': {
+                        const plans = r.plans as Record<string, string> | undefined;
+                        value = plans?.name || '';
                         break;
-                      case 'company_name':
-                        value = row.companies?.name || '';
+                      }
+                      case 'company_name': {
+                        const companies = r.companies as Record<string, string> | undefined;
+                        value = companies?.name || '';
                         break;
+                      }
                       default:
-                        value = row[field] || '';
+                        value = String(r[field] ?? '');
                     }
                     return `<td>${value}</td>`;
                   }).join('')}
                 </tr>
-              `).join('')}
+              `;}).join('')}
             </tbody>
           </table>
         </body>
@@ -427,7 +442,7 @@ const ReportsManager = () => {
                   <Label htmlFor="reportType">Tipo de Reporte</Label>
                   <Select 
                     value={customReport.type} 
-                    onValueChange={(value: any) => setCustomReport({...customReport, type: value})}
+                    onValueChange={(value: string) => setCustomReport({...customReport, type: value as ReportConfig['type']})}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -458,7 +473,7 @@ const ReportsManager = () => {
                   <Label>Formato de Salida</Label>
                   <Select 
                     value={customReport.format} 
-                    onValueChange={(value: any) => setCustomReport({...customReport, format: value})}
+                    onValueChange={(value: string) => setCustomReport({...customReport, format: value as ReportConfig['format']})}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -474,7 +489,7 @@ const ReportsManager = () => {
                   <Label>Programación (Opcional)</Label>
                   <Select 
                     value={customReport.schedule || 'none'} 
-                    onValueChange={(value) => setCustomReport({...customReport, schedule: value === 'none' ? null : value as any})}
+                    onValueChange={(value) => setCustomReport({...customReport, schedule: value === 'none' ? null : value as NonNullable<ReportConfig['schedule']>})}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Sin programación" />

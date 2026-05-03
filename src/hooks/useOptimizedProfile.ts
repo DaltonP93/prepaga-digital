@@ -71,11 +71,11 @@ export const useOptimizedProfile = () => {
         description: "Los cambios se han guardado exitosamente.",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('❌ Optimized profile update error:', error);
       toast({
         title: "Error",
-        description: error.message || "No se pudo actualizar el perfil.",
+        description: error instanceof Error ? error.message : "No se pudo actualizar el perfil.",
         variant: "destructive",
       });
     },

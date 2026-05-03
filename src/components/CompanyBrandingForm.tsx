@@ -62,8 +62,8 @@ export function CompanyBrandingForm() {
 
       setValue(type === 'logo' ? 'logoUrl' : 'favicon', publicUrl);
       toast.success(`${type === 'logo' ? 'Logo' : 'Favicon'} subido correctamente`);
-    } catch (error: any) {
-      toast.error(`Error al subir ${type}: ` + error.message);
+    } catch (error: unknown) {
+      toast.error(`Error al subir ${type}: ` + (error instanceof Error ? error.message : 'Error desconocido'));
     } finally {
       setUploading(prev => ({ ...prev, [type]: false }));
     }
@@ -73,8 +73,8 @@ export function CompanyBrandingForm() {
     try {
       await updateBranding(data);
       toast.success('Configuración de marca actualizada');
-    } catch (error: any) {
-      toast.error('Error al actualizar: ' + error.message);
+    } catch (error: unknown) {
+      toast.error('Error al actualizar: ' + (error instanceof Error ? error.message : 'Error desconocido'));
     }
   };
 
@@ -83,8 +83,8 @@ export function CompanyBrandingForm() {
       await resetBranding();
       reset();
       toast.success('Configuración restablecida a valores por defecto');
-    } catch (error: any) {
-      toast.error('Error al restablecer: ' + error.message);
+    } catch (error: unknown) {
+      toast.error('Error al restablecer: ' + (error instanceof Error ? error.message : 'Error desconocido'));
     }
   };
 

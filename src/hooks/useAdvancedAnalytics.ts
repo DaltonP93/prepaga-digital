@@ -199,7 +199,7 @@ export const useAdvancedAnalytics = (dateRange: DateRange, filters: AnalyticsFil
       const planPerformance: Record<string, { count: number; revenue: number }> =
         salesData?.reduce((acc, sale) => {
           if (sale.plans) {
-            const planName = (sale.plans as any).name;
+            const planName = (sale.plans as { name?: string } | null)?.name;
             if (!acc[planName]) {
               acc[planName] = { count: 0, revenue: 0 };
             }
@@ -218,7 +218,7 @@ export const useAdvancedAnalytics = (dateRange: DateRange, filters: AnalyticsFil
       const companyPerformance: Record<string, { ventas: number; ingresos: number }> =
         salesData?.reduce((acc, sale) => {
           if (sale.companies) {
-            const companyName = (sale.companies as any).name;
+            const companyName = (sale.companies as { name?: string } | null)?.name;
             if (!acc[companyName]) {
               acc[companyName] = { ventas: 0, ingresos: 0 };
             }

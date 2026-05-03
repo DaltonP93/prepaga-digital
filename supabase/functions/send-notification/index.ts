@@ -52,7 +52,7 @@ serve(async (req) => {
       .select('role')
       .eq('user_id', userId);
 
-    const userRoles = (roles || []).map((r: any) => r.role);
+    const userRoles = (roles || []).map((r: Record<string, unknown>) => r.role as string);
     const hasPermission = userRoles.some((r: string) => ALLOWED_ROLES.includes(r));
     if (!hasPermission) {
       return new Response(JSON.stringify({ error: "Insufficient permissions" }), {
@@ -176,7 +176,7 @@ serve(async (req) => {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error sending notification:", error);
     return new Response(
       JSON.stringify({ error: "Internal server error" }),

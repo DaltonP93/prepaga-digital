@@ -136,9 +136,9 @@ export const useSendWhatsAppNotification = () => {
         toast.success("Notificación WhatsApp enviada correctamente");
       }
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Error sending WhatsApp notification:", error);
-      toast.error(error.message || "Error al enviar notificación WhatsApp");
+      toast.error(error instanceof Error ? error.message : "Error al enviar notificación WhatsApp");
     },
   });
 };
@@ -156,7 +156,7 @@ export const useUpdateNotificationStatus = () => {
       status: string;
       errorMessage?: string;
     }) => {
-      const updateData: any = { status };
+      const updateData: Record<string, unknown> = { status };
 
       if (errorMessage) updateData.error_message = errorMessage;
 

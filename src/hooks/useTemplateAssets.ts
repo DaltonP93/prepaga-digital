@@ -59,8 +59,9 @@ export const useCreateTemplateAsset = () => {
       queryClient.invalidateQueries({ queryKey: ['template-assets', data.template_id] });
       toast({ title: 'Asset agregado', description: 'El archivo fue guardado correctamente.' });
     },
-    onError: (error: any) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     },
   });
 };
@@ -132,8 +133,9 @@ export const useDeleteTemplateAsset = () => {
       queryClient.invalidateQueries({ queryKey: ['template-assets', templateId] });
       toast({ title: 'Asset eliminado' });
     },
-    onError: (error: any) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     },
   });
 };

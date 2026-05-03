@@ -1,6 +1,6 @@
 import React from 'react';
-import { Node } from '@tiptap/core';
-import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
+import { Node, CommandProps } from '@tiptap/core';
+import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from '@tiptap/react';
 
 // Question types for dynamic forms
 export interface DynamicQuestion {
@@ -10,11 +10,11 @@ export interface DynamicQuestion {
   placeholder?: string;
   required?: boolean;
   options?: string[];
-  defaultValue?: any;
+  defaultValue?: unknown;
 }
 
 // React component for the question node view
-const DynamicQuestionComponent = ({ node, updateAttributes }: any) => {
+const DynamicQuestionComponent = ({ node, updateAttributes }: NodeViewProps) => {
   const question: DynamicQuestion = node.attrs.question;
 
   const updateQuestion = (updates: Partial<DynamicQuestion>) => {
@@ -31,7 +31,7 @@ const DynamicQuestionComponent = ({ node, updateAttributes }: any) => {
             <span className="text-purple-600 font-medium text-sm">📝 Pregunta Dinámica</span>
             <select 
               value={question.type}
-              onChange={(e) => updateQuestion({ type: e.target.value as any })}
+              onChange={(e) => updateQuestion({ type: e.target.value as DynamicQuestion['type'] })}
               className="text-xs border rounded px-2 py-1"
             >
               <option value="text">Texto</option>
@@ -150,12 +150,12 @@ export const DynamicQuestionExtension = Node.create({
 
   addCommands() {
     return {
-      insertDynamicQuestion: (question: DynamicQuestion) => ({ commands }: any) => {
+      insertDynamicQuestion: (question: DynamicQuestion) => ({ commands }: CommandProps) => {
         return commands.insertContent({
           type: this.name,
           attrs: { question },
         });
       },
-    } as any;
+    } as Record<string, (question: DynamicQuestion) => (props: CommandProps) => boolean>;
   },
 });

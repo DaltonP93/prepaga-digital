@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
     const timestamp = new Date().toISOString();
 
     // Fetch verification record
-    let verificationData: any = null;
+    let verificationData: Record<string, unknown> | null = null;
     if (verification_id) {
       const { data } = await supabase
         .from('signature_identity_verification')
@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
         .eq('id', sale_id)
         .single();
       if (sale?.companies) {
-        companyName = (sale.companies as any).name || 'N/A';
+        companyName = ((sale.companies as Record<string, unknown>).name as string) || 'N/A';
       }
     }
 

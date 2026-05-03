@@ -21,7 +21,7 @@ export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) =>
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [file, setFile] = useState<File | null>(null);
-  const [previewDocument, setPreviewDocument] = useState<any>(null);
+  const [previewDocument, setPreviewDocument] = useState<Record<string, unknown> | null>(null);
 
   // Fetch PDF branding images for HTML fallback rendering
   const { data: pdfBranding } = useQuery({
@@ -66,7 +66,7 @@ export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) =>
     }) => {
       const { data, error } = await supabase
         .from('documents')
-        .insert(document as any)
+        .insert(document as Record<string, unknown>)
         .select('id, name, document_type, created_at, file_url')
         .single();
 
@@ -188,7 +188,7 @@ export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) =>
             return;
           }
         }
-      } catch {}
+      } catch { /* intentional empty catch */ }
     }
 
     // Tier 2: file_url from storage

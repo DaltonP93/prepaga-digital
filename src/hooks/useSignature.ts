@@ -36,7 +36,7 @@ export const useSignatureByToken = (token: string) => {
         throw error;
       }
       
-      return sale as any;
+      return sale as Sale;
     },
     enabled: !!token,
     retry: 2,
@@ -81,10 +81,11 @@ export const useCreateSignature = () => {
         description: "Su firma ha sido registrada exitosamente.",
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error",
-        description: error.message || "No se pudo registrar la firma.",
+        description: message || "No se pudo registrar la firma.",
         variant: "destructive",
       });
     },
@@ -131,7 +132,7 @@ export const useSignature = () => {
     }: { 
       token: string; 
       signature: string; 
-      deviceInfo: any; 
+      deviceInfo: { userAgent: string }; 
     }) => {
       
       // Get sale by token first
@@ -167,11 +168,12 @@ export const useSignature = () => {
         description: "Su firma ha sido enviada exitosamente.",
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
       console.error('Error submitting signature:', error);
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error",
-        description: error.message || "No se pudo enviar la firma. Inténtelo nuevamente.",
+        description: message || "No se pudo enviar la firma. Inténtelo nuevamente.",
         variant: "destructive",
       });
     },

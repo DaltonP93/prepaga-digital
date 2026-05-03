@@ -25,9 +25,9 @@ interface ReporterTemplateEditorProps {
   templateName?: string;
   content: string;
   onContentChange: (content: string) => void;
-  dynamicFields: any[];
-  onDynamicFieldsChange: (fields: any[]) => void;
-  templateQuestions?: any[];
+  dynamicFields: Record<string, unknown>[];
+  onDynamicFieldsChange: (fields: Record<string, unknown>[]) => void;
+  templateQuestions?: Record<string, unknown>[];
   onAttachmentClick?: () => string | void | Promise<string | void>;
 }
 
@@ -107,10 +107,10 @@ export function ReporterTemplateEditor({
         if (!cancelled) {
           setDocxPreviewReady(true);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (!cancelled) {
           console.error("Error rendering reporter docx preview:", error);
-          setDocxPreviewError(error?.message || "No se pudo renderizar la vista fiel del Word.");
+          setDocxPreviewError(error instanceof Error ? error.message : "No se pudo renderizar la vista fiel del Word.");
         }
       } finally {
         if (!cancelled) {
@@ -155,9 +155,9 @@ export function ReporterTemplateEditor({
       onContentChange(html);
 
       toast.success(`Documento importado: ${file.name}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error importing reporter docx:", error);
-      toast.error(error?.message || "No se pudo importar el archivo .docx");
+      toast.error(error instanceof Error ? error.message : "No se pudo importar el archivo .docx");
     } finally {
       setIsImporting(false);
     }
@@ -365,7 +365,7 @@ export function ReporterTemplateEditor({
 
         <TabsContent value="template" className="space-y-4">
           <TemplateDesigner
-            template={templateId ? ({ id: templateId, name: templateName || "" } as any) : null}
+            template={templateId ? { id: templateId, name: templateName || "" } : null}
             content={content}
             onContentChange={onContentChange}
             dynamicFields={dynamicFields}

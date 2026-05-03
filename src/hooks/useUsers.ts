@@ -108,7 +108,7 @@ export const useCreateUser = () => {
       });
 
       if (error) {
-        const context = (error as any)?.context;
+        const context = (error as { context?: unknown })?.context;
         let errorMsg = 'Error al crear usuario';
         if (context instanceof Response) {
           try {
@@ -121,13 +121,17 @@ export const useCreateUser = () => {
                 const body = JSON.parse(text);
                 errorMsg = body?.error || body?.details || errorMsg;
               }
-            } catch {}
+            } catch {
+              // intentional empty catch
+            }
           }
         } else if (context?.body) {
           try {
             const body = typeof context.body === 'string' ? JSON.parse(context.body) : context.body;
             errorMsg = body?.error || body?.details || errorMsg;
-          } catch {}
+          } catch {
+            // intentional empty catch
+          }
         }
         throw new Error(errorMsg);
       }
@@ -142,9 +146,9 @@ export const useCreateUser = () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       toast.success('Usuario creado exitosamente');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Error creating user:', error);
-      toast.error(error.message || 'Error al crear usuario');
+      toast.error(error instanceof Error ? error.message : 'Error al crear usuario');
     },
   });
 };
@@ -173,8 +177,8 @@ export const useUpdateUser = () => {
       const actorCanManageRoles = actorIsSuperAdmin || actorIsAdmin;
 
       const targetCurrentRoles = (targetRolesRes.data || [])
-        .map((entry: any) => entry?.role)
-        .filter((value: any): value is string => typeof value === 'string' && value.length > 0);
+        .map((entry: { role?: string | null }) => entry?.role)
+        .filter((value: string | null | undefined): value is string => typeof value === 'string' && value.length > 0);
       const targetCurrentRole = targetCurrentRoles.length > 0 ? resolveHighestRole(targetCurrentRoles) : 'vendedor';
 
       // Restricciones RBAC para modificaciones de rol
@@ -190,13 +194,13 @@ export const useUpdateUser = () => {
         }
       }
 
-      const profilePayload: Record<string, any> = { ...profileUpdates };
+      const profilePayload: Record<string, unknown> = { ...profileUpdates };
       // role is handled separately via user_roles table below
 
       // Update profile fields (exclude role)
       const { error: profileError } = await supabase
         .from('profiles')
-        .update(profilePayload as any)
+        .update(profilePayload as Record<string, unknown>)
         .eq('id', id);
 
       if (profileError) throw profileError;
@@ -214,7 +218,7 @@ export const useUpdateUser = () => {
         // Insert the new role
         const { error: insertError } = await supabase
           .from('user_roles')
-          .insert({ user_id: id, role: role as any });
+          .insert({ user_id: id, role: role as unknown });
 
         if (insertError) throw insertError;
 
@@ -230,7 +234,7 @@ export const useUpdateUser = () => {
           user_id: actorId,
           company_id: targetCompanyId,
           user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
-        } as any);
+        } as Record<string, unknown>);
       }
 
       return { id };
@@ -239,9 +243,9 @@ export const useUpdateUser = () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       toast.success('Usuario actualizado exitosamente');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Error updating user:', error);
-      toast.error(error.message || 'No se pudo actualizar el usuario');
+      toast.error(error instanceof Error ? error.message : 'No se pudo actualizar el usuario');
     },
   });
 };
@@ -262,9 +266,9 @@ export const useDeleteUser = () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       toast.success('Usuario desactivado exitosamente');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Error deactivating user:', error);
-      toast.error(error.message || 'No se pudo desactivar el usuario');
+      toast.error(error instanceof Error ? error.message : 'No se pudo desactivar el usuario');
     },
   });
 };
@@ -283,12 +287,14 @@ export const useResetUserPassword = () => {
       if (error) {
         let errorMsg = 'Error al cambiar contraseña';
         try {
-          const context = (error as any)?.context;
-          if (context && typeof context.json === 'function') {
+          const context = (error as { context?: unknown })?.context;
+          if (context && typeof (context as { json?: () => Promise<unknown> }).json === 'function') {
             const body = await context.json();
             errorMsg = body?.error || body?.details || errorMsg;
           }
-        } catch {}
+        } catch {
+          // intentional empty catch: password reset context parsing is best-effort
+        }
         throw new Error(errorMsg);
       }
 
@@ -301,9 +307,9 @@ export const useResetUserPassword = () => {
     onSuccess: () => {
       toast.success('Contraseña actualizada exitosamente');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Error resetting password:', error);
-      toast.error(error.message || 'Error al cambiar contraseña');
+      toast.error(error instanceof Error ? error.message : 'Error al cambiar contraseña');
     },
   });
 };

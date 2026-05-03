@@ -29,7 +29,7 @@ export const OtpPolicyConfigPanel: React.FC = () => {
   }, [policy]);
 
 
-  const handleChange = (field: keyof OtpPolicyConfig, value: any) => {
+  const handleChange = (field: keyof OtpPolicyConfig, value: unknown) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -88,9 +88,10 @@ export const OtpPolicyConfigPanel: React.FC = () => {
         setSmtpTestResult({ success: false, message: data?.error || 'No se pudo conectar' });
         toast.error(data?.error || 'No se pudo conectar al servidor SMTP');
       }
-    } catch (err: any) {
-      setSmtpTestResult({ success: false, message: err.message });
-      toast.error(`Error: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setSmtpTestResult({ success: false, message });
+      toast.error(`Error: ${message}`);
     } finally {
       setTestingSmtp(false);
     }
@@ -124,8 +125,9 @@ export const OtpPolicyConfigPanel: React.FC = () => {
       } else {
         toast.error(data?.error || data?.message || 'Error al enviar prueba');
       }
-    } catch (err: any) {
-      toast.error(err.message || 'Error al probar WhatsApp');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(message || 'Error al probar WhatsApp');
     } finally {
       setTestingWhatsapp(false);
     }

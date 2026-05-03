@@ -47,8 +47,8 @@ export class CacheManager {
 
   private getLocalStorageSize(): number {
     let totalSize = 0;
-    for (let key in localStorage) {
-      if (localStorage.hasOwnProperty(key)) {
+    for (const key in localStorage) {
+      if (Object.prototype.hasOwnProperty.call(localStorage, key)) {
         totalSize += localStorage[key].length;
       }
     }
@@ -58,8 +58,8 @@ export class CacheManager {
   private getOldestLocalStorageItems(): string[] {
     const items: Array<{key: string, timestamp: number}> = [];
     
-    for (let key in localStorage) {
-      if (localStorage.hasOwnProperty(key)) {
+    for (const key in localStorage) {
+      if (Object.prototype.hasOwnProperty.call(localStorage, key)) {
         try {
           const item = JSON.parse(localStorage[key]);
           if (item.timestamp) {

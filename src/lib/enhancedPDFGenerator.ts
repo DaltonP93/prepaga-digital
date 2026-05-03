@@ -7,7 +7,7 @@ export interface EnhancedPDFDocument extends PDFDocument {
     name: string;
     version: number;
     static_content: string;
-    dynamic_fields: any[];
+    dynamic_fields: unknown[];
   };
   beneficiaries?: Array<{
     first_name: string;
@@ -616,7 +616,7 @@ export const generateEnhancedPDFContent = (document: EnhancedPDFDocument): strin
 };
 
 // Función para procesar respuestas del cuestionario y generar datos médicos
-export const processQuestionnaireForMedical = (responses: Record<string, any>) => {
+export const processQuestionnaireForMedical = (responses: Record<string, unknown>) => {
   const medical_declaration = {
     conditions: {} as Record<string, boolean>,
     medications: [] as string[],
@@ -628,8 +628,9 @@ export const processQuestionnaireForMedical = (responses: Record<string, any>) =
 
   // Procesar respuestas específicas
   Object.entries(responses).forEach(([questionId, response]) => {
-    const question = response.question?.toLowerCase() || '';
-    const answer = response.answer;
+    const resp = response as Record<string, unknown>;
+    const question = (resp.question as string | undefined)?.toLowerCase() || '';
+    const answer = resp.answer;
 
     if (question.includes('diabetes')) {
       medical_declaration.conditions.diabetes = answer === 'yes' || answer === 'sí';
@@ -639,22 +640,23 @@ export const processQuestionnaireForMedical = (responses: Record<string, any>) =
     }
     if (question.includes('medicamento')) {
       if (answer && answer !== 'no') {
-        medical_declaration.medications.push(answer);
+        medical_declaration.medications.push(answer as string);
       }
     }
     if (question.includes('peso') && question.includes('altura')) {
       // Calcular IMC si se proporcionan peso y altura
-      const weight = parseFloat(answer.weight || '0');
-      const height = parseFloat(answer.height || '0');
+      const answerObj = answer as Record<string, unknown> | undefined;
+      const weight = parseFloat((answerObj?.weight as string | undefined) || '0');
+      const height = parseFloat((answerObj?.height as string | undefined) || '0');
       if (weight > 0 && height > 0) {
         medical_declaration.bmi = weight / (height * height);
       }
     }
     if (question.includes('menstruación')) {
-      medical_declaration.last_menstruation = answer;
+      medical_declaration.last_menstruation = answer as string;
     }
     if (question.includes('pediatra')) {
-      medical_declaration.pediatrician = answer;
+      medical_declaration.pediatrician = answer as string;
     }
   });
 

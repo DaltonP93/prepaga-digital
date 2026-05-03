@@ -46,6 +46,14 @@ export const WhatsAppTemplatesPanel: React.FC = () => {
   const [showPreview, setShowPreview] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  interface WhatsAppTemplate {
+    id: string;
+    template_key: string;
+    name: string;
+    body: string;
+    is_active: boolean;
+  }
+
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['whatsapp-templates', companyId],
     queryFn: async () => {
@@ -57,7 +65,7 @@ export const WhatsAppTemplatesPanel: React.FC = () => {
         .eq('channel', 'whatsapp')
         .order('template_key');
       if (error) throw error;
-      return data || [];
+      return (data || []) as WhatsAppTemplate[];
     },
     enabled: !!companyId,
   });
@@ -128,7 +136,7 @@ export const WhatsAppTemplatesPanel: React.FC = () => {
             No se encontraron plantillas WhatsApp para esta empresa. Las plantillas base se crean automáticamente al configurar el sistema.
           </p>
         ) : (
-          templates.map((tpl: any) => {
+          templates.map((tpl: WhatsAppTemplate) => {
             const isEditing = editingId === tpl.id;
             const isPreviewing = showPreview === tpl.id;
 

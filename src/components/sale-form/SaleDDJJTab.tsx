@@ -176,7 +176,7 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
         created_at: null,
         isVirtual: true,
       };
-      return [virtualTitular as any, ...realBeneficiaries];
+      return [virtualTitular, ...realBeneficiaries];
     }
 
     return realBeneficiaries;
@@ -363,12 +363,12 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
             .eq('sale_id', saleId);
 
           const ddjjTemplateIds = (saleTemplateRows || [])
-            .filter((row: any) => {
+            .filter((row) => {
               const norm = (row.templates?.name || '')
                 .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
               return norm.includes('ddjj') || norm.includes('declaracion');
             })
-            .map((row: any) => row.template_id)
+            .map((row) => row.template_id)
             .filter(Boolean);
 
           if (ddjjTemplateIds.length > 0) {
@@ -379,7 +379,7 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
               .order('sort_order');
 
             if (ddjiQuestions && ddjiQuestions.length > 0) {
-              const responseRows = ddjiQuestions.map((q: any) => {
+              const responseRows = ddjiQuestions.map((q) => {
                 const placeholderName = normalizeDDJJPlaceholder(q.placeholder_name);
                 let responseValue = '';
                 if (placeholderName.startsWith('ddjj_pregunta_')) {
@@ -403,7 +403,7 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
 
                 return {
                   sale_id: saleId,
-                  template_id: (q as any).template_id,
+                  template_id: q.template_id,
                   question_id: q.id,
                   response_value: responseValue,
                 };
@@ -424,7 +424,10 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
         console.error('Template sync error:', e);
       }
     },
-    onError: (e: any) => toast.error(e.message || 'Error al guardar'),
+    onError: (e: unknown) => {
+      const message = e instanceof Error ? e.message : 'Error al guardar';
+      toast.error(message);
+    },
   });
 
   if (!saleId) {
@@ -470,7 +473,7 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
 
       {/* Progress stepper */}
       <div className="flex items-center gap-2 flex-wrap">
-        {sortedBeneficiaries.map((b: any, idx: number) => {
+        {sortedBeneficiaries.map((b, idx: number) => {
           const completed = isComplete(b.id);
           const isCurrent = idx === currentStep;
           const isLocked = idx > 0 && !isComplete(sortedBeneficiaries[idx - 1].id);

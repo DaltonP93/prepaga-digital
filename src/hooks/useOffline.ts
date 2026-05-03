@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 
 interface OfflineData {
-  clients: any[];
-  sales: any[];
-  documents: any[];
-  templates: any[];
+  clients: unknown[];
+  sales: unknown[];
+  documents: unknown[];
+  templates: unknown[];
 }
 
 export const useOffline = () => {
@@ -84,11 +84,11 @@ export const useOffline = () => {
     }
   };
 
-  const processOfflineChange = async (change: any) => {
+  const processOfflineChange = async (change: unknown) => {
     // Implementar lógica de sincronización específica
   };
 
-  const saveOfflineChange = (change: any) => {
+  const saveOfflineChange = (change: unknown) => {
     try {
       const pendingChanges = JSON.parse(localStorage.getItem('pendingChanges') || '[]');
       pendingChanges.push({

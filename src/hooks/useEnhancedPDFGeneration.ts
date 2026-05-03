@@ -78,8 +78,8 @@ export const useEnhancedPDFGeneration = () => {
 
       return { success: true, html: data.html, url, metadata: data.metadata };
 
-    } catch (error: any) {
-      const errorMessage = error.message || 'Error al generar documento';
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Error al generar documento';
       setState({
         isGenerating: false,
         progress: 0,
@@ -145,14 +145,14 @@ export const useEnhancedPDFGeneration = () => {
   const generateLocalPreview = useCallback((
     content: string,
     data: {
-      client?: any;
-      plan?: any;
-      company?: any;
-      sale?: any;
-      beneficiaries?: any[];
-      signatureLink?: any;
-      responses?: Record<string, any>;
-      companySettings?: any;
+      client?: unknown;
+      plan?: unknown;
+      company?: unknown;
+      sale?: unknown;
+      beneficiaries?: unknown[];
+      signatureLink?: unknown;
+      responses?: Record<string, unknown>;
+      companySettings?: unknown;
     }
   ): string => {
     const context = createEnhancedTemplateContext(

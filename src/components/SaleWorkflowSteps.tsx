@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 
 interface SaleWorkflowStepsProps {
-  sale: any;
+  sale: { status?: string };
   saleId: string;
 }
 
@@ -177,7 +177,7 @@ export const SaleWorkflowSteps: React.FC<SaleWorkflowStepsProps> = ({ sale, sale
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {signatureLinks.map((link: any) => (
+              {signatureLinks.map((link) => (
                 <div
                   key={link.id}
                   className="flex items-center justify-between p-3 border rounded-lg"
@@ -243,7 +243,7 @@ export const SaleWorkflowSteps: React.FC<SaleWorkflowStepsProps> = ({ sale, sale
             <p className="text-sm text-muted-foreground py-4">No hay actividad registrada aún.</p>
           ) : (
             <div className="space-y-3">
-              {traces.map((trace: any, index: number) => (
+              {traces.map((trace, index: number) => (
                 <div key={trace.id} className="flex items-start gap-3">
                   <div className="flex-shrink-0 mt-1">
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />

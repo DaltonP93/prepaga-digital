@@ -74,7 +74,7 @@ export const SaleRequirements: React.FC<SaleRequirementsProps> = ({
     mutationFn: async ({ requirementId, isCompleted }: { requirementId: string; isCompleted: boolean }) => {
       const { data: { user } } = await supabase.auth.getUser();
 
-      const updateData: Record<string, any> = {
+      const updateData: Record<string, unknown> = {
         is_completed: isCompleted,
       };
 

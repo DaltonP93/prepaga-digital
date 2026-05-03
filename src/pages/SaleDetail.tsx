@@ -162,6 +162,7 @@ export default function SaleDetail() {
           </TabsContent>
 
           <TabsContent value="addendums">
+            {/* @ts-expect-error useSale returns ExtendedSale which lacks beneficiaries field required by SaleWithRelations */}
             <SaleAddendumsPanel sale={sale} />
           </TabsContent>
 

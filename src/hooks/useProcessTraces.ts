@@ -8,7 +8,7 @@ interface ProcessTrace {
   action: string;
   performed_by?: string;
   client_action: boolean;
-  details?: any;
+      details?: unknown;
   created_at: string;
   user?: {
     first_name: string;
@@ -48,7 +48,7 @@ export const useCreateTrace = () => {
     mutationFn: async ({ saleId, action, details, clientAction = false }: { 
       saleId: string; 
       action: string; 
-      details?: any;
+  details?: unknown;
       clientAction?: boolean;
     }) => {
       const { data: user } = await supabase.auth.getUser();

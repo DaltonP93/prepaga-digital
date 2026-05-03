@@ -61,7 +61,7 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
         pc: configuration.primary_color,
         sc: configuration.secondary_color,
         ac: configuration.accent_color,
-        fv: (configuration as any).favicon,
+        fv: (configuration as Record<string, unknown>).favicon,
         lb: configuration.login_background_url,
         lu: configuration.login_logo_url,
         lt: configuration.login_title,
@@ -81,7 +81,8 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
 
         const max = Math.max(r, g, b);
         const min = Math.min(r, g, b);
-        let h = 0, s = 0, l = (max + min) / 2;
+        let h = 0, s = 0;
+        const l = (max + min) / 2;
 
         if (max !== min) {
           const d = max - min;
@@ -108,7 +109,7 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
       
       // Actualizar favicon si existe
       const faviconUrl =
-        sanitizeMediaUrl((configuration as any).favicon) ||
+        sanitizeMediaUrl((configuration as Record<string, unknown>).favicon as string | undefined) ||
         resolveCompanyAssetUrl(configuration.login_logo_url) ||
         resolveCompanyAssetUrl(configuration.logo_url);
       if (faviconUrl) {
@@ -124,15 +125,15 @@ export const CompanyBrandingProvider: React.FC<{ children: React.ReactNode }> = 
         const currentSubtitle = localStorage.getItem('samap_branding_login_subtitle') || '';
 
         const loginFavicon =
-          sanitizeMediaUrl((configuration as any).favicon) ||
+          sanitizeMediaUrl((configuration as Record<string, unknown>).favicon as string | undefined) ||
           resolveCompanyAssetUrl(configuration.login_logo_url) ||
           resolveCompanyAssetUrl(configuration.logo_url) ||
           currentFavicon ||
           '';
         const loginLogo = resolveCompanyAssetUrl(configuration.login_logo_url) || currentLogo || brandingData.logoUrl || '';
         const loginBackground = resolveCompanyAssetUrl(configuration.login_background_url) || currentBackground || '';
-        const loginTitle = (configuration as any).login_title || currentTitle || brandingData.companyName || '';
-        const loginSubtitle = (configuration as any).login_subtitle || currentSubtitle || 'Sistema de Firma Digital - Inicia sesión en tu cuenta';
+        const loginTitle = (configuration as Record<string, unknown>).login_title as string | undefined || currentTitle || brandingData.companyName || '';
+        const loginSubtitle = (configuration as Record<string, unknown>).login_subtitle as string | undefined || currentSubtitle || 'Sistema de Firma Digital - Inicia sesión en tu cuenta';
 
         localStorage.setItem('samap_branding_favicon', loginFavicon);
         localStorage.setItem('samap_branding_logo', loginLogo);

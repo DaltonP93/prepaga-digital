@@ -42,10 +42,10 @@ export function ProfileForm() {
         last_name: profile.last_name || "",
         phone: profile.phone || "",
         // Handle potential missing address fields safely
-        address: (profile as any).address || "",
-        city: (profile as any).city || "",
-        country: (profile as any).country || "",
-        postal_code: (profile as any).postal_code || "",
+        address: (profile as Record<string, unknown>).address as string || "",
+        city: (profile as Record<string, unknown>).city as string || "",
+        country: (profile as Record<string, unknown>).country as string || "",
+        postal_code: (profile as Record<string, unknown>).postal_code as string || "",
       });
     }
   }, [profile, reset]);

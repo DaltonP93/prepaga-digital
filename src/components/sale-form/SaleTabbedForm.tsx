@@ -17,7 +17,17 @@ import { SALE_STATUS_LABELS } from '@/types/workflow';
 import type { SaleStatus } from '@/types/workflow';
 import { toast } from 'sonner';
 import { isSaleLocked, isPrivilegedRole } from '@/lib/saleUtils';
+import type { SaleWithRelations } from '@/types/sale';
+import { Database } from '@/integrations/supabase/types';
 import { ChangeStatusModal } from './ChangeStatusModal';
+
+interface SaleFormData extends SaleWithRelations {
+  signer_email?: string | null;
+  signer_phone?: string | null;
+}
+
+type SaleUpdatePayload = Database['public']['Tables']['sales']['Update'] & { id: string } & Record<string, unknown>;
+type SaleCreatePayload = Database['public']['Tables']['sales']['Insert'] & Record<string, unknown>;
 import SaleBasicTab from './SaleBasicTab';
 import SaleAdherentsTab from './SaleAdherentsTab';
 import SaleDocumentsTab from './SaleDocumentsTab';
@@ -25,7 +35,7 @@ import SaleDDJJTab from './SaleDDJJTab';
 import SaleTemplatesTab from './SaleTemplatesTab';
 
 interface SaleTabbedFormProps {
-  sale?: any;
+  sale?: SaleFormData;
 }
 
 const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
@@ -61,8 +71,8 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
   const isAuditorOrAbove = role === 'auditor' || role === 'admin' || role === 'super_admin' || role === 'vendedor';
 
   // Centralized lock logic
-  const isAuditLocked = isSaleLocked(sale, role as any);
-  const userIsPrivileged = isPrivilegedRole(role as any);
+  const isAuditLocked = isSaleLocked(sale, role);
+  const userIsPrivileged = isPrivilegedRole(role);
 
   const TEMPLATE_LOCKED_STATUSES: SaleStatus[] = [
     'listo_para_enviar',
@@ -80,24 +90,24 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
     client_id: sale?.client_id || '',
     plan_id: sale?.plan_id || '',
     company_id: sale?.company_id || profile?.company_id || '',
-    titular_amount: (sale as any)?.titular_amount ?? sale?.total_amount ?? 0,
+    titular_amount: sale?.titular_amount ?? sale?.total_amount ?? 0,
     notes: sale?.notes || '',
     requires_adherents: sale?.requires_adherents || false,
-    signer_type: (sale as any)?.signer_type || 'titular',
-    signer_name: (sale as any)?.signer_name || '',
-    signer_dni: (sale as any)?.signer_dni || '',
-    signer_relationship: (sale as any)?.signer_relationship || '',
-    signer_email: (sale as any)?.signer_email || '',
-    signer_phone: (sale as any)?.signer_phone || '',
-    billing_razon_social: (sale as any)?.billing_razon_social || '',
-    billing_ruc: (sale as any)?.billing_ruc || '',
-    billing_email: (sale as any)?.billing_email || '',
-    billing_phone: (sale as any)?.billing_phone || '',
-    immediate_coverage: (sale as any)?.immediate_coverage || false,
-    sale_type: (sale as any)?.sale_type || 'venta_nueva',
+    signer_type: sale?.signer_type || 'titular',
+    signer_name: sale?.signer_name || '',
+    signer_dni: sale?.signer_dni || '',
+    signer_relationship: sale?.signer_relationship || '',
+    signer_email: sale?.signer_email || '',
+    signer_phone: sale?.signer_phone || '',
+    billing_razon_social: sale?.billing_razon_social || '',
+    billing_ruc: sale?.billing_ruc || '',
+    billing_email: sale?.billing_email || '',
+    billing_phone: sale?.billing_phone || '',
+    immediate_coverage: sale?.immediate_coverage || false,
+    sale_type: sale?.sale_type || 'venta_nueva',
   });
 
-  const handleChange = (field: string, value: any) => {
+  const handleChange = (field: string, value: string | number | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     // Clear tab errors when user makes changes
     setTabErrors({});
@@ -156,15 +166,15 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           billing_phone: formData.billing_phone || null,
           immediate_coverage: formData.immediate_coverage,
           sale_type: formData.sale_type,
-        } as any);
+        } as unknown as SaleUpdatePayload);
         // Recalculate total_amount = titular_amount + sum(adherentes) after save
         const { data: adherentes } = await supabase
           .from('beneficiaries')
           .select('amount, is_primary')
           .eq('sale_id', sale.id);
         const adherentesSum = (adherentes || [])
-          .filter((b: any) => !b.is_primary)
-          .reduce((sum: number, b: any) => sum + (Number(b.amount) || 0), 0);
+          .filter((b) => !b.is_primary)
+          .reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
         await supabase
           .from('sales')
           .update({ total_amount: formData.titular_amount + adherentesSum })
@@ -193,13 +203,14 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           billing_phone: formData.billing_phone || null,
           immediate_coverage: formData.immediate_coverage,
           sale_type: formData.sale_type,
-        } as any);
+        } as unknown as SaleCreatePayload);
         toast.success('Venta creada exitosamente');
         navigate(`/sales/${result.id}/edit`);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving sale:', error);
-      toast.error(error.message || 'Error al guardar la venta');
+      const message = error instanceof Error ? error.message : 'Error al guardar la venta';
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -248,20 +259,20 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                     titular_amount: formData.titular_amount,
                     notes: formData.notes,
                     requires_adherents: formData.requires_adherents,
-                    status: 'pendiente' as any,
+                    status: 'pendiente',
                     billing_razon_social: formData.billing_razon_social || null,
                     billing_ruc: formData.billing_ruc || null,
                     billing_email: formData.billing_email || null,
                     billing_phone: formData.billing_phone || null,
-                  } as any);
+                  } as unknown as SaleUpdatePayload);
                   // Recalculate total_amount = titular_amount + sum(adherentes) after save
                   const { data: adherentesAudit } = await supabase
                     .from('beneficiaries')
                     .select('amount, is_primary')
                     .eq('sale_id', sale.id);
                   const adherentesSumAudit = (adherentesAudit || [])
-                    .filter((b: any) => !b.is_primary)
-                    .reduce((sum: number, b: any) => sum + (Number(b.amount) || 0), 0);
+                    .filter((b) => !b.is_primary)
+                    .reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
                   await supabase
                     .from('sales')
                     .update({ total_amount: formData.titular_amount + adherentesSumAudit })
@@ -302,7 +313,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                     const auditRoles: Array<"admin" | "auditor" | "financiero" | "gestor" | "super_admin" | "supervisor" | "vendedor"> = ['auditor', 'supervisor', 'admin', 'super_admin'];
 
                     let auditRecipients: Array<{ user_id: string }> = [];
-                    let recipientsError: any = null;
+                    let recipientsError: unknown = null;
 
                     if (candidateIds.length > 0) {
                       const { data: roleRows, error: rolesError } = await supabase
@@ -335,7 +346,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                       if (recipientRows.length > 0) {
                         const { error: notificationError } = await supabase
                           .from('notifications')
-                          .insert(recipientRows as any);
+                          .insert(recipientRows as unknown as Database['public']['Tables']['notifications']['Insert'][]);
 
                         if (notificationError) {
                           console.error('Best-effort insert failed for notifications:', notificationError);
@@ -346,8 +357,9 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
 
                   toast.success('Venta enviada a auditoría');
                   navigate('/sales');
-                } catch (error: any) {
-                  toast.error(error.message || 'Error al enviar a auditoría');
+                } catch (error: unknown) {
+                  const message = error instanceof Error ? error.message : 'Error al enviar a auditoría';
+                  toast.error(message);
                 } finally {
                   setSaving(false);
                 }
@@ -395,11 +407,11 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2 text-orange-700 dark:text-orange-400">
               <MessageSquare className="h-5 w-5" />
-              Solicitudes de Auditoría ({infoRequests.filter((r: any) => r.status === 'pending').length} pendientes)
+              Solicitudes de Auditoría ({infoRequests.filter((r) => r.status === 'pending').length} pendientes)
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {infoRequests.map((req: any) => (
+            {infoRequests.map((req) => (
               <div key={req.id} className="p-3 rounded-lg border border-orange-200 bg-white dark:bg-background space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-muted-foreground">

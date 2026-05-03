@@ -31,25 +31,7 @@ export class ProfileBackupManager {
         JSON.stringify(backup)
       );
     } catch (error) {
-    }
-  }
-
-  static getBackupProfile(userId: string): ProfileBackupData | null {
-    try {
-      const stored = localStorage.getItem(`${this.BACKUP_KEY}_${userId}`);
-      if (!stored) return null;
-
-      const backup: ProfileBackupData = JSON.parse(stored);
-      
-      // Check if backup is still valid (not expired)
-      if (Date.now() - backup.timestamp > this.BACKUP_TTL) {
-        this.clearBackup(userId);
-        return null;
-      }
-
-      return backup;
-    } catch (error) {
-      return null;
+      // intentional empty catch: backup cleanup is best-effort
     }
   }
 
@@ -57,6 +39,24 @@ export class ProfileBackupManager {
     try {
       localStorage.removeItem(`${this.BACKUP_KEY}_${userId}`);
     } catch (error) {
+      // intentional empty catch: backup cleanup is best-effort
+    }
+  }
+
+  static getBackupProfile(userId: string): ProfileBackupData | null {
+    try {
+      const raw = localStorage.getItem(`${this.BACKUP_KEY}_${userId}`);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as ProfileBackupData;
+      if (!parsed || typeof parsed.timestamp !== 'number') return null;
+      if (Date.now() - parsed.timestamp > this.BACKUP_TTL) {
+        localStorage.removeItem(`${this.BACKUP_KEY}_${userId}`);
+        return null;
+      }
+      return parsed;
+    } catch {
+      // intentional empty catch: backup retrieval is best-effort
+      return null;
     }
   }
 

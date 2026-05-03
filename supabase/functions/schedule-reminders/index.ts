@@ -132,8 +132,9 @@ serve(async (req) => {
         } else {
           errors.push(`Link ${link.id}: ${result.error}`)
         }
-      } catch (err: any) {
-        errors.push(`Link ${link.id}: ${err?.message || "Unknown error"}`)
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        errors.push(`Link ${link.id}: ${msg}`)
       }
     }
 

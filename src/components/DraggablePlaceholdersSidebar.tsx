@@ -94,9 +94,9 @@ const databaseVariables = [
 
 interface DraggablePlaceholdersSidebarProps {
   onPlaceholderInsert: (placeholderName: string) => void;
-  dynamicFields: any[];
-  templateQuestions?: any[];
-  onQuestionInsert?: (question: any) => void;
+  dynamicFields: Array<{ type: string; label: string; name: string }>;
+  templateQuestions?: Array<{ id: string; question_type: string; question_text: string; is_required?: boolean }>;
+  onQuestionInsert?: (question: { id: string; question_type: string; question_text: string; is_required?: boolean }) => void;
 }
 
 export const DraggablePlaceholdersSidebar: React.FC<DraggablePlaceholdersSidebarProps> = ({
@@ -153,7 +153,7 @@ export const DraggablePlaceholdersSidebar: React.FC<DraggablePlaceholdersSidebar
     }
   };
 
-  const handleVariableDragStart = (e: React.DragEvent, variable: any) => {
+  const handleVariableDragStart = (e: React.DragEvent, variable: { name: string; label: string }) => {
     e.dataTransfer.setData('application/json', JSON.stringify({
       type: 'placeholder',
       placeholder_name: variable.name,
@@ -162,7 +162,7 @@ export const DraggablePlaceholdersSidebar: React.FC<DraggablePlaceholdersSidebar
     e.dataTransfer.effectAllowed = 'copy';
   };
 
-  const handlePlaceholderDragStart = (e: React.DragEvent, placeholder: any) => {
+  const handlePlaceholderDragStart = (e: React.DragEvent, placeholder: Record<string, unknown>) => {
     e.dataTransfer.setData('application/json', JSON.stringify({
       type: 'placeholder',
       placeholder_name: placeholder.placeholder_name,
@@ -171,7 +171,7 @@ export const DraggablePlaceholdersSidebar: React.FC<DraggablePlaceholdersSidebar
     e.dataTransfer.effectAllowed = 'copy';
   };
 
-  const handleQuestionDragStart = (e: React.DragEvent, question: any) => {
+  const handleQuestionDragStart = (e: React.DragEvent, question: { id: string; question_type: string; question_text: string; is_required?: boolean }) => {
     e.dataTransfer.setData('application/json', JSON.stringify({
       type: 'question',
       question: question,

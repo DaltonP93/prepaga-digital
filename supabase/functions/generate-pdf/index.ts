@@ -154,7 +154,7 @@ serve(async (req) => {
     }: GeneratePDFRequest = await req.json()
 
     let processedContent = htmlContent || ''
-    let templateData: any = null
+    let templateData: Record<string, unknown> | null = null
 
     // Server-side HTML sanitization - defense in depth
     const threats = detectThreats(processedContent)
@@ -284,13 +284,14 @@ serve(async (req) => {
 })
 
 // Interpolate template variables
-function interpolateTemplateVariables(template: string, data: any): string {
+function interpolateTemplateVariables(template: string, data: Record<string, unknown>): string {
   let result = template
 
-  const replaceNested = (obj: any, prefix: string) => {
+  const replaceNested = (obj: unknown, prefix: string) => {
     if (!obj || typeof obj !== 'object') return
-    Object.keys(obj).forEach(key => {
-      const value = obj[key]
+    const record = obj as Record<string, unknown>
+    Object.keys(record).forEach(key => {
+      const value = record[key]
       const placeholder = `{{${prefix}.${key}}}`
       const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
       if (value !== null && value !== undefined && typeof value !== 'object') {
@@ -308,7 +309,7 @@ function interpolateTemplateVariables(template: string, data: any): string {
   return result
 }
 
-function generateBeneficiariesTableHTML(beneficiaries: any[]): string {
+function generateBeneficiariesTableHTML(beneficiaries: Array<Record<string, unknown>>): string {
   if (!beneficiaries || beneficiaries.length === 0) return ''
 
   return `

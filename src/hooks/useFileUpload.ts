@@ -74,9 +74,10 @@ export const useFileUpload = () => {
 
       setUploadState({ progress: 100, isUploading: false, error: null });
       return signedUrlData.signedUrl;
-    } catch (error: any) {
-      setUploadState({ progress: 0, isUploading: false, error: error.message });
-      toast.error(error.message || 'Error al subir el archivo');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al subir el archivo';
+      setUploadState({ progress: 0, isUploading: false, error: message });
+      toast.error(message);
       return null;
     }
   };
@@ -86,8 +87,8 @@ export const useFileUpload = () => {
       await deleteManagedFile({ bucketName: bucket, filePath: path });
       toast.success('Archivo eliminado exitosamente');
       return true;
-    } catch (error: any) {
-      toast.error(error.message || 'Error al eliminar el archivo');
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Error al eliminar el archivo');
       return false;
     }
   };

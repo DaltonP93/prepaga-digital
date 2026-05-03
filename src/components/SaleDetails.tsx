@@ -4,8 +4,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { useCurrencySettings } from '@/hooks/useCurrencySettings';
 
+interface SaleWithRelations {
+  status: string;
+  contract_number?: string | null;
+  created_at: string;
+  salesperson?: { first_name?: string; last_name?: string } | null;
+  clients?: { first_name?: string; last_name?: string } | null;
+  plans?: { name?: string; price?: number } | null;
+  templates?: { name?: string } | null;
+}
+
 interface SaleDetailsProps {
-  sale: any;
+  sale: SaleWithRelations;
 }
 
 export const SaleDetails: React.FC<SaleDetailsProps> = ({ sale }) => {

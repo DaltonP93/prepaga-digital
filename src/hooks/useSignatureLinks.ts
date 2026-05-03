@@ -144,10 +144,11 @@ export const useCreateSignatureLink = () => {
         description: 'El enlace de firma ha sido generado exitosamente.',
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: 'Error',
-        description: error.message || 'No se pudo crear el enlace de firma.',
+        description: message || 'No se pudo crear el enlace de firma.',
         variant: 'destructive',
       });
     },
@@ -177,7 +178,7 @@ export const useCompleteSignatureLink = () => {
       if (fetchError) throw fetchError;
 
       // Update signature link
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         status: 'completado',
         completed_at: new Date().toISOString(),
       };
@@ -211,10 +212,11 @@ export const useCompleteSignatureLink = () => {
         description: 'La firma ha sido registrada exitosamente.',
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: 'Error',
-        description: error.message || 'No se pudo completar la firma.',
+        description: message || 'No se pudo completar la firma.',
         variant: 'destructive',
       });
     },
@@ -286,14 +288,14 @@ export const useResendSignatureLink = () => {
         // For adherente: reset status of documents tied to this beneficiary
         await supabase
           .from('documents')
-          .update({ status: 'pendiente' as any, signature_data: null, signed_at: null, signed_by: null, is_final: false })
+          .update({ status: 'pendiente', signature_data: null, signed_at: null, signed_by: null, is_final: false })
           .eq('sale_id', oldLink.sale_id)
           .eq('beneficiary_id', oldLink.recipient_id);
       } else {
         // For titular: reset status of generated documents without beneficiary_id
         await supabase
           .from('documents')
-          .update({ status: 'pendiente' as any, signature_data: null, signed_at: null, signed_by: null, is_final: false })
+          .update({ status: 'pendiente', signature_data: null, signed_at: null, signed_by: null, is_final: false })
           .eq('sale_id', oldLink.sale_id)
           .is('beneficiary_id', null)
           .eq('generated_from_template', true);
@@ -342,10 +344,11 @@ export const useResendSignatureLink = () => {
         description: 'Se ha generado un nuevo enlace de firma. Los documentos se mantienen y podrán ser firmados nuevamente.',
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: 'Error',
-        description: error.message || 'No se pudo reenviar el enlace.',
+        description: message || 'No se pudo reenviar el enlace.',
         variant: 'destructive',
       });
     },

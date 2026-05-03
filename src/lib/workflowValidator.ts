@@ -12,8 +12,8 @@ interface SaleData {
   all_signatures_completed?: boolean | null;
   audit_status?: string | null;
   adherents_count?: number | null;
-  template_responses?: any[] | null;
-  beneficiaries?: any[] | null;
+  template_responses?: unknown[] | null;
+  beneficiaries?: unknown[] | null;
 }
 
 function evaluateBuiltInCondition(key: string, sale: SaleData): boolean {
@@ -55,18 +55,19 @@ export async function validateSaleTransition(
   userRole: AppRole
 ): Promise<{ allowed: boolean; reasons: string[]; rule: TransitionRule | null }> {
   // Fetch workflow config for this company
-  const { data: configRow, error } = await supabase
-    .from('company_workflow_config' as any)
+    const { data: configRow, error } = await supabase
+    .from('company_workflow_config')
     .select('*')
     .eq('company_id', companyId)
     .maybeSingle();
 
   // If no config or error, allow (backward compatible)
-  if (error || !configRow || !(configRow as any).is_active) {
+  const configRowRecord = configRow as Record<string, unknown> | null;
+  if (error || !configRowRecord || !configRowRecord.is_active) {
     return { allowed: true, reasons: [], rule: null };
   }
 
-  const config = (configRow as any).workflow_config as WorkflowConfig;
+  const config = configRowRecord.workflow_config as WorkflowConfig;
   if (!config?.transitions) {
     return { allowed: true, reasons: [], rule: null };
   }

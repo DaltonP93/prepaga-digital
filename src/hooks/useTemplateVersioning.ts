@@ -107,11 +107,12 @@ export const useTemplateVersioning = (templateId?: string) => {
         description: "Se ha creado una nueva versión del template exitosamente.",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Error creating version:", error);
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error",
-        description: error.message || "No se pudo crear la nueva versión.",
+        description: message || "No se pudo crear la nueva versión.",
         variant: "destructive",
       });
     },
@@ -167,11 +168,12 @@ export const useTemplateVersioning = (templateId?: string) => {
         description: "Se ha restaurado la versión seleccionada exitosamente.",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Error restoring version:", error);
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error",
-        description: error.message || "No se pudo restaurar la versión.",
+        description: message || "No se pudo restaurar la versión.",
         variant: "destructive",
       });
     },
@@ -194,11 +196,12 @@ export const useTemplateVersioning = (templateId?: string) => {
         description: "La versión ha sido eliminada exitosamente.",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error("Error deleting version:", error);
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error",
-        description: error.message || "No se pudo eliminar la versión.",
+        description: message || "No se pudo eliminar la versión.",
         variant: "destructive",
       });
     },

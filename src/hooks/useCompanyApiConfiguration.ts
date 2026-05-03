@@ -74,38 +74,39 @@ export const useCompanyApiConfiguration = () => {
         return getDefaultConfiguration();
       }
 
+      const row = data as Record<string, unknown>;
       return {
-        whatsapp_provider: (data as any).whatsapp_provider || 'wame_fallback',
+        whatsapp_provider: (row.whatsapp_provider as WhatsAppProvider) || 'wame_fallback',
         whatsapp_api_enabled: !!data.whatsapp_api_key,
         whatsapp_api_token: data.whatsapp_api_key || '',
         whatsapp_phone_number: data.whatsapp_phone_id || '',
-        whatsapp_gateway_url: (data as any).whatsapp_gateway_url || '',
-        whatsapp_linked_phone: (data as any).whatsapp_linked_phone || '',
-        twilio_account_sid: (data as any).twilio_account_sid || '',
-        twilio_auth_token: (data as any).twilio_auth_token || '',
-        twilio_whatsapp_number: (data as any).twilio_whatsapp_number || '',
+        whatsapp_gateway_url: (row.whatsapp_gateway_url as string) || '',
+        whatsapp_linked_phone: (row.whatsapp_linked_phone as string) || '',
+        twilio_account_sid: (row.twilio_account_sid as string) || '',
+        twilio_auth_token: (row.twilio_auth_token as string) || '',
+        twilio_whatsapp_number: (row.twilio_whatsapp_number as string) || '',
         sms_api_enabled: !!data.sms_api_key,
         sms_api_key: data.sms_api_key || '',
-        email_provider: (data as any).email_provider || 'resend',
+        email_provider: (row.email_provider as EmailProvider) || 'resend',
         email_api_enabled: !!data.email_api_key,
         email_api_key: data.email_api_key || '',
         email_from_address: data.email_from_address || '',
         email_from_name: data.email_from_name || '',
-        signwell_enabled: !!(data as any).signwell_enabled,
-        signwell_api_key: (data as any).signwell_api_key || '',
+        signwell_enabled: !!row.signwell_enabled,
+        signwell_api_key: (row.signwell_api_key as string) || '',
       };
     },
     enabled: !!profile?.company_id,
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (updates: Record<string, any>) => {
+    mutationFn: async (updates: Record<string, unknown>) => {
       if (!profile?.company_id) {
         throw new Error('No company ID available');
       }
 
       // Map UI field names to DB column names (only columns that exist in company_settings)
-      const dbUpdates: Record<string, any> = {
+      const dbUpdates: Record<string, unknown> = {
         company_id: profile.company_id,
         updated_at: new Date().toISOString(),
       };
@@ -128,7 +129,7 @@ export const useCompanyApiConfiguration = () => {
 
       const { data, error } = await supabase
         .from('company_settings')
-        .upsert(dbUpdates as any, { onConflict: 'company_id' })
+        .upsert(dbUpdates as Record<string, unknown>, { onConflict: 'company_id' })
         .select()
         .single();
 

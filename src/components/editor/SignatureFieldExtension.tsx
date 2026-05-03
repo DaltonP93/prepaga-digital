@@ -1,6 +1,6 @@
 
 import { Node } from '@tiptap/core';
-import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
+import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from '@tiptap/react';
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -319,16 +319,16 @@ export const SignatureInsertDialog: React.FC<{
 
 // ── Main Component ─────────────────────────────────────────────────────
 
-const SignatureFieldComponent = ({ node, updateAttributes, selected, deleteNode }: any) => {
-  const [label] = useState(node.attrs.label);
-  const [signatureType] = useState(node.attrs.signatureType);
-  const [signerRole] = useState(node.attrs.signerRole);
-  const [required] = useState(node.attrs.required);
-  const [signatureStyle] = useState(node.attrs.signatureStyle || 'v2');
-  const [width, setWidth] = useState(node.attrs.width || 100);
-  const [height, setHeight] = useState(node.attrs.height || 200);
+const SignatureFieldComponent = ({ node, updateAttributes, selected, deleteNode }: NodeViewProps) => {
+  const [label] = useState<string>(node.attrs.label as string);
+  const [signatureType] = useState<string>(node.attrs.signatureType as string);
+  const [signerRole] = useState<string>(node.attrs.signerRole as string);
+  const [required] = useState<boolean>(node.attrs.required as boolean);
+  const [signatureStyle] = useState<string>((node.attrs.signatureStyle as string) || 'v2');
+  const [width, setWidth] = useState<number>((node.attrs.width as number) || 100);
+  const [height, setHeight] = useState<number>((node.attrs.height as number) || 200);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [floatDir, setFloatDir] = useState<'none' | 'left' | 'right'>(node.attrs.float || 'none');
+  const [floatDir, setFloatDir] = useState<'none' | 'left' | 'right'>((node.attrs.float as string) || 'none');
 
   const [previewSigned, setPreviewSigned] = useState(false);
 

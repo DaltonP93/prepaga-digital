@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { ArrowRight } from "lucide-react";
 import { useState, useEffect } from "react";
-import type { TransitionRule, AppRole } from "@/types/workflow";
+import type { TransitionRule, AppRole, SaleStatus } from "@/types/workflow";
 import { ALL_SALE_STATUSES, SALE_STATUS_LABELS, ALL_ROLES } from "@/types/workflow";
 import { ROLE_LABELS } from "@/types/roles";
 import { ConditionEditor } from "./ConditionEditor";
@@ -31,8 +31,8 @@ interface TransitionRuleEditorProps {
 }
 
 export function TransitionRuleEditor({ open, onOpenChange, rule, onSave }: TransitionRuleEditorProps) {
-  const [from, setFrom] = useState<string>(rule?.from || "borrador");
-  const [to, setTo] = useState<string>(rule?.to || "enviado");
+  const [from, setFrom] = useState<SaleStatus>(rule?.from || "borrador");
+  const [to, setTo] = useState<SaleStatus>(rule?.to || "enviado");
   const [allowedRoles, setAllowedRoles] = useState<AppRole[]>(rule?.allowed_roles || []);
   const [conditions, setConditions] = useState(rule?.conditions || []);
   const [requireNote, setRequireNote] = useState(rule?.require_note || false);
@@ -56,8 +56,8 @@ export function TransitionRuleEditor({ open, onOpenChange, rule, onSave }: Trans
   const handleSave = () => {
     onSave({
       id: rule?.id || `rule-${Date.now()}`,
-      from: from as any,
-      to: to as any,
+      from: from,
+      to: to,
       allowed_roles: allowedRoles,
       conditions,
       require_note: requireNote,
@@ -77,7 +77,7 @@ export function TransitionRuleEditor({ open, onOpenChange, rule, onSave }: Trans
           <div className="flex items-end gap-3">
             <div className="flex-1 space-y-1.5">
               <Label>Estado origen</Label>
-              <Select value={from} onValueChange={setFrom}>
+              <Select value={from} onValueChange={(v) => setFrom(v as unknown as SaleStatus)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -93,7 +93,7 @@ export function TransitionRuleEditor({ open, onOpenChange, rule, onSave }: Trans
             <ArrowRight className="h-5 w-5 mb-2 text-muted-foreground shrink-0" />
             <div className="flex-1 space-y-1.5">
               <Label>Estado destino</Label>
-              <Select value={to} onValueChange={setTo}>
+              <Select value={to} onValueChange={(v) => setTo(v as unknown as SaleStatus)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

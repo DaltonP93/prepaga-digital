@@ -42,8 +42,8 @@ const DashboardWidgets = () => {
 
   const visibleWidgets = widgets.filter(widget => widget.is_visible);
 
-  const getWidgetClassName = (config: any) => {
-    const size = config?.size || 'medium';
+  const getWidgetClassName = (config: Record<string, unknown>) => {
+    const size = (config?.size as string) || 'medium';
     switch (size) {
       case 'small':
         return 'col-span-1 lg:col-span-1';

@@ -160,9 +160,9 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
         // Step 4: Show page selector
         setStep("select_pages");
         setStatusText("");
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Asset upload flow error:", err);
-        setErrorText(err.message || "Error inesperado");
+        setErrorText(err instanceof Error ? err.message : "Error inesperado");
         setStep("upload");
       }
     },
@@ -174,7 +174,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
     file: File,
     assetId: string,
     companyId: string,
-    dbPages: any[],
+    dbPages: Array<{ page_number: number; id: string; width?: number; height?: number }>,
     _headers: Record<string, string>
   ): Promise<PdfPageInfo[]> => {
     const arrayBuffer = await file.arrayBuffer();
@@ -200,7 +200,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
         // Upload to standardized path
         const thumbPath = `${companyId}/template-assets/${assetId}/previews/page-${i}.png`;
         await uploadManagedFile({
-          file: new (File as any)([blob], `page-${i}.png`, { type: "image/png" }),
+          file: new File([blob], `page-${i}.png`, { type: "image/png" }),
           bucketName: "documents",
           filePath: thumbPath,
           companyId,
@@ -209,7 +209,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
         });
 
         // Update template_asset_pages row with preview path
-        const dbPage = dbPages.find((p: any) => p.page_number === i);
+        const dbPage = dbPages.find((p) => p.page_number === i);
         if (dbPage) {
           await supabase
             .from("template_asset_pages")
@@ -226,7 +226,7 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
           height: Math.round(origViewport.height),
         });
       } catch (err) {
-        const dbPage = dbPages.find((p: any) => p.page_number === i);
+        const dbPage = dbPages.find((p) => p.page_number === i);
         pageInfos.push({
           pageNumber: i,
           selected: true,
@@ -263,9 +263,9 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
       onAssetInserted(data.block.id);
       onOpenChange(false);
       resetState();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Block insert error:", err);
-      setErrorText(err.message || "Error al insertar bloque");
+      setErrorText(err instanceof Error ? err.message : "Error al insertar bloque");
       setInserting(false);
     }
   };
@@ -330,9 +330,9 @@ export const AssetUploadModal: React.FC<AssetUploadModalProps> = ({
         setPdfPages(pageInfos);
         setStep("select_pages");
         setStatusText("");
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error loading existing asset pages:", err);
-        setErrorText(err.message || "Error al cargar páginas");
+        setErrorText(err instanceof Error ? err.message : "Error al cargar páginas");
         setStep("upload");
       }
     } else if (asset.status === "ready") {

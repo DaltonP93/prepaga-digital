@@ -115,7 +115,7 @@ export function SaleForm({ open, onOpenChange, sale }: SaleFormProps) {
         await createSale.mutateAsync({
           ...saleData,
           salesperson_id: profile?.id,
-          status: 'borrador' as any,
+          status: 'borrador',
           created_at: new Date().toISOString()
         });
       }

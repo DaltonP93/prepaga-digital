@@ -53,6 +53,7 @@ export const useSmartCache = <T>(
           sessionStorage.removeItem(cacheKey);
         }
       } catch (error) {
+        // intentional empty catch: sessionStorage access may fail
       }
     }
 
@@ -72,6 +73,7 @@ export const useSmartCache = <T>(
       try {
         sessionStorage.setItem(cacheKey, JSON.stringify({ data, timestamp }));
       } catch (error) {
+        // intentional empty catch: sessionStorage access may fail
       }
     }
   }, [useMemory, useSession]);

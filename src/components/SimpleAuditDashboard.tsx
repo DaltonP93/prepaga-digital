@@ -11,7 +11,7 @@ import { formatCurrency } from '@/lib/utils';
 const SimpleAuditDashboard = () => {
   const { data: sales, isLoading } = useAuditProcesses();
   const updateSaleStatus = useUpdateSaleStatus();
-  const [selectedSale, setSelectedSale] = useState<any>(null);
+  const [selectedSale, setSelectedSale] = useState<Record<string, unknown> | null>(null);
 
   const handleApprove = (saleId: string, notes: string) => {
     updateSaleStatus.mutate({

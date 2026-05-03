@@ -41,9 +41,9 @@ export const useBranding = () => {
     } else {
       setLoading(false);
     }
-  }, [profile]);
+  }, [profile, loadBranding]);
 
-  const loadBranding = async () => {
+  const loadBranding = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('companies')
@@ -55,19 +55,19 @@ export const useBranding = () => {
 
       if (data) {
         // Type assertion para incluir las nuevas columnas de branding
-        const companyData = data as any;
+        const companyData = data as Record<string, unknown>;
         setBranding({
-          primaryColor: companyData.primary_color || DEFAULT_BRANDING.primaryColor,
-          secondaryColor: companyData.secondary_color || DEFAULT_BRANDING.secondaryColor,
-          accentColor: companyData.accent_color || DEFAULT_BRANDING.accentColor,
-          logoUrl: companyData.logo_url || DEFAULT_BRANDING.logoUrl,
-          companyName: companyData.name || DEFAULT_BRANDING.companyName,
-          favicon: companyData.favicon || DEFAULT_BRANDING.favicon,
-          customCSS: companyData.custom_css || DEFAULT_BRANDING.customCSS,
-          darkMode: companyData.dark_mode || DEFAULT_BRANDING.darkMode,
-          fontFamily: companyData.font_family || DEFAULT_BRANDING.fontFamily,
-          borderRadius: companyData.border_radius || DEFAULT_BRANDING.borderRadius,
-          shadows: companyData.shadows !== false
+          primaryColor: (companyData.primary_color as string | undefined) || DEFAULT_BRANDING.primaryColor,
+          secondaryColor: (companyData.secondary_color as string | undefined) || DEFAULT_BRANDING.secondaryColor,
+          accentColor: (companyData.accent_color as string | undefined) || DEFAULT_BRANDING.accentColor,
+          logoUrl: (companyData.logo_url as string | undefined) || DEFAULT_BRANDING.logoUrl,
+          companyName: (companyData.name as string | undefined) || DEFAULT_BRANDING.companyName,
+          favicon: (companyData.favicon as string | undefined) || DEFAULT_BRANDING.favicon,
+          customCSS: (companyData.custom_css as string | undefined) || DEFAULT_BRANDING.customCSS,
+          darkMode: (companyData.dark_mode as boolean | undefined) || DEFAULT_BRANDING.darkMode,
+          fontFamily: (companyData.font_family as string | undefined) || DEFAULT_BRANDING.fontFamily,
+          borderRadius: (companyData.border_radius as string | undefined) || DEFAULT_BRANDING.borderRadius,
+          shadows: (companyData.shadows as boolean | undefined) !== false
         });
       }
     } catch (error) {
@@ -75,7 +75,7 @@ export const useBranding = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [profile]);
 
   const updateBranding = async (updates: Partial<BrandingConfig>) => {
     try {
@@ -162,7 +162,9 @@ export const useBranding = () => {
 
     const max = Math.max(r, g, b);
     const min = Math.min(r, g, b);
-    let h, s, l = (max + min) / 2;
+    let h = 0;
+    let s = 0;
+    const l = (max + min) / 2;
 
     if (max === min) {
       h = s = 0;

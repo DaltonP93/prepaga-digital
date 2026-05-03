@@ -79,8 +79,8 @@ const Register = () => {
     try {
       await signUp(email, password, { first_name: firstName, last_name: lastName });
       navigate('/login');
-    } catch (error: any) {
-      toast.error(error.message || 'Error al crear cuenta');
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Error al crear cuenta');
     } finally {
       setLoading(false);
     }

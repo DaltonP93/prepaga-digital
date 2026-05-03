@@ -179,9 +179,9 @@ export const SimpleLoginForm = () => {
 
       toast.success('¡Bienvenido! Has iniciado sesión correctamente.');
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ SimpleLoginForm: Error en login:', error);
-      const message = error.message || 'Error al iniciar sesión';
+      const message = error instanceof Error ? error.message : 'Error al iniciar sesión';
       setLoginError(message);
       toast.error(message);
     } finally {
@@ -217,8 +217,8 @@ export const SimpleLoginForm = () => {
 
       setCanBootstrapSuperAdmin(false);
       toast.success(`Super admin creado. Usuario: ${bootstrapEmail} | Contraseña: ${bootstrapPassword}`);
-    } catch (error: any) {
-      toast.error(error.message || 'Error al crear super admin inicial');
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Error al crear super admin inicial');
     } finally {
       setIsBootstrapping(false);
     }

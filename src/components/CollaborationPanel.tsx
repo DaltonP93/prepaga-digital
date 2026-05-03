@@ -27,7 +27,11 @@ interface CollaborationPanelProps {
 }
 
 interface CommentItemProps {
-  comment: any;
+  comment: {
+    id: string;
+    created_at: string;
+    comment_text: string;
+  };
 }
 
 const CommentItem = ({ comment }: CommentItemProps) => {

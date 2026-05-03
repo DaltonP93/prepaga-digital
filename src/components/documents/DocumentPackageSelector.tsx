@@ -15,6 +15,23 @@ interface DocumentPackageSelectorProps {
   onPackageCreated?: (packageId: string) => void;
 }
 
+interface PackageItem {
+  documents?: { status?: string } | null;
+}
+
+interface DocumentPackage {
+  id: string;
+  name: string;
+  created_at: string;
+  document_package_items?: PackageItem[];
+}
+
+interface SaleDocument {
+  id: string;
+  name: string;
+  requires_signature?: boolean;
+}
+
 export const DocumentPackageSelector: React.FC<DocumentPackageSelectorProps> = ({
   saleId,
   onPackageCreated,
@@ -126,10 +143,10 @@ export const DocumentPackageSelector: React.FC<DocumentPackageSelectorProps> = (
       });
       onPackageCreated?.(data.id);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: 'Error',
-        description: error.message || 'No se pudo crear el paquete.',
+        description: error instanceof Error ? error.message : 'No se pudo crear el paquete.',
         variant: 'destructive',
       });
     },
@@ -159,10 +176,10 @@ export const DocumentPackageSelector: React.FC<DocumentPackageSelectorProps> = (
         description: 'El paquete ha sido eliminado.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: 'Error',
-        description: error.message || 'No se pudo eliminar el paquete.',
+        description: error instanceof Error ? error.message : 'No se pudo eliminar el paquete.',
         variant: 'destructive',
       });
     },
@@ -176,7 +193,7 @@ export const DocumentPackageSelector: React.FC<DocumentPackageSelectorProps> = (
     );
   };
 
-  const getPackageStatusBadge = (items: any[]) => {
+  const getPackageStatusBadge = (items: PackageItem[]) => {
     const totalDocs = items.length;
     const signedDocs = items.filter(item => item.documents?.status === 'firmado').length;
 
@@ -227,7 +244,7 @@ export const DocumentPackageSelector: React.FC<DocumentPackageSelectorProps> = (
               <div className="space-y-2">
                 <Label>Seleccionar Documentos</Label>
                 <div className="max-h-48 overflow-y-auto space-y-2 p-2 border rounded bg-background">
-                  {saleDocuments.map((doc: any) => (
+                  {saleDocuments.map((doc: SaleDocument) => (
                     <div
                       key={doc.id}
                       className="flex items-center space-x-3 p-2 rounded hover:bg-muted"
@@ -284,7 +301,7 @@ export const DocumentPackageSelector: React.FC<DocumentPackageSelectorProps> = (
             <h4 className="font-medium text-sm text-muted-foreground">
               Paquetes Existentes
             </h4>
-            {existingPackages.map((pkg: any) => (
+            {existingPackages.map((pkg: DocumentPackage) => (
               <div
                 key={pkg.id}
                 className="flex items-center justify-between p-4 border rounded-lg"

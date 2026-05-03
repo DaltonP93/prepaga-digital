@@ -25,8 +25,8 @@ function lazyRetry<T extends ComponentType<Record<string, unknown>>>(importFn: (
 }
 
 // Lazy-load components not needed for initial login page render
-const SimpleProtectedRoute = lazyRetry(() => import("@/components/SimpleProtectedRoute").then(m => ({ default: m.SimpleProtectedRoute })));
-const RoleProtectedRoute = lazyRetry(() => import("@/components/RoleProtectedRoute").then(m => ({ default: m.RoleProtectedRoute })));
+const SimpleProtectedRoute = lazyRetry(() => import("@/components/SimpleProtectedRoute").then(m => ({ default: m.SimpleProtectedRoute as unknown as ComponentType<Record<string, unknown>> })));
+const RoleProtectedRoute = lazyRetry(() => import("@/components/RoleProtectedRoute").then(m => ({ default: m.RoleProtectedRoute as unknown as ComponentType<Record<string, unknown>> })));
 const SimpleLoginForm = lazyRetry(() => import("@/components/SimpleLoginForm"));
 const MainLayout = lazyRetry(() => import("@/layouts/MainLayout"));
 
@@ -64,7 +64,7 @@ const NotFound = lazyRetry(() => import("@/pages/NotFound"));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+    <div className="animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-b-2 border-primary" />
   </div>
 );
 

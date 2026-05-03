@@ -13,12 +13,18 @@ import { Database } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 import { normalizeDateInputValue } from "@/lib/dateOnly";
 
-type Client = Database["public"]["Tables"]["clients"]["Row"];
+  type Client = Database["public"]["Tables"]["clients"]["Row"];
+
+interface ExtendedClient extends Client {
+  gender?: string;
+  marital_status?: string;
+  barrio?: string;
+}
 
 interface ClientFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  client?: Client | null;
+  client?: ExtendedClient | null;
 }
 
 interface ClientFormData {
@@ -183,8 +189,8 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
 
       setSearchResults(data as NominatimResult[]);
       toast.success("Selecciona una opcion");
-    } catch (error: any) {
-      toast.error(error?.message || "No se pudo buscar la ubicacion");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "No se pudo buscar la ubicacion");
     } finally {
       setIsSearchingLocation(false);
     }
@@ -227,10 +233,10 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
         phone: client.phone || "",
         dni: client.dni || "",
         birth_date: normalizeDateInputValue(client.birth_date),
-        gender: (client as any).gender || "",
-        marital_status: (client as any).marital_status || "",
+        gender: client.gender || "",
+        marital_status: client.marital_status || "",
         address: client.address || "",
-        barrio: (client as any).barrio || "",
+        barrio: client.barrio || "",
         city: client.city || "",
         province: client.province || "",
         latitude: "",
@@ -302,9 +308,9 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
       }
 
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving client:", error);
-      toast.error(error?.message || "No se pudo guardar el cliente");
+      toast.error(error instanceof Error ? error.message : "No se pudo guardar el cliente");
     }
   };
 

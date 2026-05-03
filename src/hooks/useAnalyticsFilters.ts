@@ -50,7 +50,7 @@ export const useAnalyticsFilters = () => {
       return (data || []).map(p => ({
         id: p.id,
         name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Sin nombre',
-        role: (p as any).role,
+        role: (p as Record<string, unknown>).role as string | undefined,
       }));
     },
     enabled: isAdminRole,

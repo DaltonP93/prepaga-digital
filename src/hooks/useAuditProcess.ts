@@ -13,7 +13,7 @@ const resolveEffectiveRoleForUser = async (userId?: string | null, fallback: str
   if (!userId) return fallback;
 
   const checks = await Promise.all(
-    ROLE_PRIORITY.map((role) => supabase.rpc('has_role', { _user_id: userId, _role: role as any }))
+    ROLE_PRIORITY.map((role) => supabase.rpc('has_role', { _user_id: userId, _role: role as string }))
   );
 
   for (let i = 0; i < ROLE_PRIORITY.length; i += 1) {
@@ -101,8 +101,8 @@ export const useCreateAuditProcess = () => {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       toast.success('Proceso de auditoría iniciado');
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Error al iniciar proceso de auditoría');
+    onError: (error: unknown) => {
+      toast.error(error instanceof Error ? error.message : 'Error al iniciar proceso de auditoría');
     },
   });
 };
@@ -175,8 +175,8 @@ export const useUpdateAuditProcess = () => {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       toast.success('Proceso de auditoría actualizado');
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Error al actualizar proceso de auditoría');
+    onError: (error: unknown) => {
+      toast.error(error instanceof Error ? error.message : 'Error al actualizar proceso de auditoría');
     },
   });
 };

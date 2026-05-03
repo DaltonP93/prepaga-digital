@@ -29,8 +29,8 @@ const DashboardCustomizer = () => {
     isUpdating
   } = useDashboardWidgets();
 
-  const getWidgetSize = (config: any): string => {
-    return config?.size || 'medium';
+  const getWidgetSize = (config: Record<string, unknown>): string => {
+    return (config?.size as string) || 'medium';
   };
 
   const getSizeColor = (size: string) => {
@@ -51,7 +51,7 @@ const DashboardCustomizer = () => {
     }
   };
 
-  const handleSizeChange = (widgetId: string, currentConfig: any, newSize: string) => {
+  const handleSizeChange = (widgetId: string, currentConfig: Record<string, unknown>, newSize: string) => {
     updateWidgetConfig(widgetId, { ...currentConfig, size: newSize });
   };
 

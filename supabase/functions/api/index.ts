@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { checkRateLimit, rateLimitResponse, getClientIdentifier } from "../_shared/rate-limiter.ts";
 
 const corsHeaders = {
@@ -24,7 +24,7 @@ async function hashApiKey(apiKey: string): Promise<string> {
  * Validate API key against database-stored keys using SHA-256 hash comparison.
  * Falls back to plaintext comparison for backward compatibility during migration.
  */
-const validateApiKey = async (supabase: any, apiKey: string): Promise<{ valid: boolean; companyId?: string }> => {
+const validateApiKey = async (supabase: SupabaseClient, apiKey: string): Promise<{ valid: boolean; companyId?: string }> => {
   if (!apiKey || apiKey.length < 32) {
     return { valid: false };
   }
@@ -130,7 +130,7 @@ serve(async (req) => {
 });
 
 // Clients API handlers - scoped to company
-async function handleClientsAPI(supabase: any, method: string, path: string, req: Request, companyId?: string) {
+async function handleClientsAPI(supabase: SupabaseClient, method: string, path: string, req: Request, companyId?: string) {
   const pathParts = path.split("/");
   const clientId = pathParts[3];
 
@@ -163,7 +163,7 @@ async function handleClientsAPI(supabase: any, method: string, path: string, req
         });
       }
 
-    case "POST":
+    case "POST": {
       const clientData = await req.json();
       // Enforce company_id from API key
       const { data, error } = await supabase
@@ -177,8 +177,9 @@ async function handleClientsAPI(supabase: any, method: string, path: string, req
         status: 201,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
+    }
 
-    case "PUT":
+    case "PUT": {
       if (!clientId) {
         throw new Error("Client ID required for update");
       }
@@ -196,8 +197,9 @@ async function handleClientsAPI(supabase: any, method: string, path: string, req
       return new Response(JSON.stringify(updatedData), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
+    }
 
-    case "DELETE":
+    case "DELETE": {
       if (!clientId) {
         throw new Error("Client ID required for delete");
       }
@@ -212,6 +214,7 @@ async function handleClientsAPI(supabase: any, method: string, path: string, req
       return new Response(JSON.stringify({ message: "Client deleted successfully" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
+    }
 
     default:
       throw new Error("Method not allowed");
@@ -219,7 +222,7 @@ async function handleClientsAPI(supabase: any, method: string, path: string, req
 }
 
 // Sales API handlers - scoped to company
-async function handleSalesAPI(supabase: any, method: string, path: string, req: Request, companyId?: string) {
+async function handleSalesAPI(supabase: SupabaseClient, method: string, path: string, req: Request, companyId?: string) {
   const pathParts = path.split("/");
   const saleId = pathParts[3];
 
@@ -260,7 +263,7 @@ async function handleSalesAPI(supabase: any, method: string, path: string, req: 
         });
       }
 
-    case "POST":
+    case "POST": {
       const saleData = await req.json();
       // Enforce company_id from API key
       const { data, error } = await supabase
@@ -274,6 +277,7 @@ async function handleSalesAPI(supabase: any, method: string, path: string, req: 
         status: 201,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
+    }
 
     default:
       throw new Error("Method not allowed for sales");
@@ -281,16 +285,16 @@ async function handleSalesAPI(supabase: any, method: string, path: string, req: 
 }
 
 // Documents API handlers - scoped to company via sales
-async function handleDocumentsAPI(supabase: any, method: string, path: string, req: Request, companyId?: string) {
+async function handleDocumentsAPI(supabase: SupabaseClient, method: string, path: string, req: Request, companyId?: string) {
   switch (method) {
-    case "GET":
+    case "GET": {
       // Get documents for sales belonging to this company
       const { data: sales } = await supabase
         .from("sales")
         .select("id")
         .eq("company_id", companyId);
       
-      const saleIds = sales?.map((s: any) => s.id) || [];
+      const saleIds = (sales as Array<{ id: string }> | null)?.map((s) => s.id) || [];
       
       const { data, error } = await supabase
         .from("documents")
@@ -302,6 +306,7 @@ async function handleDocumentsAPI(supabase: any, method: string, path: string, r
       return new Response(JSON.stringify({ documents: data, total: data?.length || 0 }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
+    }
 
     default:
       throw new Error("Method not allowed for documents");
@@ -309,7 +314,7 @@ async function handleDocumentsAPI(supabase: any, method: string, path: string, r
 }
 
 // Analytics API handlers - scoped to company
-async function handleAnalyticsAPI(supabase: any, method: string, path: string, req: Request, companyId?: string) {
+async function handleAnalyticsAPI(supabase: SupabaseClient, method: string, path: string, req: Request, companyId?: string) {
   if (method !== "GET") {
     throw new Error("Only GET method allowed for analytics");
   }
@@ -329,11 +334,12 @@ async function handleAnalyticsAPI(supabase: any, method: string, path: string, r
     totalClients: clients?.length || 0,
     totalSales: sales?.length || 0,
     totalDocuments: documents?.length || 0,
-    totalRevenue: sales?.reduce((sum: number, sale: any) => sum + (sale.total_amount || 0), 0) || 0,
-    salesByStatus: sales?.reduce((acc: any, sale: any) => {
-      acc[sale.status] = (acc[sale.status] || 0) + 1;
+    totalRevenue: (sales as Array<{ total_amount?: number }> | null)?.reduce((sum, sale) => sum + (sale.total_amount || 0), 0) || 0,
+    salesByStatus: (sales as Array<{ status?: string }> | null)?.reduce((acc: Record<string, number>, sale) => {
+      const status = sale.status || 'unknown';
+      acc[status] = (acc[status] || 0) + 1;
       return acc;
-    }, {}),
+    }, {} as Record<string, number>),
     recentSales: sales?.slice(0, 10) || []
   };
 

@@ -36,7 +36,7 @@ export function TemplateAnnexesManager({ templateId, onContentExtracted }: Templ
   const fetchAttachments = async () => {
     setIsLoading(true);
     const { data, error } = await supabase
-      .from("template_attachments" as any)
+      .from("template_attachments")
       .select("*")
       .eq("template_id", templateId)
       .order("sort_order", { ascending: true });
@@ -75,13 +75,14 @@ export function TemplateAnnexesManager({ templateId, onContentExtracted }: Templ
             entityType: "template_attachment",
             entityId: templateId,
           });
-        } catch (uploadError: any) {
-          toast.error(`Error subiendo ${file.name}: ${uploadError.message}`);
+        } catch (uploadError: unknown) {
+          const message = uploadError instanceof Error ? uploadError.message : String(uploadError);
+          toast.error(`Error subiendo ${file.name}: ${message}`);
           continue;
         }
 
         const { error: insertError } = await supabase
-          .from("template_attachments" as any)
+          .from("template_attachments")
           .insert({
             template_id: templateId,
             file_name: file.name,
@@ -89,7 +90,7 @@ export function TemplateAnnexesManager({ templateId, onContentExtracted }: Templ
             file_type: file.type || fileExt,
             file_size: file.size,
             sort_order: attachments.length,
-          } as any);
+          });
 
         if (insertError) {
           toast.error(`Error guardando ${file.name}: ${insertError.message}`);
@@ -220,7 +221,7 @@ export function TemplateAnnexesManager({ templateId, onContentExtracted }: Templ
     }
 
     const { error } = await supabase
-      .from("template_attachments" as any)
+      .from("template_attachments")
       .delete()
       .eq("id", attachment.id);
 

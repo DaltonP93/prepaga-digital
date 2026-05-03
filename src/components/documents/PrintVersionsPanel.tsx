@@ -12,6 +12,19 @@ interface PrintVersionsPanelProps {
   documentName: string;
 }
 
+interface PrintVersion {
+  id: string;
+  pdf_url: string;
+  version_number: number;
+  is_current: boolean;
+  created_at: string;
+  reason?: string;
+  profiles?: {
+    first_name?: string;
+    last_name?: string;
+  } | null;
+}
+
 export const PrintVersionsPanel: React.FC<PrintVersionsPanelProps> = ({ documentId, documentName }) => {
   const queryClient = useQueryClient();
   const [reason, setReason] = useState('Actualización de branding');
@@ -21,12 +34,12 @@ export const PrintVersionsPanel: React.FC<PrintVersionsPanelProps> = ({ document
     queryKey: ['print-versions', documentId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('document_print_versions' as any)
+        .from('document_print_versions')
         .select('*, profiles:generated_by(first_name, last_name)')
         .eq('document_id', documentId)
         .order('version_number', { ascending: false });
       if (error) throw error;
-      return (data as any[]) || [];
+      return (data as PrintVersion[]) || [];
     },
     enabled: !!documentId,
   });
@@ -48,12 +61,12 @@ export const PrintVersionsPanel: React.FC<PrintVersionsPanelProps> = ({ document
       toast.success(`Versión de impresión v${data?.version_number || '?'} generada correctamente`);
       setShowForm(false);
     },
-    onError: (err: any) => {
-      toast.error(err.message || 'Error al generar versión de impresión');
+    onError: (err: unknown) => {
+      toast.error(err instanceof Error ? err.message : 'Error al generar versión de impresión');
     },
   });
 
-  const handleDownload = async (version: any) => {
+  const handleDownload = async (version: PrintVersion) => {
     if (!version.pdf_url) return;
 
     // pdf_url format: "bucket:path" or just path
@@ -142,7 +155,7 @@ export const PrintVersionsPanel: React.FC<PrintVersionsPanelProps> = ({ document
         </div>
       ) : versions.length > 0 ? (
         <div className="space-y-1">
-          {versions.map((v: any) => {
+          {versions.map((v: PrintVersion) => {
             const profile = v.profiles;
             const generatedByName = profile
               ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim()

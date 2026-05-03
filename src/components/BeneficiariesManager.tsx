@@ -1,15 +1,21 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Trash2, Plus, Edit2, ChevronDown, FileText, UserCheck, AlertCircle } from 'lucide-react';
+import { Trash2, Plus, Edit2, ChevronDown, UserCheck, AlertCircle } from 'lucide-react';
 import { useBeneficiaries, useCreateBeneficiary, useUpdateBeneficiary, useDeleteBeneficiary } from '@/hooks/useBeneficiaries';
 import { BeneficiaryForm, BeneficiaryFormData } from '@/components/beneficiaries/BeneficiaryForm';
 import { BeneficiaryDocuments } from '@/components/beneficiaries/BeneficiaryDocuments';
 import { useCurrencySettings } from '@/hooks/useCurrencySettings';
+import { Database } from '@/integrations/supabase/types';
+
+type BeneficiaryRow = Database['public']['Tables']['beneficiaries']['Row'];
+
+type ExtendedBeneficiary = BeneficiaryRow & {
+  source_addendum_id?: string | null;
+  status?: string | null;
+};
 
 interface BeneficiariesManagerProps {
   saleId: string;
@@ -17,7 +23,7 @@ interface BeneficiariesManagerProps {
 
 export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ saleId }) => {
   const [showForm, setShowForm] = useState(false);
-  const [editingBeneficiary, setEditingBeneficiary] = useState<any>(null);
+  const [editingBeneficiary, setEditingBeneficiary] = useState<ExtendedBeneficiary | null>(null);
   const [expandedBeneficiary, setExpandedBeneficiary] = useState<string | null>(null);
 
   const { data: allBeneficiaries = [], isLoading } = useBeneficiaries(saleId);
@@ -27,13 +33,13 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
   const { formatCurrency } = useCurrencySettings();
 
   // Filter out the titular — only show adherentes
-  const beneficiaries = allBeneficiaries.filter(
-    (b: any) => String(b.relationship || '').toLowerCase() !== 'titular' && !b.is_primary && (b.status ?? 'active') === 'active'
+  const beneficiaries = (allBeneficiaries as ExtendedBeneficiary[]).filter(
+    (b) => String(b.relationship || '').toLowerCase() !== 'titular' && !b.is_primary && (b.status ?? 'active') === 'active'
   );
 
-  const isFromAddendum = (beneficiary: any) => Boolean((beneficiary as any).source_addendum_id);
+  const isFromAddendum = (beneficiary: ExtendedBeneficiary) => Boolean(beneficiary.source_addendum_id);
 
-  const handleEdit = (beneficiary: any) => {
+  const handleEdit = (beneficiary: ExtendedBeneficiary) => {
     if (isFromAddendum(beneficiary)) {
       return;
     }
@@ -92,7 +98,7 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
     setEditingBeneficiary(null);
   };
 
-  const handleDelete = (beneficiary: any) => {
+  const handleDelete = (beneficiary: ExtendedBeneficiary) => {
     if (isFromAddendum(beneficiary)) {
       return;
     }
@@ -140,7 +146,7 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
               {editingBeneficiary ? 'Editar' : 'Nuevo'} adherente
             </h3>
             <BeneficiaryForm
-              defaultValues={editingBeneficiary || {}}
+              defaultValues={editingBeneficiary ? (editingBeneficiary as unknown as Partial<BeneficiaryFormData>) : undefined}
               onSubmit={onSubmit}
               onCancel={handleCancel}
               isSubmitting={createBeneficiary.isPending || updateBeneficiary.isPending}
@@ -151,7 +157,7 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
 
         {beneficiaries.length > 0 ? (
           <div className="space-y-3">
-            {beneficiaries.map((beneficiary: any) => (
+            {beneficiaries.map((beneficiary) => (
               <Collapsible
                 key={beneficiary.id}
                 open={expandedBeneficiary === beneficiary.id}
@@ -183,7 +189,7 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
                                 Preexistencias
                               </Badge>
                             )}
-                            {(beneficiary as any).source_addendum_id && (
+                            {beneficiary.source_addendum_id && (
                               <Badge variant="outline" className="text-xs text-blue-600">
                                 Alta por anexo
                               </Badge>
@@ -263,7 +269,7 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
                         </div>
                         <div>
                           <span className="text-muted-foreground">Barrio:</span>
-                          <p className="font-medium">{(beneficiary as any).barrio || '-'}</p>
+                          <p className="font-medium">{beneficiary.barrio || '-'}</p>
                         </div>
                         <div>
                           <span className="text-muted-foreground">Ciudad:</span>
@@ -304,7 +310,7 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
                 <span className="text-sm text-muted-foreground">Total cobertura:</span>
                 <span className="ml-2 text-lg font-bold">
                   {formatCurrency(
-                    beneficiaries.reduce((sum: number, b: any) => sum + (b.amount || 0), 0)
+                    beneficiaries.reduce((sum, b) => sum + (b.amount || 0), 0)
                   )}
                 </span>
               </div>
@@ -312,7 +318,7 @@ export const BeneficiariesManager: React.FC<BeneficiariesManagerProps> = ({ sale
           </div>
         ) : (
           <p className="text-muted-foreground text-center py-8">
-            No hay adherentes agregados. Haga clic en "Agregar adherente" para comenzar.
+            No hay adherentes agregados. Haga clic en &quot;Agregar adherente&quot; para comenzar.
           </p>
         )}
       </CardContent>

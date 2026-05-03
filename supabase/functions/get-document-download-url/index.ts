@@ -164,8 +164,8 @@ Deno.serve(async (req) => {
 
     const storedUrl =
       kind === "signed"
-        ? (doc as any).signed_pdf_url || (doc as any).base_pdf_url
-        : (doc as any)[column];
+        ? ((doc as Record<string, unknown>).signed_pdf_url as string | undefined) || ((doc as Record<string, unknown>).base_pdf_url as string | undefined)
+        : (doc as Record<string, unknown>)[column] as string | undefined;
     if (!storedUrl) {
       return new Response(JSON.stringify({ error: `No ${kind} file available for this document` }), {
         status: 404,

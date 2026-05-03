@@ -38,9 +38,9 @@ const SimpleLogin = () => {
     try {
       await signIn(email, password);
       toast.success('¡Bienvenido! Has iniciado sesión correctamente.');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ SimpleLogin: Error en login:', error);
-      toast.error(error.message || 'Error al iniciar sesión');
+      toast.error(error instanceof Error ? error.message : 'Error al iniciar sesión');
     } finally {
       setIsLoggingIn(false);
     }

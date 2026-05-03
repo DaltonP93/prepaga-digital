@@ -45,13 +45,13 @@ export default function Experience() {
   // Sync form with loaded configuration
   useEffect(() => {
     if (configuration) {
-      const cfg = configuration as any;
-      setPrimaryColor(cfg.primary_color || '#1e3a5f');
-      setSecondaryColor(cfg.secondary_color || '#334155');
-      setAccentColor(cfg.accent_color || '#3b82f6');
-      setLogoUrl(cfg.logo_url || '');
-      setLoginLogoUrl(cfg.login_logo_url || '');
-      setLoginBackgroundUrl(cfg.login_background_url || '');
+      const cfg = configuration as Record<string, unknown>;
+      setPrimaryColor((cfg.primary_color as string) || '#1e3a5f');
+      setSecondaryColor((cfg.secondary_color as string) || '#334155');
+      setAccentColor((cfg.accent_color as string) || '#3b82f6');
+      setLogoUrl((cfg.logo_url as string) || '');
+      setLoginLogoUrl((cfg.login_logo_url as string) || '');
+      setLoginBackgroundUrl((cfg.login_background_url as string) || '');
     }
   }, [configuration]);
 
@@ -65,8 +65,9 @@ export default function Experience() {
         .eq('company_id', profile.company_id)
         .single();
       if (data) {
-        setPdfHeaderImageUrl((data as any).pdf_header_image_url || '');
-        setPdfFooterImageUrl((data as any).pdf_footer_image_url || '');
+        const row = data as Record<string, unknown>;
+        setPdfHeaderImageUrl((row.pdf_header_image_url as string) || '');
+        setPdfFooterImageUrl((row.pdf_footer_image_url as string) || '');
       }
     };
     loadPdfBranding();
@@ -92,9 +93,9 @@ export default function Experience() {
       });
       setUrl(publicUrl);
       toast.success('Imagen subida correctamente');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Upload error:', error);
-      toast.error(error.message || 'Error al subir la imagen');
+      toast.error(error instanceof Error ? error.message : 'Error al subir la imagen');
     } finally {
       setUploading(false);
     }
@@ -113,7 +114,7 @@ export default function Experience() {
       logo_url: logoUrl || null,
       login_logo_url: loginLogoUrl || null,
       login_background_url: loginBackgroundUrl || null,
-    } as any);
+    } as Record<string, unknown>);
 
     // Persist to localStorage for login page (pre-auth access)
     try {
@@ -129,7 +130,7 @@ export default function Experience() {
       const b = parseInt(hex.slice(5, 7), 16) / 255;
       const max = Math.max(r, g, b);
       const min = Math.min(r, g, b);
-      let h = 0, s = 0, l = (max + min) / 2;
+      let h = 0, s = 0; const l = (max + min) / 2;
       if (max !== min) {
         const d = max - min;
         s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
@@ -513,12 +514,12 @@ export default function Experience() {
                       .update({
                         pdf_header_image_url: pdfHeaderImageUrl || null,
                         pdf_footer_image_url: pdfFooterImageUrl || null,
-                      } as any)
+                      } as Record<string, unknown>)
                       .eq('company_id', profile.company_id);
                     if (error) throw error;
                     toast.success('Imágenes de PDF guardadas');
-                  } catch (err: any) {
-                    toast.error(err.message || 'Error al guardar');
+                  } catch (err: unknown) {
+                    toast.error(err instanceof Error ? err.message : 'Error al guardar');
                   } finally {
                     setSavingPdfBranding(false);
                   }

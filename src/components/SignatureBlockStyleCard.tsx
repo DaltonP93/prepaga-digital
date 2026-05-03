@@ -44,7 +44,7 @@ export const SignatureBlockStyleCard: React.FC = () => {
         .eq('company_id', profile.company_id)
         .single();
       if (data?.signature_block_style) {
-        setStyle({ ...DEFAULT_STYLE, ...(data.signature_block_style as any) });
+        setStyle({ ...DEFAULT_STYLE, ...(data.signature_block_style as unknown as Partial<SignatureBlockStyle>) });
       }
       setLoaded(true);
     };
@@ -59,13 +59,13 @@ export const SignatureBlockStyleCard: React.FC = () => {
         .from('company_settings')
         .upsert({
           company_id: profile.company_id,
-          signature_block_style: style as any,
+          signature_block_style: style as unknown as Record<string, unknown>,
           updated_at: new Date().toISOString(),
-        } as any, { onConflict: 'company_id' });
+        }, { onConflict: 'company_id' });
       if (error) throw error;
       toast.success('Estilo de firma guardado');
-    } catch (e: any) {
-      toast.error(e.message || 'Error al guardar');
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Error al guardar');
     } finally {
       setSaving(false);
     }
@@ -93,7 +93,7 @@ export const SignatureBlockStyleCard: React.FC = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="space-y-2">
             <Label>Versión del diseño</Label>
-            <Select value={style.version} onValueChange={(v) => setStyle(s => ({ ...s, version: v as any }))}>
+            <Select value={style.version} onValueChange={(v) => setStyle(s => ({ ...s, version: v as SignatureBlockStyle['version'] }))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="v1">v1 Clásico</SelectItem>
@@ -103,7 +103,7 @@ export const SignatureBlockStyleCard: React.FC = () => {
           </div>
           <div className="space-y-2">
             <Label>Tipo</Label>
-            <Select value={style.type} onValueChange={(v) => setStyle(s => ({ ...s, type: v as any }))}>
+            <Select value={style.type} onValueChange={(v) => setStyle(s => ({ ...s, type: v as SignatureBlockStyle['type'] }))}>
               <SelectTrigger><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="digital">Agregar firma (canvas manuscrita)</SelectItem>
@@ -119,7 +119,7 @@ export const SignatureBlockStyleCard: React.FC = () => {
           </div>
           <div className="space-y-2">
             <Label>Alineación</Label>
-            <Select value={style.alignment} onValueChange={(v) => setStyle(s => ({ ...s, alignment: v as any }))}>
+            <Select value={style.alignment} onValueChange={(v) => setStyle(s => ({ ...s, alignment: v as SignatureBlockStyle['alignment'] }))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="left">Izquierda</SelectItem>
@@ -130,7 +130,7 @@ export const SignatureBlockStyleCard: React.FC = () => {
           </div>
           <div className="space-y-2">
             <Label>Tamaño</Label>
-            <Select value={style.size} onValueChange={(v) => setStyle(s => ({ ...s, size: v as any }))}>
+            <Select value={style.size} onValueChange={(v) => setStyle(s => ({ ...s, size: v as SignatureBlockStyle['size'] }))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="small">Pequeño</SelectItem>

@@ -29,7 +29,7 @@ import {
   Layers, Settings2, GitBranch, FileText, Crosshair, X, MousePointer,
 } from "lucide-react";
 import type {
-  BlockType, TemplateBlock, TemplateBlockInsert,
+  BlockType, TemplateBlock, TemplateBlockInsert, TemplateBlockUpdate,
   BlockContent, SignerRole, FieldType,
 } from "@/types/templateDesigner";
 
@@ -63,7 +63,7 @@ const defaultContent = (type: BlockType): BlockContent => {
     case "placeholder_chip":
       return { kind: "placeholder_chip", placeholder_key: "client.full_name", label: "Nombre completo", example_value: "Juan Pérez" };
     default:
-      return { kind: "page_break" } as any;
+      return { kind: "page_break" } as BlockContent;
   }
 };
 
@@ -118,10 +118,20 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
     if (!file || !pendingImageBlockId) return;
     try {
       const result = await uploadTemplateImage(file, templateId);
-      updateBlock.mutate({ id: pendingImageBlockId, content: { ...((blocks.find(b => b.id === pendingImageBlockId)?.content as any) || {}), src: result.signedUrl, storage_path: result.storagePath, alt: file.name } } as any);
+      const existing = blocks.find(b => b.id === pendingImageBlockId);
+      updateBlock.mutate({
+        id: pendingImageBlockId,
+        content: {
+          ...(existing?.content as unknown as Record<string, unknown> || {}),
+          src: result.signedUrl,
+          storage_path: result.storagePath,
+          alt: file.name,
+        } as unknown as BlockContent,
+      });
       toast2({ title: "Imagen subida" });
-    } catch (err: any) {
-      toast2({ title: "Error al subir imagen", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast2({ title: "Error al subir imagen", description: message, variant: "destructive" });
     } finally {
       setPendingImageBlockId(null);
     }
@@ -169,7 +179,7 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
         x: 0, y: 0, w: 100, h: 0,
         z_index: 0, rotation: 0,
         is_locked: false, is_visible: true,
-        content: defaultContent(type) as any,
+        content: defaultContent(type),
         style: defaultStyle(type),
         visibility_rules: { roles: ["titular", "adherente", "contratada"], conditions: [] },
         sort_order: maxSort + 1,
@@ -212,7 +222,7 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
         x: cx, y: cy, w, h,
         z_index: 10, rotation: 0,
         is_locked: false, is_visible: true,
-        content: defaultContent(insertMode) as any,
+        content: defaultContent(insertMode),
         style: defaultStyle(insertMode),
         visibility_rules: { roles: ["titular", "adherente", "contratada"], conditions: [] },
         sort_order: maxSort + 1,
@@ -245,14 +255,14 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
   const handleUpdateBlock = useCallback(
     (updates: Partial<TemplateBlock>) => {
       if (!selectedBlockId) return;
-      updateBlock.mutate({ id: selectedBlockId, ...updates } as any);
+      updateBlock.mutate({ id: selectedBlockId, ...updates } as unknown as TemplateBlockUpdate);
     },
     [selectedBlockId, updateBlock]
   );
 
   const handleUpdatePosition = useCallback(
     (blockId: string, x: number, y: number, w: number, h: number) => {
-      updateBlock.mutate({ id: blockId, x, y, w, h } as any);
+      updateBlock.mutate({ id: blockId, x, y, w, h });
     },
     [updateBlock]
   );
@@ -276,8 +286,8 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
         x: offsetX, y: offsetY, w: block.w, h: block.h,
         z_index: block.z_index, rotation: block.rotation,
         is_locked: false, is_visible: block.is_visible,
-        content: block.content as any, style: block.style,
-        visibility_rules: block.visibility_rules as any,
+        content: block.content, style: block.style,
+        visibility_rules: block.visibility_rules,
         sort_order: maxSort + 1,
       }, { onSuccess: (b) => setSelectedBlockId(b.id) });
     },
@@ -285,12 +295,12 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
   );
 
   const handleToggleLock = useCallback(
-    (block: TemplateBlock) => updateBlock.mutate({ id: block.id, is_locked: !block.is_locked } as any),
+    (block: TemplateBlock) => updateBlock.mutate({ id: block.id, is_locked: !block.is_locked }),
     [updateBlock]
   );
 
   const handleToggleVisibility = useCallback(
-    (block: TemplateBlock) => updateBlock.mutate({ id: block.id, is_visible: !block.is_visible } as any),
+    (block: TemplateBlock) => updateBlock.mutate({ id: block.id, is_visible: !block.is_visible }),
     [updateBlock]
   );
 
@@ -366,11 +376,11 @@ export const TemplateDesigner2: React.FC<TemplateDesigner2Props> = ({ templateId
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] text-muted-foreground">Pág {pageNumbers.length}</span>
             <div className="flex items-center border rounded-md">
-              <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setZoom((z) => ZOOM_LEVELS[Math.max(0, ZOOM_LEVELS.indexOf(z as any) - 1)] || 0.75)}>
+              <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setZoom((z) => ZOOM_LEVELS[Math.max(0, ZOOM_LEVELS.indexOf(z as (typeof ZOOM_LEVELS)[number]) - 1)] || 0.75)}>
                 <ZoomOut className="h-3 w-3" />
               </Button>
               <span className="text-[10px] w-8 text-center">{Math.round(zoom * 100)}%</span>
-              <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setZoom((z) => ZOOM_LEVELS[Math.min(ZOOM_LEVELS.length - 1, ZOOM_LEVELS.indexOf(z as any) + 1)] || 1.25)}>
+              <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setZoom((z) => ZOOM_LEVELS[Math.min(ZOOM_LEVELS.length - 1, ZOOM_LEVELS.indexOf(z as (typeof ZOOM_LEVELS)[number]) + 1)] || 1.25)}>
                 <ZoomIn className="h-3 w-3" />
               </Button>
               <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setZoom(1)}>

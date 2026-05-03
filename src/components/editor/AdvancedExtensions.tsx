@@ -1,6 +1,6 @@
 
 import { Node } from '@tiptap/core';
-import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
+import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from '@tiptap/react';
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,12 +65,12 @@ export const DropdownExtension = Node.create({
   },
 });
 
-const DropdownComponent = ({ node, updateAttributes }: any) => {
+const DropdownComponent = ({ node, updateAttributes }: NodeViewProps) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [label, setLabel] = useState(node.attrs.label);
-  const [options, setOptions] = useState(node.attrs.options);
-  const [placeholder, setPlaceholder] = useState(node.attrs.placeholder);
-  const [required, setRequired] = useState(node.attrs.required);
+  const [label, setLabel] = useState<string>(node.attrs.label as string);
+  const [options, setOptions] = useState<string[]>(node.attrs.options as string[]);
+  const [placeholder, setPlaceholder] = useState<string>(node.attrs.placeholder as string);
+  const [required, setRequired] = useState<boolean>(node.attrs.required as boolean);
 
   const handleSave = () => {
     updateAttributes({
@@ -249,10 +249,10 @@ export const CheckboxExtension = Node.create({
   },
 });
 
-const CheckboxComponent = ({ node, updateAttributes }: any) => {
+const CheckboxComponent = ({ node, updateAttributes }: NodeViewProps) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [label, setLabel] = useState(node.attrs.label);
-  const [required, setRequired] = useState(node.attrs.required);
+  const [label, setLabel] = useState<string>(node.attrs.label as string);
+  const [required, setRequired] = useState<boolean>(node.attrs.required as boolean);
 
   const handleSave = () => {
     updateAttributes({ label, required });
@@ -375,11 +375,11 @@ export const RadioButtonExtension = Node.create({
   },
 });
 
-const RadioButtonComponent = ({ node, updateAttributes }: any) => {
+const RadioButtonComponent = ({ node, updateAttributes }: NodeViewProps) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [label, setLabel] = useState(node.attrs.label);
-  const [options, setOptions] = useState(node.attrs.options);
-  const [required, setRequired] = useState(node.attrs.required);
+  const [label, setLabel] = useState<string>(node.attrs.label as string);
+  const [options, setOptions] = useState<string[]>(node.attrs.options as string[]);
+  const [required, setRequired] = useState<boolean>(node.attrs.required as boolean);
 
   const handleSave = () => {
     updateAttributes({ label, options, required });
@@ -546,10 +546,10 @@ export const QRCodeExtension = Node.create({
   },
 });
 
-const QRCodeComponent = ({ node, updateAttributes }: any) => {
+const QRCodeComponent = ({ node, updateAttributes }: NodeViewProps) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [text, setText] = useState(node.attrs.text);
-  const [size, setSize] = useState(node.attrs.size);
+  const [text, setText] = useState<string>(node.attrs.text as string);
+  const [size, setSize] = useState<number>(node.attrs.size as number);
   const [qrDataUrl, setQrDataUrl] = useState('');
 
   React.useEffect(() => {
@@ -680,10 +680,10 @@ export const BarcodeExtension = Node.create({
   },
 });
 
-const BarcodeComponent = ({ node, updateAttributes }: any) => {
+const BarcodeComponent = ({ node, updateAttributes }: NodeViewProps) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [text, setText] = useState(node.attrs.text);
-  const [type, setType] = useState(node.attrs.type);
+  const [text, setText] = useState<string>(node.attrs.text as string);
+  const [type, setType] = useState<string>(node.attrs.type as string);
 
   const handleSave = () => {
     updateAttributes({ text, type });

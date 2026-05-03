@@ -30,7 +30,7 @@ function escapeHtml(input: unknown) {
     .replaceAll("'", "&#39;");
 }
 
-function renderTemplate(html: string, data: Record<string, any>) {
+function renderTemplate(html: string, data: Record<string, unknown>) {
   return html.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_m, key) => {
     const value = data[key];
     return value === undefined || value === null ? "" : String(value);
@@ -448,7 +448,7 @@ Deno.serve(async (req) => {
       .single();
 
     // 4) Signature link
-    let link: any = null;
+    let link: Record<string, unknown> | null = null;
     if (signature_link_id) {
       const { data } = await supabase
         .from("signature_links")
@@ -508,7 +508,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     // 6) OTP verification
-    let otp: any = null;
+    let otp: Record<string, unknown> | null = null;
     if (signEvent?.identity_verification_id) {
       const { data } = await supabase
         .from("signature_identity_verification")
@@ -525,7 +525,7 @@ Deno.serve(async (req) => {
     }
 
     // 7) Consent
-    let consent: any = null;
+    let consent: Record<string, unknown> | null = null;
     if (signEvent?.consent_record_id) {
       const { data } = await supabase
         .from("signature_consent_records")
@@ -548,15 +548,16 @@ Deno.serve(async (req) => {
       .order("created_at", { ascending: true });
 
     const eventsRows = (traces || [])
-      .map((t: any) => {
-        const action = escapeHtml(t.action || "");
-        const actor = escapeHtml(t.details?.recipient_type || t.details?.actor || "");
+      .map((t: Record<string, unknown>) => {
+        const details = (t.details as Record<string, unknown> | undefined) || {};
+        const action = escapeHtml((t.action as string | undefined) || "");
+        const actor = escapeHtml((details.recipient_type as string | undefined) || (details.actor as string | undefined) || "");
         const detail = escapeHtml(
-          JSON.stringify(t.details || {})
+          JSON.stringify(details)
             .replaceAll("{", "")
             .replaceAll("}", "")
         );
-        return `<tr><td>${escapeHtml(formatDate(t.created_at))}</td><td>${action}</td><td>${actor}</td><td>${detail}</td></tr>`;
+        return `<tr><td>${escapeHtml(formatDate(t.created_at as string | undefined))}</td><td>${action}</td><td>${actor}</td><td>${detail}</td></tr>`;
       })
       .join("");
 

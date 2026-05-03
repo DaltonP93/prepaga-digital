@@ -3,6 +3,7 @@ import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { useWorkflowConfig } from '@/hooks/useWorkflowConfig';
 import { useEffectiveRole } from '@/hooks/useEffectiveRole';
 import { toast } from 'sonner';
+import { Database } from '@/integrations/supabase/types';
 import type { SaleStatus, TransitionRule, WorkflowConfig } from '@/types/workflow';
 
 /** Minimal sale shape needed for condition evaluation */
@@ -17,7 +18,7 @@ export interface SaleForTransition {
   audit_status?: string | null;
   adherents_count?: number | null;
   template_responses?: Array<{ id: string }> | null;
-  beneficiaries?: any[] | null;
+  beneficiaries?: Database['public']['Tables']['beneficiaries']['Row'][] | null;
 }
 
 /** Evaluate a built-in condition against sale data */

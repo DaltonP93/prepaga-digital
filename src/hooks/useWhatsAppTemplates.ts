@@ -24,24 +24,24 @@ export const useWhatsAppTemplates = () => {
     queryFn: async () => {
       if (!profile?.company_id) return [];
       const { data, error } = await supabase
-        .from('whatsapp_templates' as any)
+        .from('whatsapp_templates')
         .select('*')
         .eq('company_id', profile.company_id)
         .order('created_at', { ascending: true });
       if (error) throw error;
-      return (data as any[]) || [];
+      return (data as unknown[]) || [];
     },
     enabled: !!profile?.company_id,
   });
 
   const updateTemplate = useMutation({
     mutationFn: async ({ id, message_body, is_active }: { id: string; message_body?: string; is_active?: boolean }) => {
-      const updates: Record<string, any> = { updated_at: new Date().toISOString() };
+      const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
       if (message_body !== undefined) updates.message_body = message_body;
       if (is_active !== undefined) updates.is_active = is_active;
       
       const { error } = await supabase
-        .from('whatsapp_templates' as any)
+        .from('whatsapp_templates')
         .update(updates)
         .eq('id', id);
       if (error) throw error;
@@ -50,7 +50,7 @@ export const useWhatsAppTemplates = () => {
       queryClient.invalidateQueries({ queryKey: ['whatsapp-templates'] });
       toast.success('Plantilla actualizada');
     },
-    onError: (e: any) => toast.error(e.message || 'Error al actualizar plantilla'),
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Error al actualizar plantilla'),
   });
 
   return { templates: templates as WhatsAppTemplate[], isLoading, updateTemplate };

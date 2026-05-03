@@ -72,7 +72,7 @@ export const SignatureWorkflowManager = ({
           signature_token: token,
           signature_expires_at: expiresAt.toISOString(),
           status: "enviado"
-        } as any)
+        })
         .eq("id", saleId);
 
       if (error) throw error;
@@ -114,7 +114,7 @@ export const SignatureWorkflowManager = ({
         .from('sales')
         .update({
           status: 'cancelado'
-        } as any)
+        })
         .eq('id', saleId);
 
       if (error) throw error;

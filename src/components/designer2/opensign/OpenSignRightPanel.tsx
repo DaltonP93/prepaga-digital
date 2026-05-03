@@ -59,10 +59,10 @@ const FieldPropertyPanel: React.FC<{
   onDelete: (id: string) => void;
 }> = ({ field, onUpdate, onDelete }) => {
   const role = ROLES.find((r) => r.value === field.signer_role);
-  const meta = (field as any).meta || {};
+  const meta = (field.meta || {}) as unknown as Record<string, unknown>;
 
-  const updateMeta = (key: string, value: any) => {
-    onUpdate({ meta: { ...meta, [key]: value } } as any);
+  const updateMeta = (key: string, value: unknown) => {
+    onUpdate({ meta: { ...meta, [key]: value } as unknown as Record<string, unknown> });
   };
 
   return (
@@ -117,7 +117,7 @@ const FieldPropertyPanel: React.FC<{
           <Input
             className="h-7 text-[12px]"
             placeholder="Texto de ejemplo..."
-            value={meta.placeholder || ""}
+            value={String(meta['placeholder'] || "")}
             onChange={(e) => updateMeta("placeholder", e.target.value)}
           />
         </div>
@@ -125,7 +125,7 @@ const FieldPropertyPanel: React.FC<{
         {/* Border style */}
         <div className="space-y-1">
           <Label className="text-[11px]">Borde</Label>
-          <Select value={meta.borderStyle || "solid"} onValueChange={(v) => updateMeta("borderStyle", v)}>
+          <Select value={String(meta['borderStyle'] || "solid")} onValueChange={(v) => updateMeta("borderStyle", v)}>
             <SelectTrigger className="h-7 text-[12px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="solid">Sólido</SelectItem>
@@ -142,7 +142,7 @@ const FieldPropertyPanel: React.FC<{
             <Label className="text-[11px]">Opciones (una por línea)</Label>
             <Textarea
               className="text-[12px] min-h-[60px]"
-              value={(meta.options || []).join("\n")}
+              value={Array.isArray(meta['options']) ? (meta['options'] as unknown[]).join("\n") : ""}
               onChange={(e) => updateMeta("options", e.target.value.split("\n").filter(Boolean))}
               placeholder={"Opción 1\nOpción 2\nOpción 3"}
             />

@@ -13,8 +13,50 @@ import { CheckCircle, XCircle, Clock, AlertCircle, MessageSquare, Edit, FileText
 import { SaleForm } from '@/components/SaleForm';
 import { formatCurrency } from '@/lib/utils';
 
+interface Beneficiary {
+  is_primary?: boolean;
+  amount?: number;
+}
+
+interface SaleClient {
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  phone?: string;
+  dni?: string;
+}
+
+interface SalePlan {
+  name?: string;
+  price?: number;
+}
+
+interface SalePerson {
+  first_name?: string;
+  last_name?: string;
+}
+
+interface SaleWithRelations {
+  id: string;
+  status: string;
+  notes?: string;
+  clients?: SaleClient | null;
+  plans?: SalePlan | null;
+  beneficiaries?: Beneficiary[];
+  salesperson?: SalePerson | null;
+  total_amount?: number;
+  contract_number?: string;
+  workplace?: string;
+  profession?: string;
+  work_phone?: string;
+  work_address?: string;
+  signature_modality?: string;
+  maternity_bonus?: boolean;
+  immediate_validity?: boolean;
+}
+
 interface AuditSaleDetailsProps {
-  sale: any;
+  sale: SaleWithRelations;
   onApprove: (saleId: string, notes: string) => void;
   onReject: (saleId: string, notes: string) => void;
   isUpdating: boolean;
@@ -134,7 +176,7 @@ export const AuditSaleDetails: React.FC<AuditSaleDetailsProps> = ({
               <Label className="text-sm font-medium text-muted-foreground">Precio Titular</Label>
               <p className="text-sm">
                 {formatCurrency(Number(
-                  sale.beneficiaries?.find((b: any) => b.is_primary)?.amount || sale.plans?.price || 0
+                  sale.beneficiaries?.find((b) => b.is_primary)?.amount || sale.plans?.price || 0
                 ))}
               </p>
             </div>

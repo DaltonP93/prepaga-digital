@@ -93,10 +93,10 @@ export const BeneficiaryDocuments: React.FC<BeneficiaryDocumentsProps> = ({
         description: 'El documento ha sido subido exitosamente.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: 'Error',
-        description: error.message || 'No se pudo subir el documento.',
+        description: error instanceof Error ? error.message : 'No se pudo subir el documento.',
         variant: 'destructive',
       });
     },
@@ -121,10 +121,10 @@ export const BeneficiaryDocuments: React.FC<BeneficiaryDocumentsProps> = ({
         description: 'El documento ha sido eliminado.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: 'Error',
-        description: error.message || 'No se pudo eliminar el documento.',
+        description: error instanceof Error ? error.message : 'No se pudo eliminar el documento.',
         variant: 'destructive',
       });
     },
@@ -210,7 +210,7 @@ export const BeneficiaryDocuments: React.FC<BeneficiaryDocumentsProps> = ({
           </p>
         ) : documents.length > 0 ? (
           <div className="space-y-2">
-            {documents.map((doc: any) => (
+            {documents.map((doc) => (
               <div
                 key={doc.id}
                 className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
@@ -222,7 +222,7 @@ export const BeneficiaryDocuments: React.FC<BeneficiaryDocumentsProps> = ({
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span>{formatFileSize(doc.file_size || 0)}</span>
                       <span>•</span>
-                      <span>{new Date(doc.created_at).toLocaleDateString()}</span>
+                      <span>{doc.created_at ? new Date(doc.created_at).toLocaleDateString() : '-'}</span>
                     </div>
                   </div>
                 </div>
@@ -268,9 +268,9 @@ export const BeneficiaryDocuments: React.FC<BeneficiaryDocumentsProps> = ({
           <div className="border-t pt-4 mt-4">
             <p className="text-sm font-medium mb-2">Documentos Requeridos</p>
             <div className="space-y-1">
-              {documentTypes.filter((dt: any) => dt.is_required).map((docType: any) => {
+              {documentTypes.filter((dt) => dt.is_required).map((docType) => {
                 const hasDocument = documents.some(
-                  (d: any) => d.document_type_id === docType.id
+                  (d) => d.document_type_id === docType.id
                 );
                 return (
                   <div

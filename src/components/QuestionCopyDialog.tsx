@@ -24,7 +24,7 @@ interface TemplateQuestion {
   is_required: boolean | null;
   sort_order: number | null;
   template_id: string;
-  validation_rules: any;
+  validation_rules: unknown;
   placeholder_name: string | null;
 }
 
@@ -123,8 +123,9 @@ export function QuestionCopyDialog({ open, onOpenChange, targetTemplateId }: Que
       setSourceTemplateId("");
       setSelectedQuestions([]);
     },
-    onError: (error: any) => {
-      toast.error('Error al copiar preguntas: ' + error.message);
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error('Error al copiar preguntas: ' + message);
     },
   });
 

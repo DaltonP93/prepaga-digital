@@ -114,10 +114,10 @@ const Profile = () => {
       });
       refetch();
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Error al actualizar perfil',
         variant: "destructive",
       });
     },

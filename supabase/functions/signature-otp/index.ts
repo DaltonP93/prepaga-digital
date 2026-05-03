@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { checkRateLimitPersistent, rateLimitResponse, getClientIdentifier } from '../_shared/rate-limiter.ts'
 
 const corsHeaders = {
@@ -68,16 +68,16 @@ async function sendViaSMTPRelay(
 async function sendViaWhatsApp(
   phone: string,
   otp: string,
-  supabase: any,
+  supabase: SupabaseClient,
   companyId: string,
-  otpPolicy?: any,
+  otpPolicy?: Record<string, unknown>,
 ): Promise<{ sent: boolean; provider_used: string; reason?: string }> {
   try {
     // Determine provider and gateway: prefer OTP-specific config when available.
     // If signature config is forced but points to wa.me (manual), auto-fallback to OTP config.
     let provider: string;
     let gatewayUrl: string | null = null;
-    let settings: any = null;
+    let settings: Record<string, unknown> | null = null;
 
     const useSignatureConfig = otpPolicy?.otp_use_signature_whatsapp === true;
     const hasOtpSpecificProvider = !!otpPolicy?.otp_whatsapp_provider;
@@ -122,7 +122,7 @@ async function sendViaWhatsApp(
           .select('whatsapp_api_key, whatsapp_phone_id')
           .eq('company_id', companyId)
           .single();
-        settings = s;
+        settings = s as Record<string, unknown> | null;
       }
       if (!settings?.whatsapp_api_key || !settings?.whatsapp_phone_id) {
         return { sent: false, provider_used: 'meta', reason: 'Meta API no configurada (falta token o phone_id)' };
@@ -158,7 +158,7 @@ async function sendViaWhatsApp(
           .select('twilio_account_sid, twilio_auth_token, twilio_whatsapp_number')
           .eq('company_id', companyId)
           .single();
-        settings = s;
+        settings = s as Record<string, unknown> | null;
       }
       if (!settings?.twilio_account_sid || !settings?.twilio_auth_token || !settings?.twilio_whatsapp_number) {
         return { sent: false, provider_used: 'twilio', reason: 'Twilio no configurado (falta SID, token o número)' };
@@ -216,7 +216,9 @@ async function sendViaWhatsApp(
           if (parsed?.error?.toLowerCase().includes('session')) {
             reason = 'La sesión de WhatsApp está desconectada. El administrador debe reconectarla desde el panel WAHA.';
           }
-        } catch {}
+        } catch {
+          // intentional empty catch
+        }
         return { sent: false, provider_used: 'qr_session', reason };
       }
       return { sent: true, provider_used: 'qr_session' };
@@ -313,7 +315,7 @@ Deno.serve(async (req) => {
       const companyId = saleData?.company_id;
 
       // Get OTP policy for this company
-      let otpPolicy: any = {
+      const otpPolicy: Record<string, unknown> = {
         otp_length: 6,
         otp_expiration_seconds: 300,
         max_attempts: 3,
@@ -343,9 +345,9 @@ Deno.serve(async (req) => {
       }
 
       // Determine channel
-      const channel = requestedChannel || otpPolicy.default_channel || 'email';
+      const channel = requestedChannel || (otpPolicy.default_channel as string) || 'email';
       const allowedChannels = Array.isArray(otpPolicy.allowed_channels)
-        ? otpPolicy.allowed_channels
+        ? otpPolicy.allowed_channels as string[]
         : ['email'];
 
       if (!allowedChannels.includes(channel)) {
@@ -356,13 +358,13 @@ Deno.serve(async (req) => {
       }
 
       // Generate OTP
-      const otp = generateOTP(otpPolicy.otp_length);
+      const otp = generateOTP(otpPolicy.otp_length as number);
       const otpHash = await hashOTP(otp);
-      const expiresAt = new Date(Date.now() + otpPolicy.otp_expiration_seconds * 1000);
+      const expiresAt = new Date(Date.now() + (otpPolicy.otp_expiration_seconds as number) * 1000);
 
       let destinationMasked = '';
       let sendSuccess = false;
-      let attemptedChannel = channel;
+      const attemptedChannel = channel;
       let channelUsed = channel;
       let fallbackUsed = false;
       let fallbackReason = '';
@@ -430,7 +432,7 @@ Deno.serve(async (req) => {
           destination_masked: destinationMasked,
           otp_code_hash: otpHash,
           expires_at: expiresAt.toISOString(),
-          max_attempts: otpPolicy.max_attempts,
+          max_attempts: otpPolicy.max_attempts as number,
           ip_address: ip,
           user_agent: userAgent,
           result: sendSuccess ? 'pending' : 'send_failed',
@@ -603,11 +605,12 @@ Deno.serve(async (req) => {
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
-        } catch (err: any) {
-          return new Response(JSON.stringify({ success: false, error: err.message }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        return new Response(JSON.stringify({ success: false, error: msg }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       }
 
       if (!smtp_host && !smtp_relay_url) {
@@ -669,13 +672,13 @@ Deno.serve(async (req) => {
 async function sendEmailOTP(
   email: string,
   otp: string,
-  otpPolicy: any,
+  otpPolicy: Record<string, unknown>,
   companyId: string | null,
-  supabase: any,
+  supabase: SupabaseClient,
 ): Promise<{ sent: boolean; provider_used: string; reason?: string }> {
-  const smtpRelayUrl = otpPolicy.smtp_relay_url;
-  const fromAddress = otpPolicy.smtp_from_address || 'noreply@prepagadigital.com';
-  const fromName = otpPolicy.smtp_from_name || 'Prepaga Digital';
+  const smtpRelayUrl = otpPolicy.smtp_relay_url as string | undefined;
+  const fromAddress = (otpPolicy.smtp_from_address as string | undefined) || 'noreply@prepagadigital.com';
+  const fromName = (otpPolicy.smtp_from_name as string | undefined) || 'Prepaga Digital';
 
   // 1) Try SMTP relay if configured
   if (smtpRelayUrl) {
@@ -712,7 +715,9 @@ async function sendEmailOTP(
         if (res.status === 401 || parsed?.name === 'validation_error') {
           resendReason = 'Servicio de email no configurado correctamente (clave API inválida).';
         }
-      } catch {}
+      } catch {
+        // intentional empty catch
+      }
       return { sent: false, provider_used: 'resend', reason: resendReason };
     } catch (err) {
       console.error('Resend send error:', err);

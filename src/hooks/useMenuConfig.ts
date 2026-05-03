@@ -75,7 +75,7 @@ export const useSaveMenuConfig = () => {
       const { error } = await supabase
         .from('company_settings')
         .upsert(
-          { company_id: companyId, menu_config: menuConfig } as any,
+          { company_id: companyId, menu_config: menuConfig } as { company_id: string; menu_config: MenuConfigMap },
           { onConflict: 'company_id' }
         );
       if (error) throw error;

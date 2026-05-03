@@ -116,9 +116,9 @@ const SaleForm = () => {
       }
       
       navigate('/sales');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving sale:', error);
-      toast.error(error.message || 'Error al guardar la venta');
+      toast.error(error instanceof Error ? error.message : 'Error al guardar la venta');
     } finally {
       setLoading(false);
     }

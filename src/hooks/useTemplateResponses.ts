@@ -6,6 +6,10 @@ import { Tables, TablesInsert } from "@/integrations/supabase/types";
 type TemplateResponse = Tables<"template_responses">;
 type TemplateResponseInsert = TablesInsert<"template_responses">;
 
+type TemplateResponseWithQuestion = TemplateResponse & {
+  template_questions?: { question_text: string; question_type: string }[] | null;
+};
+
 export const useTemplateResponses = (templateId?: string, clientId?: string, saleId?: string) => {
   const queryClient = useQueryClient();
 
@@ -30,7 +34,7 @@ export const useTemplateResponses = (templateId?: string, clientId?: string, sal
       const { data, error } = await query.order("created_at", { ascending: true });
 
       if (error) throw error;
-      return data as any[];
+      return data as unknown as TemplateResponseWithQuestion[];
     },
     enabled: !!templateId,
   });
@@ -97,8 +101,9 @@ export const useTemplateResponses = (templateId?: string, clientId?: string, sal
       queryClient.invalidateQueries({ queryKey: ["template-response-stats"] });
       toast.success("Respuestas guardadas exitosamente");
     },
-    onError: (error: any) => {
-      toast.error(error.message || "Error al guardar las respuestas");
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(message || "Error al guardar las respuestas");
     },
   });
 
@@ -118,8 +123,9 @@ export const useTemplateResponses = (templateId?: string, clientId?: string, sal
       queryClient.invalidateQueries({ queryKey: ["template-response-stats"] });
       toast.success("Respuestas eliminadas exitosamente");
     },
-    onError: (error: any) => {
-      toast.error(error.message || "Error al eliminar las respuestas");
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(message || "Error al eliminar las respuestas");
     },
   });
 

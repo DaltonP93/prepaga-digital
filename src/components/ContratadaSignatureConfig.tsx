@@ -35,7 +35,7 @@ function ContratadaSignatureConfigInner() {
 
       if (data) {
         setMode(data.contratada_signature_mode || 'auto');
-        setAutoWhatsapp((data as any).contratada_auto_whatsapp ?? true);
+        setAutoWhatsapp((data as Record<string, unknown>).contratada_auto_whatsapp as boolean ?? true);
         setSignerName(data.contratada_signer_name || '');
         setSignerEmail(data.contratada_signer_email || '');
         setSignerDni(data.contratada_signer_dni || '');
@@ -61,13 +61,13 @@ function ContratadaSignatureConfigInner() {
           contratada_signer_email: signerEmail || null,
           contratada_signer_dni: signerDni || null,
           contratada_signer_phone: signerPhone || null,
-        } as any)
+        } as Record<string, unknown>)
         .eq('company_id', profile.company_id);
 
       if (error) throw error;
       toast.success('Configuración de firma contratada guardada');
-    } catch (err: any) {
-      toast.error('Error: ' + err.message);
+    } catch (err: unknown) {
+      toast.error('Error: ' + (err instanceof Error ? err.message : 'Error desconocido'));
     } finally {
       setSaving(false);
     }

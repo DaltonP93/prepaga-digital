@@ -16,6 +16,34 @@ import { useBeneficiaries } from '@/hooks/useBeneficiaries';
 import { validateSaleTransition } from '@/lib/workflowValidator';
 import { DocumentPreviewDialog } from '@/components/documents/DocumentPreviewDialog';
 import { useRolePermissions } from '@/hooks/useRolePermissions';
+import { Database } from '@/integrations/supabase/types';
+
+type TemplateAttachment = Database['public']['Tables']['template_attachments']['Row'];
+type DocumentInsert = Database['public']['Tables']['documents']['Insert'];
+
+interface SaleTemplateItem {
+  id: string;
+  sale_id: string;
+  template_id: string;
+  created_at?: string | null;
+  templates?: { id: string; name: string; description?: string | null } | null;
+}
+
+type SalesRow = Database['public']['Tables']['sales']['Row'];
+interface SaleWithJoinedRelations extends SalesRow {
+  clients?: { first_name: string; last_name: string; email?: string; phone?: string; dni?: string } | null;
+  plans?: { name: string; price?: number; description?: string; coverage_details?: unknown } | null;
+  companies?: { id: string; name: string; logo_url?: string } | null;
+}
+
+type PreviewDoc = {
+  name: string;
+  content: string | null;
+  file_url?: string | null;
+  document_type: string;
+  status: string;
+  beneficiary_id?: string | null;
+} | null;
 
 interface SaleTemplatesTabProps {
   saleId?: string;
@@ -75,16 +103,16 @@ const normalizeResponsePlaceholder = (value?: string | null): string => {
   return normalized;
 };
 
-const insertDocumentsWithFallback = async (documents: Record<string, any>[]) => {
+const insertDocumentsWithFallback = async (documents: DocumentInsert[]) => {
   if (documents.length === 0) return;
 
-  const { error } = await supabase.from('documents').insert(documents as any);
+  const { error } = await supabase.from('documents').insert(documents);
   if (!error) return;
 
   console.error('[DocGen] Bulk document insert failed, retrying sequentially:', error);
 
   for (const document of documents) {
-    const { error: singleError } = await supabase.from('documents').insert(document as any);
+    const { error: singleError } = await supabase.from('documents').insert(document);
     if (singleError) {
       console.error(`[DocGen] Error inserting "${document.name}":`, singleError);
       throw singleError;
@@ -132,7 +160,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
   const [regenerating, setRegenerating] = useState(false);
   const [regenerandoPdf, setRegenerandoPdf] = useState<string | null>(null);
   const [showDocuments, setShowDocuments] = useState(true);
-  const [previewDoc, setPreviewDoc] = useState<any>(null);
+  const [previewDoc, setPreviewDoc] = useState<PreviewDoc>(null);
   const [needsRegeneration, setNeedsRegeneration] = useState(false);
   const { data: beneficiaries } = useBeneficiaries(saleId || '');
   const [annexSignedUrls, setAnnexSignedUrls] = useState<Record<string, string>>({});
@@ -158,30 +186,30 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         .select('*, templates:template_id(id, name, description)')
         .eq('sale_id', saleId);
       if (error) throw error;
-      return data || [];
+      return (data || []) as unknown as SaleTemplateItem[];
     },
     enabled: !!saleId,
   });
 
   // Fetch annexes for all associated template IDs
-  const templateIds = saleTemplates?.map((st: any) => st.templates?.id || st.template_id).filter(Boolean) || [];
+  const templateIds = saleTemplates?.map((st) => st.templates?.id || st.template_id).filter(Boolean) || [];
   const { data: templateAnnexes } = useQuery({
     queryKey: ['sale-template-annexes', templateIds],
     queryFn: async () => {
       if (templateIds.length === 0) return [];
       const { data, error } = await supabase
-        .from('template_attachments' as any)
+        .from('template_attachments')
         .select('*')
         .in('template_id', templateIds)
         .order('sort_order', { ascending: true });
       if (error) throw error;
-      return (data as any[]) || [];
+      return (data || []) as TemplateAttachment[];
     },
     enabled: templateIds.length > 0,
   });
 
   // Load signed URL for an annex
-  const loadAnnexSignedUrl = async (annex: any) => {
+  const loadAnnexSignedUrl = async (annex: TemplateAttachment) => {
     if (annexSignedUrls[annex.id]) return annexSignedUrls[annex.id];
     const { data } = await supabase.storage
       .from('documents')
@@ -196,7 +224,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
   // Auto-load signed URLs for PDF annexes
   useEffect(() => {
     if (!templateAnnexes?.length) return;
-    templateAnnexes.forEach((annex: any) => {
+    templateAnnexes.forEach((annex) => {
       const isPDF = annex.file_type === 'application/pdf' || annex.file_name?.endsWith('.pdf');
       if (isPDF && !annexSignedUrls[annex.id]) {
         loadAnnexSignedUrl(annex);
@@ -236,8 +264,9 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
 
         toast.success('PDF regenerado correctamente');
         queryClient.invalidateQueries({ queryKey: ['sale-generated-documents', saleId] });
-      } catch (err: any) {
-        toast.error(err.message || 'Error al regenerar el PDF');
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Error al regenerar el PDF';
+        toast.error(message);
       } finally {
         setRegenerandoPdf(null);
       }
@@ -260,7 +289,10 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       }
       toast.success('Template asociado exitosamente');
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: unknown) => {
+      const message = e instanceof Error ? e.message : 'Error';
+      toast.error(message);
+    },
   });
 
   const removeTemplate = useMutation({
@@ -276,7 +308,10 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       }
       toast.success('Template removido');
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: unknown) => {
+      const message = e instanceof Error ? e.message : 'Error';
+      toast.error(message);
+    },
   });
 
   const handleSendDocuments = async () => {
@@ -285,7 +320,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
     try {
       setSending(true);
 
-      const templateIds = saleTemplates.map((st: any) => st.templates?.id || st.template_id).filter(Boolean);
+      const templateIds = saleTemplates.map((st) => st.templates?.id || st.template_id).filter(Boolean);
       const [
         saleResult,
         beneficiariesResult,
@@ -317,7 +352,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           .select('*, template_questions:question_id(placeholder_name)')
           .eq('sale_id', saleId),
         supabase
-          .from('template_attachments' as any)
+          .from('template_attachments')
           .select('*')
           .in('template_id', templateIds)
           .order('sort_order', { ascending: true }),
@@ -328,14 +363,14 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       if (templateContentsResult.error) throw templateContentsResult.error;
       if (attachmentsResult.error) throw attachmentsResult.error;
 
-      const sale = saleResult.data;
-      const client = sale?.clients as any;
-      const plan = sale?.plans as any;
-      const company = sale?.companies as any;
+      const sale = saleResult.data as unknown as SaleWithJoinedRelations;
+      const client = sale?.clients;
+      const plan = sale?.plans;
+      const company = sale?.companies;
       const effectiveBeneficiaries = beneficiariesResult.data || beneficiaries || [];
       const templateContents = templateContentsResult.data || [];
       const templateResponses = templateResponsesResult.data || [];
-      const allAttachments = (attachmentsResult.data as any[]) || [];
+      const allAttachments = (attachmentsResult.data || []) as TemplateAttachment[];
 
       if (company?.logo_url && company.logo_url.includes('.supabase.co/storage/v1/')) {
         const pathMatch = company.logo_url.match(/\/storage\/v1\/object\/(?:sign|public)\/([^/]+)\/([^?]+)/);
@@ -352,8 +387,8 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       }
 
       // Build responses map keyed by placeholder_name
-      const responsesMap: Record<string, any> = {};
-      (templateResponses || []).forEach((tr: any) => {
+      const responsesMap: Record<string, unknown> = {};
+      (templateResponses || []).forEach((tr) => {
         const placeholderName = tr.template_questions?.placeholder_name;
         const normalizedPlaceholder = normalizeResponsePlaceholder(placeholderName);
         if (tr.response_value !== null && tr.response_value !== undefined) {
@@ -368,7 +403,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
 
       // Fallback: If DDJJ responses are not populated from template_responses,
       // build them directly from beneficiary health data (primary beneficiary / titular)
-      const primaryBen = (effectiveBeneficiaries || []).find((b: any) => b.is_primary);
+      const primaryBen = (effectiveBeneficiaries || []).find((b) => b.is_primary);
       if (primaryBen && !responsesMap['ddjj_peso']) {
         const healthDetail = primaryBen.preexisting_conditions_detail || '';
         const detailLines = healthDetail.split('; ');
@@ -422,14 +457,21 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         .single();
 
       const context = createEnhancedTemplateContext(
-        client, plan, company, sale, effectiveBeneficiaries || [], undefined, responsesMap, companySettings
+        client as unknown as Record<string, unknown>,
+        plan as unknown as Record<string, unknown>,
+        company as unknown as Record<string, unknown>,
+        sale as unknown as Record<string, unknown>,
+        effectiveBeneficiaries || [],
+        undefined,
+        responsesMap,
+        companySettings as unknown as Record<string, unknown>
       );
 
-      const templatesWithAttachments = new Set((allAttachments || []).map((a: any) => a.template_id));
+      const templatesWithAttachments = new Set((allAttachments || []).map((a) => a.template_id));
       // Build a map of template_id -> first PDF attachment for direct file linking
-      const templatePdfAttachmentMap = new Map<string, any>();
+      const templatePdfAttachmentMap = new Map<string, TemplateAttachment>();
       const directAnnexTemplateIds = new Set<string>();
-      for (const att of (allAttachments as any[] || [])) {
+      for (const att of allAttachments || []) {
         const isPDF = att.file_type === 'application/pdf' || att.file_name?.endsWith('.pdf');
         if (isPDF && !templatePdfAttachmentMap.has(att.template_id)) {
           templatePdfAttachmentMap.set(att.template_id, att);
@@ -451,7 +493,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         await Promise.all(sortedTemplates.map(async (template) => {
           const hasDesignerContent = !!template.content?.trim();
           const norm = normalizeAccents(template.name);
-          const isDDJJ = norm.includes('ddjj') || norm.includes('declaracion') || (template as any).document_type === 'ddjj_salud';
+          const isDDJJ = norm.includes('ddjj') || norm.includes('declaracion') || template.document_type === 'ddjj_salud';
           const isContrato = norm.includes('contrato');
           const isAnexoPlan = isAnexoPlanName(template.name);
           const isAnexo = isAnexoPlan || (!isDDJJ && !isContrato);
@@ -465,7 +507,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
               document_type: 'anexo',
               content: null,
               file_url: pdfAttachment.file_url,
-              status: 'pendiente' as any,
+              status: 'pendiente',
               requires_signature: false,
               is_final: true,
               generated_from_template: true,
@@ -491,7 +533,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
             name: template.name,
             document_type: isAnexo ? 'anexo' : (isDDJJ ? 'ddjj_salud' : 'contrato'),
             content: normalizedContent,
-            status: 'pendiente' as any,
+            status: 'pendiente',
             requires_signature: !isAnexo,
             is_final: isAnexo,
             generated_from_template: true,
@@ -504,7 +546,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       const ddjiTemplates = (templateContents || []).filter(t => {
         const norm = normalizeAccents(t.name);
         return norm.includes('ddjj') || norm.includes('declaracion')
-          || (t as any).document_type === 'ddjj_salud';
+          || t.document_type === 'ddjj_salud';
       });
 
       const beneficiaryDocuments = (
@@ -513,7 +555,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
             return [];
           }
 
-          const benResponsesMap: Record<string, any> = { ...responsesMap };
+          const benResponsesMap: Record<string, unknown> = { ...responsesMap };
           const benDetail = b.preexisting_conditions_detail || '';
           const benLines = benDetail.split('; ');
           for (const line of benLines) {
@@ -547,11 +589,16 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
             const beneficiaryContext = createEnhancedTemplateContext(
               {
                 first_name: b.first_name, last_name: b.last_name,
-                email: b.email, phone: b.phone, dni: b.document_number || (b as any).dni,
+                email: b.email, phone: b.phone, dni: b.document_number || b.dni,
                 address: b.address, birth_date: b.birth_date,
-                city: (b as any).city, province: (b as any).province,
+                city: b.city, province: b.province,
               },
-              plan, company, sale, effectiveBeneficiaries || [], undefined, benResponsesMap
+              plan as unknown as Record<string, unknown>,
+              company as unknown as Record<string, unknown>,
+              sale as unknown as Record<string, unknown>,
+              effectiveBeneficiaries || [],
+              undefined,
+              benResponsesMap
             );
             let renderedContent = interpolateEnhancedTemplate(ddjiTemplate.content || '', beneficiaryContext);
             renderedContent = await resolveStorageImages(renderedContent);
@@ -561,7 +608,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
               name: `${ddjiTemplate.name} - ${b.first_name} ${b.last_name}`,
               document_type: 'ddjj_salud',
               content: renderedContent,
-              status: 'pendiente' as any,
+              status: 'pendiente',
               requires_signature: true,
               beneficiary_id: b.id,
             };
@@ -570,14 +617,14 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       ).filter(Boolean);
 
       const templateNameById = new Map(
-        (templateContents || []).map((t: any) => [t.id, t.name])
+        (templateContents || []).map((t) => [t.id, t.name])
       );
       const templatesWithContent = new Set(
-        (templateContents || []).filter((t: any) => !!t.content?.trim()).map((t: any) => t.id)
+        (templateContents || []).filter((t) => !!t.content?.trim()).map((t) => t.id)
       );
       const attachmentDocuments = allAttachments
-        .filter((att: any) => !templatesWithContent.has(att.template_id) && !directAnnexTemplateIds.has(att.template_id))
-        .map((att: any) => {
+        .filter((att) => !templatesWithContent.has(att.template_id) && !directAnnexTemplateIds.has(att.template_id))
+        .map((att) => {
           const parentTemplateName = templateNameById.get(att.template_id);
           const isAnexoPlanAttachment = isAnexoPlanName(parentTemplateName) || isAnexoPlanName(att.file_name);
 
@@ -587,7 +634,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
             document_type: 'anexo',
             file_url: att.file_url,
             content: null,
-            status: 'pendiente' as any,
+            status: 'pendiente',
             requires_signature: false,
             is_final: true,
             generated_from_template: true,
@@ -596,9 +643,9 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         });
 
       await insertDocumentsWithFallback([
-        ...titularDocuments,
-        ...beneficiaryDocuments,
-        ...attachmentDocuments,
+        ...(titularDocuments as unknown as DocumentInsert[]),
+        ...(beneficiaryDocuments as unknown as DocumentInsert[]),
+        ...(attachmentDocuments as unknown as DocumentInsert[]),
       ]);
 
       // Validate adherentes have documents before creating links
@@ -608,7 +655,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       if (adherentesNeedingLinks.length > 0) {
         const idsWithDocs = new Set(
           beneficiaryDocuments
-            .map((document: any) => document.beneficiary_id)
+            .map((document) => document.beneficiary_id)
             .filter(Boolean)
         );
         const missing = adherentesNeedingLinks.filter((b) => !idsWithDocs.has(b.id));
@@ -640,7 +687,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
 
       const { error: signatureLinksError } = await supabase
         .from('signature_links')
-        .insert(signatureLinkRows as any);
+        .insert(signatureLinkRows as unknown as Database['public']['Tables']['signature_links']['Insert'][]);
       if (signatureLinksError) throw signatureLinksError;
 
       // Validate workflow transition
@@ -648,14 +695,14 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       if (saleForValidation?.company_id) {
         const { data: currentUser } = await supabase.auth.getUser();
         const { data: userRoleData } = await supabase.rpc('get_user_role', { _user_id: currentUser?.user?.id || '' });
-        const check = await validateSaleTransition(saleForValidation.company_id, saleForValidation, 'enviado', (userRoleData as any) || 'vendedor');
+        const check = await validateSaleTransition(saleForValidation.company_id, saleForValidation, 'enviado', (userRoleData as unknown as string) || 'vendedor');
         if (!check.allowed) throw new Error(check.reasons.join(', '));
       }
 
       // Update sale status to 'enviado'
       await supabase
         .from('sales')
-        .update({ status: 'enviado' } as any)
+        .update({ status: 'enviado' })
         .eq('id', saleId);
 
       queryClient.invalidateQueries({ queryKey: ['sale', saleId] });
@@ -666,8 +713,9 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       toast.success('Documentos generados y enviados para firma. Redirigiendo...');
 
       navigate(`/signature-workflow/${saleId}`);
-    } catch (error: any) {
-      toast.error(error.message || 'Error al enviar documentos');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al enviar documentos';
+      toast.error(message);
     } finally {
       setSending(false);
     }
@@ -679,7 +727,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
 
     try {
       setRegenerating(true);
-      const tplIds = saleTemplates.map((st: any) => st.templates?.id || st.template_id).filter(Boolean);
+      const tplIds = saleTemplates.map((st) => st.templates?.id || st.template_id).filter(Boolean);
 
       const [
         deleteGeneratedResult,
@@ -695,7 +743,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           .delete()
           .eq('sale_id', saleId)
           .eq('generated_from_template', true)
-          .neq('status', 'firmado' as any)
+          .neq('status', 'firmado')
           .is('is_final', false),
         supabase
           .from('documents')
@@ -703,7 +751,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           .eq('sale_id', saleId)
           .eq('generated_from_template', true)
           .eq('document_type', 'anexo')
-          .neq('status', 'firmado' as any),
+          .neq('status', 'firmado'),
         supabase
           .from('sales')
           .select(`*, clients:client_id(*), plans:plan_id(*), companies:company_id(*)`)
@@ -723,32 +771,34 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           .select('*, template_questions:question_id(placeholder_name)')
           .eq('sale_id', saleId),
         supabase
-          .from('template_attachments' as any)
+          .from('template_attachments')
           .select('*')
           .in('template_id', tplIds)
           .order('sort_order', { ascending: true }),
       ]);
 
       if (deleteGeneratedResult.error) {
+        // ignore generated docs delete errors
       }
       if (deleteAnnexesResult.error) {
+        // ignore annexes delete errors
       }
       if (saleResult.error) throw saleResult.error;
       if (beneficiariesResult.error) throw beneficiariesResult.error;
       if (templateContentsResult.error) throw templateContentsResult.error;
       if (attachmentsResult.error) throw attachmentsResult.error;
 
-      const sale = saleResult.data;
-      const client = sale?.clients as any;
-      const plan = sale?.plans as any;
-      const company = sale?.companies as any;
+      const sale = saleResult.data as unknown as SaleWithJoinedRelations;
+      const client = sale?.clients;
+      const plan = sale?.plans;
+      const company = sale?.companies;
       const effectiveBeneficiaries = beneficiariesResult.data || beneficiaries || [];
       const templateContents = templateContentsResult.data || [];
       const templateResponses = templateResponsesResult.data || [];
-      const allAttachments = (attachmentsResult.data as any[]) || [];
+      const allAttachments = (attachmentsResult.data || []) as TemplateAttachment[];
 
-      const responsesMap: Record<string, any> = {};
-      (templateResponses || []).forEach((tr: any) => {
+      const responsesMap: Record<string, unknown> = {};
+      (templateResponses || []).forEach((tr) => {
         const ph = normalizeResponsePlaceholder(tr.template_questions?.placeholder_name);
         if (tr.response_value !== null && tr.response_value !== undefined) {
           if (ph) responsesMap[ph] = tr.response_value;
@@ -757,7 +807,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       });
 
       // Fallback: Build DDJJ responses from primary beneficiary health data (same as handleSendDocuments)
-      const primaryBen = (effectiveBeneficiaries || []).find((b: any) => b.is_primary);
+      const primaryBen = (effectiveBeneficiaries || []).find((b) => b.is_primary);
       if (primaryBen && !responsesMap['ddjj_peso']) {
         const healthDetail = primaryBen.preexisting_conditions_detail || '';
         const detailLines = healthDetail.split('; ');
@@ -803,9 +853,18 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         .eq('company_id', company.id)
         .single();
 
-      const context = createEnhancedTemplateContext(client, plan, company, sale, effectiveBeneficiaries, undefined, responsesMap, csSettings);
-      const templatesWithAttachments = new Set(allAttachments.map((a: any) => a.template_id));
-      const templatePdfAttachmentMap = new Map<string, any>();
+      const context = createEnhancedTemplateContext(
+        client as unknown as Record<string, unknown>,
+        plan as unknown as Record<string, unknown>,
+        company as unknown as Record<string, unknown>,
+        sale as unknown as Record<string, unknown>,
+        effectiveBeneficiaries,
+        undefined,
+        responsesMap,
+        csSettings as unknown as Record<string, unknown>
+      );
+      const templatesWithAttachments = new Set(allAttachments.map((a) => a.template_id));
+      const templatePdfAttachmentMap = new Map<string, TemplateAttachment>();
       const directAnnexTemplateIds = new Set<string>();
       for (const attachment of allAttachments) {
         const isPDF = attachment.file_type === 'application/pdf' || attachment.file_name?.endsWith('.pdf');
@@ -841,7 +900,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
               document_type: 'anexo',
               file_url: pdfAttachment.file_url,
               content: null,
-              status: 'pendiente' as any,
+              status: 'pendiente',
               requires_signature: false,
               is_final: true,
               generated_from_template: true,
@@ -869,7 +928,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
             name: template.name,
             document_type: isAnexo ? 'anexo' : (isDDJJ ? 'ddjj_salud' : 'contrato'),
             content: rendered,
-            status: 'pendiente' as any,
+            status: 'pendiente',
             requires_signature: !isAnexo,
             is_final: isAnexo,
             generated_from_template: true,
@@ -880,14 +939,14 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
 
       // DDJJ per adherente
       const ddjiTpls = templateContents.filter(isDDJJTemplate);
-      const unresolvedTraceRows: Record<string, any>[] = [];
+      const unresolvedTraceRows: Record<string, unknown>[] = [];
       const beneficiaryDocuments = (
         await Promise.all((effectiveBeneficiaries || []).flatMap((b) => {
           if (b.signature_required === false || b.is_primary || ddjiTpls.length === 0) {
             return [];
           }
 
-          const benResponsesMap: Record<string, any> = { ...responsesMap };
+          const benResponsesMap: Record<string, unknown> = { ...responsesMap };
           const benDetail = b.preexisting_conditions_detail || '';
           const benLines = benDetail.split('; ');
           for (const line of benLines) {
@@ -924,15 +983,15 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
                 last_name: b.last_name,
                 email: b.email,
                 phone: b.phone,
-                dni: b.document_number || (b as any).dni,
+                dni: b.document_number || b.dni,
                 address: b.address,
                 birth_date: b.birth_date,
-                city: (b as any).city,
-                province: (b as any).province,
+                city: b.city,
+                province: b.province,
               },
-              plan,
-              company,
-              sale,
+              plan as unknown as Record<string, unknown>,
+              company as unknown as Record<string, unknown>,
+              sale as unknown as Record<string, unknown>,
               effectiveBeneficiaries,
               undefined,
               benResponsesMap
@@ -958,7 +1017,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
               name: `${ddji.name} - ${b.first_name} ${b.last_name}`,
               document_type: 'ddjj_salud',
               content: renderedDDJJ,
-              status: 'pendiente' as any,
+              status: 'pendiente',
               requires_signature: true,
               beneficiary_id: b.id,
               generated_from_template: true,
@@ -967,13 +1026,13 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         }))
       ).filter(Boolean);
 
-      const templateNameById = new Map(templateContents.map((t: any) => [t.id, t.name]));
+      const templateNameById = new Map(templateContents.map((t) => [t.id, t.name]));
       const templatesWithContent = new Set(
-        templateContents.filter((t: any) => !!t.content?.trim()).map((t: any) => t.id)
+        templateContents.filter((t) => !!t.content?.trim()).map((t) => t.id)
       );
       const attachmentDocuments = allAttachments
-        .filter((att: any) => !templatesWithContent.has(att.template_id) && !directAnnexTemplateIds.has(att.template_id))
-        .map((att: any) => {
+        .filter((att) => !templatesWithContent.has(att.template_id) && !directAnnexTemplateIds.has(att.template_id))
+        .map((att) => {
           const parentTemplateName = templateNameById.get(att.template_id);
           return {
             sale_id: saleId,
@@ -981,7 +1040,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
             document_type: 'anexo',
             file_url: att.file_url,
             content: null,
-            status: 'pendiente' as any,
+            status: 'pendiente',
             requires_signature: false,
             is_final: true,
             generated_from_template: true,
@@ -990,22 +1049,24 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         });
 
       await insertDocumentsWithFallback([
-        ...titularDocuments,
-        ...beneficiaryDocuments,
-        ...attachmentDocuments,
+        ...(titularDocuments as unknown as DocumentInsert[]),
+        ...(beneficiaryDocuments as unknown as DocumentInsert[]),
+        ...(attachmentDocuments as unknown as DocumentInsert[]),
       ]);
 
       if (unresolvedTraceRows.length > 0) {
-        const { error: traceError } = await supabase.from('process_traces').insert(unresolvedTraceRows as any);
+        const { error: traceError } = await supabase.from('process_traces').insert(unresolvedTraceRows as unknown as Database['public']['Tables']['process_traces']['Insert'][]);
         if (traceError) {
+          // ignore trace insert errors
         }
       }
 
       queryClient.invalidateQueries({ queryKey: ['sale-generated-documents', saleId] });
       queryClient.invalidateQueries({ queryKey: ['signed-documents', saleId] });
       toast.success('Documentos regenerados exitosamente');
-    } catch (error: any) {
-      toast.error(error.message || 'Error al regenerar documentos');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al regenerar documentos';
+      toast.error(message);
     } finally {
       setRegenerating(false);
       setNeedsRegeneration(false);
@@ -1038,7 +1099,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
   }
 
   const availableTemplates = templates?.filter(
-    t => t.is_active !== false && !saleTemplates?.some(st => (st as any).templates?.id === t.id)
+    t => t.is_active !== false && !saleTemplates?.some(st => st.templates?.id === t.id)
   ) || [];
 
   // Group generated docs
@@ -1127,9 +1188,9 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         <div className="text-center py-8 text-muted-foreground">Cargando templates...</div>
       ) : saleTemplates && saleTemplates.length > 0 ? (
         <div className="space-y-2">
-          {saleTemplates.map((st: any) => {
+          {saleTemplates.map((st) => {
             const tplId = st.templates?.id || st.template_id;
-            const tplAnnexes = (templateAnnexes || []).filter((a: any) => a.template_id === tplId);
+            const tplAnnexes = (templateAnnexes || []).filter((a) => a.template_id === tplId);
             // isAnnexOnly: template has PDF attachments and no HTML content (content not fetched in list query)
             const isAnnexOnly = tplAnnexes.length > 0;
             const isExpanded = expandedAnnexes[st.id] || false;
@@ -1176,7 +1237,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
                   {/* Inline annexes viewer */}
                   {isExpanded && tplAnnexes.length > 0 && (
                     <div className="space-y-3 pt-2 border-t">
-                      {tplAnnexes.map((annex: any) => {
+                      {tplAnnexes.map((annex) => {
                         const isPDF = annex.file_type === 'application/pdf' || annex.file_name?.endsWith('.pdf');
                         const url = annexSignedUrls[annex.id];
                         return (

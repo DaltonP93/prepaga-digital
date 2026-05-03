@@ -39,14 +39,14 @@ interface LiveTemplatePreviewProps {
   content: string;
   templateId?: string;
   sampleData?: {
-    client?: any;
-    plan?: any;
-    company?: any;
-    sale?: any;
-    beneficiaries?: any[];
-    signatureLink?: any;
-    responses?: Record<string, any>;
-    companySettings?: any;
+    client?: Record<string, unknown>;
+    plan?: Record<string, unknown>;
+    company?: Record<string, unknown>;
+    sale?: Record<string, unknown>;
+    beneficiaries?: Record<string, unknown>[];
+    signatureLink?: Record<string, unknown>;
+    responses?: Record<string, unknown>;
+    companySettings?: Record<string, unknown>;
   };
   className?: string;
   onDownloadPDF?: () => void;
@@ -130,8 +130,8 @@ const defaultSampleData = {
     expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     status: 'pendiente',
   },
-  responses: {} as Record<string, any>,
-  companySettings: undefined as any,
+  responses: {} as Record<string, unknown>,
+  companySettings: undefined as Record<string, unknown> | undefined,
 };
 
 export const LiveTemplatePreview: React.FC<LiveTemplatePreviewProps> = ({
@@ -154,7 +154,7 @@ export const LiveTemplatePreview: React.FC<LiveTemplatePreviewProps> = ({
     if (!templateId) return;
     setAnnexesLoading(true);
     supabase
-      .from("template_attachments" as any)
+      .from("template_attachments")
       .select("*")
       .eq("template_id", templateId)
       .order("sort_order", { ascending: true })

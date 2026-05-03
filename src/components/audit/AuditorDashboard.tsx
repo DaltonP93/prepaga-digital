@@ -44,7 +44,7 @@ interface ParsedHealthData {
   lastMenstruation: string;
 }
 
-const parseHealthDetail = (detail: string | null, hasPreexisting: boolean | null): ParsedHealthData => {
+const parseHealthDetail = (detail: string | null | undefined, hasPreexisting: boolean | null | undefined): ParsedHealthData => {
   const data: ParsedHealthData = {
     peso: '', altura: '',
     answers: new Array(HEALTH_QUESTIONS.length).fill(''),
@@ -79,12 +79,12 @@ const parseHealthDetail = (detail: string | null, hasPreexisting: boolean | null
   return data;
 };
 
-const logBestEffortInsertError = (tableName: string, error: any) => {
+const logBestEffortInsertError = (tableName: string, error: unknown) => {
   if (!error) return;
   console.error(`Best-effort insert failed for ${tableName}:`, error);
 };
 
-const BeneficiaryHealthView: React.FC<{ beneficiary: any }> = ({ beneficiary }) => {
+const BeneficiaryHealthView: React.FC<{ beneficiary: { preexisting_conditions_detail?: string | null; has_preexisting_conditions?: boolean | null } }> = ({ beneficiary }) => {
   const health = parseHealthDetail(beneficiary.preexisting_conditions_detail, beneficiary.has_preexisting_conditions);
   const hasData = beneficiary.preexisting_conditions_detail || beneficiary.has_preexisting_conditions !== null;
 
@@ -216,19 +216,19 @@ export const AuditorDashboard: React.FC = () => {
       if (error) throw error;
 
       // Fetch salesperson profiles separately
-      const salespersonIds = [...new Set((data || []).map((s: any) => s.salesperson_id).filter(Boolean))];
-      let profilesMap: Record<string, any> = {};
+      const salespersonIds = [...new Set((data || []).map((s) => s.salesperson_id).filter(Boolean))] as string[];
+      let profilesMap: Record<string, { first_name?: string | null; last_name?: string | null; email?: string | null }> = {};
       if (salespersonIds.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id, first_name, last_name, email')
           .in('id', salespersonIds);
-        profilesMap = (profiles || []).reduce((acc: any, p: any) => { acc[p.id] = p; return acc; }, {});
+        profilesMap = (profiles || []).reduce((acc: Record<string, { first_name?: string | null; last_name?: string | null; email?: string | null }>, p: unknown) => { acc[(p as { id: string }).id] = p as { first_name?: string | null; last_name?: string | null; email?: string | null }; return acc; }, {} as Record<string, { first_name?: string | null; last_name?: string | null; email?: string | null }>);
       }
 
-      return (data || []).map((s: any) => ({
+      return (data || []).map((s) => ({
         ...s,
-        profiles: profilesMap[s.salesperson_id] || null,
+        profiles: (s.salesperson_id && profilesMap[s.salesperson_id]) || null,
       }));
     },
     refetchInterval: 30_000,
@@ -244,6 +244,7 @@ export const AuditorDashboard: React.FC = () => {
     queryKey: ['auditor-sale-detail', selectedSaleId],
     enabled: !!selectedSaleId,
     queryFn: async () => {
+      if (!selectedSaleId) throw new Error('Sale ID is required');
       let saleQuery = supabase
         .from('sales')
         .select(`
@@ -304,8 +305,8 @@ export const AuditorDashboard: React.FC = () => {
       if (documentsError) throw documentsError;
       if (saleDocumentsError) throw saleDocumentsError;
 
-      const beneficiaryIds = (beneficiaries || []).map((b: any) => b.id).filter(Boolean);
-      const beneficiaryDocsMap: Record<string, any[]> = {};
+      const beneficiaryIds = (beneficiaries || []).map((b) => b.id).filter(Boolean);
+      const beneficiaryDocsMap: Record<string, Array<{ id: string; file_name?: string | null; file_type?: string | null; is_verified?: boolean | null; file_url?: string | null }>> = {};
       if (beneficiaryIds.length > 0) {
         const { data: benDocs, error: benDocsError } = await supabase
           .from('beneficiary_documents')
@@ -315,7 +316,7 @@ export const AuditorDashboard: React.FC = () => {
 
         if (benDocsError) throw benDocsError;
 
-        (benDocs || []).forEach((doc: any) => {
+        (benDocs || []).forEach((doc) => {
           if (!beneficiaryDocsMap[doc.beneficiary_id]) beneficiaryDocsMap[doc.beneficiary_id] = [];
           beneficiaryDocsMap[doc.beneficiary_id].push(doc);
         });
@@ -324,7 +325,7 @@ export const AuditorDashboard: React.FC = () => {
       return {
         ...sale,
         profiles: salespersonProfile,
-        beneficiaries: (beneficiaries || []).map((b: any) => ({
+        beneficiaries: (beneficiaries || []).map((b) => ({
           ...b,
           beneficiary_documents: beneficiaryDocsMap[b.id] || [],
         })),
@@ -341,12 +342,12 @@ export const AuditorDashboard: React.FC = () => {
   const canApproveSelectedSale = !!selectedSale && (canViewAllAuditSales || (isVendedor && isOwnSelectedSale));
   const canRejectOrRequestInfoSelectedSale = !!selectedSale && canViewAllAuditSales;
 
-  const assertAuditActionAllowed = (sale: any, action: 'approve' | 'reject' | 'request_info') => {
+  const assertAuditActionAllowed = (sale: unknown, action: 'approve' | 'reject' | 'request_info') => {
     if (!sale) {
       throw new Error('No se encontró la venta seleccionada');
     }
 
-    const isOwnSale = !!user?.id && sale.salesperson_id === user.id;
+    const isOwnSale = !!user?.id && (sale as { salesperson_id?: string }).salesperson_id === user.id;
 
     if (action === 'approve') {
       if (canViewAllAuditSales) return;
@@ -402,7 +403,7 @@ export const AuditorDashboard: React.FC = () => {
   // Approve sale - changes status to 'aprobado_para_templates' (approved, ready for next steps)
   const approveSale = useMutation({
     mutationFn: async (saleId: string) => {
-      const saleData = sales.find((s: any) => s.id === saleId);
+      const saleData = sales.find((s) => s.id === saleId);
       assertAuditActionAllowed(saleData, 'approve');
       const previousStatus = saleData?.status || 'pendiente';
 
@@ -417,9 +418,9 @@ export const AuditorDashboard: React.FC = () => {
           auditor_id: profile?.id,
           audited_at: new Date().toISOString(),
           audit_notes: auditNotes || 'Aprobado sin observaciones',
-          status: 'aprobado_para_templates' as any,
+          status: 'aprobado_para_templates' as unknown as string,
           contract_start_date: contractStartDate,
-        } as any)
+        } as Record<string, unknown>)
         .eq('id', saleId);
 
       if (error) throw error;
@@ -466,10 +467,10 @@ export const AuditorDashboard: React.FC = () => {
         description: 'La venta ha sido aprobada y pasa a estado Aprobado.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: 'Error',
-        description: error.message || 'No se pudo aprobar la venta.',
+        description: error instanceof Error ? error.message : 'No se pudo aprobar la venta.',
         variant: 'destructive',
       });
     },
@@ -478,7 +479,7 @@ export const AuditorDashboard: React.FC = () => {
   // Reject sale - returns to 'rechazado' so vendedor can fix and resubmit
   const rejectSale = useMutation({
     mutationFn: async (saleId: string) => {
-      const saleData = sales.find((s: any) => s.id === saleId);
+      const saleData = sales.find((s) => s.id === saleId);
       assertAuditActionAllowed(saleData, 'reject');
       if (!auditNotes.trim()) {
         throw new Error('Debe proporcionar un motivo de rechazo');
@@ -492,7 +493,7 @@ export const AuditorDashboard: React.FC = () => {
           auditor_id: profile?.id,
           audited_at: new Date().toISOString(),
           audit_notes: auditNotes,
-          status: 'rechazado' as any,
+          status: 'rechazado',
         })
         .eq('id', saleId);
 
@@ -539,10 +540,10 @@ export const AuditorDashboard: React.FC = () => {
         variant: 'destructive',
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: 'Error',
-        description: error.message || 'No se pudo rechazar la venta.',
+        description: error instanceof Error ? error.message : 'No se pudo rechazar la venta.',
         variant: 'destructive',
       });
     },
@@ -551,7 +552,7 @@ export const AuditorDashboard: React.FC = () => {
   // Request more info
   const requestMoreInfo = useMutation({
     mutationFn: async (saleId: string) => {
-      const saleData = sales.find((s: any) => s.id === saleId);
+      const saleData = sales.find((s) => s.id === saleId);
       assertAuditActionAllowed(saleData, 'request_info');
       if (!auditNotes.trim()) {
         throw new Error('Debe especificar qué información adicional necesita');
@@ -564,7 +565,7 @@ export const AuditorDashboard: React.FC = () => {
           audit_status: 'requiere_info',
           auditor_id: profile?.id,
           audit_notes: auditNotes,
-          status: 'rechazado' as any,
+          status: 'rechazado',
         })
         .eq('id', saleId);
 
@@ -650,31 +651,31 @@ export const AuditorDashboard: React.FC = () => {
   };
 
   // Classify each sale for filtering and stats
-  const classifySale = (sale: any): string => {
-    if (sale.audit_status === 'aprobado') return 'aprobado';
-    if (sale.audit_status === 'rechazado') return 'rechazado';
-    if (sale.audit_status === 'requiere_info') return 'requiere_info';
+  const classifySale = (sale: unknown): string => {
+    if ((sale as { audit_status?: string }).audit_status === 'aprobado') return 'aprobado';
+    if ((sale as { audit_status?: string }).audit_status === 'rechazado') return 'rechazado';
+    if ((sale as { audit_status?: string }).audit_status === 'requiere_info') return 'requiere_info';
     return 'pending';
   };
 
   // Stats from ALL sales
   const stats = {
-    pending: sales.filter((s: any) => classifySale(s) === 'pending').length,
-    approved: sales.filter((s: any) => classifySale(s) === 'aprobado').length,
-    rejected: sales.filter((s: any) => classifySale(s) === 'rechazado').length,
-    infoRequired: sales.filter((s: any) => classifySale(s) === 'requiere_info').length,
+    pending: sales.filter((s) => classifySale(s) === 'pending').length,
+    approved: sales.filter((s) => classifySale(s) === 'aprobado').length,
+    rejected: sales.filter((s) => classifySale(s) === 'rechazado').length,
+    infoRequired: sales.filter((s) => classifySale(s) === 'requiere_info').length,
   };
 
   // Filter by status tab, then by search
   const filteredSales = sales
-    .filter((sale: any) => {
+    .filter((sale) => {
       if (statusFilter === 'pending') return classifySale(sale) === 'pending';
       if (statusFilter === 'aprobado') return classifySale(sale) === 'aprobado';
       if (statusFilter === 'rechazado') return classifySale(sale) === 'rechazado';
       if (statusFilter === 'requiere_info') return classifySale(sale) === 'requiere_info';
       return true; // 'all'
     })
-    .filter((sale: any) => {
+    .filter((sale) => {
       if (!searchTerm) return true;
       const searchLower = searchTerm.toLowerCase();
       return (
@@ -828,7 +829,7 @@ export const AuditorDashboard: React.FC = () => {
               <div>
                 <span className="font-medium">Precio Titular: </span>
                 {formatCurrency(Number(
-                  selectedSale.beneficiaries?.find((b: any) => b.is_primary === true)?.amount || 
+                  selectedSale.beneficiaries?.find((b) => b.is_primary === true)?.amount || 
                   selectedSale.total_amount || 0
                 ))}
               </div>
@@ -870,7 +871,7 @@ export const AuditorDashboard: React.FC = () => {
 
           {/* Adherentes (excluye titular) */}
           {(() => {
-            const adherentes = (selectedSale.beneficiaries || []).filter((b: any) => !b.is_primary);
+            const adherentes = (selectedSale.beneficiaries || []).filter((b) => !b.is_primary);
             if (adherentes.length === 0) return null;
             return (
               <Card className="lg:col-span-2">
@@ -879,7 +880,7 @@ export const AuditorDashboard: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {adherentes.map((ben: any) => (
+                    {adherentes.map((ben) => (
                       <div key={ben.id} className="p-3 border rounded-lg space-y-3">
                         <div className="flex items-center justify-between">
                           <div>
@@ -897,7 +898,7 @@ export const AuditorDashboard: React.FC = () => {
                                 {[ben.address, ben.barrio, ben.city].filter(Boolean).join(', ')}
                               </div>
                             )}
-                            {ben.amount > 0 && (
+                            {ben.amount && ben.amount > 0 && (
                               <div className="text-sm text-muted-foreground">
                                 Monto: {formatCurrency(Number(ben.amount))}
                               </div>
@@ -908,7 +909,7 @@ export const AuditorDashboard: React.FC = () => {
                         {ben.beneficiary_documents && ben.beneficiary_documents.length > 0 && (
                           <div className="border-t pt-2 space-y-1">
                             <p className="text-xs font-medium text-muted-foreground">Documentos adjuntos ({ben.beneficiary_documents.length})</p>
-                            {ben.beneficiary_documents.map((doc: any) => (
+                            {ben.beneficiary_documents.map((doc) => (
                               <div key={doc.id} className="flex items-center justify-between p-2 bg-muted/30 rounded text-sm">
                                 <div className="flex items-center gap-2">
                                   <FileText className="h-3 w-3" />
@@ -923,12 +924,13 @@ export const AuditorDashboard: React.FC = () => {
                                   variant="ghost"
                                   size="sm"
                                   onClick={async () => {
+                                    if (!doc.file_url) return;
                                     const { data } = await supabase.storage
                                       .from('documents')
                                       .createSignedUrl(doc.file_url, 3600);
                                     if (data?.signedUrl) {
                                       setLightboxUrl(data.signedUrl);
-                                      setLightboxName(doc.file_name);
+                                      setLightboxName(doc.file_name || '');
                                       setLightboxType(doc.file_type || '');
                                       setLightboxOpen(true);
                                     }
@@ -960,7 +962,7 @@ export const AuditorDashboard: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {selectedSale.beneficiaries.map((ben: any) => (
+                  {selectedSale.beneficiaries.map((ben) => (
                     <div key={ben.id} className="p-3 border rounded-lg space-y-2">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{ben.first_name} {ben.last_name}</span>
@@ -988,7 +990,7 @@ export const AuditorDashboard: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {selectedSale.documents.map((doc: any) => (
+                  {selectedSale.documents.map((doc) => (
                     <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex items-center gap-2">
                         <FileText className="h-4 w-4" />
@@ -1015,7 +1017,7 @@ export const AuditorDashboard: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {selectedSale.attached_documents.map((doc: any) => (
+                  {selectedSale.attached_documents.map((doc) => (
                     <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex items-center gap-2">
                         <FileText className="h-4 w-4 text-muted-foreground" />
@@ -1212,7 +1214,7 @@ export const AuditorDashboard: React.FC = () => {
             </div>
           ) : paginatedSales.length > 0 ? (
             <div className="space-y-3">
-              {paginatedSales.map((sale: any) => (
+              {paginatedSales.map((sale) => (
                 <div
                   key={sale.id}
                   className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
@@ -1222,7 +1224,7 @@ export const AuditorDashboard: React.FC = () => {
                       <span className="font-medium">
                         {sale.clients?.first_name} {sale.clients?.last_name}
                       </span>
-                      {getStatusBadge(sale.status, sale.audit_status)}
+                       {getStatusBadge(sale.status || '', sale.audit_status)}
                     </div>
                     <div className="text-sm text-muted-foreground">
                       {sale.plans?.name} • {formatCurrency(Number(sale.total_amount || 0))}

@@ -14,10 +14,57 @@ import {
   Settings2, Type, Heading, PenTool, FileUp, Lightbulb,
   Tag, Upload, ImageIcon, Link, Trash2, Replace,
 } from "lucide-react";
-import type { TemplateBlock, SignerRole, BlockType } from "@/types/templateDesigner";
+import type { TemplateBlock, SignerRole, BlockType, BlockContent } from "@/types/templateDesigner";
 import { supabase } from "@/integrations/supabase/client";
 import { uploadTemplateImage } from "@/lib/templateImageUpload";
 import { useToast } from "@/hooks/use-toast";
+
+type LooseContent = Record<string, unknown> & {
+  html?: string;
+  plain_text?: string;
+  semantic_role?: string;
+  text?: string;
+  level?: number;
+  src?: string;
+  storage_path?: string;
+  alt?: string;
+  caption?: string;
+  fit?: string;
+  opacity?: number;
+  is_background?: boolean;
+  label?: string;
+  signer_role?: string;
+  signature_mode?: string;
+  preset?: string;
+  show_name?: boolean;
+  show_dni?: boolean;
+  show_timestamp?: boolean;
+  show_ip?: boolean;
+  show_method?: boolean;
+  source?: string;
+  header?: boolean;
+  striped?: boolean;
+  title?: string;
+  description?: string;
+  display_mode?: string;
+  include_in_final_pdf?: boolean;
+  allow_overlay_fields?: boolean;
+  replaceable?: boolean;
+  placeholder_key?: string;
+  example_value?: string;
+  asset_id?: string;
+};
+
+type LooseStyle = Record<string, unknown> & {
+  textAlign?: string;
+  fontSize?: number;
+  fontWeight?: number;
+  color?: string;
+  align?: string;
+  size?: string;
+  borderTop?: boolean;
+  paddingTop?: number;
+};
 
 interface BlockPropertyPanelProps {
   block: TemplateBlock | null;
@@ -128,14 +175,14 @@ export const BlockPropertyPanel: React.FC<BlockPropertyPanelProps> = ({
     );
   }
 
-  const content = block.content as any;
-  const style = block.style as any;
-  const visibility = block.visibility_rules as any;
+  const content = block.content as unknown as LooseContent;
+  const style = block.style as unknown as LooseStyle;
+  const visibility = block.visibility_rules;
 
-  const updateContent = (key: string, value: any) => {
-    onUpdate({ content: { ...content, [key]: value } as any });
+  const updateContent = (key: string, value: unknown) => {
+    onUpdate({ content: { ...content, [key]: value } as unknown as BlockContent });
   };
-  const updateStyle = (key: string, value: any) => {
+  const updateStyle = (key: string, value: unknown) => {
     onUpdate({ style: { ...style, [key]: value } });
   };
   const updateVisibilityRoles = (role: SignerRole, checked: boolean) => {
@@ -143,7 +190,7 @@ export const BlockPropertyPanel: React.FC<BlockPropertyPanelProps> = ({
     const newRoles = checked
       ? [...currentRoles, role]
       : currentRoles.filter((r: SignerRole) => r !== role);
-    onUpdate({ visibility_rules: { ...visibility, roles: newRoles } as any });
+    onUpdate({ visibility_rules: { ...visibility, roles: newRoles } });
   };
 
   return (
@@ -223,10 +270,10 @@ function TypeProperties({
   block, content, style, updateContent, updateStyle, templateId, onUpdate, onRequestPickImage,
 }: {
   block: TemplateBlock;
-  content: any;
-  style: any;
-  updateContent: (k: string, v: any) => void;
-  updateStyle: (k: string, v: any) => void;
+  content: LooseContent;
+  style: LooseStyle;
+  updateContent: (k: string, v: unknown) => void;
+  updateStyle: (k: string, v: unknown) => void;
   templateId?: string;
   onUpdate: (u: Partial<TemplateBlock>) => void;
   onRequestPickImage?: () => void;
@@ -372,7 +419,7 @@ function TypeProperties({
             ].map((item) => (
               <div key={item.key} className="flex items-center justify-between">
                 <span className="text-[11px]">{item.label}</span>
-                <Switch checked={content[item.key] ?? true} onCheckedChange={(v) => updateContent(item.key, v)} />
+                <Switch checked={(content[item.key] as boolean | undefined) ?? true} onCheckedChange={(v) => updateContent(item.key, v)} />
               </div>
             ))}
           </div>
@@ -488,8 +535,8 @@ function TypeProperties({
 function ImageProperties({
   content, updateContent, templateId, onUpdate, block, onRequestPickImage,
 }: {
-  content: any;
-  updateContent: (k: string, v: any) => void;
+  content: LooseContent;
+  updateContent: (k: string, v: unknown) => void;
   templateId?: string;
   onUpdate: (u: Partial<TemplateBlock>) => void;
   block: TemplateBlock;
@@ -510,8 +557,9 @@ function ImageProperties({
       updateContent("storage_path", result.storagePath);
       updateContent("alt", file.name);
       toast({ title: "Imagen subida" });
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast({ title: "Error", description: message, variant: "destructive" });
     } finally {
       setUploading(false);
     }

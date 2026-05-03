@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,7 +11,7 @@ interface FileUploadData {
   bucketName: string;
   filePath?: string;
   isPublic?: boolean;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 serve(async (req) => {
@@ -65,16 +65,17 @@ serve(async (req) => {
         throw new Error("Invalid action parameter");
     }
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("File manager error:", error);
-    return new Response(JSON.stringify({ error: error?.message || "Unknown error" }), {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return new Response(JSON.stringify({ error: message }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }
 });
 
-async function handleFileUpload(supabase: any, req: Request, userId: string) {
+async function handleFileUpload(supabase: SupabaseClient, req: Request, userId: string) {
   const formData = await req.formData();
   const file = formData.get("file") as File;
   const bucketName = formData.get("bucketName") as string || "documents";
@@ -144,6 +145,7 @@ async function handleFileUpload(supabase: any, req: Request, userId: string) {
     .single();
 
   if (dbError) {
+    // intentional empty: DB metadata storage is best-effort
   }
 
   // Get public URL if file is public
@@ -171,7 +173,7 @@ async function handleFileUpload(supabase: any, req: Request, userId: string) {
   });
 }
 
-async function handleFileList(supabase: any, req: Request, userId: string) {
+async function handleFileList(supabase: SupabaseClient, req: Request, userId: string) {
   const url = new URL(req.url);
   const bucketName = url.searchParams.get("bucket") || "documents";
   const limit = parseInt(url.searchParams.get("limit") || "50");
@@ -191,7 +193,7 @@ async function handleFileList(supabase: any, req: Request, userId: string) {
 
   // Get signed URLs for each file
   const filesWithUrls = await Promise.all(
-    files.map(async (file: any) => {
+    files.map(async (file: Record<string, unknown>) => {
       const { data: urlData, error: urlError } = await supabase.storage
         .from(file.bucket_name)
         .createSignedUrl(file.file_path, 3600); // 1 hour expiry
@@ -214,7 +216,7 @@ async function handleFileList(supabase: any, req: Request, userId: string) {
 }
 
 async function handleFileDelete(
-  supabase: any,
+  supabase: SupabaseClient,
   req: Request,
   userId: string,
   payload?: Record<string, unknown> | null
@@ -290,7 +292,7 @@ async function handleFileDelete(
 }
 
 async function handleGetSignedUrl(
-  supabase: any,
+  supabase: SupabaseClient,
   req: Request,
   userId: string,
   payload?: Record<string, unknown> | null

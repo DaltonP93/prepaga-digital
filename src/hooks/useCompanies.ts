@@ -35,8 +35,8 @@ export const useCreateCompany = () => {
       queryClient.invalidateQueries({ queryKey: ['companies'] });
       toast.success('Empresa creada exitosamente');
     },
-    onError: (error: any) => {
-      toast.error('Error al crear empresa: ' + error.message);
+    onError: (error: unknown) => {
+      toast.error('Error al crear empresa: ' + (error instanceof Error ? error.message : 'Error desconocido'));
     },
   });
 };
@@ -60,8 +60,8 @@ export const useUpdateCompany = () => {
       queryClient.invalidateQueries({ queryKey: ['companies'] });
       toast.success('Empresa actualizada exitosamente');
     },
-    onError: (error: any) => {
-      toast.error('Error al actualizar empresa: ' + error.message);
+    onError: (error: unknown) => {
+      toast.error('Error al actualizar empresa: ' + (error instanceof Error ? error.message : 'Error desconocido'));
     },
   });
 };
@@ -77,8 +77,8 @@ export const useDeleteCompany = () => {
       queryClient.invalidateQueries({ queryKey: ['companies'] });
       toast.success('Empresa desactivada exitosamente');
     },
-    onError: (error: any) => {
-      toast.error('Error al desactivar empresa: ' + error.message);
+    onError: (error: unknown) => {
+      toast.error('Error al desactivar empresa: ' + (error instanceof Error ? error.message : 'Error desconocido'));
     },
   });
 };

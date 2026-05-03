@@ -20,7 +20,7 @@ interface TemplateVersion {
   version_number: number;
   content: string;
   designer_version: string;
-  layout_snapshot: any;
+  layout_snapshot: unknown;
   version_label: string | null;
   is_published: boolean;
   created_at: string;
@@ -51,20 +51,20 @@ export const VersionPanel: React.FC<VersionPanelProps> = ({ templateId }) => {
       // Unpublish all others
       await supabase
         .from("template_versions")
-        .update({ is_published: false } as any)
+        .update({ is_published: false } as unknown as Record<string, unknown>)
         .eq("template_id", templateId);
 
       // Publish this one
       const { error: pubErr } = await supabase
         .from("template_versions")
-        .update({ is_published: true } as any)
+        .update({ is_published: true } as unknown as Record<string, unknown>)
         .eq("id", versionId);
       if (pubErr) throw pubErr;
 
       // Set published_version_id on templates
       const { error: tplErr } = await supabase
         .from("templates")
-        .update({ published_version_id: versionId } as any)
+        .update({ published_version_id: versionId } as unknown as Record<string, unknown>)
         .eq("id", templateId);
       if (tplErr) throw tplErr;
     },
@@ -72,8 +72,9 @@ export const VersionPanel: React.FC<VersionPanelProps> = ({ templateId }) => {
       queryClient.invalidateQueries({ queryKey: ["template-versions", templateId] });
       toast({ title: "Versión publicada" });
     },
-    onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    onError: (err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      toast({ title: "Error", description: message, variant: "destructive" });
     },
   });
 
@@ -81,7 +82,7 @@ export const VersionPanel: React.FC<VersionPanelProps> = ({ templateId }) => {
     mutationFn: async (version: TemplateVersion) => {
       const { error } = await supabase
         .from("templates")
-        .update({ content: version.content } as any)
+        .update({ content: version.content } as unknown as Record<string, unknown>)
         .eq("id", templateId);
       if (error) throw error;
     },
@@ -89,8 +90,9 @@ export const VersionPanel: React.FC<VersionPanelProps> = ({ templateId }) => {
       queryClient.invalidateQueries({ queryKey: ["templates"] });
       toast({ title: "Contenido restaurado desde versión anterior" });
     },
-    onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    onError: (err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      toast({ title: "Error", description: message, variant: "destructive" });
     },
   });
 

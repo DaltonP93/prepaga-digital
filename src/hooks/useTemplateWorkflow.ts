@@ -66,7 +66,7 @@ export const useTemplateWorkflow = (templateId?: string) => {
     }: {
       templateId: string;
       eventType?: string;
-      metadata?: Record<string, any>;
+      metadata?: Record<string, unknown>;
     }) => {
       // Update views_count in template_analytics
       const { data: existing } = await supabase
@@ -159,10 +159,11 @@ export const useTemplateComments = (templateId?: string) => {
         description: "El comentario ha sido agregado exitosamente",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error al agregar comentario",
-        description: error.message,
+        description: message,
         variant: "destructive",
       });
     },
@@ -258,10 +259,11 @@ export const useTemplateVersions = (templateId?: string) => {
         description: "Se ha creado una nueva versión del template",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error al crear versión",
-        description: error.message,
+        description: message,
         variant: "destructive",
       });
     },
@@ -300,10 +302,11 @@ export const useTemplateVersions = (templateId?: string) => {
         description: "El template ha sido revertido a la versión seleccionada",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error al revertir",
-        description: error.message,
+        description: message,
         variant: "destructive",
       });
     },

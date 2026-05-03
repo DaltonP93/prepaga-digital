@@ -1,6 +1,6 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import type { StateAccessRule, AppRole } from "@/types/workflow";
+import type { StateAccessRule, AppRole, SaleStatus } from "@/types/workflow";
 import { ALL_SALE_STATUSES, SALE_STATUS_LABELS, ALL_ROLES } from "@/types/workflow";
 import { ROLE_LABELS } from "@/types/roles";
 
@@ -13,7 +13,7 @@ export function StateAccessList({ stateAccess, onChange }: StateAccessListProps)
   const getRule = (state: string): StateAccessRule => {
     return (
       stateAccess.find((r) => r.state === state) || {
-        state: state as any,
+        state: state as SaleStatus,
         visible_to: ALL_ROLES,
         editable_by: [],
       }

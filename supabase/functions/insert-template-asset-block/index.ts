@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const companyId = (asset as any).templates?.company_id;
+    const companyId = ((asset as Record<string, unknown>).templates as Record<string, unknown> | undefined)?.company_id as string | undefined;
 
     // Verify user belongs to same company
     const { data: profile } = await adminClient
@@ -98,17 +98,17 @@ Deno.serve(async (req) => {
       const pages = checkPages || [];
       const selectedPageNumbers = selected_pages && selected_pages.length > 0
         ? selected_pages
-        : pages.map((p: any) => p.page_number);
+        : pages.map((p: Record<string, unknown>) => p.page_number as number);
 
       const missingPreviews = pages
-        .filter((p: any) => selectedPageNumbers.includes(p.page_number))
-        .filter((p: any) => !p.preview_image_url);
+        .filter((p: Record<string, unknown>) => selectedPageNumbers.includes(p.page_number as number))
+        .filter((p: Record<string, unknown>) => !p.preview_image_url);
 
       if (missingPreviews.length > 0) {
         return new Response(
           JSON.stringify({
             error: "Previews not ready yet. Please wait for thumbnail generation to complete.",
-            missing_pages: missingPreviews.map((p: any) => p.page_number),
+            missing_pages: missingPreviews.map((p: Record<string, unknown>) => p.page_number as number),
           }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
@@ -139,16 +139,16 @@ Deno.serve(async (req) => {
       const pages = assetPages || [];
       const selectedPageNumbers = selected_pages && selected_pages.length > 0
         ? selected_pages
-        : pages.map((p: any) => p.page_number);
+        : pages.map((p: Record<string, unknown>) => p.page_number as number);
 
       // Build page_previews from DB rows (storage paths, not signed URLs)
       const pagePreviews = pages
-        .filter((p: any) => selectedPageNumbers.includes(p.page_number))
-        .map((p: any) => ({
-          page_number: p.page_number,
-          preview_image_url: p.preview_image_url || "",
-          width: p.width || 595,
-          height: p.height || 842,
+        .filter((p: Record<string, unknown>) => selectedPageNumbers.includes(p.page_number as number))
+        .map((p: Record<string, unknown>) => ({
+          page_number: p.page_number as number,
+          preview_image_url: (p.preview_image_url as string) || "",
+          width: (p.width as number) || 595,
+          height: (p.height as number) || 842,
         }));
 
       blockType = "pdf_embed";
@@ -240,10 +240,11 @@ Deno.serve(async (req) => {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Unexpected error:", err);
+    const message = err instanceof Error ? err.message : "Internal server error";
     return new Response(
-      JSON.stringify({ error: err.message || "Internal server error" }),
+      JSON.stringify({ error: message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

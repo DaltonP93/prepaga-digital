@@ -138,7 +138,7 @@ const Users = () => {
                       </TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell>
-                        <Badge variant={getRoleBadgeVariant(role) as any}>
+                        <Badge variant={getRoleBadgeVariant(role) as 'default' | 'secondary' | 'destructive' | 'outline'}>
                           {getRoleLabel(role)}
                         </Badge>
                       </TableCell>

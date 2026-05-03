@@ -30,7 +30,7 @@ export const AuditLogViewer = () => {
     }
   };
 
-  const formatJsonValue = (value: any) => {
+  const formatJsonValue = (value: unknown) => {
     if (!value) return 'N/A';
     if (typeof value === 'object') {
       return JSON.stringify(value, null, 2);
@@ -135,7 +135,7 @@ export const AuditLogViewer = () => {
                 <div className="text-center py-8">Cargando intentos de acceso...</div>
               ) : authAttempts && authAttempts.length > 0 ? (
                 <div className="space-y-3">
-                  {authAttempts.map((attempt: any) => (
+                  {authAttempts.map((attempt) => (
                     <Card key={attempt.id} className="p-4">
                       <div className="flex items-center justify-between">
                         <div className="space-y-1">

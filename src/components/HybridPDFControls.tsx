@@ -94,7 +94,7 @@ export const HybridPDFControls: React.FC<HybridPDFControlsProps> = ({
         {/* Selector de Modo */}
         <div className="space-y-2">
           <label className="text-sm font-medium">Modo de Generación</label>
-          <Select value={mode} onValueChange={(value: any) => setMode(value)}>
+          <Select value={mode} onValueChange={(value: string) => setMode(value as 'auto' | 'client' | 'server')}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>

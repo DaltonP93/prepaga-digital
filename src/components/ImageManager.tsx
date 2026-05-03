@@ -132,8 +132,9 @@ export const ImageManager: React.FC<ImageManagerProps> = ({ onImageSelect }) => 
       await refetch();
       toast.success('Imagen subida exitosamente');
       onImageSelect(signedUrl);
-    } catch (error: any) {
-      setUploadState({ isUploading: false, progress: 0, error: error.message });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      setUploadState({ isUploading: false, progress: 0, error: message });
       toast.error('Error al subir la imagen');
     }
   };

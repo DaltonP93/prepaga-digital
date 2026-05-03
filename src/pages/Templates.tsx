@@ -315,8 +315,8 @@ const Templates = () => {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Motor:</span>
-                    <Badge variant={getDesignerMeta((template as any).designer_version).variant}>
-                      {getDesignerMeta((template as any).designer_version).label}
+                    <Badge variant={getDesignerMeta((template as Record<string, unknown>).designer_version as string | null | undefined).variant}>
+                      {getDesignerMeta((template as Record<string, unknown>).designer_version as string | null | undefined).label}
                     </Badge>
                   </div>
                   <div className="flex items-center justify-between text-sm">

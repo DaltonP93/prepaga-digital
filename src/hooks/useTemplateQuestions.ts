@@ -60,7 +60,7 @@ export const useTemplateQuestions = (templateId?: string) => {
       queryClient.invalidateQueries({ queryKey: ['templates'] });
       toast.success('Pregunta creada exitosamente');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Error creating question:', error);
       toast.error('Error al crear la pregunta');
     },
@@ -94,7 +94,7 @@ export const useTemplateQuestions = (templateId?: string) => {
       queryClient.invalidateQueries({ queryKey: ['templates'] });
       toast.success('Pregunta actualizada exitosamente');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Error updating question:', error);
       toast.error('Error al actualizar la pregunta');
     },
@@ -119,7 +119,7 @@ export const useTemplateQuestions = (templateId?: string) => {
       queryClient.invalidateQueries({ queryKey: ['templates'] });
       toast.success('Pregunta eliminada exitosamente');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Error deleting question:', error);
       toast.error('Error al eliminar la pregunta');
     },
@@ -150,7 +150,7 @@ export const useTemplateQuestions = (templateId?: string) => {
       queryClient.invalidateQueries({ queryKey: ['template-questions', templateId] });
       toast.success('Opción creada exitosamente');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Error creating option:', error);
       toast.error('Error al crear la opción');
     },
@@ -169,7 +169,7 @@ export const useTemplateQuestions = (templateId?: string) => {
       queryClient.invalidateQueries({ queryKey: ['template-questions', templateId] });
       toast.success('Opción eliminada exitosamente');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Error deleting option:', error);
       toast.error('Error al eliminar la opción');
     },
@@ -190,7 +190,7 @@ export const useTemplateQuestions = (templateId?: string) => {
       queryClient.invalidateQueries({ queryKey: ['template-questions', templateId] });
       toast.success('Orden de preguntas actualizado');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Error reordering questions:', error);
       toast.error('Error al reordenar las preguntas');
     },

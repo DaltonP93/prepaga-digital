@@ -5,7 +5,7 @@ interface UseRetryLogicProps {
   maxRetries: number;
   onRetry: () => Promise<void>;
   shouldRetry: boolean;
-  resetTrigger?: any;
+  resetTrigger?: unknown;
 }
 
 export const useRetryLogic = ({ 

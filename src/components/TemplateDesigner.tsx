@@ -8,15 +8,23 @@ import { useToast } from "@/hooks/use-toast";
 import DOMPurify from 'dompurify';
 import { Button } from "@/components/ui/button";
 
+interface TemplateMeta {
+  name?: string;
+  description?: string;
+  content?: string;
+  template_type?: string;
+  is_active?: boolean;
+}
+
 interface TemplateDesignerProps {
-  template?: any;
+  template?: TemplateMeta;
   content?: string;
   onContentChange?: (content: string) => void;
-  dynamicFields?: any[];
-  onDynamicFieldsChange?: (fields: any[]) => void;
-  templateQuestions?: any[];
+  dynamicFields?: unknown[];
+  onDynamicFieldsChange?: (fields: unknown[]) => void;
+  templateQuestions?: Array<{ id: string }>;
   templateId?: string;
-  onSave?: (templateData: any) => void;
+  onSave?: (templateData: TemplateMeta) => void;
   onCancel?: () => void;
   onAttachmentClick?: () => string | void | Promise<string | void>;
   helperMode?: "default" | "reporter";
@@ -85,7 +93,7 @@ export const TemplateDesigner: React.FC<TemplateDesignerProps> = ({
     handleContentChange(newContent);
   };
 
-  const handleQuestionInsert = (question: any) => {
+  const handleQuestionInsert = (question: { id: string }) => {
     const questionPlaceholder = `{{question_${question.id}}}`;
     const newContent = templateData.content + " " + questionPlaceholder;
     handleContentChange(newContent);

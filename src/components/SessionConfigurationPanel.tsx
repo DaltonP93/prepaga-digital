@@ -51,7 +51,7 @@ export const SessionConfigurationPanel = () => {
     }
   };
 
-  const updateConfig = (field: keyof SessionConfig, value: any) => {
+  const updateConfig = (field: keyof SessionConfig, value: boolean | number) => {
     setConfig(prev => ({
       ...prev,
       [field]: value

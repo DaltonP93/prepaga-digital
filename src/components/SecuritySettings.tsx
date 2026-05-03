@@ -66,9 +66,9 @@ export function SecuritySettings() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating password:', error);
-      toast.error(error.message || 'Error al actualizar la contraseña');
+      toast.error(error instanceof Error ? error.message : 'Error al actualizar la contraseña');
     } finally {
       setLoading(false);
     }

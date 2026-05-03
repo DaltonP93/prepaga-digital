@@ -29,7 +29,7 @@ export const useProcessTraces = (saleId: string) => {
 
 export const useCreateTrace = () => {
   return {
-    mutate: async ({ saleId, action, details }: { saleId: string; action: string; details: any }) => {
+    mutate: async ({ saleId, action, details }: { saleId: string; action: string; details: unknown }) => {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) return;
 

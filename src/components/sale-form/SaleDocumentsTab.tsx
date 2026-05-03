@@ -68,7 +68,10 @@ const SaleDocumentsTab: React.FC<SaleDocumentsTabProps> = ({ saleId }) => {
       toast.success('Documento subido correctamente');
       setFileName('');
     },
-    onError: (e: any) => toast.error(e.message || 'Error al subir documento'),
+    onError: (e: unknown) => {
+      const message = e instanceof Error ? e.message : 'Error al subir documento';
+      toast.error(message);
+    },
   });
 
   const deleteMutation = useMutation({
@@ -84,7 +87,10 @@ const SaleDocumentsTab: React.FC<SaleDocumentsTabProps> = ({ saleId }) => {
       queryClient.invalidateQueries({ queryKey: ['sale-documents-tab', saleId] });
       toast.success('Documento eliminado');
     },
-    onError: (e: any) => toast.error(e.message || 'Error al eliminar'),
+    onError: (e: unknown) => {
+      const message = e instanceof Error ? e.message : 'Error al eliminar';
+      toast.error(message);
+    },
   });
 
   const onDrop = useCallback((acceptedFiles: File[]) => {

@@ -169,8 +169,8 @@ serve(async (req) => {
     }
 
     const body = JSON.parse(rawBody);
-    const statuses = body?.entry?.flatMap((entry: any) =>
-      entry?.changes?.flatMap((change: any) => change?.value?.statuses || [])
+    const statuses = (body?.entry as Array<Record<string, unknown>> | undefined)?.flatMap((entry) =>
+      (entry?.changes as Array<Record<string, unknown>> | undefined)?.flatMap((change) => (change?.value as Record<string, unknown> | undefined)?.statuses as Array<Record<string, unknown>> || [])
     ) || [];
 
     if (!Array.isArray(statuses) || statuses.length === 0) {
@@ -210,8 +210,9 @@ serve(async (req) => {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (error: any) {
-    return new Response(JSON.stringify({ success: false, error: error?.message || "Unknown error" }), {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    return new Response(JSON.stringify({ success: false, error: msg }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -106,7 +106,7 @@ const NotificationCenter = () => {
 
   const handleNotificationClick = async (notification: typeof notifications[0]) => {
     if (!notification.is_read) {
-      try { await markAsReadAsync(notification.id); } catch {}
+      try { await markAsReadAsync(notification.id); } catch { /* intentional empty catch */ }
     }
     setIsOpen(false);
     if (notification.link) {

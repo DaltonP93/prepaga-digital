@@ -127,9 +127,9 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
           relativeTo: "page",
           normalized: { x: fx, y: fy, w: defaults.w, h: defaults.h },
           appearance: { placeholderText: FIELD_LABELS[activeFieldType] || activeFieldType, borderStyle: "dashed", color: ROLE_BORDER[activeSignerRole] },
-        } as any,
+        },
       }, {
-        onError: (err: any) => { console.error("createField error:", err); toast({ title: "Error al crear campo", description: err.message, variant: "destructive" }); },
+        onError: (err: unknown) => { const message = err instanceof Error ? err.message : String(err); console.error("createField error:", err); toast({ title: "Error al crear campo", description: message, variant: "destructive" }); },
       });
     },
     [placementActive, interactionState, activeFieldType, activeSignerRole, templateId, currentPage, createField, selectField]
@@ -176,9 +176,9 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
         updateField.mutate({
           id: interactionState.fieldId,
           x: livePos.x, y: livePos.y, w: livePos.w, h: livePos.h,
-          meta: { ...(field?.meta as any), normalized: { x: livePos.x, y: livePos.y, w: livePos.w, h: livePos.h } },
+          meta: { ...(field?.meta || {}), normalized: { x: livePos.x, y: livePos.y, w: livePos.w, h: livePos.h } },
         }, {
-          onError: (err: any) => { console.error("updateField error:", err); toast({ title: "Error al mover campo", description: err.message, variant: "destructive" }); },
+          onError: (err: unknown) => { const message = err instanceof Error ? err.message : String(err); console.error("updateField error:", err); toast({ title: "Error al mover campo", description: message, variant: "destructive" }); },
         });
       }
       setInteractionState(null);
@@ -197,7 +197,7 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
         if ((e.target as HTMLElement).tagName === "INPUT" || (e.target as HTMLElement).tagName === "TEXTAREA") return;
         e.preventDefault();
         deleteField.mutate({ id: selectedFieldId, templateId }, {
-          onError: (err: any) => { console.error("deleteField error:", err); toast({ title: "Error al eliminar campo", description: err.message, variant: "destructive" }); },
+          onError: (err: unknown) => { const message = err instanceof Error ? err.message : String(err); console.error("deleteField error:", err); toast({ title: "Error al eliminar campo", description: message, variant: "destructive" }); },
         });
         selectField(null);
       }
@@ -226,9 +226,9 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
       page: currentPage, x: clamp(nx - defaults.w / 2, 0, 1 - defaults.w), y: clamp(ny - defaults.h / 2, 0, 1 - defaults.h),
       w: defaults.w, h: defaults.h,
       required: true, label: FIELD_LABELS[widgetType] || widgetType,
-      meta: {} as any,
+      meta: {} as unknown as Record<string, unknown>,
     }, {
-      onError: (err: any) => { console.error("createField drop error:", err); toast({ title: "Error al crear campo", description: err.message, variant: "destructive" }); },
+      onError: (err: unknown) => { const message = err instanceof Error ? err.message : String(err); console.error("createField drop error:", err); toast({ title: "Error al crear campo", description: message, variant: "destructive" }); },
     });
   }, [templateId, currentPage, createField]);
 
@@ -332,7 +332,7 @@ export const CanvasFieldOverlay: React.FC<CanvasFieldOverlayProps> = ({
               onClick={(e) => {
                 e.stopPropagation();
                 deleteField.mutate({ id: field.id, templateId }, {
-                  onError: (err: any) => { console.error("deleteField error:", err); toast({ title: "Error al eliminar campo", description: err.message, variant: "destructive" }); },
+                  onError: (err: unknown) => { const message = err instanceof Error ? err.message : String(err); console.error("deleteField error:", err); toast({ title: "Error al eliminar campo", description: message, variant: "destructive" }); },
                 });
                 if (selectedFieldId === field.id) selectField(null);
               }}

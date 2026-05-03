@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import type { Json } from '@/integrations/supabase/types';
+import type { Database, Json } from '@/integrations/supabase/types';
 import type { TemplateBlock, TemplateBlockInsert, TemplateBlockUpdate } from '@/types/templateDesigner';
 
 export const useTemplateBlocks = (templateId?: string) => {
@@ -44,8 +44,9 @@ export const useCreateTemplateBlock = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['template-blocks', data.template_id] });
     },
-    onError: (error: any) => {
-      toast({ title: 'Error al crear bloque', description: error.message, variant: 'destructive' });
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      toast({ title: 'Error al crear bloque', description: message, variant: 'destructive' });
     },
   });
 };
@@ -62,7 +63,7 @@ export const useUpdateTemplateBlock = () => {
 
       const { data, error } = await supabase
         .from('template_blocks')
-        .update(payload as any)
+        .update(payload as unknown as Database['public']['Tables']['template_blocks']['Update'])
         .eq('id', id)
         .select()
         .single();
@@ -89,8 +90,9 @@ export const useDeleteTemplateBlock = () => {
       queryClient.invalidateQueries({ queryKey: ['template-blocks', templateId] });
       toast({ title: 'Bloque eliminado' });
     },
-    onError: (error: any) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     },
   });
 };

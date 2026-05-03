@@ -160,7 +160,7 @@ const WhatsAppNotificationPanel = ({
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
     switch (status) {
       case "pending":
         return "secondary";
@@ -225,7 +225,7 @@ const WhatsAppNotificationPanel = ({
               <Label htmlFor="type">Tipo de Notificación</Label>
               <Select
                 value={notificationType}
-                onValueChange={(value: any) => setNotificationType(value)}
+                onValueChange={(value: string) => setNotificationType(value as "signature" | "questionnaire" | "general")}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -317,7 +317,7 @@ const WhatsAppNotificationPanel = ({
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center gap-2">
                         {getStatusIcon(notification.status)}
-                        <Badge variant={getStatusColor(notification.status) as any}>
+                        <Badge variant={getStatusColor(notification.status)}>
                           {getStatusLabel(notification.status)}
                         </Badge>
                       </div>
@@ -361,7 +361,7 @@ const WhatsAppNotificationPanel = ({
                           </div>
                           <div>
                             <p className="text-sm font-medium">Estado:</p>
-                            <Badge variant={getStatusColor(notification.status) as any}>
+                            <Badge variant={getStatusColor(notification.status)}>
                               {getStatusLabel(notification.status)}
                             </Badge>
                           </div>

@@ -18,6 +18,79 @@ import DOMPurify from 'dompurify';
 import { formatCurrency } from "@/lib/utils";
 import { useSignatureVerification, generateDocumentHash, buildEvidenceBundle } from "@/hooks/useSignatureVerification";
 
+interface DocumentLike {
+  id: string;
+  name: string;
+  document_type?: string | null;
+  content?: string | null;
+  base_pdf_url?: string | null;
+  signed_pdf_url?: string | null;
+  file_url?: string | null;
+  is_final?: boolean | null;
+  requires_signature?: boolean | null;
+  beneficiary_id?: string | null;
+  status?: string | null;
+  signed_at?: string | null;
+}
+
+interface BeneficiaryLike {
+  id: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+}
+
+interface ClientLike {
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+}
+
+interface CompanyLike {
+  name?: string | null;
+  logo_url?: string | null;
+  primary_color?: string | null;
+  phone?: string | null;
+  email?: string | null;
+}
+
+interface LinkDataLike {
+  id: string;
+  sale_id: string;
+  token: string;
+  recipient_type: string;
+  recipient_id?: string | null;
+  recipient_email?: string | null;
+  recipient_phone?: string | null;
+  status?: string | null;
+  expires_at: string;
+  completed_at?: string | null;
+  accessed_at?: string | null;
+  access_count?: number | null;
+  sale?: {
+    companies?: CompanyLike;
+    clients?: ClientLike;
+    beneficiaries?: BeneficiaryLike[];
+    plans?: { name?: string | null; price?: number | null };
+  };
+  signwell_signing_url?: string | null;
+  isActive?: boolean;
+  pdfBranding?: {
+    pdf_header_image_url?: string | null;
+    pdf_footer_image_url?: string | null;
+  };
+}
+
+interface SignatureLinkLike {
+  id: string;
+  recipient_type: string;
+  recipient_id?: string | null;
+  status?: string | null;
+  completed_at?: string | null;
+}
+
 const SignatureView = () => {
   const { token } = useParams<{ token: string }>();
   const { data: linkData, isLoading, error } = useSignatureLinkByToken(token || '');
@@ -39,14 +112,26 @@ const SignatureView = () => {
   const [consentRecordId, setConsentRecordId] = useState<string | null>(null);
   const verification = useSignatureVerification();
 
+  // Accessibility refs for focus management across steps
+  const otpInputRef = useRef<HTMLInputElement>(null);
+  const consentCheckboxRef = useRef<HTMLInputElement>(null);
+  const [liveRegionText, setLiveRegionText] = useState('');
+
   // Check if this link has a SignWell signing URL
-  const signwellSigningUrl = (linkData as any)?.signwell_signing_url;
+  const signwellSigningUrl = (linkData as unknown as LinkDataLike)?.signwell_signing_url;
+
+  // SignWell allowed origins — CRITICAL for security
+  const ALLOWED_SIGNWELL_ORIGINS = ['https://www.signwell.com'];
 
   // Listen for SignWell postMessage events (embedded signing completion)
   const handleSignWellMessage = useCallback((event: MessageEvent) => {
+    // CRÍTICO: validar origen antes de procesar cualquier mensaje
+    if (!ALLOWED_SIGNWELL_ORIGINS.includes(event.origin)) return;
+
     // SignWell sends a postMessage when signing is complete
     if (event.data?.type === 'signwell_event' && event.data?.event === 'completed') {
       setSignwellCompleted(true);
+      setLiveRegionText('Firma completada vía SignWell. Procesando...');
       // Submit as signwell_completed
       if (linkData && token) {
         submitSignature.mutate({
@@ -57,6 +142,28 @@ const SignatureView = () => {
       }
     }
   }, [linkData, token]);
+
+  // Focus management: move focus to OTP input when awaiting code
+  useEffect(() => {
+    if (verification.step === 'awaiting_code' && otpInputRef.current) {
+      otpInputRef.current.focus();
+    }
+  }, [verification.step]);
+
+  // Focus management: move focus to consent checkbox when verified
+  useEffect(() => {
+    if (verification.isVerified && consentCheckboxRef.current) {
+      consentCheckboxRef.current.focus();
+    }
+  }, [verification.isVerified]);
+
+  // Focus management: scroll to signature section when consent is saved
+  useEffect(() => {
+    if (consentRecordId && signatureSectionRef.current) {
+      signatureSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      signatureSectionRef.current.focus();
+    }
+  }, [consentRecordId]);
 
   useEffect(() => {
     if (signwellSigningUrl) {
@@ -79,7 +186,7 @@ const SignatureView = () => {
     }
   }, [verification.otpPolicy]);
 
-  const handleDownloadSignedContent = async (doc: any) => {
+  const handleDownloadSignedContent = async (doc: DocumentLike) => {
     const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
     const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
@@ -104,6 +211,7 @@ const SignatureView = () => {
         return;
       }
     } catch (err) {
+      // intentional empty catch: signed URL fetch is best-effort
     }
 
     // Try base PDF if available
@@ -128,14 +236,15 @@ const SignatureView = () => {
           return;
         }
       } catch (err) {
+        // intentional empty catch: base PDF fetch is best-effort
       }
     }
 
     // Fallback: open HTML content for printing with branding
     if (!doc?.content) return;
-    const comp = linkData?.sale?.companies;
+    const comp = (linkData as unknown as LinkDataLike)?.sale?.companies;
     const companyName = comp?.name || '';
-    const branding = (linkData as any)?.pdfBranding || {};
+    const branding = (linkData as unknown as LinkDataLike)?.pdfBranding || {};
     const headerImg = branding.pdf_header_image_url || '';
     const footerImg = branding.pdf_footer_image_url || '';
     const logoUrl = comp?.logo_url || '';
@@ -171,7 +280,7 @@ const SignatureView = () => {
           ${headerImg ? `<img src="${headerImg}" alt="${companyName}" />` : logoUrl ? `<img src="${logoUrl}" alt="${companyName}" />` : `<span style="font-weight:700;font-size:18px;">${companyName}</span>`}
         </div>
         <div class="page-footer">
-          ${footerImg ? `<img src="${footerImg}" alt="${companyName}" />` : `<span style="font-size:8px;color:#777;">${companyName} ${(comp as any)?.phone ? '| ' + (comp as any).phone : ''} ${(comp as any)?.email ? '| ' + (comp as any).email : ''}</span>`}
+          ${footerImg ? `<img src="${footerImg}" alt="${companyName}" />` : `<span style="font-size:8px;color:#777;">${companyName} ${comp?.phone ? '| ' + comp.phone : ''} ${comp?.email ? '| ' + comp.email : ''}</span>`}
         </div>
         ${DOMPurify.sanitize(doc.content || '', { FORCE_BODY: true })}
       </body>
@@ -191,7 +300,7 @@ const SignatureView = () => {
     if (!linkData || !termsAccepted) return;
     
     // For digital signature (canvas), require signatureData
-    const isElectronic = documents?.some((doc: any) => {
+    const isElectronic = documents?.some((doc: DocumentLike) => {
       const content = (doc.content || '').toLowerCase();
       return content.includes('firma electrónica') || content.includes('firma electronica') ||
              content.includes('signature-type="electronic"') || content.includes('signature-type="electronica"') ||
@@ -210,7 +319,7 @@ const SignatureView = () => {
 
     try {
       // Generate document hashes for all docs to sign
-      const docsToSign = documents?.filter((d: any) => d.requires_signature !== false) || [];
+      const docsToSign = documents?.filter((d: DocumentLike) => d.requires_signature !== false) || [];
       const timestamp = new Date().toISOString();
       const ip = 'client-side'; // Will be captured server-side
       const ua = navigator.userAgent;
@@ -241,7 +350,7 @@ const SignatureView = () => {
         });
 
         // Insert signature event
-        const { data: eventData } = await sigClient.from('signature_events' as any).insert({
+        const { data: eventData } = await sigClient.from('signature_events').insert({
           signature_link_id: linkData.id,
           sale_id: linkData.sale_id,
           document_id: doc.id,
@@ -257,9 +366,9 @@ const SignatureView = () => {
         }).select().single();
 
         // Insert evidence bundle (immutable chain of custody)
-        const { data: bundleData } = await sigClient.from('signature_evidence_bundles' as any).insert({
+        const { data: bundleData } = await sigClient.from('signature_evidence_bundles').insert({
           signature_link_id: linkData.id,
-          signature_event_id: (eventData as any)?.id || null,
+          signature_event_id: (eventData as unknown as { id?: string })?.id || null,
           sale_id: linkData.sale_id,
           document_id: doc.id,
           document_hash: docHash,
@@ -269,8 +378,8 @@ const SignatureView = () => {
 
         // Insert hash anchor (internal integrity proof)
         if (bundleData) {
-          await sigClient.from('hash_anchors' as any).insert({
-            evidence_bundle_id: (bundleData as any).id,
+          await sigClient.from('hash_anchors').insert({
+            evidence_bundle_id: (bundleData as unknown as { id?: string })?.id,
             hash_value: evidenceResult.hash,
             anchor_type: 'internal',
             anchor_reference: `sha256:${evidenceResult.hash}`,
@@ -325,10 +434,11 @@ const SignatureView = () => {
       if (error) throw error;
       setConsentRecordId(data.id);
       return data.id;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error saving consent:', err);
       const { toast } = await import('sonner');
-      toast.error(err.message || "No se pudo registrar el consentimiento. Intente nuevamente.");
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(message || "No se pudo registrar el consentimiento. Intente nuevamente.");
     }
   };
 
@@ -375,7 +485,7 @@ const SignatureView = () => {
   }
 
   // Link not yet active (sequential signing)
-  if ((linkData as any).isActive === false) {
+  if ((linkData as unknown as LinkDataLike).isActive === false) {
     return (
       <PublicLayout>
         <div className="flex justify-center py-12">
@@ -402,7 +512,7 @@ const SignatureView = () => {
   if (linkData.status === 'completado') {
     const isTitular = linkData.recipient_type === 'titular';
     const completedAdherenteLinks = isTitular 
-      ? (allLinks || []).filter((l: any) => l.recipient_type === 'adherente' && l.status === 'completado')
+      ? (allLinks || []).filter((l: SignatureLinkLike) => l.recipient_type === 'adherente' && l.status === 'completado')
       : [];
 
     return (
@@ -434,7 +544,7 @@ const SignatureView = () => {
 
           {(() => {
             // Only show final (signed) documents in success view
-            const signedDocs = (documents || []).filter((doc: any) => doc.is_final === true);
+            const signedDocs = (documents || []).filter((doc: DocumentLike) => doc.is_final === true);
             if (signedDocs.length === 0) return null;
             return (
               <Card>
@@ -445,7 +555,7 @@ const SignatureView = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {signedDocs.map((doc: any) => (
+                  {signedDocs.map((doc: DocumentLike) => (
                     <div key={doc.id} className="border rounded-lg p-3 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <FileText className="h-4 w-4 text-primary" />
@@ -516,9 +626,9 @@ const SignatureView = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {completedAdherenteLinks.map((aLink: any) => {
-                  const beneficiary = linkData.sale?.beneficiaries?.find(
-                    (b: any) => b.id === aLink.recipient_id
+                {completedAdherenteLinks.map((aLink: SignatureLinkLike) => {
+                  const beneficiary = (linkData as unknown as LinkDataLike).sale?.beneficiaries?.find(
+                    (b: BeneficiaryLike) => b.id === aLink.recipient_id
                   );
                   return (
                     <div key={aLink.id} className="flex items-center justify-between border rounded p-2">
@@ -549,7 +659,7 @@ const SignatureView = () => {
     if (isTitular && client) return `${client.first_name} ${client.last_name}`;
     if (isContratada) return 'Representante Legal';
     if (!isTitular && linkData.recipient_id && sale?.beneficiaries) {
-      const ben = sale.beneficiaries.find((b: any) => b.id === linkData.recipient_id);
+      const ben = sale.beneficiaries.find((b: BeneficiaryLike) => b.id === linkData.recipient_id);
       if (ben) return `${ben.first_name} ${ben.last_name}`;
     }
     return '';
@@ -558,6 +668,10 @@ const SignatureView = () => {
 
   return (
     <PublicLayout>
+      {/* Live region for screen reader announcements */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {liveRegionText}
+      </div>
       <div className="max-w-3xl mx-auto space-y-6 py-6 px-4">
         {/* Company Header */}
         {company && (
@@ -641,13 +755,13 @@ const SignatureView = () => {
         {(() => {
           // Annexes are documents that don't require signature OR have annex-related document_type
           // BUT: signed contracts (is_final with signed_pdf_url) should NOT be classified as annexes
-          const isAnnex = (d: any) => {
+          const isAnnex = (d: DocumentLike) => {
             // Never treat a signed final contract as an annex
             if (d.document_type === 'contrato' && (d.signed_pdf_url || d.is_final)) return false;
             return d.requires_signature === false || d.document_type === 'anexo' || d.document_type?.includes('anexo');
           };
-          const annexDocs = documents?.filter((d: any) => isAnnex(d)) || [];
-          const docsToSign = documents?.filter((d: any) => !isAnnex(d)) || [];
+          const annexDocs = documents?.filter((d: DocumentLike) => isAnnex(d)) || [];
+          const docsToSign = documents?.filter((d: DocumentLike) => !isAnnex(d)) || [];
           const hasAnyDocs = docsToSign.length > 0 || annexDocs.length > 0;
 
           if (!hasAnyDocs) {
@@ -678,7 +792,7 @@ const SignatureView = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    {docsToSign.map((doc: any) => (
+                    {docsToSign.map((doc: DocumentLike) => (
                         <div key={doc.id} className="flex items-center justify-between border rounded-lg p-4">
                           <div className="flex items-center gap-3">
                             <FileText className="h-5 w-5 text-primary flex-shrink-0" />
@@ -714,7 +828,7 @@ const SignatureView = () => {
                     <CardDescription>Documentos informativos adjuntos. No requieren firma.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    {annexDocs.map((doc: any) => (
+                    {annexDocs.map((doc: DocumentLike) => (
                       <div key={doc.id} className="flex items-center justify-between border rounded-lg p-4 bg-muted/20">
                         <div className="flex items-center gap-3">
                           <Paperclip className="h-5 w-5 text-muted-foreground flex-shrink-0" />
@@ -780,7 +894,7 @@ const SignatureView = () => {
         })()}
 
         {/* Enhanced Signature Flow */}
-        {documents && documents.filter((d: any) => d.requires_signature !== false).length > 0 && (
+        {documents && documents.filter((d: DocumentLike) => d.requires_signature !== false).length > 0 && (
           <div ref={signatureSectionRef} className="space-y-4">
             {signwellSigningUrl && !signwellCompleted ? (
               <Card>
@@ -873,9 +987,9 @@ const SignatureView = () => {
                                   (isTitular ? client?.email : '') || '';
                                 // For contratada, use recipient_phone from the link itself
                                 const phone = isContratada
-                                  ? (linkData as any).recipient_phone || ''
-                                  : isTitular ? (client as any)?.phone : 
-                                    (sale?.beneficiaries?.find((b: any) => b.id === linkData.recipient_id) as any)?.phone || '';
+                                  ? (linkData as unknown as LinkDataLike).recipient_phone || ''
+                                  : isTitular ? (client as unknown as ClientLike)?.phone : 
+                                    (sale?.beneficiaries?.find((b: BeneficiaryLike) => b.id === linkData.recipient_id) as unknown as BeneficiaryLike)?.phone || '';
                                 const normalizedPhone = phone && !phone.startsWith('+') ? `+595${phone}` : phone;
                                 const effectiveChannel = verification.otpPolicy?.allowed_channels?.includes(selectedChannel)
                                   ? selectedChannel
@@ -914,11 +1028,14 @@ const SignatureView = () => {
                             )}
                             <div className="flex gap-2">
                               <Input
+                                ref={otpInputRef}
                                 placeholder="Ingrese código de 6 dígitos"
                                 value={otpCode}
                                 onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                                 maxLength={6}
                                 className="text-center text-lg tracking-widest font-mono"
+                                aria-invalid={!!verification.error}
+                                aria-describedby={verification.error ? 'otp-error' : undefined}
                               />
                               <Button
                                 onClick={() => verification.verifyOTP(otpCode, linkData.id, token!)}
@@ -930,7 +1047,7 @@ const SignatureView = () => {
                               </Button>
                             </div>
                             {verification.error && (
-                              <Alert variant="destructive">
+                              <Alert variant="destructive" id="otp-error">
                                 <AlertCircle className="h-4 w-4" />
                                 <AlertDescription>{verification.error}</AlertDescription>
                               </Alert>
@@ -943,15 +1060,15 @@ const SignatureView = () => {
                                 setOtpCode('');
                                 // Re-send OTP automatically
                                 setTimeout(() => {
-                                  const email = isContratada
+                                  const email = (isContratada
                                     ? linkData.recipient_email || ''
-                                    : isTitular ? (client as any)?.email :
-                                      (sale?.beneficiaries?.find((b: any) => b.id === linkData.recipient_id) as any)?.email ||
-                                      (isTitular ? client?.email : '') || '';
+                                    : isTitular ? (client as unknown as ClientLike)?.email || '' :
+                                      (sale?.beneficiaries?.find((b: BeneficiaryLike) => b.id === linkData.recipient_id) as unknown as BeneficiaryLike)?.email ||
+                                      (isTitular ? client?.email : '') || '') || '';
                                   const phone = isContratada
-                                    ? (linkData as any).recipient_phone || ''
-                                    : isTitular ? (client as any)?.phone :
-                                      (sale?.beneficiaries?.find((b: any) => b.id === linkData.recipient_id) as any)?.phone || '';
+                                    ? (linkData as unknown as LinkDataLike).recipient_phone || ''
+                                    : isTitular ? (client as unknown as ClientLike)?.phone :
+                                      (sale?.beneficiaries?.find((b: BeneficiaryLike) => b.id === linkData.recipient_id) as unknown as BeneficiaryLike)?.phone || '';
                                   const normalizedPhone = phone && !phone.startsWith('+') ? `+595${phone}` : phone;
                                   const effectiveChannel = verification.otpPolicy?.allowed_channels?.includes(selectedChannel)
                                     ? selectedChannel
@@ -998,6 +1115,7 @@ const SignatureView = () => {
 
                       <label className="flex items-start gap-3 cursor-pointer">
                         <input
+                          ref={consentCheckboxRef}
                           type="checkbox"
                           checked={termsAccepted}
                           onChange={(e) => setTermsAccepted(e.target.checked)}
@@ -1068,77 +1186,79 @@ const SignatureView = () => {
                       </CardContent>
                     </Card>
 
-                    {/* Signature Input */}
-                    {(() => {
-                      const hasElectronicSignature = documents?.some((doc: any) => {
-                        const content = (doc.content || '').toLowerCase();
-                        return content.includes('signature-type="electronic"') ||
-                               content.includes("signature-type='electronic'") ||
-                               content.includes('data-signature-type="electronic"') ||
-                               content.includes("data-signature-type='electronic'") ||
-                               content.includes('signature-type="electronica"') ||
-                               content.includes('data-signature-type="electronica"') ||
-                               content.includes('firma electrónica') ||
-                               content.includes('firma electronica');
-                      });
+                     {/* Signature Input */}
+                     <div ref={signatureSectionRef} tabIndex={-1}>
+                     {(() => {
+                        const hasElectronicSignature = documents?.some((doc: DocumentLike) => {
+                         const content = (doc.content || '').toLowerCase();
+                         return content.includes('signature-type="electronic"') ||
+                                content.includes("signature-type='electronic'") ||
+                                content.includes('data-signature-type="electronic"') ||
+                                content.includes("data-signature-type='electronic'") ||
+                                content.includes('signature-type="electronica"') ||
+                                content.includes('data-signature-type="electronica"') ||
+                                content.includes('firma electrónica') ||
+                                content.includes('firma electronica');
+                       });
 
-                      return (
-                        <Card>
-                          <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                              <Shield className="h-5 w-5" />
-                              {hasElectronicSignature ? 'Firma Electrónica' : 'Firma Digital'}
-                            </CardTitle>
-                            <CardDescription>
-                              {hasElectronicSignature
-                                ? 'Presione el botón para registrar su firma electrónica con validez legal.'
-                                : 'Dibuje su firma en el área a continuación.'}
-                            </CardDescription>
-                          </CardHeader>
-                          <CardContent className="space-y-6">
-                            {!hasElectronicSignature && (
-                              <>
-                                <EnhancedSignatureCanvas
-                                  onSignatureChange={setSignatureData}
-                                  width={600}
-                                  height={200}
-                                />
-                                <Separator />
-                              </>
-                            )}
+                       return (
+                         <Card>
+                           <CardHeader>
+                             <CardTitle className="flex items-center gap-2">
+                               <Shield className="h-5 w-5" />
+                               {hasElectronicSignature ? 'Firma Electrónica' : 'Firma Digital'}
+                             </CardTitle>
+                             <CardDescription>
+                               {hasElectronicSignature
+                                 ? 'Presione el botón para registrar su firma electrónica con validez legal.'
+                                 : 'Dibuje su firma en el área a continuación.'}
+                             </CardDescription>
+                           </CardHeader>
+                           <CardContent className="space-y-6">
+                             {!hasElectronicSignature && (
+                               <>
+                                 <EnhancedSignatureCanvas
+                                   onSignatureChange={setSignatureData}
+                                   width={600}
+                                   height={200}
+                                 />
+                                 <Separator />
+                               </>
+                             )}
 
-                            <Button
-                              onClick={handleSignatureComplete}
-                              disabled={
-                                (!hasElectronicSignature && !signatureData) ||
-                                submitSignature.isPending
-                              }
-                              className="w-full"
-                              size="lg"
-                            >
-                              {submitSignature.isPending ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                  Procesando firma...
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCircle className="h-4 w-4 mr-2" />
-                                  Firmar Todos los Documentos
-                                </>
-                              )}
-                            </Button>
+                             <Button
+                               onClick={handleSignatureComplete}
+                               disabled={
+                                 (!hasElectronicSignature && !signatureData) ||
+                                 submitSignature.isPending
+                               }
+                               className="w-full"
+                               size="lg"
+                             >
+                               {submitSignature.isPending ? (
+                                 <>
+                                   <Loader2 className="h-4 w-4 mr-2 animate-spin motion-reduce:animate-none" />
+                                   Procesando firma...
+                                 </>
+                               ) : (
+                                 <>
+                                   <CheckCircle className="h-4 w-4 mr-2" />
+                                   Firmar Todos los Documentos
+                                 </>
+                               )}
+                             </Button>
 
-                            <p className="text-xs text-center text-muted-foreground">
-                              Al firmar, se generará un paquete de evidencia inmutable (Evidence Bundle)
-                              que incluye hash SHA-256, marca de tiempo y registro de verificación de identidad.
-                            </p>
-                          </CardContent>
-                        </Card>
-                      );
-                    })()}
-                  </>
-                )}
+                             <p className="text-xs text-center text-muted-foreground">
+                               Al firmar, se generará un paquete de evidencia inmutable (Evidence Bundle)
+                               que incluye hash SHA-256, marca de tiempo y registro de verificación de identidad.
+                             </p>
+                           </CardContent>
+                         </Card>
+                       );
+                     })()}
+                     </div>
+                   </>
+                 )}
               </>
             )}
           </div>

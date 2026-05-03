@@ -78,12 +78,13 @@ const fetchProfileData = async (userId: string): Promise<{ profile: ProfileWithR
     }
 
     const roleList = (roleResult.data || [])
-      .map((entry: any) => entry?.role)
-      .filter((role: any): role is string => typeof role === 'string' && role.length > 0);
+      .map((entry: { role?: string }) => entry?.role)
+      .filter((role): role is string => typeof role === 'string' && role.length > 0);
 
+    const profileRecord = profileResult.data as Record<string, unknown> | null;
     const legacyProfileRole =
-      typeof (profileResult.data as any)?.role === 'string' && (profileResult.data as any)?.role.length > 0
-        ? ((profileResult.data as any).role as AppRole)
+      typeof profileRecord?.role === 'string' && profileRecord.role.length > 0
+        ? (profileRecord.role as AppRole)
         : null;
 
     const role = roleList.length > 0

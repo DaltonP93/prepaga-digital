@@ -57,7 +57,7 @@ export const useSaleProgressConfig = () => {
         return { ...DEFAULT_PROGRESS_CONFIG };
       }
 
-      const storedConfig = (data as any)?.sale_progress_config;
+      const storedConfig = (data as Record<string, unknown> | null)?.sale_progress_config;
       if (!storedConfig || typeof storedConfig !== 'object') {
         return { ...DEFAULT_PROGRESS_CONFIG };
       }
@@ -82,7 +82,7 @@ export const useSaleProgressConfig = () => {
           company_id: profile.company_id,
           sale_progress_config: newConfig,
           updated_at: new Date().toISOString(),
-        } as any)
+        })
         .select();
 
       if (error) throw error;
@@ -91,8 +91,9 @@ export const useSaleProgressConfig = () => {
       queryClient.invalidateQueries({ queryKey: ['sale-progress-config'] });
       toast.success('Configuración de progreso guardada');
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Error al guardar la configuración');
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(message || 'Error al guardar la configuración');
     },
   });
 

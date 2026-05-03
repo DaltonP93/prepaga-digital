@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ComponentType } from 'react';
 import { CheckCircle, XCircle, AlertCircle, Clock, Shield, CreditCard } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -12,7 +12,7 @@ interface SystemCheck {
   description: string;
   status: 'completed' | 'pending' | 'error' | 'warning';
   priority: 'high' | 'medium' | 'low';
-  icon: any;
+  icon: ComponentType<{ className?: string }>;
 }
 
 export const SystemStatus = () => {

@@ -115,8 +115,8 @@ export const useHybridPDFGeneration = () => {
 
       return { url: pdfUrl, blob: pdfBlob };
 
-    } catch (error: any) {
-      const errorMessage = error.message || 'Error al generar PDF';
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Error al generar PDF';
       
       setState({
         isGenerating: false,

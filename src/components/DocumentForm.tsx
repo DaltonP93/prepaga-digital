@@ -8,9 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface DocumentFormProps {
-  onSubmit: (documentData: any) => void;
+  onSubmit: (documentData: Record<string, unknown>) => void;
   onCancel: () => void;
-  initialData?: any;
+  initialData?: Record<string, unknown>;
 }
 
 export const DocumentForm: React.FC<DocumentFormProps> = ({ 
@@ -18,7 +18,7 @@ export const DocumentForm: React.FC<DocumentFormProps> = ({
   onCancel, 
   initialData 
 }) => {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Record<string, unknown>>({
     name: initialData?.name || '',
     document_type: initialData?.document_type || 'contract',
     content: initialData?.content || '',

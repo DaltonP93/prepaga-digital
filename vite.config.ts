@@ -48,6 +48,9 @@ export default defineConfig(({ mode }) => ({
     dedupe: ['react', 'react-dom'],
   },
   build: {
+    target: 'es2020',
+    chunkSizeWarningLimit: 500,
+    reportCompressedSize: false,
     rollupOptions: {
       output: {
         manualChunks: {

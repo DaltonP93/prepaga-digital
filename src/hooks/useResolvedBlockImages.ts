@@ -10,7 +10,7 @@ export function useResolvedBlockImages(blocks: TemplateBlock[]) {
   const [urlMap, setUrlMap] = useState<Record<string, string>>({});
 
   const imageBlocks = blocks.filter(
-    (b) => b.block_type === "image" && (b.content as any)?.storage_path
+    (b) => b.block_type === "image" && (b.content as Record<string, unknown>)?.storage_path
   );
 
   useEffect(() => {
@@ -20,7 +20,7 @@ export function useResolvedBlockImages(blocks: TemplateBlock[]) {
       const newEntries: Record<string, string> = {};
 
       for (const block of imageBlocks) {
-        const content = block.content as any;
+        const content = block.content as Record<string, unknown>;
         const storagePath = content.storage_path as string;
 
         // Skip if already resolved and not expired (check every render)
@@ -46,7 +46,7 @@ export function useResolvedBlockImages(blocks: TemplateBlock[]) {
     if (imageBlocks.length > 0) resolve();
 
     return () => { cancelled = true; };
-  }, [imageBlocks.map((b) => b.id + (b.content as any)?.storage_path).join(",")]);
+  }, [imageBlocks.map((b) => b.id + (b.content as Record<string, unknown>)?.storage_path).join(",")]);
 
   const getResolvedUrl = useCallback(
     (blockId: string, fallbackSrc?: string) => urlMap[blockId] || fallbackSrc || "",

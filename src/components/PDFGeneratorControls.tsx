@@ -15,10 +15,10 @@ import { usePDFGeneration } from '@/hooks/usePDFGeneration';
 
 interface PDFGeneratorControlsProps {
   content: string;
-  dynamicFields: any[];
+  dynamicFields: Array<Record<string, unknown>>;
   templateType: string;
   templateName?: string;
-  clientData?: any;
+  clientData?: Record<string, unknown>;
   disabled?: boolean;
 }
 
@@ -42,22 +42,18 @@ export const PDFGeneratorControls: React.FC<PDFGeneratorControlsProps> = ({
   const generateOptions = {
     htmlContent: content,
     filename: `${templateName}_${new Date().toISOString().split('T')[0]}`,
-    documentType: templateType as any,
+    documentType: templateType as unknown as string,
     dynamicFields,
     clientData,
     templateData: { name: templateName },
   };
 
   const handleDownload = async () => {
-    const success = await downloadPDF(generateOptions);
-    if (success) {
-    }
+    await downloadPDF(generateOptions);
   };
 
   const handlePreview = async () => {
-    const success = await previewPDF(generateOptions);
-    if (success) {
-    }
+    await previewPDF(generateOptions);
   };
 
   const canGenerate = content && content.trim().length > 0;

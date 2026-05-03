@@ -86,10 +86,11 @@ export const useCreateTemplate = () => {
         description: 'El template ha sido creado exitosamente.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: 'Error',
-        description: error.message || 'No se pudo crear el template.',
+        description: message || 'No se pudo crear el template.',
         variant: 'destructive',
       });
     },
@@ -120,10 +121,11 @@ export const useUpdateTemplate = () => {
         description: 'Los cambios han sido guardados exitosamente.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: 'Error',
-        description: error.message || 'No se pudo actualizar el template.',
+        description: message || 'No se pudo actualizar el template.',
         variant: 'destructive',
       });
     },
@@ -157,10 +159,11 @@ export const useDeleteTemplate = () => {
         description: 'El template ha sido eliminado exitosamente.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: 'Error',
-        description: error.message || 'No se pudo eliminar el template.',
+        description: message || 'No se pudo eliminar el template.',
         variant: 'destructive',
       });
     },

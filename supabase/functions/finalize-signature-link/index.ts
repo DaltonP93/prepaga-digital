@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 // --- Inlined: _shared/public-app-url.ts ---
 function getPublicAppUrl(): string {
@@ -50,7 +50,7 @@ serve(async (req) => {
       })
     }
 
-    const result: Record<string, any> = {
+    const result: Record<string, unknown> = {
       ok: true,
       signed_documents: 0,
       activated_contratada: false,
@@ -138,7 +138,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('finalize-signature-link error:', error)
     return new Response(JSON.stringify({ ok: false, error: 'Internal server error' }), {
       status: 500,
@@ -157,8 +157,8 @@ serve(async (req) => {
  *   parent contract sequence.
  */
 async function triggerPadesSigning(
-  supabase: any,
-  link: any,
+  supabase: SupabaseClient,
+  link: Record<string, unknown>,
   supabaseUrl: string,
   serviceKey: string
 ): Promise<{ count: number; docIds: string[] }> {
@@ -200,9 +200,9 @@ async function triggerPadesSigning(
 }
 
 async function signDocuments(
-  supabase: any,
-  docs: any[],
-  link: any,
+  supabase: SupabaseClient,
+  docs: Array<Record<string, unknown>>,
+  link: Record<string, unknown>,
   supabaseUrl: string,
   serviceKey: string
 ): Promise<{ count: number; docIds: string[] }> {
@@ -293,7 +293,7 @@ async function signDocuments(
 }
 
 async function completeSaleAddendumForLink(
-  supabase: any,
+  supabase: SupabaseClient,
   signatureLinkId: string
 ): Promise<boolean> {
   const { data, error } = await supabase.rpc('try_complete_sale_addendum_for_link', {
@@ -309,8 +309,8 @@ async function completeSaleAddendumForLink(
  * When all step_order=1 links are completed, activate step_order=2 (contratada).
  */
 async function activateNextStep(
-  supabase: any,
-  link: any,
+  supabase: SupabaseClient,
+  link: Record<string, unknown>,
   supabaseUrl: string,
   serviceKey: string
 ): Promise<boolean> {
@@ -330,7 +330,7 @@ async function activateNextStep(
 
   if (!step1Links) return false
 
-  const allStep1Done = step1Links.every((l: any) => l.status === 'completado')
+  const allStep1Done = step1Links.every((l) => (l as Record<string, unknown>).status === 'completado')
   if (!allStep1Done) return false
 
   // Activate step 2 links (contratada)
@@ -422,7 +422,7 @@ async function activateNextStep(
           continue
         }
 
-        const companyName = (sale?.companies as any)?.name || 'La empresa'
+        const companyName = ((sale?.companies as Record<string, unknown> | undefined)?.name as string) || 'La empresa'
         const signerName = s2Link.recipient_name || 'Representante Legal'
 
         await fetch(`${supabaseUrl}/functions/v1/send-whatsapp`, {
@@ -458,8 +458,8 @@ async function activateNextStep(
  * Only runs when contratada_auto_whatsapp = true in company_settings.
  */
 async function sendSignedDocumentsToClient(
-  supabase: any,
-  link: any,
+  supabase: SupabaseClient,
+  link: Record<string, unknown>,
   supabaseUrl: string,
   serviceKey: string
 ): Promise<void> {
@@ -481,10 +481,10 @@ async function sendSignedDocumentsToClient(
   if (!cs?.contratada_auto_whatsapp) return
 
   // Determine client phone: if responsable de pago, use signer_phone; else client phone
-  const client = sale.clients as any
-  const recipientPhone = sale.signer_type === 'responsable_pago'
-    ? (sale.signer_phone || client?.phone)
-    : client?.phone
+      const client = sale.clients as Record<string, unknown> | undefined
+      const recipientPhone = sale.signer_type === 'responsable_pago'
+        ? ((sale.signer_phone as string | undefined) || (client?.phone as string | undefined))
+        : (client?.phone as string | undefined)
 
   if (!recipientPhone) {
     console.log('No recipient phone found, skipping document send')
@@ -512,7 +512,7 @@ async function sendSignedDocumentsToClient(
   for (const doc of docs) {
     try {
       // Generate a signed URL for 24h access
-      let fileUrl = doc.signed_pdf_url as string
+      let fileUrl = doc.signed_pdf_url as string | undefined
 
       // If it's a storage path (not a full URL), generate a signed URL
       if (!fileUrl.startsWith('http')) {

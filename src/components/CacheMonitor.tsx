@@ -6,9 +6,15 @@ import { Badge } from '@/components/ui/badge';
 import { useCacheManager } from '@/hooks/useCacheManager';
 import { RefreshCw, Trash2, AlertTriangle } from 'lucide-react';
 
+interface CacheStatus {
+  localStorageSize: number;
+  itemCount: number;
+  sessionStorageSize: number;
+}
+
 export const CacheMonitor: React.FC = () => {
   const { clearCache, checkCacheStatus } = useCacheManager();
-  const [cacheStatus, setCacheStatus] = useState<any>(null);
+  const [cacheStatus, setCacheStatus] = useState<CacheStatus | null>(null);
   const [isClearing, setIsClearing] = useState(false);
 
   useEffect(() => {

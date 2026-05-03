@@ -24,7 +24,7 @@ interface DynamicQuestionnaireProps {
   templateId: string;
   saleId: string;
   signatureToken?: string;
-  onComplete?: (responses: Record<string, any>) => void;
+  onComplete?: (responses: Record<string, unknown>) => void;
   readOnly?: boolean;
 }
 
@@ -35,7 +35,7 @@ export const DynamicQuestionnaire = ({
   onComplete, 
   readOnly = false 
 }: DynamicQuestionnaireProps) => {
-  const [responses, setResponses] = useState<Record<string, any>>({});
+  const [responses, setResponses] = useState<Record<string, unknown>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const { questions, isLoading } = useTemplateQuestions(templateId);
@@ -58,7 +58,7 @@ export const DynamicQuestionnaire = ({
 
         if (error) throw error;
 
-        const existingResponses: Record<string, any> = {};
+        const existingResponses: Record<string, unknown> = {};
         data?.forEach((response) => {
           existingResponses[response.question_id] = response.response_value;
         });
@@ -73,7 +73,7 @@ export const DynamicQuestionnaire = ({
     loadExistingResponses();
   }, [saleId, templateId, form]);
 
-  const handleResponseChange = (questionId: string, value: any) => {
+  const handleResponseChange = (questionId: string, value: unknown) => {
     const newResponses = { ...responses, [questionId]: value };
     setResponses(newResponses);
     form.setValue(questionId, value);
@@ -124,9 +124,10 @@ export const DynamicQuestionnaire = ({
       } else {
         onComplete?.(responses);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving responses:", error);
-      toast.error(error.message || "Error al guardar las respuestas");
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error(message || "Error al guardar las respuestas");
     } finally {
       setIsSubmitting(false);
     }

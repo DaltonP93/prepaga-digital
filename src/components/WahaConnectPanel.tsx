@@ -40,7 +40,7 @@ export const WahaConnectPanel: React.FC<WahaConnectPanelProps> = ({
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [detectedPhone, setDetectedPhone] = useState(linkedPhone);
   const [showMessages, setShowMessages] = useState(false);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<unknown[]>([]);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -57,20 +57,20 @@ export const WahaConnectPanel: React.FC<WahaConnectPanelProps> = ({
       });
 
       const responseText = await response.text();
-      let data: any = null;
+      let data: Record<string, unknown> | null = null;
 
       try {
-        data = responseText ? JSON.parse(responseText) : null;
+        data = responseText ? (JSON.parse(responseText) as Record<string, unknown>) : null;
       } catch {
         data = { error: responseText || `Edge function error (${response.status})` };
       }
 
       if (!response.ok) {
-        throw new Error(data?.error || data?.message || `Edge function error (${response.status})`);
+        throw new Error((data?.error || data?.message || `Edge function error (${response.status})`) as string);
       }
 
       if (data?.error) {
-        throw new Error(data.error);
+        throw new Error(data.error as string);
       }
 
       return data;
@@ -104,9 +104,11 @@ export const WahaConnectPanel: React.FC<WahaConnectPanelProps> = ({
     }
   }, [sessionName]);
 
-  const extractPhone = (meData: any): string => {
+  const extractPhone = (meData: unknown): string => {
     try {
-      const id = meData?.id || meData?.me?.id || '';
+      const md = meData as Record<string, unknown>;
+      const me = md?.me as Record<string, unknown> | undefined;
+      const id = (md?.id || me?.id || '') as string;
       if (!id || typeof id !== 'string') return '';
       return '+' + id.replace(/@.*$/, '');
     } catch { return ''; }
@@ -135,12 +137,13 @@ export const WahaConnectPanel: React.FC<WahaConnectPanelProps> = ({
       } else {
         setQrImage(null);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Session might not exist
-      if (err.message?.includes('404') || err.message?.includes('not found')) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('404') || message.includes('not found')) {
         setStatus('STOPPED');
       } else {
-        setError(err.message);
+        setError(message);
         setStatus('UNKNOWN');
       }
     }
@@ -169,8 +172,9 @@ export const WahaConnectPanel: React.FC<WahaConnectPanelProps> = ({
       }
       // Wait a moment then sync
       setTimeout(() => syncStatus(), 2000);
-    } catch (err: any) {
-      setError(`Error al ${label}: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(`Error al ${label}: ${message}`);
     } finally {
       setActionLoading(null);
     }

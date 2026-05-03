@@ -70,7 +70,7 @@ export const useAnalyticsConfig = () => {
         return { ...DEFAULT_ANALYTICS_CONFIG };
       }
 
-      const stored = (data as any)?.analytics_config;
+      const stored = (data as { analytics_config?: unknown } | null)?.analytics_config;
       if (!stored || typeof stored !== 'object') {
         return { ...DEFAULT_ANALYTICS_CONFIG };
       }
@@ -95,7 +95,7 @@ export const useAnalyticsConfig = () => {
           company_id: profile.company_id,
           analytics_config: newConfig,
           updated_at: new Date().toISOString(),
-        } as any)
+        } as Record<string, unknown>)
         .select();
 
       if (error) throw error;
@@ -104,8 +104,8 @@ export const useAnalyticsConfig = () => {
       queryClient.invalidateQueries({ queryKey: ['analytics-config'] });
       toast.success('Configuración de analytics guardada');
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Error al guardar configuración');
+    onError: (error: unknown) => {
+      toast.error(error instanceof Error ? error.message : 'Error al guardar configuración');
     },
   });
 

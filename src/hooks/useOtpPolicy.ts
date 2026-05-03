@@ -55,7 +55,7 @@ export const useOtpPolicy = () => {
       if (!profile?.company_id) return DEFAULT_POLICY;
 
       const { data, error } = await supabase
-        .from('company_otp_policy' as any)
+        .from('company_otp_policy' as unknown as keyof Database['public']['Tables'])
         .select('*')
         .eq('company_id', profile.company_id)
         .single();
@@ -67,26 +67,27 @@ export const useOtpPolicy = () => {
 
       if (!data) return DEFAULT_POLICY;
 
+      const row = data as Record<string, unknown>;
       return {
-        id: (data as any).id,
-        company_id: (data as any).company_id,
-        require_otp_for_signature: (data as any).require_otp_for_signature ?? true,
-        otp_length: (data as any).otp_length ?? 6,
-        otp_expiration_seconds: (data as any).otp_expiration_seconds ?? 300,
-        max_attempts: (data as any).max_attempts ?? 3,
-        default_channel: (data as any).default_channel ?? 'email',
-        allowed_channels: (data as any).allowed_channels ?? ['email'],
-        whatsapp_otp_enabled: (data as any).whatsapp_otp_enabled ?? false,
-        smtp_host: (data as any).smtp_host ?? '',
-        smtp_port: (data as any).smtp_port ?? 587,
-        smtp_user: (data as any).smtp_user ?? '',
-        smtp_password_encrypted: (data as any).smtp_password_encrypted ?? '',
-        smtp_from_address: (data as any).smtp_from_address ?? '',
-        smtp_from_name: (data as any).smtp_from_name ?? '',
-        smtp_tls: (data as any).smtp_tls ?? true,
-        otp_whatsapp_provider: (data as any).otp_whatsapp_provider ?? 'qr_session',
-        otp_whatsapp_gateway_url: (data as any).otp_whatsapp_gateway_url ?? '',
-        otp_use_signature_whatsapp: (data as any).otp_use_signature_whatsapp ?? true,
+        id: row.id as string | undefined,
+        company_id: row.company_id as string | undefined,
+        require_otp_for_signature: (row.require_otp_for_signature as boolean | undefined) ?? true,
+        otp_length: (row.otp_length as number | undefined) ?? 6,
+        otp_expiration_seconds: (row.otp_expiration_seconds as number | undefined) ?? 300,
+        max_attempts: (row.max_attempts as number | undefined) ?? 3,
+        default_channel: (row.default_channel as string | undefined) ?? 'email',
+        allowed_channels: (row.allowed_channels as string[] | undefined) ?? ['email'],
+        whatsapp_otp_enabled: (row.whatsapp_otp_enabled as boolean | undefined) ?? false,
+        smtp_host: (row.smtp_host as string | undefined) ?? '',
+        smtp_port: (row.smtp_port as number | undefined) ?? 587,
+        smtp_user: (row.smtp_user as string | undefined) ?? '',
+        smtp_password_encrypted: (row.smtp_password_encrypted as string | undefined) ?? '',
+        smtp_from_address: (row.smtp_from_address as string | undefined) ?? '',
+        smtp_from_name: (row.smtp_from_name as string | undefined) ?? '',
+        smtp_tls: (row.smtp_tls as boolean | undefined) ?? true,
+        otp_whatsapp_provider: (row.otp_whatsapp_provider as string | undefined) ?? 'qr_session',
+        otp_whatsapp_gateway_url: (row.otp_whatsapp_gateway_url as string | undefined) ?? '',
+        otp_use_signature_whatsapp: (row.otp_use_signature_whatsapp as boolean | undefined) ?? true,
       };
     },
     enabled: !!profile?.company_id,
@@ -96,7 +97,7 @@ export const useOtpPolicy = () => {
     mutationFn: async (updates: Partial<OtpPolicyConfig>) => {
       if (!profile?.company_id) throw new Error('No company ID');
 
-      const { id, company_id, ...cleanUpdates } = updates as any;
+      const { id, company_id, ...cleanUpdates } = updates;
 
       const dbData = {
         company_id: profile.company_id,
@@ -106,7 +107,7 @@ export const useOtpPolicy = () => {
 
       // Check if policy already exists
       const { data: existing } = await supabase
-        .from('company_otp_policy' as any)
+        .from('company_otp_policy' as unknown as keyof Database['public']['Tables'])
         .select('id')
         .eq('company_id', profile.company_id)
         .maybeSingle();
@@ -114,8 +115,8 @@ export const useOtpPolicy = () => {
       let result;
       if (existing) {
         const { data, error } = await supabase
-          .from('company_otp_policy' as any)
-          .update(dbData as any)
+          .from('company_otp_policy' as unknown as keyof Database['public']['Tables'])
+          .update(dbData as Record<string, unknown>)
           .eq('company_id', profile.company_id)
           .select()
           .single();
@@ -123,8 +124,8 @@ export const useOtpPolicy = () => {
         result = data;
       } else {
         const { data, error } = await supabase
-          .from('company_otp_policy' as any)
-          .insert(dbData as any)
+          .from('company_otp_policy' as unknown as keyof Database['public']['Tables'])
+          .insert(dbData as Record<string, unknown>)
           .select()
           .single();
         if (error) throw error;
@@ -137,7 +138,7 @@ export const useOtpPolicy = () => {
       queryClient.invalidateQueries({ queryKey: ['otp-policy'] });
       toast.success('Política OTP actualizada correctamente');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Error updating OTP policy:', error);
       toast.error('Error al actualizar política OTP');
     },

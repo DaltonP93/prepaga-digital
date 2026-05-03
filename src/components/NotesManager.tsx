@@ -13,9 +13,16 @@ interface NotesManagerProps {
   saleId: string;
 }
 
+interface SaleNote {
+  id: string;
+  note?: string;
+  note_text?: string;
+  created_at: string;
+}
+
 export const NotesManager: React.FC<NotesManagerProps> = ({ saleId }) => {
   const [showForm, setShowForm] = useState(false);
-  const [editingNote, setEditingNote] = useState<any>(null);
+  const [editingNote, setEditingNote] = useState<SaleNote | null>(null);
   const [content, setContent] = useState('');
 
   const { toast } = useToast();
@@ -31,13 +38,13 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ saleId }) => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data;
+      return data as SaleNote[];
     },
     enabled: !!saleId,
   });
 
   const createNote = useMutation({
-    mutationFn: async (note: any) => {
+    mutationFn: async (note: Record<string, unknown>) => {
       const { data, error } = await supabase
         .from('sale_notes')
         .insert(note)
@@ -55,7 +62,7 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ saleId }) => {
   });
 
   const updateNote = useMutation({
-    mutationFn: async ({ id, ...updates }: any) => {
+    mutationFn: async ({ id, ...updates }: { id: string; [key: string]: unknown }) => {
       const { data, error } = await supabase
         .from('sale_notes')
         .update(updates)
@@ -94,9 +101,9 @@ export const NotesManager: React.FC<NotesManagerProps> = ({ saleId }) => {
     setEditingNote(null);
   };
 
-  const handleEdit = (note: any) => {
+  const handleEdit = (note: SaleNote) => {
     setEditingNote(note);
-    setContent(note.note);
+    setContent(note.note || '');
     setShowForm(true);
   };
 

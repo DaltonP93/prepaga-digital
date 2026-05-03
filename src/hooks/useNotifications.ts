@@ -98,21 +98,22 @@ export const useNotifications = () => {
     };
   }, [queryClient]);
 
-  const sendSignatureNotification = async (saleData: any, signatureUrl: string) => {
+  const sendSignatureNotification = async (saleData: Record<string, unknown>, signatureUrl: string) => {
     setIsSending(true);
     try {
+      const clients = saleData.clients as Record<string, unknown> | undefined;
       const { error } = await supabase.functions.invoke('send-notification', {
         body: {
           type: 'signature_request',
-          to: saleData.clients?.email,
-          data: { clientName: `${saleData.clients?.first_name} ${saleData.clients?.last_name}`, signatureUrl }
+          to: clients?.email as string | undefined,
+          data: { clientName: `${clients?.first_name as string | undefined} ${clients?.last_name as string | undefined}`, signatureUrl }
         }
       });
       if (error) throw error;
       toast({ title: "Notificación enviada" });
       return { success: true };
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Error", description: error instanceof Error ? error.message : 'Error al enviar notificación', variant: "destructive" });
       return { success: false };
     } finally {
       setIsSending(false);

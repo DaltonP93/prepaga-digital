@@ -30,7 +30,7 @@ type ExtendedSale = Sale & {
     name: string;
     price: number;
     description?: string;
-    coverage_details?: any;
+    coverage_details?: unknown;
   };
   salesperson?: {
     first_name: string;
@@ -120,7 +120,7 @@ export const useSales = () => {
       const profilesMap = (profiles || []).reduce((acc, p) => {
         acc[p.id] = p;
         return acc;
-      }, {} as Record<string, any>);
+      }, {} as Record<string, ExtendedSale['profiles']>);
 
       return (salesData || []).map(sale => ({
         ...sale,
@@ -180,8 +180,8 @@ export function useSalesList(paramsOrEnabled: SalesListParams | boolean = {}) {
       }
 
       if (status && status !== 'todos') {
-        salesQuery = salesQuery.eq('status', status as any);
-        countQuery = countQuery.eq('status', status as any);
+        salesQuery = salesQuery.eq('status', status);
+        countQuery = countQuery.eq('status', status);
       }
 
       if (search.trim()) {
@@ -282,10 +282,11 @@ export const useCreateSale = () => {
         description: "La venta ha sido creada exitosamente.",
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error",
-        description: error.message || "No se pudo crear la venta.",
+        description: message || "No se pudo crear la venta.",
         variant: "destructive",
       });
     },
@@ -315,10 +316,11 @@ export const useUpdateSale = () => {
         description: "Los cambios han sido guardados exitosamente.",
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error",
-        description: error.message || "No se pudo actualizar la venta.",
+        description: message || "No se pudo actualizar la venta.",
         variant: "destructive",
       });
     },
@@ -345,10 +347,11 @@ export const useDeleteSale = () => {
         description: "La venta ha sido eliminada exitosamente.",
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error",
-        description: error.message || "No se pudo eliminar la venta.",
+        description: message || "No se pudo eliminar la venta.",
         variant: "destructive",
       });
     },
@@ -391,7 +394,7 @@ export const useGenerateQuestionnaireLink = () => {
         if (sale.company_id) {
           const { data: currentUser } = await supabase.auth.getUser();
           const { data: userRoleData } = await supabase.rpc('get_user_role', { _user_id: currentUser?.user?.id || '' });
-          const check = await validateSaleTransition(sale.company_id, sale, 'enviado', (userRoleData as any) || 'vendedor');
+          const check = await validateSaleTransition(sale.company_id, sale, 'enviado', (userRoleData as string | null) ?? 'vendedor');
           if (!check.allowed) throw new Error(check.reasons.join(', '));
         }
 
@@ -406,7 +409,7 @@ export const useGenerateQuestionnaireLink = () => {
             signature_token: token,
             signature_expires_at: expiresAtString,
             status: 'enviado'
-          } as any) // Using 'as any' to bypass type checking for new fields
+          })
           .eq('id', saleId);
 
         if (updateError) throw updateError;
@@ -427,10 +430,11 @@ export const useGenerateQuestionnaireLink = () => {
         description: "El enlace ha sido copiado al portapapeles y está listo para enviar al cliente.",
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error",
-        description: error.message || "No se pudo generar el enlace del cuestionario.",
+        description: message || "No se pudo generar el enlace del cuestionario.",
         variant: "destructive",
       });
     },
@@ -491,7 +495,7 @@ export const useGenerateSignatureLink = () => {
         if (sale.company_id) {
           const { data: currentUser } = await supabase.auth.getUser();
           const { data: userRoleData } = await supabase.rpc('get_user_role', { _user_id: currentUser?.user?.id || '' });
-          const check = await validateSaleTransition(sale.company_id, sale, 'enviado', (userRoleData as any) || 'vendedor');
+          const check = await validateSaleTransition(sale.company_id, sale, 'enviado', (userRoleData as string | null) ?? 'vendedor');
           if (!check.allowed) throw new Error(check.reasons.join(', '));
         }
 
@@ -506,7 +510,7 @@ export const useGenerateSignatureLink = () => {
             signature_token: token,
             signature_expires_at: expiresAt,
             status: 'enviado'
-          } as any) // Using 'as any' to bypass type checking for new fields
+          })
           .eq('id', saleId)
           .select(`
             *,
@@ -534,10 +538,11 @@ export const useGenerateSignatureLink = () => {
         description: "El enlace ha sido copiado al portapapeles. Envíelo al cliente para que complete la firma.",
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error",
-        description: error.message || "No se pudo generar el enlace de firma.",
+        description: message || "No se pudo generar el enlace de firma.",
         variant: "destructive",
       });
     },
@@ -555,7 +560,7 @@ export const useRevokeSignatureToken = () => {
       if (saleForValidation?.company_id) {
         const { data: currentUser } = await supabase.auth.getUser();
         const { data: userRoleData } = await supabase.rpc('get_user_role', { _user_id: currentUser?.user?.id || '' });
-        const check = await validateSaleTransition(saleForValidation.company_id, saleForValidation, 'cancelado', (userRoleData as any) || 'vendedor');
+        const check = await validateSaleTransition(saleForValidation.company_id, saleForValidation, 'cancelado', (userRoleData as string | null) ?? 'vendedor');
         if (!check.allowed) throw new Error(check.reasons.join(', '));
       }
 
@@ -564,7 +569,7 @@ export const useRevokeSignatureToken = () => {
         .from('sales')
         .update({
           status: 'cancelado'
-        } as any) // Using 'as any' to bypass type checking for new fields
+        })
         .eq('id', saleId)
         .select()
         .single();
@@ -581,10 +586,11 @@ export const useRevokeSignatureToken = () => {
         description: "El token de firma ha sido revocado exitosamente.",
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error",
-        description: error.message || "No se pudo revocar el token de firma.",
+        description: message || "No se pudo revocar el token de firma.",
         variant: "destructive",
       });
     },

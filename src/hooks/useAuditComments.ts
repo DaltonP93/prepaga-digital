@@ -25,7 +25,7 @@ export const useAuditComments = (saleId?: string) => {
     enabled: !!saleId,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('audit_comments' as any)
+        .from('audit_comments')
         .select('*')
         .eq('sale_id', saleId!)
         .order('created_at', { ascending: true });
@@ -33,8 +33,8 @@ export const useAuditComments = (saleId?: string) => {
       if (error) throw error;
 
       // Fetch user profiles separately
-      const userIds = [...new Set((data || []).map((c: any) => c.user_id))];
-      let profilesMap: Record<string, any> = {};
+      const userIds = [...new Set((data || []).map((c) => (c as Record<string, unknown>).user_id as string).filter(Boolean))];
+      let profilesMap: Record<string, unknown> = {};
 
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
@@ -45,12 +45,12 @@ export const useAuditComments = (saleId?: string) => {
         profilesMap = (profiles || []).reduce((acc, p) => {
           acc[p.id] = p;
           return acc;
-        }, {} as Record<string, any>);
+        }, {} as Record<string, unknown>);
       }
 
-      return (data || []).map((comment: any) => ({
-        ...comment,
-        profiles: profilesMap[comment.user_id] || null,
+      return (data || []).map((comment) => ({
+        ...(comment as Record<string, unknown>),
+        profiles: profilesMap[(comment as Record<string, unknown>).user_id as string] || null,
       })) as AuditComment[];
     },
   });
@@ -75,7 +75,7 @@ export const useCreateAuditComment = () => {
       if (!currentUser?.user?.id) throw new Error('No autenticado');
 
       const { data, error } = await supabase
-        .from('audit_comments' as any)
+        .from('audit_comments')
         .insert({
           sale_id: saleId,
           user_id: currentUser.user.id,
@@ -93,8 +93,8 @@ export const useCreateAuditComment = () => {
       queryClient.invalidateQueries({ queryKey: ['audit-comments', variables.saleId] });
       toast.success('Comentario de auditoría registrado');
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Error al registrar comentario');
+    onError: (error: unknown) => {
+      toast.error(error instanceof Error ? error.message : 'Error al registrar comentario');
     },
   });
 };

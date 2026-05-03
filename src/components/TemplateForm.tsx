@@ -111,7 +111,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
   const updateTemplate = useUpdateTemplate();
   const isEditing = !!template;
   const [showCopyDialog, setShowCopyDialog] = useState(false);
-  const [dynamicFields, setDynamicFields] = useState<any[]>([]);
+  const [dynamicFields, setDynamicFields] = useState<unknown[]>([]);
   const [activeTab, setActiveTab] = useState<TabKey>("setup");
   const [workingTemplateId, setWorkingTemplateId] = useState<string | undefined>(template?.id);
   
@@ -145,7 +145,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
       setValue("description", template.description || "");
       setValue("active", template.is_active ?? true);
       setValue("is_global", false);
-      setValue("designer_version", (template as any).designer_version || "1.0");
+      setValue("designer_version", String((template as unknown as Record<string, unknown>).designer_version || "1.0"));
       setDynamicFields([]);
       setActiveTab("setup");
 
@@ -202,7 +202,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
       is_active: watch("active"),
       company_id: profile.company_id,
       designer_version: watch("designer_version"),
-    } as any);
+    } as unknown as Database["public"]["Tables"]["templates"]["Insert"]);
 
     setWorkingTemplateId(createdTemplate.id);
     return createdTemplate.id;
@@ -232,7 +232,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
           ...templateData,
         });
       } else {
-        const createdTemplate = await createTemplate.mutateAsync(templateData as any);
+        const createdTemplate = await createTemplate.mutateAsync(templateData as unknown as Database["public"]["Tables"]["templates"]["Insert"]);
         setWorkingTemplateId(createdTemplate.id);
       }
 
@@ -249,7 +249,7 @@ export function TemplateForm({ open, onOpenChange, template, mode = "dialog" }: 
     setValue("content", newContent);
   };
 
-  const handleDynamicFieldsChange = (fields: any[]) => {
+  const handleDynamicFieldsChange = (fields: unknown[]) => {
     setDynamicFields(fields);
   };
 

@@ -234,7 +234,7 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
 
               <div className="space-y-2">
                 <Label>Rol *</Label>
-                <Select value={watch("role")} onValueChange={(value: any) => setValue("role", value)}>
+                  <Select value={watch("role")} onValueChange={(value: string) => setValue("role", value as UserFormData['role'])}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar rol" />
                   </SelectTrigger>

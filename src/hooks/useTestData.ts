@@ -194,14 +194,15 @@ export const useTestData = () => {
       });
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating test data:", error);
+      const message = error instanceof Error ? error.message : "No se pudieron crear los datos de prueba.";
       toast({
         title: "Error",
-        description: error.message || "No se pudieron crear los datos de prueba.",
+        description: message,
         variant: "destructive",
       });
-      return { success: false, error: error.message };
+      return { success: false, error: message };
     } finally {
       setIsCreating(false);
     }

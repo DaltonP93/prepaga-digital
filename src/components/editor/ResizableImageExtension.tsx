@@ -1,12 +1,18 @@
 import React, { useCallback, useRef, useState } from "react";
 import { Node, mergeAttributes } from "@tiptap/core";
-import { ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
+import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from "@tiptap/react";
 import { AlignLeft, AlignCenter, AlignRight, Trash2 } from "lucide-react";
 
 /* ─── NodeView Component ─── */
 
-const ResizableImageView: React.FC<any> = ({ node, updateAttributes, deleteNode, selected }) => {
-  const { src, alt, width, height, float: floatAttr } = node.attrs;
+const ResizableImageView: React.FC<NodeViewProps> = ({ node, updateAttributes, deleteNode, selected }) => {
+  const { src, alt, width, height, float: floatAttr } = node.attrs as {
+    src: string;
+    alt?: string;
+    width?: string | number;
+    height?: string | number;
+    float?: string;
+  };
   const imgRef = useRef<HTMLImageElement>(null);
   const [isResizing, setIsResizing] = useState(false);
   const startRef = useRef({ mx: 0, my: 0, w: 0, h: 0, corner: "" });
@@ -176,7 +182,7 @@ export const ResizableImageExtension = Node.create({
       "data-storage-path": {
         default: null,
         parseHTML: (element: HTMLElement) => element.getAttribute("data-storage-path"),
-        renderHTML: (attributes: any) => {
+        renderHTML: (attributes: Record<string, unknown>) => {
           if (!attributes["data-storage-path"]) return {};
           return { "data-storage-path": attributes["data-storage-path"] };
         },
@@ -205,11 +211,11 @@ export const ResizableImageExtension = Node.create({
     return ReactNodeViewRenderer(ResizableImageView);
   },
 
-  addCommands(): any {
+  addCommands(): Record<string, (...args: unknown[]) => unknown> {
     return {
       setImage:
         (options: { src: string; alt?: string; title?: string }) =>
-        ({ commands }: any) =>
+        ({ commands }: { commands: Record<string, (...args: unknown[]) => unknown> }) =>
           commands.insertContent({ type: this.name, attrs: options }),
     };
   },

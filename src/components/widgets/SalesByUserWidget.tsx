@@ -30,10 +30,21 @@ const SalesByUserWidget = () => {
     );
   }
 
+  interface SalesByUserAcc {
+    [userId: string]: {
+      name: string;
+      totalSales: number;
+      totalAmount: number;
+      completedSales: number;
+      conversionRate: number;
+    };
+  }
+
   // Procesar datos de ventas por usuario
-  const salesByUser = sales?.reduce((acc: any, sale: any) => {
-    const userId = sale.salesperson_id;
-    const userName = users?.find(u => u.id === userId)?.first_name + ' ' + users?.find(u => u.id === userId)?.last_name || 'Sin asignar';
+  const salesByUser = sales?.reduce((acc: SalesByUserAcc, sale) => {
+    const userId = sale.salesperson_id ?? 'unassigned';
+    const user = users?.find(u => u.id === userId);
+    const userName = (user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : '') || 'Sin asignar';
     
     if (!acc[userId]) {
       acc[userId] = {
@@ -59,7 +70,7 @@ const SalesByUserWidget = () => {
     return acc;
   }, {}) || {};
 
-  const chartData = Object.values(salesByUser).map((user: any) => ({
+  const chartData = Object.values(salesByUser).map((user) => ({
     name: user.name,
     ventas: user.totalSales,
     ingresos: user.totalAmount,
@@ -67,7 +78,7 @@ const SalesByUserWidget = () => {
     conversion: Math.round(user.conversionRate)
   }));
 
-  const pieData = Object.values(salesByUser).map((user: any) => ({
+  const pieData = Object.values(salesByUser).map((user) => ({
     name: user.name,
     value: user.totalSales
   }));
@@ -204,7 +215,10 @@ const SalesByUserWidget = () => {
                       border: '1px solid hsl(var(--border))',
                       borderRadius: '6px'
                     }}
-                    formatter={(value: any) => [`₲${value.toLocaleString()}`, 'Ingresos']}
+                    formatter={(value: unknown) => {
+                      const num = typeof value === 'number' ? value : Number(value);
+                      return [`₲${num.toLocaleString()}`, 'Ingresos'];
+                    }}
                   />
                   <Bar 
                     dataKey="ingresos" 

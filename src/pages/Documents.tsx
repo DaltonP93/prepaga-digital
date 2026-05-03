@@ -25,7 +25,7 @@ interface SaleGroup {
   clientName: string;
   planName: string;
   saleStatus: string;
-  documents: any[];
+  documents: Record<string, unknown>[];
 }
 
 type NormalizedDocumentType = "contrato" | "ddjj_salud" | "anexo";
@@ -130,7 +130,7 @@ const Documents: React.FC = () => {
     const groups: Record<string, SaleGroup> = {};
 
     for (const doc of documentPage.documents) {
-      const sale = doc.sales as any;
+      const sale = doc.sales as Record<string, unknown>;
       const saleId = doc.sale_id;
 
       if (!groups[saleId]) {
@@ -331,7 +331,7 @@ const Documents: React.FC = () => {
                     <CollapsibleContent>
                       <CardContent className="pt-0 pb-3 px-4">
                         <div className="space-y-2 border-t pt-3">
-                          {group.documents.map((doc: any) => (
+                          {group.documents.map((doc) => (
                             <div
                               key={doc.id}
                               className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${

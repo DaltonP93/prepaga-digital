@@ -22,7 +22,8 @@ import { getDocumentAccessUrl } from '@/lib/assetUrlHelper';
 import { toast } from 'sonner';
 import { useSale } from '@/hooks/useSale';
 
-const formatDateTimePY = (dateStr: string) => {
+const formatDateTimePY = (dateStr: string | null | undefined) => {
+  if (!dateStr) return '-';
   return new Date(dateStr).toLocaleString('es-PY', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
@@ -39,6 +40,57 @@ interface SignatureWorkflowLink {
   recipient_id: string | null;
   recipient_email: string | null;
   recipient_phone: string | null;
+  status?: string | null;
+  expires_at?: string | null;
+  created_at?: string | null;
+  completed_at?: string | null;
+  accessed_at?: string | null;
+  access_count?: number | null;
+  ip_addresses?: unknown;
+  recipient_name?: string | null;
+}
+
+interface DocumentLike {
+  id: string;
+  name: string;
+  document_type?: string | null;
+  content?: string | null;
+  file_url?: string | null;
+  signed_pdf_url?: string | null;
+  is_final?: boolean | null;
+  status?: string | null;
+  signed_at?: string | null;
+  beneficiary_id?: string | null;
+  evidence_certificate_url?: string | null;
+}
+
+interface BeneficiaryLike {
+  id: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+}
+
+interface ClientLike {
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+}
+
+interface SalespersonLike {
+  first_name?: string | null;
+  last_name?: string | null;
+}
+
+interface WorkflowStepLike {
+  id: string;
+  signature_link_id: string;
+  step_type: string;
+  completed_at?: string | null;
+  created_at: string;
+  data?: unknown;
 }
 
 interface PhoneVerificationState {
@@ -125,7 +177,7 @@ const SignatureWorkflow = () => {
     queryFn: async () => {
       if (!saleId) return [];
       // Get all signature link IDs for this sale
-      const linkIds = signatureLinks?.map((l: any) => l.id) || [];
+      const linkIds = signatureLinks?.map((l) => l.id) || [];
       if (linkIds.length === 0) return [];
       const { data, error } = await supabase
         .from('signature_workflow_steps')
@@ -139,7 +191,7 @@ const SignatureWorkflow = () => {
   });
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [detailLink, setDetailLink] = useState<any>(null);
+  const [detailLink, setDetailLink] = useState<SignatureWorkflowLink | null>(null);
   const [regeneratingLinkId, setRegeneratingLinkId] = useState<string | null>(null);
   const [phoneVerification, setPhoneVerification] = useState<PhoneVerificationState | null>(null);
   const [isConfirmingPhone, setIsConfirmingPhone] = useState(false);
@@ -236,7 +288,7 @@ const SignatureWorkflow = () => {
       } else {
         toast.error(result.error || 'Error al enviar WhatsApp');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error sending WhatsApp:', err);
       // Fallback to wa.me
       const message = encodeURIComponent(
@@ -284,7 +336,7 @@ const SignatureWorkflow = () => {
     }
   };
 
-  const handleDownloadContent = (doc: any) => {
+  const handleDownloadContent = (doc: DocumentLike) => {
     if (!doc?.content) return;
     const htmlContent = `<!doctype html>
 <html lang="es">
@@ -353,9 +405,9 @@ const SignatureWorkflow = () => {
     window.open(accessUrl, '_blank', 'noopener,noreferrer');
   };
 
-  const handleDownloadSignedDocs = async (link: any) => {
+  const handleDownloadSignedDocs = async (link: SignatureWorkflowLink) => {
     // Find signed (final) documents for this recipient
-    const recipientDocs = signedDocs.filter((doc: any) => {
+    const recipientDocs = signedDocs.filter((doc: DocumentLike) => {
       if (doc.document_type === 'firma') return false;
       if (!doc.is_final) return false;
       if (link.recipient_type === 'adherente' && link.recipient_id) {
@@ -397,6 +449,7 @@ const SignatureWorkflow = () => {
             continue;
           }
         } catch (err) {
+          // intentional empty catch: signed PDF download is best-effort
         }
       }
       // Fallback
@@ -408,8 +461,8 @@ const SignatureWorkflow = () => {
     }
   };
 
-  const handleRegenerateAndDownload = async (link: any) => {
-    const recipientDocs = signedDocs.filter((doc: any) => {
+  const handleRegenerateAndDownload = async (link: SignatureWorkflowLink) => {
+    const recipientDocs = signedDocs.filter((doc: DocumentLike) => {
       if (doc.document_type === 'firma') return false;
       if (!doc.is_final) return false;
       if (link.recipient_type === 'adherente' && link.recipient_id) {
@@ -471,16 +524,17 @@ const SignatureWorkflow = () => {
         }
       }
       toast.success('Documentos regenerados con encabezado');
-    } catch (err: any) {
-      toast.error(err.message || 'Error al regenerar documentos');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast.error(message || 'Error al regenerar documentos');
     } finally {
       setRegeneratingLinkId(null);
     }
   };
 
-  const getRecipientLabel = (link: any) => {
+  const getRecipientLabel = (link: SignatureWorkflowLink) => {
     if (link.recipient_type === 'titular') {
-      const client = selectedSale?.clients as any;
+      const client = selectedSale?.clients as unknown as ClientLike | undefined;
       return `Titular: ${client ? `${client.first_name} ${client.last_name}` : 'Sin datos'}`;
     }
     if (link.recipient_type === 'contratada') {
@@ -490,37 +544,37 @@ const SignatureWorkflow = () => {
         || 'Representante Legal';
       return `Contratada: ${name}`;
     }
-    const beneficiary = beneficiaries?.find((b: any) => b.id === link.recipient_id);
+    const beneficiary = beneficiaries?.find((b: BeneficiaryLike) => b.id === link.recipient_id);
     if (beneficiary) return `Adherente: ${beneficiary.first_name} ${beneficiary.last_name}`;
     return `Adherente: ${link.recipient_email || link.recipient_phone || 'Sin datos'}`;
   };
 
-  const getRecipientPhone = (link: any) => {
+  const getRecipientPhone = (link: SignatureWorkflowLink) => {
     if (link.recipient_phone) return link.recipient_phone;
     if (link.recipient_type === 'titular') {
-      const client = selectedSale?.clients as any;
+      const client = selectedSale?.clients as unknown as ClientLike | undefined;
       return client?.phone || null;
     }
     if (link.recipient_type === 'contratada') return null;
-    const beneficiary = beneficiaries?.find((b: any) => b.id === link.recipient_id);
+    const beneficiary = beneficiaries?.find((b: BeneficiaryLike) => b.id === link.recipient_id);
     return beneficiary?.phone || null;
   };
 
-  const getRecipientName = (link: any) => {
+  const getRecipientName = (link: SignatureWorkflowLink) => {
     if (link.recipient_type === 'titular') {
-      const client = selectedSale?.clients as any;
+      const client = selectedSale?.clients as unknown as ClientLike | undefined;
       return client ? `${client.first_name} ${client.last_name}` : 'Cliente';
     }
     if (link.recipient_type === 'contratada') {
       return link.recipient_name || link.recipient_phone || link.recipient_email || 'Representante Legal';
     }
-    const beneficiary = beneficiaries?.find((b: any) => b.id === link.recipient_id);
+    const beneficiary = beneficiaries?.find((b: BeneficiaryLike) => b.id === link.recipient_id);
     return beneficiary ? `${beneficiary.first_name} ${beneficiary.last_name}` : 'Adherente';
   };
 
   // Get the most recent active link for each recipient (skip revoked old ones)
-  const getActiveLinks = (links: any[]) => {
-    const byRecipient = new Map<string, any>();
+  const getActiveLinks = (links: SignatureWorkflowLink[]) => {
+    const byRecipient = new Map<string, SignatureWorkflowLink>();
     for (const link of links) {
       const key = link.recipient_type === 'titular' ? 'titular'
         : link.recipient_type === 'contratada' ? 'contratada'
@@ -541,7 +595,7 @@ const SignatureWorkflow = () => {
   };
 
   const getStepsForLink = (linkId: string) => {
-    return workflowSteps.filter((s: any) => s.signature_link_id === linkId);
+    return workflowSteps.filter((s) => s.signature_link_id === linkId);
   };
 
   if (token) {
@@ -571,7 +625,7 @@ const SignatureWorkflow = () => {
     const canViewAllSales = permissions.sales.viewAll;
 
     const availableSales = sales.filter(sale =>
-      ['enviado', 'firmado', 'completado'].includes(sale.status) ||
+      (sale.status && ['enviado', 'firmado', 'completado'].includes(sale.status)) ||
       (isSeller && sale.salesperson_id === profile?.id) ||
       canViewAllSales
     );
@@ -636,14 +690,14 @@ const SignatureWorkflow = () => {
     );
   }
 
-  const client = selectedSale.clients as any;
+  const client = selectedSale?.clients as unknown as ClientLike | undefined;
   const clientName = client ? `${client.first_name} ${client.last_name}` : 'Sin cliente';
 
-  const titularLinks = getActiveLinks(signatureLinks?.filter((l: any) => l.recipient_type === 'titular') || []);
-  const adherenteLinks = getActiveLinks(signatureLinks?.filter((l: any) => l.recipient_type === 'adherente') || []);
-  const contratadaLinks = getActiveLinks(signatureLinks?.filter((l: any) => l.recipient_type === 'contratada') || []);
+  const titularLinks = getActiveLinks(signatureLinks?.filter((l) => l.recipient_type === 'titular') || []);
+  const adherenteLinks = getActiveLinks(signatureLinks?.filter((l) => l.recipient_type === 'adherente') || []);
+  const contratadaLinks = getActiveLinks(signatureLinks?.filter((l) => l.recipient_type === 'contratada') || []);
 
-  function renderSignatureLinks(links: any[]) {
+  function renderSignatureLinks(links: SignatureWorkflowLink[]) {
     if (linksLoading) {
       return <p className="text-muted-foreground text-center py-4">Cargando enlaces...</p>;
     }
@@ -657,9 +711,9 @@ const SignatureWorkflow = () => {
 
     return (
       <div className="space-y-4">
-        {links.map((link: any) => {
+        {links.map((link: SignatureWorkflowLink) => {
           const isCompleted = link.status === 'completado';
-          const isExpired = !isCompleted && new Date(link.expires_at) < new Date();
+          const isExpired = !isCompleted && !!link.expires_at && new Date(link.expires_at) < new Date();
           const isRevoked = link.status === 'revocado';
           const isActive = !isCompleted && !isExpired && !isRevoked;
 
@@ -880,7 +934,7 @@ const SignatureWorkflow = () => {
                 <p className="font-medium">Vendedor:</p>
                 <p className="text-muted-foreground">
                   {selectedSale.salesperson ?
-                    `${(selectedSale.salesperson as any).first_name} ${(selectedSale.salesperson as any).last_name}` :
+                    `${(selectedSale.salesperson as unknown as SalespersonLike)?.first_name} ${(selectedSale.salesperson as unknown as SalespersonLike)?.last_name}` :
                     'No asignado'
                   }
                 </p>
@@ -926,13 +980,13 @@ const SignatureWorkflow = () => {
             <CardTitle className="flex items-center gap-2">
               <Building className="h-5 w-5" />
               Firma de la Contratada ({contratadaLinks.length})
-              {contratadaLinks.length > 0 && contratadaLinks.every((l: any) => l.status === 'completado') && (
+              {contratadaLinks.length > 0 && contratadaLinks.every((l) => l.status === 'completado') && (
                 <Badge className="bg-green-600 ml-2">✓ Completado</Badge>
               )}
             </CardTitle>
             <CardDescription>
               El representante legal de la empresa firma el contrato en el último paso
-              {contratadaLinks.some((l: any) => (l as any).is_active === false && l.status !== 'completado') && (
+              {contratadaLinks.some((l) => (l as unknown as { is_active?: boolean }).is_active === false && l.status !== 'completado') && (
                 <span className="text-amber-600 font-medium ml-1">
                   ⏳ Se activa cuando titular y todos los adherentes completen su firma.
                 </span>
@@ -1013,10 +1067,10 @@ const SignatureWorkflow = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {signedDocs.map((doc: any) => {
+                {signedDocs.map((doc: DocumentLike) => {
                   const isSigned = doc.status === 'firmado' || doc.signed_at;
                   const beneficiary = doc.beneficiary_id
-                    ? beneficiaries?.find((b: any) => b.id === doc.beneficiary_id)
+                    ? beneficiaries?.find((b: BeneficiaryLike) => b.id === doc.beneficiary_id)
                     : null;
                   const canDownload = doc.file_url || doc.content;
 
@@ -1084,23 +1138,23 @@ const SignatureWorkflow = () => {
               {detailLink && getRecipientLabel(detailLink)}
             </DialogDescription>
           </DialogHeader>
-          {detailLink && (
+          {detailLink && (detailLink as SignatureWorkflowLink) && (
             <div className="space-y-4">
               {/* General Info */}
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <p className="text-muted-foreground">Estado</p>
-                  <Badge variant={detailLink.status === 'completado' ? 'default' : 'outline'}>
-                    {detailLink.status === 'completado' ? '✓ Firmado' : detailLink.status}
+                  <Badge variant={(detailLink.status || '') === 'completado' ? 'default' : 'outline'}>
+                    {(detailLink.status || '') === 'completado' ? '✓ Firmado' : (detailLink.status || '')}
                   </Badge>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Creado</p>
-                  <p className="font-medium">{new Date(detailLink.created_at).toLocaleString('es-PY')}</p>
+                  <p className="font-medium">{detailLink.created_at ? new Date(detailLink.created_at).toLocaleString('es-PY') : '-'}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Expira</p>
-                  <p className="font-medium">{new Date(detailLink.expires_at).toLocaleString('es-PY')}</p>
+                  <p className="font-medium">{detailLink.expires_at ? new Date(detailLink.expires_at).toLocaleString('es-PY') : '-'}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Accesos</p>
@@ -1121,7 +1175,7 @@ const SignatureWorkflow = () => {
               </div>
 
               {/* IP Addresses */}
-              {detailLink.ip_addresses && (
+              {!!detailLink.ip_addresses && (
                 <div>
                   <p className="text-sm font-medium mb-1 flex items-center gap-1">
                     <Globe className="h-3.5 w-3.5" /> Direcciones IP
@@ -1145,8 +1199,8 @@ const SignatureWorkflow = () => {
                   <div>
                     <p className="text-sm font-medium mb-2">Historial de Actividad</p>
                     <div className="space-y-2">
-                      {steps.map((step: any) => {
-                        const stepData = step.data || {};
+                      {steps.map((step) => {
+                        const stepData = (step.data || {}) as { user_agent?: string; signed_ip?: string };
                         const device = detectDevice(stepData.user_agent);
                         const DeviceIcon = device.icon;
                         return (
@@ -1154,7 +1208,7 @@ const SignatureWorkflow = () => {
                             <div className="flex items-center justify-between">
                               <Badge variant="outline" className="text-[10px]">{step.step_type}</Badge>
                               <span className="text-muted-foreground">
-                                {new Date(step.completed_at || step.created_at).toLocaleString('es-PY')}
+                                {new Date(step.completed_at || step.created_at || new Date().toISOString()).toLocaleString('es-PY')}
                               </span>
                             </div>
                             {stepData.signed_ip && (

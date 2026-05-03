@@ -477,11 +477,12 @@ async function sendViaMetaAPI(
       success: true,
       messageId: result.messages?.[0]?.id
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error calling Meta WhatsApp API:', error)
+    const msg = error instanceof Error ? error.message : 'Network error sending WhatsApp message';
     return {
       success: false,
-      error: error?.message || 'Network error sending WhatsApp message'
+      error: msg
     }
   }
 }
@@ -530,11 +531,12 @@ async function sendViaTwilio(
       success: true,
       messageId: result.sid,
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error calling Twilio API:', error)
+    const msg = error instanceof Error ? error.message : 'Network error sending via Twilio';
     return {
       success: false,
-      error: error?.message || 'Network error sending via Twilio'
+      error: msg
     }
   }
 }
@@ -592,11 +594,12 @@ async function sendViaWAHA(
       success: true,
       messageId: result.id || result.key?.id || undefined,
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error calling WAHA API:', error)
+    const msg = error instanceof Error ? error.message : 'Network error sending via WAHA';
     return {
       success: false,
-      error: error?.message || 'Network error sending via WAHA'
+      error: msg
     }
   }
 }

@@ -1,6 +1,6 @@
 
 import { Node } from '@tiptap/core';
-import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
+import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from '@tiptap/react';
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 
@@ -37,11 +37,11 @@ export const DynamicPlaceholderExtension = Node.create({
   },
 });
 
-const DynamicPlaceholderComponent = ({ node }: any) => {
+const DynamicPlaceholderComponent = ({ node }: NodeViewProps) => {
   return (
     <NodeViewWrapper as="span" className="inline">
       <Badge variant="secondary" className="font-mono text-xs cursor-default">
-        {`{{${node.attrs.name}}}`}
+        {`{{${node.attrs.name as string}}}`}
       </Badge>
     </NodeViewWrapper>
   );

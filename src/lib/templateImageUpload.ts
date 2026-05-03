@@ -68,7 +68,7 @@ export async function uploadTemplateImage(
     file_url: storagePath,
     company_id: companyId,
   }).then(({ error }) => {
-    if (error) {}
+    if (error) { /* ignore upload error */ }
   });
 
   return { storagePath, signedUrl, companyId };

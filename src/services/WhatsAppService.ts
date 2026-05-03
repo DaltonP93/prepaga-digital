@@ -34,16 +34,16 @@ export interface WhatsAppMessage {
   sale_id: string | null;
   signature_link_id: string | null;
   phone_number: string;
-  message_type: string;
+  message_type: string | null;
   message_body: string | null;
   whatsapp_message_id: string | null;
-  status: string;
+  status: string | null;
   sent_at: string | null;
   delivered_at: string | null;
   read_at: string | null;
   error_message: string | null;
   sent_by: string | null;
-  created_at: string;
+  created_at: string | null;
 }
 
 class WhatsAppService {
@@ -69,9 +69,9 @@ class WhatsAppService {
       }
 
       return data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error sending WhatsApp message:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
     }
   }
 
@@ -206,9 +206,9 @@ class WhatsAppService {
       }
 
       return data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error triggering reminders:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
     }
   }
 

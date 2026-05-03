@@ -5,9 +5,15 @@ import { PDFGeneratorControls } from '@/components/PDFGeneratorControls';
 import DOMPurify from 'dompurify';
 import { getAssetSignedUrl } from '@/lib/assetUrlHelper';
 
+interface DynamicField {
+  name: string;
+  label: string;
+  type: string;
+}
+
 interface DocumentPreviewProps {
   content: string;
-  dynamicFields: any[];
+  dynamicFields: DynamicField[];
   templateType: string;
   templateName?: string;
 }

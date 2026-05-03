@@ -78,7 +78,7 @@ export const ChangeStatusModal: React.FC<ChangeStatusModalProps> = ({
       });
 
       if (error) throw error;
-      const result = data as any;
+      const result = data as unknown as { ok: boolean; error?: string };
       if (result && !result.ok) throw new Error(result.error || 'Error al cambiar estado');
 
       toast.success('Estado actualizado correctamente');
@@ -87,8 +87,9 @@ export const ChangeStatusModal: React.FC<ChangeStatusModalProps> = ({
       queryClient.invalidateQueries({ queryKey: ['audit-sales'] });
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       onOpenChange(false);
-    } catch (err: any) {
-      toast.error(err.message || 'Error al cambiar estado');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error al cambiar estado';
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }

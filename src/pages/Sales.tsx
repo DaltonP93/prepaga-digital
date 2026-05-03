@@ -228,7 +228,7 @@ const Sales = () => {
 
                           <TableCell>
                             {(() => {
-                              const displayStatus = (sale as any).all_signatures_completed ? 'completado' : (sale.status || 'borrador');
+                              const displayStatus = (sale as { all_signatures_completed?: boolean }).all_signatures_completed ? 'completado' : (sale.status || 'borrador');
                               return (
                                 <Badge variant={getStatusBadgeVariant(displayStatus)} className={displayStatus === 'completado' ? 'bg-green-600' : ''}>
                                   {getStatusText(displayStatus)}
@@ -247,7 +247,7 @@ const Sales = () => {
                           <TableCell>
                             {(() => {
                               // Hybrid: if all signatures completed, show 100% regardless of status
-                              const progress = (sale as any).all_signatures_completed 
+                              const progress = (sale as { all_signatures_completed?: boolean }).all_signatures_completed 
                                 ? 100 
                                 : getProgress(sale.status || 'borrador');
                               return (

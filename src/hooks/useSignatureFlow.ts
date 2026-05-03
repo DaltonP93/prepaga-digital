@@ -3,6 +3,40 @@ import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useCreateSignature, useCompleteSignature } from '@/hooks/useSignature';
+import { Database } from '@/integrations/supabase/types';
+
+type Sale = Database['public']['Tables']['sales']['Row'];
+type Client = Database['public']['Tables']['clients']['Row'];
+type Plan = Database['public']['Tables']['plans']['Row'];
+
+interface SaleWithRelations extends Sale {
+  clients?: Client | null;
+  plans?: Plan | null;
+}
+
+interface TemplateResponseWithQuestion {
+  question_id: string;
+  response_value: unknown;
+  template_questions: {
+    question_text: string;
+    question_type: string;
+  } | null;
+}
+
+interface ContractHTMLData {
+  client?: Partial<Client> | null;
+  plan?: Partial<Plan> | null;
+  questionnaire_responses?: Record<string, {
+    question: string;
+    answer: unknown;
+    question_type: string;
+  }>;
+  signatures: Array<{
+    signature_data: string;
+    signed_at: string;
+    document_id: string;
+  }>;
+}
 
 export const useSignatureFlow = () => {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -12,7 +46,7 @@ export const useSignatureFlow = () => {
   const completeSignature = useCompleteSignature();
 
   const processSignature = async (
-    saleData: any,
+    saleData: SaleWithRelations,
     signatureData: string,
     documentId: string
   ) => {
@@ -30,7 +64,7 @@ export const useSignatureFlow = () => {
       setCurrentStep(2); // Obteniendo respuestas del cuestionario
 
       // 2. Obtener respuestas del cuestionario si existe template
-      let questionnaireResponses: Record<string, any> = {};
+      let questionnaireResponses: Record<string, unknown> = {};
       if (saleData.template_id) {
         const { data: responses, error: responsesError } = await supabase
           .from('template_responses')
@@ -43,7 +77,7 @@ export const useSignatureFlow = () => {
           .eq('sale_id', saleData.id);
 
         if (!responsesError && responses) {
-          questionnaireResponses = responses.reduce((acc: Record<string, any>, response: any) => {
+          questionnaireResponses = (responses as TemplateResponseWithQuestion[]).reduce((acc: Record<string, unknown>, response: TemplateResponseWithQuestion) => {
             const question = response.template_questions;
             if (question) {
               acc[response.question_id] = {
@@ -119,21 +153,22 @@ export const useSignatureFlow = () => {
       });
 
       return { success: true, documentUrl: fileName };
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error en proceso de firma:', error);
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error",
-        description: error.message || "Error al procesar la firma.",
+        description: message || "Error al procesar la firma.",
         variant: "destructive",
       });
-      return { success: false, error: error.message };
+      return { success: false, error: message };
     } finally {
       setIsProcessing(false);
       setCurrentStep(0);
     }
   };
 
-  const generateContractHTML = (data: any) => {
+  const generateContractHTML = (data: ContractHTMLData) => {
     return `
       <!DOCTYPE html>
       <html>
@@ -176,7 +211,7 @@ export const useSignatureFlow = () => {
         ${Object.keys(data.questionnaire_responses || {}).length > 0 ? `
         <div class="questionnaire">
           <h2>Respuestas del Cuestionario</h2>
-          ${Object.values(data.questionnaire_responses).map((response: any) => `
+          ${Object.values(data.questionnaire_responses).map((response) => `
             <div class="question">
               <p><strong>Pregunta:</strong> ${response.question}</p>
               <p class="answer">Respuesta: ${response.answer}</p>
@@ -187,7 +222,7 @@ export const useSignatureFlow = () => {
 
         <div class="signature-section">
           <h2>Firmas</h2>
-          ${data.signatures.map((sig: any) => `
+          ${data.signatures.map((sig) => `
             <div>
               <p><strong>Firmado el:</strong> ${new Date(sig.signed_at).toLocaleString()}</p>
               <div>

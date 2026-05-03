@@ -59,10 +59,10 @@ export const useUpdateSaleStatus = () => {
         description: "El estado de la venta ha sido actualizado exitosamente.",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error",
-        description: error.message || "No se pudo actualizar el estado de la venta.",
+        description: error instanceof Error ? error.message : "No se pudo actualizar el estado de la venta.",
         variant: "destructive",
       });
     },

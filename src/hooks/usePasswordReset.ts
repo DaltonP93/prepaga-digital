@@ -16,9 +16,10 @@ export const usePasswordReset = () => {
       
       toast.success('Enlace de recuperación enviado a tu email');
       return { success: true };
-    } catch (error: any) {
-      toast.error('Error al enviar enlace de recuperación: ' + error.message);
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error desconocido';
+      toast.error('Error al enviar enlace de recuperación: ' + message);
+      return { success: false, error: message };
     } finally {
       setLoading(false);
     }
@@ -35,9 +36,10 @@ export const usePasswordReset = () => {
       
       toast.success('Contraseña actualizada exitosamente');
       return { success: true };
-    } catch (error: any) {
-      toast.error('Error al actualizar contraseña: ' + error.message);
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error desconocido';
+      toast.error('Error al actualizar contraseña: ' + message);
+      return { success: false, error: message };
     } finally {
       setLoading(false);
     }

@@ -31,7 +31,7 @@ interface SaleBasicTabProps {
     immediate_coverage: boolean;
     sale_type: string;
   };
-  onChange: (field: string, value: any) => void;
+  onChange: (field: string, value: string | number | boolean) => void;
   companyId?: string;
 }
 

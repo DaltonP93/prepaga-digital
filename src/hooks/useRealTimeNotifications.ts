@@ -32,7 +32,7 @@ export const useRealTimeNotifications = () => {
         { event: 'INSERT', schema: 'public', table: 'notifications' },
         (payload) => {
           scheduleInvalidate('notifications', ['notifications'], 100);
-          const n = payload.new as any;
+          const n = payload.new as Record<string, string>;
           toast({
             title: n.title || 'Nueva notificación',
             description: n.message || '',
@@ -43,7 +43,7 @@ export const useRealTimeNotifications = () => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'sales' },
         (payload) => {
-          const saleId = (payload.new as any)?.id || (payload.old as any)?.id;
+          const saleId = (payload.new as { id?: string } | null)?.id || (payload.old as { id?: string } | null)?.id;
           scheduleInvalidate('sales', ['sales']);
           scheduleInvalidate('sales-list', ['sales-list']);
           scheduleInvalidate('sales-lookup', ['sales-lookup']);
@@ -57,7 +57,7 @@ export const useRealTimeNotifications = () => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'documents' },
         (payload) => {
-          const doc = (payload.new as any) || (payload.old as any);
+          const doc = (payload.new as { id?: string; sale_id?: string } | null) || (payload.old as { id?: string; sale_id?: string } | null);
           const documentId = doc?.id;
           scheduleInvalidate('documents', ['documents']);
           scheduleInvalidate('documents-list', ['documents-list']);
@@ -76,7 +76,7 @@ export const useRealTimeNotifications = () => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'signature_links' },
         (payload) => {
-          const link = (payload.new as any) || (payload.old as any);
+          const link = (payload.new as { sale_id?: string; status?: string } | null) || (payload.old as { sale_id?: string; status?: string } | null);
           scheduleInvalidate('signature-links', ['signature-links']);
           scheduleInvalidate('all-signature-links-public', ['all-signature-links-public']);
           if (link?.sale_id) {
@@ -85,7 +85,7 @@ export const useRealTimeNotifications = () => {
             scheduleInvalidate(`sale-from-signature-${link.sale_id}`, ['sale', link.sale_id]);
           }
           // Notify on completion
-          if (link?.status === 'completado' && (payload.old as any)?.status !== 'completado') {
+          if (link?.status === 'completado' && (payload.old as { status?: string } | null)?.status !== 'completado') {
             toast({
               title: '¡Firma completada!',
               description: `Se ha completado una firma para el contrato.`,

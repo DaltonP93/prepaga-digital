@@ -167,11 +167,11 @@ export const AdminConfigPanel: React.FC = () => {
     updateApiConfig(apiFormData);
   };
 
-  const handleUiInputChange = (field: string, value: any) => {
+  const handleUiInputChange = (field: string, value: string | boolean) => {
     setUiFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleApiInputChange = (field: string, value: any) => {
+  const handleApiInputChange = (field: string, value: string | boolean) => {
     setApiFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -546,7 +546,7 @@ export const AdminConfigPanel: React.FC = () => {
                     <Input
                       id="waha_key"
                       type="password"
-                      value={(apiFormData as any).whatsapp_api_token || ''}
+                      value={(apiFormData as Record<string, unknown>).whatsapp_api_token as string || ''}
                       onChange={(e) => handleApiInputChange('whatsapp_api_token', e.target.value)}
                       placeholder="Tu API Key de WAHA"
                     />
@@ -636,8 +636,8 @@ export const AdminConfigPanel: React.FC = () => {
                           } else {
                             toast.error(data?.error || data?.message || 'Error al enviar prueba');
                           }
-                        } catch (err: any) {
-                          toast.error(err.message || 'Error al probar WhatsApp');
+                        } catch (err: unknown) {
+                          toast.error(err instanceof Error ? err.message : 'Error al probar WhatsApp');
                         } finally {
                           setWhatsappTesting(false);
                         }
@@ -938,8 +938,8 @@ export const AdminConfigPanel: React.FC = () => {
                         } else {
                           toast.error(data?.error || 'No se pudo conectar con SignWell');
                         }
-                      } catch (err: any) {
-                        toast.error(err.message || 'Error al probar conexión');
+                      } catch (err: unknown) {
+                        toast.error(err instanceof Error ? err.message : 'Error al probar conexión');
                       } finally {
                         setSignwellTesting(false);
                       }

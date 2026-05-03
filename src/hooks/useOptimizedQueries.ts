@@ -47,9 +47,9 @@ export const useOptimizedDashboard = () => {
 
       // Calcular métricas
       const totalSales = sales.length;
-      const totalRevenue = sales.reduce((sum: number, sale: any) => sum + (sale.total_amount || 0), 0);
-      const completedSales = sales.filter((sale: any) => sale.status === 'completado').length;
-      const pendingSales = sales.filter((sale: any) => sale.status === 'pendiente').length;
+      const totalRevenue = sales.reduce((sum: number, sale) => sum + (sale.total_amount || 0), 0);
+      const completedSales = sales.filter((sale) => sale.status === 'completado').length;
+      const pendingSales = sales.filter((sale) => sale.status === 'pendiente').length;
 
       // Calcular crecimiento (últimos 30 días vs anteriores 30 días)
       const thirtyDaysAgo = new Date();
@@ -58,11 +58,11 @@ export const useOptimizedDashboard = () => {
       const sixtyDaysAgo = new Date();
       sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
-      const recentSalesCount = sales.filter((sale: any) => 
+      const recentSalesCount = sales.filter((sale) => 
         new Date(sale.created_at) >= thirtyDaysAgo
       ).length;
 
-      const previousSalesCount = sales.filter((sale: any) => 
+      const previousSalesCount = sales.filter((sale) => 
         new Date(sale.created_at) >= sixtyDaysAgo && 
         new Date(sale.created_at) < thirtyDaysAgo
       ).length;

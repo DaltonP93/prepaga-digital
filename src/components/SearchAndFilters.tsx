@@ -41,7 +41,7 @@ export const SearchAndFilters = ({
 }: SearchAndFiltersProps) => {
   const [showFilters, setShowFilters] = useState(false);
 
-  const updateFilter = (key: keyof FilterOptions, value: any) => {
+  const updateFilter = (key: keyof FilterOptions, value: FilterOptions[keyof FilterOptions]) => {
     onFiltersChange({ ...filters, [key]: value });
   };
 

@@ -51,7 +51,7 @@ export const PageFieldOverlay: React.FC<PageFieldOverlayProps> = ({
   const overlayRef = useRef<HTMLDivElement>(null);
 
   const fields = allFields.filter(
-    (f) => f.block_id === blockId && (f.meta as any)?.sourcePageNumber === pageNumber
+    (f) => f.block_id === blockId && f.meta.sourcePageNumber === pageNumber
   );
 
   const handleClick = useCallback(
@@ -90,7 +90,7 @@ export const PageFieldOverlay: React.FC<PageFieldOverlayProps> = ({
             borderStyle: "dashed",
             color: ROLE_BORDER[signerRole],
           },
-        } as any,
+        },
       });
     },
     [templateId, blockId, signerRole, fieldType, pageNumber, dragging, createField]
@@ -122,13 +122,13 @@ export const PageFieldOverlay: React.FC<PageFieldOverlayProps> = ({
         x: Math.max(0, Math.min(nx, 1 - field.w)),
         y: Math.max(0, Math.min(ny, 1 - field.h)),
         meta: {
-          ...(field.meta as any),
+          ...(field.meta || {}),
           normalized: {
-            ...(field.meta as any)?.normalized,
+            ...(field.meta?.normalized || {}),
             x: Math.max(0, Math.min(nx, 1 - field.w)),
             y: Math.max(0, Math.min(ny, 1 - field.h)),
           },
-        } as any,
+        },
       });
     },
     [dragging, dragOffset, fields, updateField]

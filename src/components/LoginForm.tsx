@@ -50,9 +50,9 @@ export const LoginForm = () => {
       resetAttempts();
       toast.success('¡Bienvenido! Has iniciado sesión correctamente.');
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ LoginForm: Error en login:', error);
-      const errorMessage = error?.message || '';
+      const errorMessage = error instanceof Error ? error.message : '';
 
       if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError') || errorMessage.includes('fetch')) {
         toast.error('Error de conexión. Verifica tu conexión a internet e intenta nuevamente.');

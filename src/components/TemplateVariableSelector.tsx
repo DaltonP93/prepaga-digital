@@ -10,10 +10,16 @@ import { Plus, X } from 'lucide-react';
 import { getAvailableVariables } from '@/lib/templateEngine';
 import { useTemplate } from '@/hooks/useTemplates';
 
+interface VariableItem {
+  key: string;
+  label?: string;
+  type?: string;
+}
+
 interface TemplateVariableSelectorProps {
-  onVariableSelect: (variable: any) => void;
-  customFields: any[];
-  onCustomFieldAdd: (field: any) => void;
+  onVariableSelect: (variable: VariableItem) => void;
+  customFields: VariableItem[];
+  onCustomFieldAdd: (field: VariableItem) => void;
   onCustomFieldRemove: (index: number) => void;
   templateId?: string;
 }
@@ -48,7 +54,7 @@ export function TemplateVariableSelector({
   };
 
   // Generar variables de preguntas del template
-  const questionVariables = templateData?.template_questions?.map((question: any) => ({
+  const questionVariables = templateData?.template_questions?.map((question: { id: string; question_text: string }) => ({
     key: `respuestas.${question.id}`,
     label: question.question_text,
     type: 'question'

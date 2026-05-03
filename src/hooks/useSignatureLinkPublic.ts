@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { useToast } from '@/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -13,11 +13,11 @@ const _publicClient = SUPABASE_URL
     })
   : null;
 
-const _signatureClientCache = new Map<string, any>();
+const _signatureClientCache = new Map<string, SupabaseClient<Database>>();
 
-const getPublicClient = (): any => _publicClient!;
+const getPublicClient = (): SupabaseClient<Database> => _publicClient!;
 
-const getSignatureClient = (token: string): any => {
+const getSignatureClient = (token: string): SupabaseClient<Database> => {
   if (!_signatureClientCache.has(token)) {
     _signatureClientCache.set(
       token,
@@ -30,13 +30,26 @@ const getSignatureClient = (token: string): any => {
   return _signatureClientCache.get(token)!;
 };
 
+interface SignatureLinkUpdateResult {
+  id: string;
+  sale_id: string;
+  recipient_type: string;
+  recipient_id: string | null;
+  recipient_name: string | null;
+  status: string | null;
+  completed_at: string | null;
+  sale_addendum_id: string | null;
+  sale_addendum_beneficiary_id: string | null;
+}
+
 const completeSaleAddendumForLink = async (
-  signatureClient: any,
+  signatureClient: SupabaseClient<Database>,
   linkData: { id: string; sale_addendum_id?: string | null }
 ): Promise<boolean> => {
   if (!linkData.sale_addendum_id) return false;
 
-  const { data, error } = await signatureClient.rpc('try_complete_sale_addendum_for_link' as any, {
+  // @ts-expect-error RPC function not yet in auto-generated Database types
+  const { data, error } = await signatureClient.rpc('try_complete_sale_addendum_for_link', {
     p_signature_link_id: linkData.id,
   });
 
@@ -47,6 +60,39 @@ const completeSaleAddendumForLink = async (
 
   return data === true;
 };
+
+interface SaleWithPublicRelations {
+  id: string;
+  contract_number: string | null;
+  status: string;
+  sale_date: string;
+  total_amount: number;
+  clients: {
+    first_name: string;
+    last_name: string;
+    email: string | null;
+    phone: string | null;
+    dni: string | null;
+  } | null;
+  plans: {
+    name: string;
+    price: number;
+    description: string | null;
+  } | null;
+  companies: {
+    name: string;
+    logo_url: string | null;
+    primary_color: string | null;
+  } | null;
+  beneficiaries: Array<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    dni: string | null;
+    phone: string | null;
+    email: string | null;
+  }>;
+}
 
 interface SignatureLinkData {
   id: string;
@@ -65,68 +111,36 @@ interface SignatureLinkData {
   signwell_signing_url?: string | null;
   created_at: string;
   updated_at: string | null;
-  sale?: {
-    id: string;
-    contract_number: string | null;
-    status: string;
-    sale_date: string;
-    total_amount: number;
-    clients: {
-      first_name: string;
-      last_name: string;
-      email: string | null;
-      phone: string | null;
-      dni: string | null;
-    } | null;
-    plans: {
-      name: string;
-      price: number;
-      description: string | null;
-    } | null;
-    companies: {
-      name: string;
-      logo_url: string | null;
-      primary_color: string | null;
-    } | null;
-    beneficiaries: Array<{
-      id: string;
-      first_name: string;
-      last_name: string;
-      dni: string | null;
-      phone: string | null;
-      email: string | null;
-    }>;
-  };
+  is_active: boolean | null;
+  isActive?: boolean;
+  sale?: SaleWithPublicRelations;
 }
 
 export const useSignatureLinkByToken = (token: string) => {
-  return useQuery({
+  return useQuery<SignatureLinkData & { pdfBranding: { pdf_header_image_url?: string; pdf_footer_image_url?: string } }, Error>({
     queryKey: ['signature-link-public', token],
     queryFn: async () => {
       if (!token) throw new Error('Token is required');
 
       const signatureClient = getSignatureClient(token);
 
-      const { data: linkData, error: linkError } = await signatureClient
-        .from('signature_links')
-        .select('id,sale_id,package_id,recipient_type,recipient_id,recipient_email,recipient_phone,recipient_name,expires_at,accessed_at,access_count,status,completed_at,created_at,updated_at,signwell_signing_url,is_active,step_order,sale_addendum_id,sale_addendum_beneficiary_id')
-        .eq('token', token)
-        .gt('expires_at', new Date().toISOString())
-        .single();
+      const { data: linkData, error: linkError } = await signatureClient.from('signature_links').select('id,sale_id,package_id,recipient_type,recipient_id,recipient_email,recipient_phone,recipient_name,expires_at,accessed_at,access_count,status,completed_at,created_at,updated_at,signwell_signing_url,is_active,step_order,sale_addendum_id,sale_addendum_beneficiary_id').eq('token', token).gt('expires_at', new Date().toISOString()).single();
 
       if (linkError) {
         console.error('Error fetching signature link:', linkError);
         throw new Error('Enlace no válido o expirado');
       }
 
+      const typedLinkData = linkData as unknown as SignatureLinkData;
+
       // Increment access count
       await signatureClient
         .from('signature_links')
         .update({ 
-          access_count: (linkData.access_count || 0) + 1,
+          access_count: (typedLinkData.access_count || 0) + 1,
           accessed_at: new Date().toISOString()
         })
-        .eq('id', linkData.id);
+        .eq('id', typedLinkData.id);
 
       // Get sale data with beneficiaries
       const { data: saleData, error: saleError } = await signatureClient
@@ -163,7 +177,7 @@ export const useSignatureLinkByToken = (token: string) => {
             email
           )
         `)
-        .eq('id', linkData.sale_id)
+        .eq('id', typedLinkData.sale_id)
         .single();
 
       if (saleError) {
@@ -177,15 +191,15 @@ export const useSignatureLinkByToken = (token: string) => {
         const { data: brandingData } = await signatureClient
           .rpc('get_pdf_branding_by_token', { p_token: token });
         const row = Array.isArray(brandingData) ? brandingData[0] : brandingData;
-        if (row) pdfBranding = row;
+        if (row) pdfBranding = row as typeof pdfBranding;
       } catch { /* ignore */ }
 
-      const result = {
-        ...linkData,
-        sale: saleData as any,
-        isActive: (linkData as any).is_active !== false,
+      const result: SignatureLinkData & { pdfBranding: typeof pdfBranding } = {
+        ...typedLinkData,
+        sale: saleData as SaleWithPublicRelations,
+        isActive: typedLinkData.is_active !== false,
         pdfBranding,
-      } as SignatureLinkData & { pdfBranding: typeof pdfBranding };
+      };
 
       return result;
     },
@@ -198,19 +212,19 @@ export const useSubmitSignatureLink = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutation<SignatureLinkUpdateResult & { addendum_completed: boolean }, Error, {
+    linkId: string;
+    token: string;
+    signatureData: string;
+    identityVerificationId?: string;
+    consentRecordId?: string;
+  }>({
     mutationFn: async ({
       linkId,
       token,
       signatureData,
       identityVerificationId,
       consentRecordId,
-    }: {
-      linkId: string;
-      token: string;
-      signatureData: string;
-      identityVerificationId?: string;
-      consentRecordId?: string;
     }) => {
       const signatureClient = getSignatureClient(token);
 
@@ -220,22 +234,17 @@ export const useSubmitSignatureLink = () => {
         const ipData = await ipResponse.json();
         clientIp = ipData.ip;
       } catch {
+        // intentional empty catch: IP detection is best-effort
       }
 
-      const { data, error } = await signatureClient
-        .from('signature_links')
-        .update({
-          status: 'completado',
-          completed_at: new Date().toISOString(),
-        })
-        .eq('id', linkId)
-        .select('id,sale_id,recipient_type,recipient_id,recipient_name,status,completed_at,sale_addendum_id,sale_addendum_beneficiary_id')
-        .single();
+      const { data, error } = await signatureClient.from('signature_links').update({ status: 'completado', completed_at: new Date().toISOString() }).eq('id', linkId).select('id,sale_id,recipient_type,recipient_id,recipient_name,status,completed_at,sale_addendum_id,sale_addendum_beneficiary_id').single();
 
       if (error) {
         console.error('Error updating signature link:', error);
         throw error;
       }
+
+      const typedData = data as unknown as SignatureLinkUpdateResult;
 
       // Log workflow step
       const { data: existingSteps } = await signatureClient
@@ -271,9 +280,10 @@ export const useSubmitSignatureLink = () => {
           .from('signature_links')
           .update({
             ip_addresses: [clientIp],
-          } as any)
+          })
           .eq('id', linkId);
       } catch (ipErr) {
+        // intentional empty catch: IP update is best-effort
       }
 
       // For SignWell completions, skip canvas-specific document embedding
@@ -284,11 +294,11 @@ export const useSubmitSignatureLink = () => {
           await signatureClient
             .from('process_traces')
             .insert({
-              sale_id: data.sale_id,
+              sale_id: typedData.sale_id,
               action: 'firma_completada',
               details: {
-                recipient_type: data.recipient_type,
-                recipient_id: data.recipient_id,
+                recipient_type: typedData.recipient_type,
+                recipient_id: typedData.recipient_id,
                 signed_ip: clientIp,
                 signature_link_id: linkId,
                 completed_at: new Date().toISOString(),
@@ -296,9 +306,10 @@ export const useSubmitSignatureLink = () => {
               },
             });
         } catch (traceErr) {
+          // intentional empty catch: process trace logging is best-effort
         }
-        const addendumCompleted = await completeSaleAddendumForLink(signatureClient, data as any);
-        return { ...data, addendum_completed: addendumCompleted };
+        const addendumCompleted = await completeSaleAddendumForLink(signatureClient, typedData);
+        return { ...typedData, addendum_completed: addendumCompleted };
       }
 
       // Detect if this is an electronic signature (JSON string) vs canvas (base64 image)
@@ -313,23 +324,24 @@ export const useSubmitSignatureLink = () => {
         await signatureClient
           .from('documents')
           .insert({
-            sale_id: data.sale_id,
-            name: `Firma - ${data.recipient_type === 'titular' ? 'Titular' : data.recipient_type === 'contratada' ? 'Contratada' : 'Adherente'}`,
+            sale_id: typedData.sale_id,
+            name: `Firma - ${typedData.recipient_type === 'titular' ? 'Titular' : typedData.recipient_type === 'contratada' ? 'Contratada' : 'Adherente'}`,
             document_type: 'firma',
             content: signatureData,
-            status: 'firmado' as any,
+            status: 'firmado',
             signed_at: new Date().toISOString(),
-            beneficiary_id: data.recipient_id || null,
+            beneficiary_id: typedData.recipient_id || null,
             requires_signature: false,
             is_final: true,
           });
       } catch (docErr) {
+        // intentional empty catch: document storage is best-effort
       }
 
       // Build final signed documents with embedded signature (canvas flow)
       try {
-        const recipientType = data.recipient_type;
-        const recipientId = data.recipient_id;
+        const recipientType = typedData.recipient_type;
+        const recipientId = typedData.recipient_id;
 
         let contratadaMergedOk = false;
 
@@ -341,7 +353,7 @@ export const useSubmitSignatureLink = () => {
             const { data: titularFinalDocs } = await signatureClient
               .from('documents')
               .select('*')
-              .eq('sale_id', data.sale_id)
+              .eq('sale_id', typedData.sale_id)
               .eq('is_final', true)
               .is('beneficiary_id', null)
               .eq('document_type', 'contrato')
@@ -355,7 +367,7 @@ export const useSubmitSignatureLink = () => {
               const safeSignedAt = new Date().toLocaleString('es-PY');
 
               // Fetch contratada signer info via SECURITY DEFINER RPC
-              let cInfo: any = null;
+              let cInfo: { signer_name?: string; signer_dni?: string } | null = null;
               try {
                 const { data: contratadaInfo } = await signatureClient
                   .rpc('get_contratada_info_by_token', { p_token: token });
@@ -368,7 +380,7 @@ export const useSubmitSignatureLink = () => {
                 if (parsed.type === 'electronica') isElecSig = true;
               } catch { /* not JSON */ }
 
-              const signerName = cInfo?.signer_name || (data as any)?.recipient_name || 'Representante Legal';
+              const signerName = cInfo?.signer_name || typedData.recipient_name || 'Representante Legal';
               const signerCI = cInfo?.signer_dni || '';
 
               let contratadaBlock: string;
@@ -447,18 +459,18 @@ export const useSubmitSignatureLink = () => {
                   content: finalContent,
                   signed_at: nowIso,
                   signature_data: signatureData,
-                } as any)
+                })
                 .eq('id', titularDoc.id);
 
               // Update original doc status
               await signatureClient
                 .from('documents')
                 .update({
-                  status: 'firmado' as any,
+                  status: 'firmado',
                   signed_at: nowIso,
                   signature_data: signatureData,
-                } as any)
-                .eq('sale_id', data.sale_id)
+                })
+                .eq('sale_id', typedData.sale_id)
                 .eq('is_final', false)
                 .is('beneficiary_id', null)
                 .eq('document_type', 'contrato');
@@ -466,378 +478,386 @@ export const useSubmitSignatureLink = () => {
               contratadaMergedOk = true;
             }
           } catch (mergeErr) {
+            // intentional empty catch: signature merge is best-effort
           }
         }
 
         if (!contratadaMergedOk) {
-        // First, delete any existing final copies for this recipient to avoid duplicates
-        let deleteQuery = signatureClient
-          .from('documents')
-          .delete()
-          .eq('sale_id', data.sale_id)
-          .eq('is_final', true)
-          .neq('document_type', 'firma');
+          // First, delete any existing final copies for this recipient to avoid duplicates
+          let deleteQuery = signatureClient
+            .from('documents')
+            .delete()
+            .eq('sale_id', typedData.sale_id)
+            .eq('is_final', true)
+            .neq('document_type', 'firma');
 
-        if (recipientType === 'adherente' && recipientId) {
-          deleteQuery = deleteQuery.eq('beneficiary_id', recipientId);
-        } else if (recipientType === 'contratada') {
-          // Contratada only signs contracts (no beneficiary_id)
-          deleteQuery = deleteQuery.is('beneficiary_id', null).eq('document_type', 'contrato');
-        } else if (recipientType === 'titular') {
-          deleteQuery = deleteQuery.is('beneficiary_id', null);
-        }
-        await deleteQuery;
+          if (recipientType === 'adherente' && recipientId) {
+            deleteQuery = deleteQuery.eq('beneficiary_id', recipientId);
+          } else if (recipientType === 'contratada') {
+            // Contratada only signs contracts (no beneficiary_id)
+            deleteQuery = deleteQuery.is('beneficiary_id', null).eq('document_type', 'contrato');
+          } else if (recipientType === 'titular') {
+            deleteQuery = deleteQuery.is('beneficiary_id', null);
+          }
+          await deleteQuery;
 
-        // Query documents to sign — filtered by role
-        // IMPORTANT: always filter requires_signature = true to exclude annexes
-        let docsQuery = signatureClient
-          .from('documents')
-          .select('*')
-          .eq('sale_id', data.sale_id)
-          .neq('document_type', 'firma')
-          .neq('document_type', 'anexo')
-          .eq('is_final', false)
-          .eq('requires_signature', true);
+          // Query documents to sign — filtered by role
+          // IMPORTANT: always filter requires_signature = true to exclude annexes
+          let docsQuery = signatureClient
+            .from('documents')
+            .select('*')
+            .eq('sale_id', typedData.sale_id)
+            .neq('document_type', 'firma')
+            .neq('document_type', 'anexo')
+            .eq('is_final', false)
+            .eq('requires_signature', true);
 
-        if (recipientType === 'adherente' && recipientId) {
-          docsQuery = docsQuery.eq('beneficiary_id', recipientId);
-        } else if (recipientType === 'contratada') {
-          // Contratada only signs the contract document
-          docsQuery = docsQuery.is('beneficiary_id', null).eq('document_type', 'contrato');
-        } else if (recipientType === 'titular') {
-          docsQuery = docsQuery.is('beneficiary_id', null);
-        }
-
-        const { data: docsToSign, error: docsError } = await docsQuery;
-        if (docsError) throw docsError;
-
-        if (docsToSign && docsToSign.length > 0) {
-          const nowIso = new Date().toISOString();
-          const safeSignedAt = new Date().toLocaleString('es-PY');
-
-          // Fetch only signer data needed for signature blocks.
-          let saleClientInfo: any = null;
-          let saleBeneficiaries: any[] = [];
-          let companySettings: any = null;
-          try {
-            const { data: saleInfo } = await signatureClient
-              .from('sales')
-              .select('company_id, clients:client_id(first_name, last_name, dni), beneficiaries(id, first_name, last_name, dni)')
-              .eq('id', data.sale_id)
-              .single();
-            saleClientInfo = (saleInfo as any)?.clients || null;
-            saleBeneficiaries = (saleInfo as any)?.beneficiaries || [];
-
-            // Fetch contratada signer info via SECURITY DEFINER RPC
-            try {
-              const { data: contratadaRpc } = await signatureClient
-                .rpc('get_contratada_info_by_token', { p_token: token });
-              const cRpc = Array.isArray(contratadaRpc) ? contratadaRpc[0] : contratadaRpc;
-              if (cRpc) {
-                companySettings = {
-                  contratada_signer_name: cRpc.signer_name,
-                  contratada_signer_dni: cRpc.signer_dni,
-                  contratada_signer_email: cRpc.signer_email,
-                };
-              }
-            } catch { /* ignore */ }
-          } catch { /* ignore */ }
-
-          // Check if the other party (contratante or contratada) already signed the contract
-          let existingOtherPartyBlock: string | null = null;
-          if (recipientType === 'titular' || recipientType === 'contratada') {
-            try {
-              const otherType = recipientType === 'titular' ? 'contratada' : 'titular';
-              const { data: otherFinalDocs } = await signatureClient
-                .from('documents')
-                .select('content')
-                .eq('sale_id', data.sale_id)
-                .eq('is_final', true)
-                .is('beneficiary_id', null)
-                .like('document_type', '%contrato%')
-                .limit(1);
-              if (otherFinalDocs && otherFinalDocs.length > 0) {
-                const otherContent = otherFinalDocs[0].content || '';
-                try {
-                  const parser = new DOMParser();
-                  const parsedDoc = parser.parseFromString(otherContent, 'text/html');
-                  const signerBlock = parsedDoc.querySelector(`[data-signer="${otherType}"]`);
-                  if (signerBlock) {
-                    existingOtherPartyBlock = signerBlock.outerHTML;
-                  } else {
-                    const roleText = otherType === 'contratada' ? 'CONTRATADA' : 'CONTRATANTE';
-                    const allDivs = parsedDoc.querySelectorAll('div');
-                    for (const div of Array.from(allDivs)) {
-                      if (
-                        div.textContent?.includes(roleText) &&
-                        div.querySelectorAll('p').length >= 2 &&
-                        !div.querySelector('div')
-                      ) {
-                        existingOtherPartyBlock = div.outerHTML;
-                        break;
-                      }
-                    }
-                  }
-                } catch { /* ignore parsing errors */ }
-              }
-            } catch { /* ignore */ }
+          if (recipientType === 'adherente' && recipientId) {
+            docsQuery = docsQuery.eq('beneficiary_id', recipientId);
+          } else if (recipientType === 'contratada') {
+            // Contratada only signs the contract document
+            docsQuery = docsQuery.is('beneficiary_id', null).eq('document_type', 'contrato');
+          } else if (recipientType === 'titular') {
+            docsQuery = docsQuery.is('beneficiary_id', null);
           }
 
-          const finalDocs = docsToSign.map((doc) => {
-            const originalContent = doc.content?.trim()
-              ? doc.content
-              : `
-                  <div>
-                    <h3>${doc.name}</h3>
-                    <p>Documento firmado digitalmente.</p>
-                    ${doc.file_url ? `<p><strong>Archivo original:</strong> ${doc.file_url}</p>` : ''}
-                  </div>
-                `;
+          const { data: docsToSign, error: docsError } = await docsQuery;
+          if (docsError) throw docsError;
 
-            // Build signature block depending on type (canvas vs electronic)
-            let signatureBlock: string;
-            let signatureImgWithDate: string;
+          if (docsToSign && docsToSign.length > 0) {
+            const nowIso = new Date().toISOString();
+            const safeSignedAt = new Date().toLocaleString('es-PY');
 
-            if (isElectronicSignature) {
-              const isoTimestamp = new Date().toISOString();
-              const signedDate = new Date();
-              const formattedDate = `${String(signedDate.getDate()).padStart(2,'0')}.${String(signedDate.getMonth()+1).padStart(2,'0')}.${signedDate.getFullYear()} ${String(signedDate.getHours()).padStart(2,'0')}:${String(signedDate.getMinutes()).padStart(2,'0')}:${String(signedDate.getSeconds()).padStart(2,'0')}`;
+            // Fetch only signer data needed for signature blocks.
+            let saleClientInfo: { first_name: string | null; last_name: string | null; dni: string | null } | null = null;
+            let saleBeneficiaries: { id: string; first_name: string; last_name: string; dni: string | null }[] = [];
+            let companySettings: { contratada_signer_name?: string; contratada_signer_dni?: string; contratada_signer_email?: string } | null = null;
+            try {
+              const { data: saleInfo } = await signatureClient
+                .from('sales')
+                .select('company_id, clients:client_id(first_name, last_name, dni), beneficiaries(id, first_name, last_name, dni)')
+                .eq('id', typedData.sale_id)
+                .single();
+              const typedSaleInfo = saleInfo as unknown as {
+                company_id: string | null;
+                clients: { first_name: string | null; last_name: string | null; dni: string | null } | null;
+                beneficiaries: { id: string; first_name: string; last_name: string; dni: string | null }[] | null;
+              };
+              saleClientInfo = typedSaleInfo?.clients || null;
+              saleBeneficiaries = typedSaleInfo?.beneficiaries || [];
 
-              let signerName = '';
-              let signerCI = '';
-              let roleLabel = 'CONTRATANTE';
-
-              if (recipientType === 'adherente' && recipientId && saleBeneficiaries.length > 0) {
-                const ben = saleBeneficiaries.find((b: any) => b.id === recipientId);
-                if (ben) {
-                  signerName = `${ben.first_name || ''} ${ben.last_name || ''}`.trim();
-                  signerCI = ben.dni || '';
+              // Fetch contratada signer info via SECURITY DEFINER RPC
+              try {
+                const { data: contratadaRpc } = await signatureClient
+                  .rpc('get_contratada_info_by_token', { p_token: token });
+                const cRpc = Array.isArray(contratadaRpc) ? contratadaRpc[0] : contratadaRpc;
+                if (cRpc) {
+                  companySettings = {
+                    contratada_signer_name: (cRpc as Record<string, unknown>).signer_name as string | undefined,
+                    contratada_signer_dni: (cRpc as Record<string, unknown>).signer_dni as string | undefined,
+                    contratada_signer_email: (cRpc as Record<string, unknown>).signer_email as string | undefined,
+                  };
                 }
-                roleLabel = 'ADHERENTE';
-              } else if (recipientType === 'contratada') {
-                signerName = companySettings?.contratada_signer_name || (data as any)?.recipient_name || 'Representante Legal';
-                signerCI = companySettings?.contratada_signer_dni || '';
-                roleLabel = 'CONTRATADA';
-              } else if (saleClientInfo) {
-                signerName = `${saleClientInfo.first_name || ''} ${saleClientInfo.last_name || ''}`.trim();
-                signerCI = saleClientInfo.dni || '';
-                roleLabel = 'CONTRATANTE';
-              }
+              } catch { /* ignore */ }
+            } catch { /* ignore */ }
 
-              const deviceSummary = navigator.userAgent.replace(/\s+/g, ' ').substring(0, 80);
-              const hashRef = Array.from(new TextEncoder().encode(signatureData + isoTimestamp))
-                .reduce((a, b) => ((a << 5) - a + b) | 0, 0)
-                .toString(16).replace('-', '').toUpperCase().padStart(8, '0');
-
-              // Detect signature style from document content
-              const useV1 = originalContent.includes('data-signature-style="v1"');
-
-              let electronicBlock: string;
-              if (useV1) {
-                // v1.0 — Detailed block with metadata
-                const signerAttr = recipientType === 'contratada' ? 'contratada' : recipientType === 'adherente' ? 'adherente' : 'titular';
-                electronicBlock = `
-                  <div data-signer="${signerAttr}" style="display:inline-block;vertical-align:top;width:48%;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#111;border:1px solid #ccc;border-radius:6px;padding:10px;">
-                    <table style="width:100%;border-collapse:collapse;font-size:10px;">
-                      <tr><td style="color:#666;padding:1px 4px;">Firmante:</td><td><strong>${signerName}</strong></td></tr>
-                      <tr><td style="color:#666;padding:1px 4px;">Fecha:</td><td>${formattedDate}</td></tr>
-                      <tr><td style="color:#666;padding:1px 4px;">Ref. Doc.:</td><td style="font-family:monospace;font-size:9px;">${isoTimestamp.substring(0,8)}…</td></tr>
-                      <tr><td style="color:#666;padding:1px 4px;">IP:</td><td style="font-family:monospace;">Registrada</td></tr>
-                      <tr><td style="color:#666;padding:1px 4px;">Dispositivo:</td><td style="font-size:9px;">${deviceSummary.substring(0,40)}…</td></tr>
-                      <tr><td style="color:#666;padding:1px 4px;">Hash:</td><td style="font-family:monospace;font-size:9px;">${hashRef}</td></tr>
-                    </table>
-                    <p style="margin:4px 0 0;font-size:9px;color:#666;font-style:italic;">Firma válida conforme a Ley 4017/2010</p>
-                    <div style="border-top:1px solid #333;width:80%;margin:6px 0 4px 0;"></div>
-                    <p style="margin:0;text-align:center;font-weight:bold;font-size:10px;">${roleLabel}</p>
-                    <p style="margin:2px 0 0 0;font-size:10px;">Aclaración: ${signerName || '.............................'}</p>
-                    <p style="margin:2px 0 0 0;font-size:10px;">C.I.Nº: ${signerCI || '.............................'}</p>
-                  </div>
-                `;
-              } else {
-                // v2.0 — Professional block matching reference PDF format
-                const signerAttrV2 = recipientType === 'contratada' ? 'contratada' : recipientType === 'adherente' ? 'adherente' : 'titular';
-                electronicBlock = `
-                  <div data-signer="${signerAttrV2}" style="display:inline-block;vertical-align:top;width:48%;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111;">
-                    <p style="margin:0 0 2px 0;font-size:11px;">Firmado electrónicamente por: <strong>${signerName}</strong></p>
-                    <p style="margin:0 0 12px 0;font-size:11px;">Fecha: ${formattedDate}</p>
-                    <div style="border-top:1px solid #555;width:80%;margin:0 0 6px 0;"></div>
-                    <p style="margin:0;font-size:11px;font-weight:bold;">${roleLabel}</p>
-                    <p style="margin:4px 0 0 0;font-size:11px;">Aclaración: ${signerName || '.............................'}</p>
-                    <p style="margin:2px 0 0 0;font-size:11px;">C.I.Nº: ${signerCI || '.............................'}</p>
-                  </div>
-                `;
-              }
-              signatureImgWithDate = electronicBlock;
-              signatureBlock = electronicBlock;
-            } else {
-              const signatureImg = `<img src="${signatureData}" alt="Firma digital" style="max-width:280px;max-height:120px;display:block;" />`;
-              signatureImgWithDate = `
-                <div style="text-align:center;">
-                  ${signatureImg}
-                  <p style="margin:4px 0 0 0;font-size:10px;color:#6b7280;">Firmado el: ${safeSignedAt}</p>
-                </div>
-              `;
-              signatureBlock = `
-                <hr style="margin:24px 0;border:none;border-top:1px solid #d1d5db;" />
-                <section style="padding:16px;border:1px solid #e5e7eb;border-radius:8px;background:#fafafa;">
-                  <h4 style="margin:0 0 8px 0;font-size:14px;">Firma Digital Incrustada</h4>
-                  <p style="margin:0 0 8px 0;font-size:12px;color:#4b5563;">
-                    Firmado el: ${safeSignedAt}
-                  </p>
-                  ${signatureImg}
-                </section>
-              `;
+            // Check if the other party (contratante or contratada) already signed the contract
+            let existingOtherPartyBlock: string | null = null;
+            if (recipientType === 'titular' || recipientType === 'contratada') {
+              try {
+                const otherType = recipientType === 'titular' ? 'contratada' : 'titular';
+                const { data: otherFinalDocs } = await signatureClient
+                  .from('documents')
+                  .select('content')
+                  .eq('sale_id', typedData.sale_id)
+                  .eq('is_final', true)
+                  .is('beneficiary_id', null)
+                  .like('document_type', '%contrato%')
+                  .limit(1);
+                if (otherFinalDocs && otherFinalDocs.length > 0) {
+                  const otherContent = otherFinalDocs[0].content || '';
+                  try {
+                    const parser = new DOMParser();
+                    const parsedDoc = parser.parseFromString(otherContent, 'text/html');
+                    const signerBlock = parsedDoc.querySelector(`[data-signer="${otherType}"]`);
+                    if (signerBlock) {
+                      existingOtherPartyBlock = signerBlock.outerHTML;
+                    } else {
+                      const roleText = otherType === 'contratada' ? 'CONTRATADA' : 'CONTRATANTE';
+                      const allDivs = parsedDoc.querySelectorAll('div');
+                      for (const div of Array.from(allDivs)) {
+                        if (
+                          div.textContent?.includes(roleText) &&
+                          div.querySelectorAll('p').length >= 2 &&
+                          !div.querySelector('div')
+                        ) {
+                          existingOtherPartyBlock = div.outerHTML;
+                          break;
+                        }
+                      }
+                    }
+                  } catch { /* ignore parsing errors */ }
+                }
+              } catch { /* ignore */ }
             }
 
-            // Try to replace signature placeholders in the document content
-            const placeholderPatterns = recipientType === 'adherente'
-              ? [/\{\{firma_adherente\}\}/gi, /\{\{firma_contratante\}\}/gi, /\{\{firma_titular\}\}/gi]
-              : recipientType === 'contratada'
-              ? [/\{\{firma_contratada\}\}/gi]
-              : [/\{\{firma_contratante\}\}/gi, /\{\{firma_titular\}\}/gi];
+            type DocumentInsert = Database['public']['Tables']['documents']['Insert'];
+            const finalDocs: DocumentInsert[] = docsToSign.map((doc) => {
+              const originalContent = doc.content?.trim()
+                ? doc.content
+                : `
+                    <div>
+                      <h3>${doc.name}</h3>
+                      <p>Documento firmado digitalmente.</p>
+                      ${doc.file_url ? `<p><strong>Archivo original:</strong> ${doc.file_url}</p>` : ''}
+                    </div>
+                  `;
 
-            const textMarkerPatterns = [/Firma del Cliente/gi];
+              // Build signature block depending on type (canvas vs electronic)
+              let signatureBlock: string;
+              let signatureImgWithDate: string;
 
-            let finalContent = originalContent;
-            let placeholderFound = false;
+              if (isElectronicSignature) {
+                const isoTimestamp = new Date().toISOString();
+                const signedDate = new Date();
+                const formattedDate = `${String(signedDate.getDate()).padStart(2,'0')}.${String(signedDate.getMonth()+1).padStart(2,'0')}.${signedDate.getFullYear()} ${String(signedDate.getHours()).padStart(2,'0')}:${String(signedDate.getMinutes()).padStart(2,'0')}:${String(signedDate.getSeconds()).padStart(2,'0')}`;
 
-            // FIRST: Replace <div data-signature-field="true" ...>...</div> elements
-            // Role-aware: only replace the field matching the current signer
-            // 'cliente' role = titular / adherente; 'empresa' role = contratada
-            const signerRoleForField = recipientType === 'contratada' ? 'empresa' : 'cliente';
+                let signerName = '';
+                let signerCI = '';
+                let roleLabel = 'CONTRATANTE';
 
-            // Helper: find the full outer div (handles nested divs)
-            const findFullSignatureDiv = (html: string, role: string): { start: number; end: number } | null => {
-              const tagRegex = /<div\b([^>]*)>/gi;
-              let m: RegExpExecArray | null;
-              while ((m = tagRegex.exec(html)) !== null) {
-                const attrs = m[1];
-                const hasField = /data-signature-field\s*=\s*["']true["']/i.test(attrs);
-                const hasRole = new RegExp(`data-signer-role\\s*=\\s*["']${role}["']`, 'i').test(attrs);
-                const noRoleAttr = !/data-signer-role/i.test(attrs);
-                if (!hasField) continue;
-                if (!hasRole && !(noRoleAttr && role === 'cliente')) continue;
+                if (recipientType === 'adherente' && recipientId && saleBeneficiaries.length > 0) {
+                  const ben = saleBeneficiaries.find((b) => b.id === recipientId);
+                  if (ben) {
+                    signerName = `${ben.first_name || ''} ${ben.last_name || ''}`.trim();
+                    signerCI = ben.dni || '';
+                  }
+                  roleLabel = 'ADHERENTE';
+                } else if (recipientType === 'contratada') {
+                  signerName = companySettings?.contratada_signer_name || typedData.recipient_name || 'Representante Legal';
+                  signerCI = companySettings?.contratada_signer_dni || '';
+                  roleLabel = 'CONTRATADA';
+                } else if (saleClientInfo) {
+                  signerName = `${saleClientInfo.first_name || ''} ${saleClientInfo.last_name || ''}`.trim();
+                  signerCI = saleClientInfo.dni || '';
+                  roleLabel = 'CONTRATANTE';
+                }
 
-                const start = m.index;
-                let depth = 1;
-                let pos = start + m[0].length;
-                while (pos < html.length && depth > 0) {
-                  const nextOpen = html.indexOf('<div', pos);
-                  const nextClose = html.indexOf('</div>', pos);
-                  if (nextClose === -1) break;
-                  if (nextOpen !== -1 && nextOpen < nextClose) {
-                    depth++;
-                    pos = nextOpen + 4;
-                  } else {
-                    depth--;
-                    pos = nextClose + 6;
+                const deviceSummary = navigator.userAgent.replace(/\s+/g, ' ').substring(0, 80);
+                const hashRef = Array.from(new TextEncoder().encode(signatureData + isoTimestamp))
+                  .reduce((a, b) => ((a << 5) - a + b) | 0, 0)
+                  .toString(16).replace('-', '').toUpperCase().padStart(8, '0');
+
+                // Detect signature style from document content
+                const useV1 = originalContent.includes('data-signature-style="v1"');
+
+                let electronicBlock: string;
+                if (useV1) {
+                  // v1.0 — Detailed block with metadata
+                  const signerAttr = recipientType === 'contratada' ? 'contratada' : recipientType === 'adherente' ? 'adherente' : 'titular';
+                  electronicBlock = `
+                    <div data-signer="${signerAttr}" style="display:inline-block;vertical-align:top;width:48%;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#111;border:1px solid #ccc;border-radius:6px;padding:10px;">
+                      <table style="width:100%;border-collapse:collapse;font-size:10px;">
+                        <tr><td style="color:#666;padding:1px 4px;">Firmante:</td><td><strong>${signerName}</strong></td></tr>
+                        <tr><td style="color:#666;padding:1px 4px;">Fecha:</td><td>${formattedDate}</td></tr>
+                        <tr><td style="color:#666;padding:1px 4px;">Ref. Doc.:</td><td style="font-family:monospace;font-size:9px;">${isoTimestamp.substring(0,8)}…</td></tr>
+                        <tr><td style="color:#666;padding:1px 4px;">IP:</td><td style="font-family:monospace;">Registrada</td></tr>
+                        <tr><td style="color:#666;padding:1px 4px;">Dispositivo:</td><td style="font-size:9px;">${deviceSummary.substring(0,40)}…</td></tr>
+                        <tr><td style="color:#666;padding:1px 4px;">Hash:</td><td style="font-family:monospace;font-size:9px;">${hashRef}</td></tr>
+                      </table>
+                      <p style="margin:4px 0 0;font-size:9px;color:#666;font-style:italic;">Firma válida conforme a Ley 4017/2010</p>
+                      <div style="border-top:1px solid #333;width:80%;margin:6px 0 4px 0;"></div>
+                      <p style="margin:0;text-align:center;font-weight:bold;font-size:10px;">${roleLabel}</p>
+                      <p style="margin:2px 0 0 0;font-size:10px;">Aclaración: ${signerName || '.............................'}</p>
+                      <p style="margin:2px 0 0 0;font-size:10px;">C.I.Nº: ${signerCI || '.............................'}</p>
+                    </div>
+                  `;
+                } else {
+                  // v2.0 — Professional block matching reference PDF format
+                  const signerAttrV2 = recipientType === 'contratada' ? 'contratada' : recipientType === 'adherente' ? 'adherente' : 'titular';
+                  electronicBlock = `
+                    <div data-signer="${signerAttrV2}" style="display:inline-block;vertical-align:top;width:48%;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111;">
+                      <p style="margin:0 0 2px 0;font-size:11px;">Firmado electrónicamente por: <strong>${signerName}</strong></p>
+                      <p style="margin:0 0 12px 0;font-size:11px;">Fecha: ${formattedDate}</p>
+                      <div style="border-top:1px solid #555;width:80%;margin:0 0 6px 0;"></div>
+                      <p style="margin:0;font-size:11px;font-weight:bold;">${roleLabel}</p>
+                      <p style="margin:4px 0 0 0;font-size:11px;">Aclaración: ${signerName || '.............................'}</p>
+                      <p style="margin:2px 0 0 0;font-size:11px;">C.I.Nº: ${signerCI || '.............................'}</p>
+                    </div>
+                  `;
+                }
+                signatureImgWithDate = electronicBlock;
+                signatureBlock = electronicBlock;
+              } else {
+                const signatureImg = `<img src="${signatureData}" alt="Firma digital" style="max-width:280px;max-height:120px;display:block;" />`;
+                signatureImgWithDate = `
+                  <div style="text-align:center;">
+                    ${signatureImg}
+                    <p style="margin:4px 0 0 0;font-size:10px;color:#6b7280;">Firmado el: ${safeSignedAt}</p>
+                  </div>
+                `;
+                signatureBlock = `
+                  <hr style="margin:24px 0;border:none;border-top:1px solid #d1d5db;" />
+                  <section style="padding:16px;border:1px solid #e5e7eb;border-radius:8px;background:#fafafa;">
+                    <h4 style="margin:0 0 8px 0;font-size:14px;">Firma Digital Incrustada</h4>
+                    <p style="margin:0 0 8px 0;font-size:12px;color:#4b5563;">
+                      Firmado el: ${safeSignedAt}
+                    </p>
+                    ${signatureImg}
+                  </section>
+                `;
+              }
+
+              // Try to replace signature placeholders in the document content
+              const placeholderPatterns = recipientType === 'adherente'
+                ? [/\{\{firma_adherente\}\}/gi, /\{\{firma_contratante\}\}/gi, /\{\{firma_titular\}\}/gi]
+                : recipientType === 'contratada'
+                ? [/\{\{firma_contratada\}\}/gi]
+                : [/\{\{firma_contratante\}\}/gi, /\{\{firma_titular\}\}/gi];
+
+              const textMarkerPatterns = [/Firma del Cliente/gi];
+
+              let finalContent = originalContent;
+              let placeholderFound = false;
+
+              // FIRST: Replace <div data-signature-field="true" ...>...</div> elements
+              // Role-aware: only replace the field matching the current signer
+              // 'cliente' role = titular / adherente; 'empresa' role = contratada
+              const signerRoleForField = recipientType === 'contratada' ? 'empresa' : 'cliente';
+
+              // Helper: find the full outer div (handles nested divs)
+              const findFullSignatureDiv = (html: string, role: string): { start: number; end: number } | null => {
+                const tagRegex = /<div\b([^>]*)>/gi;
+                let m: RegExpExecArray | null;
+                while ((m = tagRegex.exec(html)) !== null) {
+                  const attrs = m[1];
+                  const hasField = /data-signature-field\s*=\s*["']true["']/i.test(attrs);
+                  const hasRole = new RegExp(`data-signer-role\\s*=\\s*["']${role}["']`, 'i').test(attrs);
+                  const noRoleAttr = !/data-signer-role/i.test(attrs);
+                  if (!hasField) continue;
+                  if (!hasRole && !(noRoleAttr && role === 'cliente')) continue;
+
+                  const start = m.index;
+                  let depth = 1;
+                  let pos = start + m[0].length;
+                  while (pos < html.length && depth > 0) {
+                    const nextOpen = html.indexOf('<div', pos);
+                    const nextClose = html.indexOf('</div>', pos);
+                    if (nextClose === -1) break;
+                    if (nextOpen !== -1 && nextOpen < nextClose) {
+                      depth++;
+                      pos = nextOpen + 4;
+                    } else {
+                      depth--;
+                      pos = nextClose + 6;
+                    }
+                  }
+                  return { start, end: pos };
+                }
+                return null;
+              };
+
+              const sigDivRange = findFullSignatureDiv(finalContent, signerRoleForField);
+              if (sigDivRange) {
+                finalContent =
+                  finalContent.substring(0, sigDivRange.start) +
+                  signatureImgWithDate +
+                  finalContent.substring(sigDivRange.end);
+                placeholderFound = true;
+              }
+
+              // If signer is titular/adherente: clean up the 'empresa' field to leave it blank
+              // (Contratada will sign in their own step)
+              if (recipientType !== 'contratada') {
+                const empresaRange = findFullSignatureDiv(finalContent, 'empresa');
+                if (empresaRange) {
+                  const emptyContratadaBlock = `
+                    <div style="display:inline-block;vertical-align:top;width:48%;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111;">
+                      <p style="margin:0 0 12px 0;font-size:11px;">Pendiente firma de la empresa</p>
+                      <hr style="border:none;border-top:1px solid #555;width:80%;margin:0 0 6px 0;" />
+                      <p style="margin:0;font-size:11px;font-weight:bold;">CONTRATADA</p>
+                      <p style="margin:4px 0 0 0;font-size:11px;">Aclaración: .............................</p>
+                      <p style="margin:2px 0 0 0;font-size:11px;">C.I.Nº: .............................</p>
+                    </div>
+                  `;
+                  finalContent =
+                    finalContent.substring(0, empresaRange.start) +
+                    emptyContratadaBlock +
+                    finalContent.substring(empresaRange.end);
+                }
+              }
+
+              // Clean up any raw attribute text that leaked from sanitization
+              const rawAttrRegex = /data-signature-field\s*=\s*["']true["'][^<]*/gi;
+              finalContent = finalContent.replace(rawAttrRegex, '');
+
+              // Then try placeholder patterns
+              if (!placeholderFound) {
+                for (const pattern of placeholderPatterns) {
+                  if (pattern.test(finalContent)) {
+                    finalContent = finalContent.replace(pattern, signatureImgWithDate);
+                    placeholderFound = true;
+                    break;
                   }
                 }
-                return { start, end: pos };
               }
-              return null;
-            };
 
-            const sigDivRange = findFullSignatureDiv(finalContent, signerRoleForField);
-            if (sigDivRange) {
-              finalContent =
-                finalContent.substring(0, sigDivRange.start) +
-                signatureImgWithDate +
-                finalContent.substring(sigDivRange.end);
-              placeholderFound = true;
-            }
-
-            // If signer is titular/adherente: clean up the 'empresa' field to leave it blank
-            // (Contratada will sign in their own step)
-            if (recipientType !== 'contratada') {
-              const empresaRange = findFullSignatureDiv(finalContent, 'empresa');
-              if (empresaRange) {
-                const emptyContratadaBlock = `
-                  <div style="display:inline-block;vertical-align:top;width:48%;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111;">
-                    <p style="margin:0 0 12px 0;font-size:11px;">Pendiente firma de la empresa</p>
-                    <hr style="border:none;border-top:1px solid #555;width:80%;margin:0 0 6px 0;" />
-                    <p style="margin:0;font-size:11px;font-weight:bold;">CONTRATADA</p>
-                    <p style="margin:4px 0 0 0;font-size:11px;">Aclaración: .............................</p>
-                    <p style="margin:2px 0 0 0;font-size:11px;">C.I.Nº: .............................</p>
-                  </div>
-                `;
-                finalContent =
-                  finalContent.substring(0, empresaRange.start) +
-                  emptyContratadaBlock +
-                  finalContent.substring(empresaRange.end);
-              }
-            }
-
-            // Clean up any raw attribute text that leaked from sanitization
-            const rawAttrRegex = /data-signature-field\s*=\s*["']true["'][^<]*/gi;
-            finalContent = finalContent.replace(rawAttrRegex, '');
-
-            // Then try placeholder patterns
-            if (!placeholderFound) {
-              for (const pattern of placeholderPatterns) {
-                if (pattern.test(finalContent)) {
-                  finalContent = finalContent.replace(pattern, signatureImgWithDate);
-                  placeholderFound = true;
-                  break;
+              // Try text marker replacement if no placeholder found
+              if (!placeholderFound) {
+                for (const pattern of textMarkerPatterns) {
+                  if (pattern.test(finalContent)) {
+                    finalContent = finalContent.replace(pattern, signatureImgWithDate);
+                    placeholderFound = true;
+                    break;
+                  }
                 }
               }
-            }
 
-            // Try text marker replacement if no placeholder found
-            if (!placeholderFound) {
-              for (const pattern of textMarkerPatterns) {
-                if (pattern.test(finalContent)) {
-                  finalContent = finalContent.replace(pattern, signatureImgWithDate);
-                  placeholderFound = true;
-                  break;
-                }
+              // Fallback: append signature block at the end (only if nothing was replaced)
+              if (!placeholderFound) {
+                finalContent = `${finalContent}${signatureBlock}`;
               }
-            }
 
-            // Fallback: append signature block at the end (only if nothing was replaced)
-            if (!placeholderFound) {
-              finalContent = `${finalContent}${signatureBlock}`;
-            }
+              // For contract documents: merge with existing other party block if available
+              const isContractDoc = doc.document_type === 'contrato' || doc.name?.toLowerCase().includes('contrato');
+              if (isContractDoc && existingOtherPartyBlock && (recipientType === 'titular' || recipientType === 'contratada')) {
+                // Add the other party's block side by side
+                finalContent = `${finalContent}${existingOtherPartyBlock}`;
+              }
 
-            // For contract documents: merge with existing other party block if available
-            const isContractDoc = doc.document_type === 'contrato' || doc.name?.toLowerCase().includes('contrato');
-            if (isContractDoc && existingOtherPartyBlock && (recipientType === 'titular' || recipientType === 'contratada')) {
-              // Add the other party's block side by side
-              finalContent = `${finalContent}${existingOtherPartyBlock}`;
-            }
+              return {
+                sale_id: doc.sale_id,
+                beneficiary_id: doc.beneficiary_id,
+                name: `${doc.name} (Firmado)`,
+                document_type: doc.document_type || 'documento',
+                document_type_id: doc.document_type_id,
+                generated_from_template: doc.generated_from_template,
+                requires_signature: false,
+                is_final: true,
+                status: 'firmado' as const,
+                signed_at: nowIso,
+                signed_by: null,
+                signature_data: signatureData,
+                file_url: null,
+                content: finalContent,
+                version: (doc.version || 1) + 1,
+              } satisfies DocumentInsert;
+            });
 
-            return {
-              sale_id: doc.sale_id,
-              beneficiary_id: doc.beneficiary_id,
-              name: `${doc.name} (Firmado)`,
-              document_type: doc.document_type || 'documento',
-              document_type_id: doc.document_type_id,
-              generated_from_template: doc.generated_from_template,
-              requires_signature: false,
-              is_final: true,
-              status: 'firmado' as const,
-              signed_at: nowIso,
-              signed_by: null,
-              signature_data: signatureData,
-              file_url: null,
-              content: finalContent,
-              version: (doc.version || 1) + 1,
-            };
-          });
+            await signatureClient.from('documents').insert(finalDocs);
 
-          await signatureClient.from('documents').insert(finalDocs as any);
-
-          await signatureClient
-            .from('documents')
-            .update({
-              status: 'firmado',
-              signed_at: nowIso,
-              signature_data: signatureData,
-            } as any)
-            .in('id', docsToSign.map((d) => d.id));
-        }
+            await signatureClient
+              .from('documents')
+              .update({
+                status: 'firmado',
+                signed_at: nowIso,
+                signature_data: signatureData,
+              })
+              .in('id', docsToSign.map((d) => d.id));
+          }
         } // end if (!contratadaMergedOk)
       } catch (signedDocsErr) {
+        // intentional empty catch: signed document generation is best-effort
       }
 
       // Log in process_traces for audit trail
@@ -845,21 +865,22 @@ export const useSubmitSignatureLink = () => {
         await signatureClient
           .from('process_traces')
           .insert({
-            sale_id: data.sale_id,
+            sale_id: typedData.sale_id,
             action: 'firma_completada',
             details: {
-              recipient_type: data.recipient_type,
-              recipient_id: data.recipient_id,
+              recipient_type: typedData.recipient_type,
+              recipient_id: typedData.recipient_id,
               signed_ip: clientIp,
               signature_link_id: linkId,
               completed_at: new Date().toISOString(),
             },
           });
       } catch (traceErr) {
+        // intentional empty catch: process trace logging is best-effort
       }
 
       // --- POST FIRMA: delegar todo al backend ---
-      let finalizeResult: any = null;
+      let finalizeResult: unknown = null;
       try {
         const finalizeResponse = await fetch(
           `${SUPABASE_URL}/functions/v1/finalize-signature-link`,
@@ -881,13 +902,13 @@ export const useSubmitSignatureLink = () => {
           }
         );
         finalizeResult = await finalizeResponse.json();
-        if (!finalizeResponse.ok || !finalizeResult.ok) {
-          if ((data as any).sale_addendum_id) {
+        if (!finalizeResponse.ok || !(finalizeResult as { ok?: boolean })?.ok) {
+          if (typedData.sale_addendum_id) {
             throw new Error('La firma fue registrada, pero no se pudo completar el anexo. Contacte a la empresa para revisar el alta.');
           }
         }
       } catch (finalizeErr) {
-        if ((data as any).sale_addendum_id) {
+        if (typedData.sale_addendum_id) {
           throw finalizeErr instanceof Error
             ? finalizeErr
             : new Error('La firma fue registrada, pero no se pudo completar el anexo. Contacte a la empresa para revisar el alta.');
@@ -895,12 +916,12 @@ export const useSubmitSignatureLink = () => {
         // No bloquear la firma del contrato si falla el pipeline backend
       }
 
-      let addendumCompleted = finalizeResult?.addendum_completed === true;
-      if ((data as any).sale_addendum_id && !addendumCompleted) {
-        addendumCompleted = await completeSaleAddendumForLink(signatureClient, data as any);
+      let addendumCompleted = (finalizeResult as { addendum_completed?: boolean })?.addendum_completed === true;
+      if (typedData.sale_addendum_id && !addendumCompleted) {
+        addendumCompleted = await completeSaleAddendumForLink(signatureClient, typedData);
       }
 
-      return { ...data, addendum_completed: addendumCompleted };
+      return { ...typedData, addendum_completed: addendumCompleted };
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['signature-link-public', variables.token] });
@@ -911,7 +932,7 @@ export const useSubmitSignatureLink = () => {
         description: "Su firma ha sido registrada exitosamente.",
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
       console.error('Error submitting signature:', error);
       toast({
         title: "Error",
@@ -976,7 +997,7 @@ export const useSignatureLinkDocuments = (
             .replace(/\s*-\s*Representante\s*Legal\s*$/i, '')
             .trim();
         
-        const groups: Record<string, any[]> = {};
+        const groups: Record<string, typeof docs> = {};
         for (const doc of docs) {
           const key = baseName(doc.name);
           if (!groups[key]) groups[key] = [];
@@ -985,16 +1006,16 @@ export const useSignatureLinkDocuments = (
         
         // For each group: if there's an unsigned original (is_final: false), show that for signing.
         // If ALL copies are final/signed, show the latest signed one as read-only.
-        const result: any[] = [];
+        const result: typeof docs = [];
         for (const key of Object.keys(groups)) {
           const group = groups[key];
-          const unsigned = group.find((d: any) => !d.is_final && !d.signed_pdf_url);
+          const unsigned = group.find((d) => !d.is_final && !d.signed_pdf_url);
           if (unsigned) {
             result.push(unsigned);
           } else {
             // All signed — pick the latest
-            const sorted = group.sort((a: any, b: any) => 
-              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            const sorted = group.sort((a, b) => 
+              new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
             );
             result.push(sorted[0]);
           }
@@ -1012,11 +1033,11 @@ export const useSignatureLinkDocuments = (
       const docs = data || [];
 
       // If final signed documents exist, prioritize them to avoid showing stale pre-signature versions
-      const hasFinalSignedDocs = docs.some((d: any) => d.is_final === true && d.requires_signature !== false);
+      const hasFinalSignedDocs = docs.some((d) => d.is_final === true && d.requires_signature !== false);
       if (hasFinalSignedDocs) {
         return docs
-          .filter((d: any) => d.is_final === true || d.requires_signature === false)
-          .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+          .filter((d) => d.is_final === true || d.requires_signature === false)
+          .sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
       }
 
       return docs;
@@ -1036,12 +1057,7 @@ export const useAllSignatureLinksPublic = (saleId: string | undefined, token?: s
       const client = token
         ? getSignatureClient(token)
         : getPublicClient();
-      const { data, error } = await client
-        .from('signature_links')
-        .select('id,sale_id,recipient_type,recipient_id,status,completed_at,created_at')
-        .eq('sale_id', saleId)
-        .is('sale_addendum_id', null)
-        .order('created_at', { ascending: true });
+      const { data, error } = await client.from('signature_links').select('id,sale_id,recipient_type,recipient_id,status,completed_at,created_at').eq('sale_id', saleId).is('sale_addendum_id', null).order('created_at', { ascending: true });
       if (error) throw error;
       return data || [];
     },

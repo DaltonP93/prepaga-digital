@@ -9,6 +9,7 @@ import React, {
   useRef
 } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
+import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import { CharacterCount } from '@tiptap/extension-character-count';
@@ -32,14 +33,27 @@ import { DynamicPlaceholderExtension } from './editor/DynamicPlaceholderExtensio
 import { TemplateAnnexesManager } from './templates/TemplateAnnexesManager';
 import { resolveStorageImages } from '@/lib/resolveStorageImages';
 
+export interface DynamicField {
+  type: string;
+  label: string;
+  name: string;
+}
+
+export interface TemplateQuestionItem {
+  id: string;
+  question_type: string;
+  question_text: string;
+  is_required?: boolean;
+}
+
 export interface TipTapEditorProps {
   initialContent?: string;
   content?: string;
   onChange?: (html: string) => void;
   onContentChange?: (html: string) => void;
-  dynamicFields?: any[];
-  onDynamicFieldsChange?: (fields: any[]) => void;
-  templateQuestions?: any[];
+  dynamicFields?: DynamicField[];
+  onDynamicFieldsChange?: (fields: DynamicField[]) => void;
+  templateQuestions?: TemplateQuestionItem[];
   templateId?: string;
   showToolbar?: boolean;
   showSidebar?: boolean;
@@ -59,8 +73,8 @@ export interface TipTapEditorAPI {
   insertDynamicQuestion: (type: string, label: string) => void;
   insertText: (text: string) => void;
   addImage: (url?: string) => void;
-  getEditor: () => any;
-  updateSelectedNodeAttrs: (attrs: any) => void;
+  getEditor: () => Editor | null;
+  updateSelectedNodeAttrs: (attrs: Record<string, unknown>) => void;
   setContent: (content: string) => void;
   getContent: () => string;
   focus: () => void;
@@ -108,7 +122,7 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
         },
       }),
       Placeholder.configure({
-        placeholder: ({ node }: any) => {
+        placeholder: ({ node }: { node: { type: { name: string } } }) => {
           if (node.type.name === 'heading') {
             return 'Título...';
           }
@@ -302,15 +316,15 @@ const TipTapEditor = forwardRef<TipTapEditorAPI, TipTapEditorProps>((props, ref)
   const addImage = useCallback((url: string = '', storagePath?: string) => {
     if (!editor) return;
 
-    const attrs: any = { src: url };
+    const attrs: Record<string, unknown> = { src: url };
     if (storagePath) {
       attrs["data-storage-path"] = storagePath;
     }
-    (editor.chain().focus() as any).setImage(attrs).run();
+    (editor.chain().focus() as unknown as { setImage: (attrs: Record<string, unknown>) => { run: () => boolean } }).setImage(attrs).run();
     setShowImageManager(false);
   }, [editor, setShowImageManager]);
 
-  const updateSelectedNodeAttrs = useCallback((attrs: any) => {
+  const updateSelectedNodeAttrs = useCallback((attrs: Record<string, unknown>) => {
     if (!editor) return;
 
     Object.entries(attrs).forEach(([key, value]) => {

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,11 +18,12 @@ import {
   useSaleAddendums,
   useSubmitSaleAddendumForAudit,
 } from '@/hooks/useSaleAddendums';
+import { SaleWithRelations } from '@/types/sale';
 import { getSignatureLinkPath, getSignatureLinkUrl } from '@/lib/appUrls';
 import { AlertCircle, CheckCircle2, ClipboardCheck, Copy, ExternalLink, Loader2, Plus, Send, Trash2, Users } from 'lucide-react';
 
 interface SaleAddendumsPanelProps {
-  sale: any;
+  sale: SaleWithRelations;
 }
 
 const emptyBeneficiary: AddendumBeneficiaryInput = {
@@ -92,13 +93,14 @@ export const SaleAddendumsPanel: React.FC<SaleAddendumsPanelProps> = ({ sale }) 
 
   const isEnterpriseSale = sale.sale_type === 'empresarial' || sale.sale_type === 'unipersonal';
   const isCompleted = sale.status === 'completado';
+  // @ts-expect-error contract_end_date exists in DB but not yet in auto-generated Database types
   const contractEndDate = sale.contract_end_date || null;
   const isExpired = contractEndDate ? new Date(contractEndDate) < new Date(new Date().toDateString()) : false;
   const canCreateAddendum = isEnterpriseSale && isCompleted && !isExpired;
 
   const selectedAddendum = useMemo(() => {
-    if (!selectedAddendumId) return addendums[0] as any;
-    return addendums.find((item: any) => item.id === selectedAddendumId) as any;
+    if (!selectedAddendumId) return addendums[0];
+    return addendums.find((item) => item.id === selectedAddendumId);
   }, [addendums, selectedAddendumId]);
 
   useEffect(() => {
@@ -107,14 +109,14 @@ export const SaleAddendumsPanel: React.FC<SaleAddendumsPanelProps> = ({ sale }) 
 
   const isAuditActionPending = submitForAudit.isPending || approveAddendum.isPending || rejectAddendum.isPending;
 
-  const handleCreateAddendum = () => {
+  const handleCreateAddendum = useCallback(() => {
     createAddendum.mutate(
       { saleId: sale.id, companyId: sale.company_id },
-      { onSuccess: (data: any) => setSelectedAddendumId(data.id) },
+      { onSuccess: (data) => setSelectedAddendumId(data.id) },
     );
-  };
+  }, [createAddendum, sale.id, sale.company_id]);
 
-  const handleAddBeneficiary = () => {
+  const handleAddBeneficiary = useCallback(() => {
     if (!selectedAddendum?.id) return;
     if (!beneficiaryForm.first_name.trim() || !beneficiaryForm.last_name.trim()) return;
     addBeneficiary.mutate(
@@ -128,9 +130,18 @@ export const SaleAddendumsPanel: React.FC<SaleAddendumsPanelProps> = ({ sale }) 
       },
       { onSuccess: () => setBeneficiaryForm(emptyBeneficiary) },
     );
-  };
+  }, [addBeneficiary, selectedAddendum?.id, beneficiaryForm]);
 
-  const copyLink = async (token: string) => {
+  const handleBeneficiaryChange = useCallback((field: keyof AddendumBeneficiaryInput, value: string) => {
+    setBeneficiaryForm((prev) => {
+      if (field === 'phone') return { ...prev, phone: value.replace(/\D/g, '') };
+      if (field === 'amount') return { ...prev, amount: parseAmount(value) };
+      if (field === 'preexisting_conditions_detail') return { ...prev, has_preexisting_conditions: !!value.trim(), preexisting_conditions_detail: value };
+      return { ...prev, [field]: value };
+    });
+  }, []);
+
+  const copyLink = useCallback(async (token: string) => {
     try {
       await navigator.clipboard.writeText(getSignatureLinkUrl(token));
       toast({ title: 'Enlace copiado', description: 'El enlace de firma quedó copiado al portapapeles.' });
@@ -141,7 +152,7 @@ export const SaleAddendumsPanel: React.FC<SaleAddendumsPanelProps> = ({ sale }) 
         variant: 'destructive',
       });
     }
-  };
+  }, [toast]);
 
   if (!isEnterpriseSale) {
     return (
@@ -203,7 +214,7 @@ export const SaleAddendumsPanel: React.FC<SaleAddendumsPanelProps> = ({ sale }) 
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <span>{(error as any)?.message || 'No se pudieron cargar los anexos.'}</span>
+              <span>{error?.message || 'No se pudieron cargar los anexos.'}</span>
               <Button type="button" size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}>
                 {isFetching && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Reintentar
@@ -224,7 +235,7 @@ export const SaleAddendumsPanel: React.FC<SaleAddendumsPanelProps> = ({ sale }) 
         ) : (
           <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
             <div className="space-y-2">
-              {addendums.map((addendum: any) => (
+              {addendums.map((addendum) => (
                 <button
                   key={addendum.id}
                   type="button"
@@ -292,8 +303,8 @@ export const SaleAddendumsPanel: React.FC<SaleAddendumsPanelProps> = ({ sale }) 
 
                   {selectedAddendum.status === 'en_auditoria' && canAudit(role) && (
                     <div className="mt-4 space-y-2">
-                      <Label>Nota de auditoría</Label>
-                      <Textarea value={auditNote} onChange={(event) => setAuditNote(event.target.value)} rows={2} />
+                      <Label htmlFor="addendum-audit-note">Nota de auditoría</Label>
+                      <Textarea id="addendum-audit-note" value={auditNote} onChange={(event) => setAuditNote(event.target.value)} rows={2} />
                     </div>
                   )}
 
@@ -310,61 +321,58 @@ export const SaleAddendumsPanel: React.FC<SaleAddendumsPanelProps> = ({ sale }) 
                     <h4 className="font-medium">Nuevo adherente</h4>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="space-y-1">
-                        <Label>Nombre *</Label>
-                        <Input value={beneficiaryForm.first_name || ''} onChange={(e) => setBeneficiaryForm({ ...beneficiaryForm, first_name: e.target.value })} />
+                        <Label htmlFor="addendum-first-name">Nombre *</Label>
+                        <Input id="addendum-first-name" value={beneficiaryForm.first_name || ''} onChange={(e) => handleBeneficiaryChange('first_name', e.target.value)} aria-required="true" />
                       </div>
                       <div className="space-y-1">
-                        <Label>Apellido *</Label>
-                        <Input value={beneficiaryForm.last_name || ''} onChange={(e) => setBeneficiaryForm({ ...beneficiaryForm, last_name: e.target.value })} />
+                        <Label htmlFor="addendum-last-name">Apellido *</Label>
+                        <Input id="addendum-last-name" value={beneficiaryForm.last_name || ''} onChange={(e) => handleBeneficiaryChange('last_name', e.target.value)} aria-required="true" />
                       </div>
                       <div className="space-y-1">
-                        <Label>C.I.</Label>
-                        <Input value={beneficiaryForm.dni || ''} onChange={(e) => setBeneficiaryForm({ ...beneficiaryForm, dni: e.target.value })} />
+                        <Label htmlFor="addendum-dni">C.I.</Label>
+                        <Input id="addendum-dni" value={beneficiaryForm.dni || ''} onChange={(e) => handleBeneficiaryChange('dni', e.target.value)} />
                       </div>
                       <div className="space-y-1">
-                        <Label>Parentesco</Label>
-                        <Input value={beneficiaryForm.relationship || ''} onChange={(e) => setBeneficiaryForm({ ...beneficiaryForm, relationship: e.target.value })} />
+                        <Label htmlFor="addendum-relationship">Parentesco</Label>
+                        <Input id="addendum-relationship" value={beneficiaryForm.relationship || ''} onChange={(e) => handleBeneficiaryChange('relationship', e.target.value)} />
                       </div>
                       <div className="space-y-1">
-                        <Label>Fecha nacimiento</Label>
-                        <Input type="date" value={beneficiaryForm.birth_date || ''} onChange={(e) => setBeneficiaryForm({ ...beneficiaryForm, birth_date: e.target.value })} />
+                        <Label htmlFor="addendum-birth-date">Fecha nacimiento</Label>
+                        <Input id="addendum-birth-date" type="date" value={beneficiaryForm.birth_date || ''} onChange={(e) => handleBeneficiaryChange('birth_date', e.target.value)} />
                       </div>
                       <div className="space-y-1">
-                        <Label>Teléfono</Label>
-                        <Input value={beneficiaryForm.phone || ''} onChange={(e) => setBeneficiaryForm({ ...beneficiaryForm, phone: e.target.value.replace(/\D/g, '') })} />
+                        <Label htmlFor="addendum-phone">Teléfono</Label>
+                        <Input id="addendum-phone" value={beneficiaryForm.phone || ''} onChange={(e) => handleBeneficiaryChange('phone', e.target.value)} />
                       </div>
                       <div className="space-y-1">
-                        <Label>Email</Label>
-                        <Input type="email" value={beneficiaryForm.email || ''} onChange={(e) => setBeneficiaryForm({ ...beneficiaryForm, email: e.target.value })} />
+                        <Label htmlFor="addendum-email">Email</Label>
+                        <Input id="addendum-email" type="email" value={beneficiaryForm.email || ''} onChange={(e) => handleBeneficiaryChange('email', e.target.value)} />
                       </div>
                       <div className="space-y-1">
-                        <Label>Monto</Label>
-                        <Input inputMode="numeric" value={beneficiaryForm.amount ? Number(beneficiaryForm.amount).toLocaleString('es-PY') : ''} onChange={(e) => setBeneficiaryForm({ ...beneficiaryForm, amount: parseAmount(e.target.value) })} />
+                        <Label htmlFor="addendum-amount">Monto</Label>
+                        <Input id="addendum-amount" inputMode="numeric" value={beneficiaryForm.amount ? Number(beneficiaryForm.amount).toLocaleString('es-PY') : ''} onChange={(e) => handleBeneficiaryChange('amount', e.target.value)} />
                       </div>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-3">
                       <div className="space-y-1">
-                        <Label>Domicilio</Label>
-                        <Input value={beneficiaryForm.address || ''} onChange={(e) => setBeneficiaryForm({ ...beneficiaryForm, address: e.target.value })} />
+                        <Label htmlFor="addendum-address">Domicilio</Label>
+                        <Input id="addendum-address" value={beneficiaryForm.address || ''} onChange={(e) => handleBeneficiaryChange('address', e.target.value)} />
                       </div>
                       <div className="space-y-1">
-                        <Label>Barrio</Label>
-                        <Input value={beneficiaryForm.barrio || ''} onChange={(e) => setBeneficiaryForm({ ...beneficiaryForm, barrio: e.target.value })} />
+                        <Label htmlFor="addendum-barrio">Barrio</Label>
+                        <Input id="addendum-barrio" value={beneficiaryForm.barrio || ''} onChange={(e) => handleBeneficiaryChange('barrio', e.target.value)} />
                       </div>
                       <div className="space-y-1">
-                        <Label>Ciudad</Label>
-                        <Input value={beneficiaryForm.city || ''} onChange={(e) => setBeneficiaryForm({ ...beneficiaryForm, city: e.target.value })} />
+                        <Label htmlFor="addendum-city">Ciudad</Label>
+                        <Input id="addendum-city" value={beneficiaryForm.city || ''} onChange={(e) => handleBeneficiaryChange('city', e.target.value)} />
                       </div>
                     </div>
                     <div className="space-y-1">
-                      <Label>Preexistencias / observaciones de salud</Label>
+                      <Label htmlFor="addendum-preexisting-conditions">Preexistencias / observaciones de salud</Label>
                       <Textarea
+                        id="addendum-preexisting-conditions"
                         value={beneficiaryForm.preexisting_conditions_detail || ''}
-                        onChange={(e) => setBeneficiaryForm({
-                          ...beneficiaryForm,
-                          has_preexisting_conditions: !!e.target.value.trim(),
-                          preexisting_conditions_detail: e.target.value,
-                        })}
+                        onChange={(e) => handleBeneficiaryChange('preexisting_conditions_detail', e.target.value)}
                         rows={2}
                       />
                     </div>
@@ -381,8 +389,8 @@ export const SaleAddendumsPanel: React.FC<SaleAddendumsPanelProps> = ({ sale }) 
 
                 <div className="space-y-3">
                   <h4 className="font-medium">Adherentes del anexo</h4>
-                  {(selectedAddendum.beneficiaries || []).length > 0 ? (
-                    selectedAddendum.beneficiaries.map((beneficiary: any) => (
+                  {selectedAddendum.beneficiaries && selectedAddendum.beneficiaries.length > 0 ? (
+                    selectedAddendum.beneficiaries.map((beneficiary) => (
                       <div key={beneficiary.id} className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <div className="font-medium">{beneficiary.first_name} {beneficiary.last_name}</div>
@@ -414,10 +422,10 @@ export const SaleAddendumsPanel: React.FC<SaleAddendumsPanelProps> = ({ sale }) 
                   )}
                 </div>
 
-                {(selectedAddendum.signature_links || []).length > 0 && (
+                {selectedAddendum.signature_links && selectedAddendum.signature_links.length > 0 && (
                   <div className="space-y-3">
                     <h4 className="font-medium">Enlaces de firma</h4>
-                    {selectedAddendum.signature_links.map((link: any) => (
+                    {selectedAddendum.signature_links.map((link) => (
                       <div key={link.id} className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <div className="font-medium">{link.recipient_name || 'Adherente'}</div>

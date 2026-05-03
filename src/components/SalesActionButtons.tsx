@@ -77,10 +77,11 @@ export const SalesActionButtons: React.FC<SalesActionButtonsProps> = ({ sale }) 
   const handleGenerateQuestionnaire = async () => {
     try {
       await generateQuestionnaireLink.mutateAsync(sale.id);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "No se pudo generar el enlace del cuestionario";
       toast({
         title: "Error",
-        description: error.message || "No se pudo generar el enlace del cuestionario",
+        description: message,
         variant: "destructive"
       });
     }
@@ -89,10 +90,11 @@ export const SalesActionButtons: React.FC<SalesActionButtonsProps> = ({ sale }) 
   const handleGenerateSignature = async () => {
     try {
       await generateSignatureLink.mutateAsync(sale.id);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "No se pudo generar el enlace de firma";
       toast({
         title: "Error",
-        description: error.message || "No se pudo generar el enlace de firma",
+        description: message,
         variant: "destructive"
       });
     }

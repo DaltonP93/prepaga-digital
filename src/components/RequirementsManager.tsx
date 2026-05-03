@@ -15,9 +15,16 @@ interface RequirementsManagerProps {
   saleId: string;
 }
 
+interface Requirement {
+  id: string;
+  requirement_text: string;
+  is_completed: boolean;
+  created_at: string;
+}
+
 export const RequirementsManager: React.FC<RequirementsManagerProps> = ({ saleId }) => {
   const [showForm, setShowForm] = useState(false);
-  const [editingRequirement, setEditingRequirement] = useState<any>(null);
+  const [editingRequirement, setEditingRequirement] = useState<Requirement | null>(null);
   const [requirementText, setRequirementText] = useState('');
   const [isCompleted, setIsCompleted] = useState(false);
 
@@ -58,7 +65,7 @@ export const RequirementsManager: React.FC<RequirementsManagerProps> = ({ saleId
   });
 
   const updateRequirement = useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; requirement_text?: string; is_completed?: boolean }) => {
+    mutationFn: async ({ id, ...updates }: { id: string; requirement_text?: string; is_completed?: boolean; [key: string]: unknown }) => {
       const { data, error } = await supabase
         .from('sale_requirements')
         .update(updates)
@@ -98,7 +105,7 @@ export const RequirementsManager: React.FC<RequirementsManagerProps> = ({ saleId
     setEditingRequirement(null);
   };
 
-  const handleEdit = (requirement: any) => {
+  const handleEdit = (requirement: Requirement) => {
     setEditingRequirement(requirement);
     setRequirementText(requirement.requirement_text || '');
     setIsCompleted(requirement.is_completed || false);

@@ -7,6 +7,26 @@ import { useTemplateQuestions } from "@/hooks/useTemplateQuestions";
 import { generateDocumentWithResponses, createTemplateContext } from "@/lib/templateEngine";
 import { downloadPDF } from "@/lib/pdfGenerator";
 
+interface TemplateResponse {
+  id: string;
+  question_id: string;
+  response_value: string;
+  client_id: string;
+  created_at: string;
+  clients?: { first_name?: string; last_name?: string; email?: string } | null;
+  sale_id?: string | null;
+}
+
+interface ClientResponseGroup {
+  client: TemplateResponse['clients'];
+  responses: TemplateResponse[];
+}
+
+interface ResponseStatItem {
+  total: number;
+  responses: Record<string, number>;
+}
+
 interface TemplateResponsesViewProps {
   templateId: string;
   clientId?: string;
@@ -29,7 +49,7 @@ export const TemplateResponsesView = ({ templateId, clientId, saleId }: Template
     );
   }
 
-  const handleGeneratePDF = async (clientResponses: any[]) => {
+  const handleGeneratePDF = async (clientResponses: TemplateResponse[]) => {
     try {
       // Group responses by client
       const responsesByClient = clientResponses.reduce((acc, response) => {
@@ -61,7 +81,7 @@ export const TemplateResponsesView = ({ templateId, clientId, saleId }: Template
   };
 
   // Group responses by client
-  const responsesByClient = responses.reduce((acc: any, response: any) => {
+  const responsesByClient = responses.reduce<Record<string, ClientResponseGroup>>((acc, response) => {
     const clientId = response.client_id;
     if (!acc[clientId]) {
       acc[clientId] = {
@@ -85,7 +105,7 @@ export const TemplateResponsesView = ({ templateId, clientId, saleId }: Template
       </div>
 
       {/* Individual Client Responses */}
-      {Object.entries(responsesByClient).map(([clientId, data]: [string, any]) => (
+      {Object.entries(responsesByClient).map(([clientId, data]) => (
         <Card key={clientId}>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -111,7 +131,7 @@ export const TemplateResponsesView = ({ templateId, clientId, saleId }: Template
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {data.responses.map((response: any) => {
+              {data.responses.map((response) => {
                 const question = questions.find(q => q.id === response.question_id);
                 return (
                   <div key={response.id} className="border-l-2 border-primary/20 pl-4">
@@ -143,7 +163,7 @@ export const TemplateResponsesView = ({ templateId, clientId, saleId }: Template
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {Object.entries(responseStats).map(([questionId, stats]: [string, any]) => {
+              {Object.entries(responseStats as Record<string, ResponseStatItem>).map(([questionId, stats]) => {
                 const question = questions.find(q => q.id === questionId);
                 return (
                   <div key={questionId} className="border rounded p-3">
@@ -154,7 +174,7 @@ export const TemplateResponsesView = ({ templateId, clientId, saleId }: Template
                       Total de respuestas: {stats.total}
                     </div>
                     <div className="space-y-1">
-                      {Object.entries(stats.responses).map(([value, count]: [string, any]) => (
+                      {Object.entries(stats.responses).map(([value, count]: [string, number]) => (
                         <div key={value} className="flex justify-between items-center text-sm">
                           <span>{value}</span>
                           <Badge variant="secondary">{count}</Badge>

@@ -95,7 +95,7 @@ export function parseLegacyHtml(
             level,
             text: el.textContent?.trim() || "",
             placeholder_refs: extractPlaceholders(el.textContent || ""),
-          } as any,
+          } as BlockContent,
           style: {
             fontFamily: "Inter",
             fontSize: level === 1 ? 20 : level === 2 ? 16 : 14,
@@ -120,7 +120,7 @@ export function parseLegacyHtml(
             header: true,
             striped: false,
             empty_state: "Sin datos",
-          } as any,
+          } as BlockContent,
           style: { fontSize: 11, headerBackground: "#f3f4f6", borderColor: "#d1d5db", cellPadding: 8 },
         });
         return;
@@ -145,7 +145,7 @@ export function parseLegacyHtml(
             plain_text: el.textContent?.trim() || "",
             semantic_role: "paragraph",
             placeholder_refs: extractPlaceholders(el.textContent || ""),
-          } as any,
+          } as BlockContent,
           style: {
             fontFamily: "Inter", fontSize: 12, fontWeight: 400,
             lineHeight: 1.5, textAlign: "left", color: "#111827",

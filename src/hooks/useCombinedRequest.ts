@@ -99,14 +99,15 @@ export const useCombinedRequest = () => {
 
       return { success: true, sale, client };
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error processing combined request:', error);
+      const message = error instanceof Error ? error.message : 'Error al procesar la solicitud.';
       toast({
         title: 'Error',
-        description: error.message || 'Error al procesar la solicitud.',
+        description: message,
         variant: 'destructive',
       });
-      return { success: false, error: error.message };
+      return { success: false, error: message };
     } finally {
       setIsProcessing(false);
     }

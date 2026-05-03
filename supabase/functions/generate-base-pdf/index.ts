@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -141,7 +141,7 @@ function normalizeLegacyContractHeader(html: string): string {
  */
 async function resolveContentImages(
   html: string,
-  supabaseAdmin: any,
+  supabaseAdmin: SupabaseClient,
   bucket: string
 ): Promise<string> {
   if (!html) return html;
@@ -201,8 +201,8 @@ async function imageUrlToDataUri(url: string): Promise<string> {
     const contentType = resp.headers.get("content-type") || "image/png";
     const buffer = new Uint8Array(await resp.arrayBuffer());
     let binary = "";
-    for (let i = 0; i < buffer.length; i++) {
-      binary += String.fromCharCode(buffer[i]);
+    for (const byte of buffer) {
+      binary += String.fromCharCode(byte);
     }
     const b64 = btoa(binary);
     return `data:${contentType};base64,${b64}`;
@@ -216,7 +216,7 @@ async function imageUrlToDataUri(url: string): Promise<string> {
  */
 async function resolveStorageUrl(
   url: string | null,
-  supabaseAdmin: any
+  supabaseAdmin: SupabaseClient
 ): Promise<string | null> {
   if (!url) return null;
 
@@ -309,7 +309,7 @@ Deno.serve(async (req) => {
     }
 
     // 2. Fetch company info via sale
-    let branding: BrandingInfo = {
+    const branding: BrandingInfo = {
       companyName: "",
       logoUrl: null,
       phone: null,

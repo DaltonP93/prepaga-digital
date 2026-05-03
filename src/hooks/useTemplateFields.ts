@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import type { Json } from '@/integrations/supabase/types';
+import type { Database, Json } from '@/integrations/supabase/types';
 import type { TemplateField, TemplateFieldInsert, TemplateFieldUpdate } from '@/types/templateDesigner';
 
 export const useTemplateFields = (templateId?: string) => {
@@ -42,8 +42,9 @@ export const useCreateTemplateField = () => {
       queryClient.invalidateQueries({ queryKey: ['template-fields', data.template_id] });
       toast({ title: 'Campo agregado' });
     },
-    onError: (error: any) => {
-      toast({ title: 'Error al crear campo', description: error.message, variant: 'destructive' });
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      toast({ title: 'Error al crear campo', description: message, variant: 'destructive' });
     },
   });
 };
@@ -58,7 +59,7 @@ export const useUpdateTemplateField = () => {
 
       const { data, error } = await supabase
         .from('template_fields')
-        .update(payload as any)
+        .update(payload as unknown as Database['public']['Tables']['template_fields']['Update'])
         .eq('id', id)
         .select()
         .single();
@@ -85,8 +86,9 @@ export const useDeleteTemplateField = () => {
       queryClient.invalidateQueries({ queryKey: ['template-fields', templateId] });
       toast({ title: 'Campo eliminado' });
     },
-    onError: (error: any) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     },
   });
 };

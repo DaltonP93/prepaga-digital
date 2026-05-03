@@ -192,7 +192,7 @@ export const useDocumentsList = ({
       if (countError) throw countError;
 
       const saleIds = [...new Set((documentsData || []).map((document) => document.sale_id).filter(Boolean))];
-      let salesMap: Record<string, any> = {};
+      let salesMap: Record<string, unknown> = {};
 
       if (saleIds.length > 0) {
         const { data: salesData, error: salesError } = await supabase
@@ -211,7 +211,7 @@ export const useDocumentsList = ({
         salesMap = (salesData || []).reduce((acc, sale) => {
           acc[sale.id] = sale;
           return acc;
-        }, {} as Record<string, any>);
+        }, {} as Record<string, unknown>);
       }
 
       const documents = (documentsData || []).map((document) => ({

@@ -51,10 +51,10 @@ export const useFileManager = () => {
       });
       setUploadProgress(0);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error al subir archivo",
-        description: error.message || "No se pudo subir el archivo",
+        description: error instanceof Error ? error.message : "No se pudo subir el archivo",
         variant: "destructive"
       });
       setUploadProgress(0);
@@ -95,10 +95,10 @@ export const useFileManager = () => {
         description: "El archivo se eliminó correctamente."
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error al eliminar archivo",
-        description: error.message || "No se pudo eliminar el archivo",
+        description: error instanceof Error ? error.message : "No se pudo eliminar el archivo",
         variant: "destructive"
       });
     }
@@ -125,13 +125,7 @@ export const useFileManager = () => {
     const uploadPromises = files.map(file => 
       uploadFileMutation.mutateAsync({ file, options })
     );
-    
-    try {
-      const results = await Promise.all(uploadPromises);
-      return results;
-    } catch (error) {
-      throw error;
-    }
+    return Promise.all(uploadPromises);
   };
 
   // Validate file before upload

@@ -70,10 +70,10 @@ export const useDashboardWidgets = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dashboard-widgets'] });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error",
-        description: "No se pudo actualizar el widget",
+        description: error instanceof Error ? error.message : "No se pudo actualizar el widget",
         variant: "destructive"
       });
     }
@@ -103,7 +103,7 @@ export const useDashboardWidgets = () => {
     updateWidgetMutation.mutate({ id, updates: { is_visible } });
   };
 
-  const updateWidgetConfig = (id: string, config: any) => {
+  const updateWidgetConfig = (id: string, config: Record<string, unknown>) => {
     updateWidgetMutation.mutate({ id, updates: { config } });
   };
 

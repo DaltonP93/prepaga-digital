@@ -38,8 +38,8 @@ export const ForgotPasswordDialog = ({ open, onOpenChange }: ForgotPasswordDialo
 
       setSent(true);
       toast.success('Se ha enviado un enlace de recuperación a su email');
-    } catch (error: any) {
-      toast.error('Error al enviar email de recuperación: ' + error.message);
+    } catch (error: unknown) {
+      toast.error('Error al enviar email de recuperación: ' + (error instanceof Error ? error.message : 'Error desconocido'));
     } finally {
       setLoading(false);
     }

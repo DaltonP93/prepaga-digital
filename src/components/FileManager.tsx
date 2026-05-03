@@ -12,7 +12,7 @@ interface FileManagerProps {
   bucketName?: string;
   allowMultiple?: boolean;
   showUploadArea?: boolean;
-  onFileSelect?: (file: any) => void;
+  onFileSelect?: (file: Record<string, unknown>) => void;
 }
 
 const FileManager = ({ 
@@ -72,11 +72,11 @@ const FileManager = ({
     setIsDragOver(false);
   };
 
-  const handleDownload = async (file: any) => {
+  const handleDownload = async (file: Record<string, unknown>) => {
     try {
       await getSignedUrl({
-        filePath: file.file_path,
-        bucketName: file.bucket_name
+        filePath: file.file_path as string,
+        bucketName: file.bucket_name as string
       });
     } catch (error) {
       console.error('Download error:', error);

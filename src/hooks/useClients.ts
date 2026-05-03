@@ -132,10 +132,10 @@ export const useCreateClient = () => {
         description: "El cliente ha sido creado exitosamente.",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error",
-        description: error.message || "No se pudo crear el cliente.",
+        description: error instanceof Error ? error.message : "No se pudo crear el cliente.",
         variant: "destructive",
       });
     },
@@ -173,10 +173,10 @@ export const useUpdateClient = () => {
         description: "Los cambios han sido guardados exitosamente.",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error",
-        description: error.message || "No se pudo actualizar el cliente.",
+        description: error instanceof Error ? error.message : "No se pudo actualizar el cliente.",
         variant: "destructive",
       });
     },
@@ -211,10 +211,10 @@ export const useDeleteClient = () => {
         description: "El cliente ha sido eliminado exitosamente.",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error",
-        description: error.message || "No se pudo eliminar el cliente.",
+        description: error instanceof Error ? error.message : "No se pudo eliminar el cliente.",
         variant: "destructive",
       });
     },

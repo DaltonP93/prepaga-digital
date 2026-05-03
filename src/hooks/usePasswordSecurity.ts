@@ -108,7 +108,7 @@ export const usePasswordSecurity = (): UsePasswordSecurityReturn => {
     }
 
     // Caracteres especiales
-    if (!/[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/~`]/.test(password)) {
+    if (!/[!@#$%^&*(),.?":{}|<>_+=[\]/\\~`-]/.test(password)) {
       errors.push('Debe incluir al menos un carácter especial (!@#$%^&*...)');
     } else {
       score += 15;

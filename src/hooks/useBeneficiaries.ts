@@ -23,21 +23,21 @@ async function recalculateSaleTotalAmount(saleId: string) {
     .select('amount, is_primary')
     .eq('sale_id', saleId);
 
-  const hasPrimary = (beneficiaries || []).some((b: any) => b.is_primary);
+  const hasPrimary = (beneficiaries || []).some((b: Beneficiary) => b.is_primary);
 
   if (hasPrimary) {
     // If a primary beneficiary exists, use ALL beneficiary amounts (primary + adherentes)
-    const totalAmount = (beneficiaries || []).reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
+    const totalAmount = (beneficiaries || []).reduce((sum: number, b: Beneficiary) => sum + (b.amount || 0), 0);
     // Also sync titular_amount with primary beneficiary's amount
-    const primaryAmount = (beneficiaries || []).find((b: any) => b.is_primary)?.amount || 0;
+    const primaryAmount = (beneficiaries || []).find((b: Beneficiary) => b.is_primary)?.amount || 0;
     await supabase.from('sales').update({
       titular_amount: primaryAmount,
       total_amount: totalAmount,
     }).eq('id', saleId);
   } else {
     // No primary: use titular_amount as base + sum of adherentes
-    const titularBase = Number((sale as any)?.titular_amount || 0);
-    const adherentesSum = (beneficiaries || []).reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
+    const titularBase = Number(sale?.titular_amount || 0);
+    const adherentesSum = (beneficiaries || []).reduce((sum: number, b: Beneficiary) => sum + (b.amount || 0), 0);
     const totalAmount = titularBase + adherentesSum;
     await supabase.from('sales').update({ total_amount: totalAmount }).eq('id', saleId);
   }
@@ -94,10 +94,11 @@ export const useCreateBeneficiary = () => {
         description: "El beneficiario ha sido agregado exitosamente.",
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error",
-        description: error.message || "No se pudo crear el beneficiario.",
+        description: message || "No se pudo crear el beneficiario.",
         variant: "destructive",
       });
     },
@@ -129,10 +130,11 @@ export const useUpdateBeneficiary = () => {
         description: "Los cambios han sido guardados exitosamente.",
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error",
-        description: error.message || "No se pudo actualizar el beneficiario.",
+        description: message || "No se pudo actualizar el beneficiario.",
         variant: "destructive",
       });
     },
@@ -170,10 +172,11 @@ export const useDeleteBeneficiary = () => {
         description: "El beneficiario ha sido eliminado exitosamente.",
       });
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error",
-        description: error.message || "No se pudo eliminar el beneficiario.",
+        description: message || "No se pudo eliminar el beneficiario.",
         variant: "destructive",
       });
     },

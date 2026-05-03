@@ -12,7 +12,7 @@ import { useRolePermissions } from '@/hooks/useRolePermissions';
 
 const Plans = () => {
   const [showForm, setShowForm] = useState(false);
-  const [editingPlan, setEditingPlan] = useState(null);
+  const [editingPlan, setEditingPlan] = useState<Record<string, unknown> | null>(null);
   const { can } = useRolePermissions();
   const queryClient = useQueryClient();
 
@@ -50,7 +50,7 @@ const Plans = () => {
     }
   });
 
-  const handleEdit = (plan: any) => {
+  const handleEdit = (plan: Record<string, unknown>) => {
     setEditingPlan(plan);
     setShowForm(true);
   };

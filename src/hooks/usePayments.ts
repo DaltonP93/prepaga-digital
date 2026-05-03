@@ -32,10 +32,10 @@ export const usePayments = () => {
         window.open(data.url, '_blank');
       }
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error en el pago",
-        description: error.message || "No se pudo procesar el pago",
+        description: error instanceof Error ? error.message : "No se pudo procesar el pago",
         variant: "destructive"
       });
     }
@@ -56,10 +56,10 @@ export const usePayments = () => {
         window.open(data.url, '_blank');
       }
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error en la suscripción",
-        description: error.message || "No se pudo crear la suscripción",
+        description: error instanceof Error ? error.message : "No se pudo crear la suscripción",
         variant: "destructive"
       });
     }

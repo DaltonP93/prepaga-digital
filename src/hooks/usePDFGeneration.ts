@@ -7,9 +7,9 @@ interface GeneratePDFOptions {
   filename: string;
   saleId?: string;
   documentType?: 'contract' | 'declaration' | 'questionnaire' | 'other';
-  dynamicFields?: any[];
-  clientData?: any;
-  templateData?: any;
+  dynamicFields?: unknown[];
+  clientData?: unknown;
+  templateData?: unknown;
 }
 
 interface PDFGenerationState {
@@ -83,8 +83,8 @@ export const usePDFGeneration = () => {
 
       return htmlContent;
 
-    } catch (error: any) {
-      const errorMessage = error.message || 'Error al generar documento';
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Error al generar documento';
       
       setState({
         isGenerating: false,
@@ -144,23 +144,23 @@ export const usePDFGeneration = () => {
     return !!newWindow;
   };
 
-  const generateFromTemplate = async (templateData: any, clientData: any = {}) => {
-    if (!templateData.static_content && !templateData.content) {
+  const generateFromTemplate = async (templateData: Record<string, unknown>, clientData: Record<string, unknown> = {}) => {
+    if (!(templateData.static_content as string | undefined) && !(templateData.content as string | undefined)) {
       throw new Error('Template content is required');
     }
 
-    const htmlContent = templateData.static_content || '';
-    const dynamicFields = templateData.dynamic_fields || [];
+    const htmlContent = (templateData.static_content as string | undefined) || '';
+    const dynamicFields = (templateData.dynamic_fields as unknown[] | undefined) || [];
 
     return await generatePDF({
       htmlContent,
-      filename: `${templateData.name || 'documento'}_${Date.now()}`,
-      documentType: templateData.template_type || 'contract',
+      filename: `${(templateData.name as string | undefined) || 'documento'}_${Date.now()}`,
+      documentType: (templateData.template_type as string | undefined) || 'contract',
       dynamicFields,
       clientData,
       templateData: {
-        name: templateData.name,
-        description: templateData.description,
+        name: templateData.name as string | undefined,
+        description: templateData.description as string | undefined,
       },
     });
   };

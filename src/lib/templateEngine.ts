@@ -39,47 +39,47 @@ export interface TemplateContext {
     actual: string;
     vencimiento?: string;
   };
-  respuestas: Record<string, any>;
+  respuestas: Record<string, unknown>;
 }
 
 export const createTemplateContext = (
-  client: any,
-  plan: any,
-  company: any,
-  sale: any,
-  responses?: Record<string, any>
+  client: Record<string, unknown>,
+  plan: Record<string, unknown>,
+  company: Record<string, unknown>,
+  sale: Record<string, unknown>,
+  responses?: Record<string, unknown>
 ): TemplateContext => {
   return {
     cliente: {
-      nombre: client?.first_name || '',
-      apellido: client?.last_name || '',
-      email: client?.email || '',
-      telefono: client?.phone || '',
-      dni: client?.dni || '',
-      direccion: client?.address || '',
-      fecha_nacimiento: client?.birth_date || '',
+      nombre: (client?.first_name as string | undefined) || '',
+      apellido: (client?.last_name as string | undefined) || '',
+      email: (client?.email as string | undefined) || '',
+      telefono: (client?.phone as string | undefined) || '',
+      dni: (client?.dni as string | undefined) || '',
+      direccion: (client?.address as string | undefined) || '',
+      fecha_nacimiento: (client?.birth_date as string | undefined) || '',
     },
     plan: {
-      nombre: plan?.name || '',
-      precio: plan?.price || 0,
-      descripcion: plan?.description || '',
-      cobertura: plan?.coverage_details || '',
+      nombre: (plan?.name as string | undefined) || '',
+      precio: (plan?.price as number | undefined) || 0,
+      descripcion: (plan?.description as string | undefined) || '',
+      cobertura: (plan?.coverage_details as string | undefined) || '',
     },
     empresa: {
-      nombre: company?.name || '',
-      email: company?.email || '',
-      telefono: company?.phone || '',
-      direccion: company?.address || '',
+      nombre: (company?.name as string | undefined) || '',
+      email: (company?.email as string | undefined) || '',
+      telefono: (company?.phone as string | undefined) || '',
+      direccion: (company?.address as string | undefined) || '',
     },
     venta: {
-      fecha: sale?.sale_date ? new Date(sale.sale_date).toLocaleDateString() : new Date().toLocaleDateString(),
-      total: sale?.total_amount || 0,
-      vendedor: sale?.salesperson ? `${sale.salesperson.first_name} ${sale.salesperson.last_name}` : '',
-      notas: sale?.notes || '',
+      fecha: sale?.sale_date ? new Date(sale.sale_date as string).toLocaleDateString() : new Date().toLocaleDateString(),
+      total: (sale?.total_amount as number | undefined) || 0,
+      vendedor: sale?.salesperson ? `${(sale.salesperson as Record<string, unknown>).first_name} ${(sale.salesperson as Record<string, unknown>).last_name}` : '',
+      notas: (sale?.notes as string | undefined) || '',
     },
     fecha: {
       actual: new Date().toLocaleDateString(),
-      vencimiento: sale?.signature_expires_at ? new Date(sale.signature_expires_at).toLocaleDateString() : '',
+      vencimiento: sale?.signature_expires_at ? new Date(sale.signature_expires_at as string).toLocaleDateString() : '',
     },
     respuestas: responses || {},
   };
@@ -89,7 +89,7 @@ export const interpolateTemplate = (template: string, context: TemplateContext):
   let result = template;
 
   // Replace nested object variables like {{cliente.nombre}}
-  const replaceNestedVariables = (obj: any, prefix: string) => {
+  const replaceNestedVariables = (obj: Record<string, unknown>, prefix: string) => {
     Object.keys(obj).forEach(key => {
       const value = obj[key];
       const placeholder = `{{${prefix}.${key}}}`;
@@ -149,9 +149,9 @@ export const getAvailableVariables = (): string[] => {
 
 // Helper function to generate document content with questionnaire responses
 export const generateDocumentWithResponses = (
-  template: any,
+  template: unknown,
   context: TemplateContext,
-  responses: Record<string, any>
+  responses: Record<string, unknown>
 ): string => {
   // Create enhanced context with responses
   const enhancedContext = {

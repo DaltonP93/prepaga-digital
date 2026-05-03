@@ -11,6 +11,24 @@ import { PageFieldOverlay } from "./PageFieldOverlay";
 import DOMPurify from "dompurify";
 import type { DraggableProvidedDragHandleProps } from "react-beautiful-dnd";
 
+type LooseContent = Record<string, unknown> & {
+  html?: string;
+  level?: number;
+  text?: string;
+  src?: string;
+  storage_path?: string;
+  alt?: string;
+  page_selection?: { pages?: number[] };
+  page_previews?: Array<{ preview_image_url?: string; page_number?: number }>;
+  label?: string;
+  signer_role?: string;
+  show_name?: boolean;
+  show_dni?: boolean;
+  show_timestamp?: boolean;
+  columns?: Array<{ label: string; key?: string }>;
+  placeholder_key?: string;
+};
+
 /* ─── Constants ─── */
 
 export const POSITIONED_TYPES = new Set<BlockType>([
@@ -56,7 +74,7 @@ const BlockContentRenderer: React.FC<{
   fieldPlacementRole: SignerRole;
   fieldPlacementType: FieldType;
 }> = ({ block, isSelected, templateId, fieldPlacementRole, fieldPlacementType }) => {
-  const content = block.content as any;
+  const content = block.content as unknown as LooseContent;
   const [resolvedImageUrl, setResolvedImageUrl] = useState("");
   const pageContainerRef = useRef<HTMLDivElement>(null);
   const [containerDims, setContainerDims] = useState({ w: 0, h: 0 });
@@ -127,7 +145,7 @@ const BlockContentRenderer: React.FC<{
           </div>
           {content.page_previews?.length > 0 ? (
             <div className="grid grid-cols-3 gap-1">
-              {content.page_previews.slice(0, 9).map((p: any, i: number) => (
+              {content.page_previews.slice(0, 9).map((p, i) => (
                 <div key={i} className="relative" ref={i === 0 ? pageContainerRef : undefined}>
                   {p.preview_image_url ? (
                     <div className="relative">
@@ -201,14 +219,14 @@ const BlockContentRenderer: React.FC<{
           <table className="w-full text-[9px] border">
             <thead>
               <tr className="bg-muted/30">
-                {(content.columns || []).map((col: any, i: number) => (
+                {(content.columns || []).map((col, i) => (
                   <th key={i} className="border px-1.5 py-0.5 text-left font-medium">{col.label}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               <tr>
-                {(content.columns || []).map((_: any, i: number) => (
+                {(content.columns || []).map((_, i) => (
                   <td key={i} className="border px-1.5 py-0.5 text-muted-foreground italic">...</td>
                 ))}
               </tr>

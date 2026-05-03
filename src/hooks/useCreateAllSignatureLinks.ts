@@ -44,17 +44,18 @@ export const useCreateAllSignatureLinks = () => {
 
       // 2. Generar enlace para el firmante principal (titular o responsable de pago)
       const titularToken = generateUUID();
-      const isResponsablePago = (sale as any).signer_type === 'responsable_pago';
+      const saleRecord = sale as Record<string, unknown>;
+      const isResponsablePago = (saleRecord.signer_type as string | undefined) === 'responsable_pago';
 
       // Si hay responsable de pago, el link va a esa persona; si no, al titular/cliente
       const signerEmail = isResponsablePago
-        ? ((sale as any).signer_email || sale.clients.email || '')
+        ? ((saleRecord.signer_email as string | undefined) || sale.clients.email || '')
         : (sale.clients.email || '');
       const signerPhone = isResponsablePago
-        ? ((sale as any).signer_phone || sale.clients.phone || null)
+        ? ((saleRecord.signer_phone as string | null | undefined) || sale.clients.phone || null)
         : (sale.clients.phone || null);
       const signerName = isResponsablePago
-        ? ((sale as any).signer_name || `${sale.clients.first_name} ${sale.clients.last_name}`)
+        ? ((saleRecord.signer_name as string | undefined) || `${sale.clients.first_name} ${sale.clients.last_name}`)
         : `${sale.clients.first_name} ${sale.clients.last_name}`;
 
       const { data: titularLink, error: titularError } = await supabase
@@ -63,7 +64,7 @@ export const useCreateAllSignatureLinks = () => {
           sale_id: saleId,
           token: titularToken,
           recipient_type: 'titular',
-          recipient_name: isResponsablePago ? (sale as any).signer_name || null : null,
+          recipient_name: isResponsablePago ? (saleRecord.signer_name as string | undefined) || null : null,
           recipient_email: signerEmail,
           recipient_phone: signerPhone,
           recipient_id: isResponsablePago ? null : sale.client_id,
@@ -71,7 +72,7 @@ export const useCreateAllSignatureLinks = () => {
           status: 'pendiente',
           step_order: 1,
           is_active: true,
-        } as any)
+        } as Record<string, unknown>)
         .select()
         .single();
 
@@ -108,7 +109,7 @@ export const useCreateAllSignatureLinks = () => {
                 status: 'pendiente',
                 step_order: 1,
                 is_active: true,
-              } as any)
+              } as Record<string, unknown>)
               .select()
               .single();
 
@@ -141,7 +142,7 @@ export const useCreateAllSignatureLinks = () => {
           .eq('step_order', 1)
           .neq('status', 'revocado');
 
-        const allStep1Done = step1Links && step1Links.length > 0 && step1Links.every((l: any) => l.status === 'completado');
+        const allStep1Done = step1Links && step1Links.length > 0 && step1Links.every((l) => (l as Record<string, unknown>).status === 'completado');
 
         const { data: contratadaLink, error: contratadaError } = await supabase
           .from('signature_links')
@@ -157,7 +158,7 @@ export const useCreateAllSignatureLinks = () => {
             status: 'pendiente',
             step_order: 2,
             is_active: allStep1Done ? true : false,
-          } as any)
+          } as Record<string, unknown>)
           .select()
           .single();
 
@@ -192,9 +193,9 @@ export const useCreateAllSignatureLinks = () => {
 
       toast.success(desc);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Error generating signature links:', error);
-      toast.error(error.message || 'Error al generar enlaces de firma');
+      toast.error(error instanceof Error ? error.message : 'Error al generar enlaces de firma');
     },
   });
 };

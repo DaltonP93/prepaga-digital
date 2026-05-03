@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { X, ZoomIn, ZoomOut, Download, Maximize2, Minimize2 } from 'lucide-react';
 
@@ -55,6 +55,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
           fullscreen ? 'max-w-[100vw] w-[100vw] h-[100vh] max-h-[100vh] rounded-none' : 'max-w-[90vw] max-h-[90vh] w-[90vw] h-[85vh]'
         }`}
       >
+        <DialogTitle className="sr-only">Vista previa de imagen</DialogTitle>
         {/* Toolbar */}
         <div className="absolute top-2 right-2 z-50 flex items-center gap-1 bg-background/80 rounded-lg p-1 backdrop-blur-sm">
           {isImage && (

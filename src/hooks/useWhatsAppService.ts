@@ -23,8 +23,8 @@ export const useWhatsAppService = (saleId?: string) => {
         toast.error(`Error al enviar mensaje: ${data.error}`);
       }
     },
-    onError: (error: any) => {
-      toast.error(`Error al enviar mensaje: ${error.message}`);
+    onError: (error: unknown) => {
+      toast.error(`Error al enviar mensaje: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     },
   });
 
@@ -40,8 +40,8 @@ export const useWhatsAppService = (saleId?: string) => {
         toast.error(`Error al enviar enlace: ${data.error}`);
       }
     },
-    onError: (error: any) => {
-      toast.error(`Error al enviar enlace: ${error.message}`);
+    onError: (error: unknown) => {
+      toast.error(`Error al enviar enlace: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     },
   });
 
@@ -57,8 +57,8 @@ export const useWhatsAppService = (saleId?: string) => {
         toast.error(`Error al enviar enlace: ${data.error}`);
       }
     },
-    onError: (error: any) => {
-      toast.error(`Error al enviar enlace: ${error.message}`);
+    onError: (error: unknown) => {
+      toast.error(`Error al enviar enlace: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     },
   });
 
@@ -74,8 +74,8 @@ export const useWhatsAppService = (saleId?: string) => {
         toast.error(`Error al enviar notificación: ${data.error}`);
       }
     },
-    onError: (error: any) => {
-      toast.error(`Error al enviar notificación: ${error.message}`);
+    onError: (error: unknown) => {
+      toast.error(`Error al enviar notificación: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     },
   });
 
@@ -91,8 +91,8 @@ export const useWhatsAppService = (saleId?: string) => {
         toast.error(`Error al enviar notificación: ${data.error}`);
       }
     },
-    onError: (error: any) => {
-      toast.error(`Error al enviar notificación: ${error.message}`);
+    onError: (error: unknown) => {
+      toast.error(`Error al enviar notificación: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     },
   });
 
@@ -106,8 +106,8 @@ export const useWhatsAppService = (saleId?: string) => {
         toast.error(`Error al enviar recordatorios: ${data.error}`);
       }
     },
-    onError: (error: any) => {
-      toast.error(`Error al enviar recordatorios: ${error.message}`);
+    onError: (error: unknown) => {
+      toast.error(`Error al enviar recordatorios: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     },
   });
 

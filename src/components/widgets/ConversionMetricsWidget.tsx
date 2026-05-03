@@ -200,9 +200,9 @@ const ConversionMetricsWidget = () => {
                     borderRadius: '6px',
                     fontSize: '12px'
                   }}
-                  formatter={(value: any, name: string) => {
-                    if (name === 'conversion') return [`${value}%`, 'Conversión'];
-                    return [value, name === 'ventas' ? 'Ventas' : 'Completadas'];
+                  formatter={(value: unknown, name: string) => {
+                    if (name === 'conversion') return [`${String(value)}%`, 'Conversión'];
+                    return [String(value), name === 'ventas' ? 'Ventas' : 'Completadas'];
                   }}
                 />
                 <Area

@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RotateCcw, Check } from "lucide-react";
@@ -36,7 +36,7 @@ export const SignatureCanvas = ({
     ctx.fillRect(0, 0, width, height);
   }, [width, height]);
 
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.PointerEvent<HTMLCanvasElement>) => {
     setIsDrawing(true);
     setIsEmpty(false);
     const canvas = canvasRef.current;
@@ -53,7 +53,7 @@ export const SignatureCanvas = ({
     ctx.moveTo(x, y);
   };
 
-  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return;
 
     const canvas = canvasRef.current;
@@ -108,10 +108,16 @@ export const SignatureCanvas = ({
             width={width}
             height={height}
             className="border border-border rounded cursor-crosshair"
+            tabIndex={0}
+            role="img"
+            aria-label="Área de firma digital. Use el mouse o pantalla táctil para dibujar."
             onMouseDown={startDrawing}
             onMouseMove={draw}
             onMouseUp={stopDrawing}
             onMouseLeave={stopDrawing}
+            onPointerDown={startDrawing}
+            onPointerMove={draw}
+            onPointerUp={stopDrawing}
           />
         </div>
         <div className="flex gap-2">
@@ -126,7 +132,10 @@ export const SignatureCanvas = ({
           </Button>
         </div>
         <p className="text-sm text-muted-foreground">
-          Dibuja tu firma en el recuadro usando el mouse
+          Dibuja tu firma en el recuadro usando el mouse o pantalla táctil.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Si usas teclado, enfoca el área de firma y utiliza la tecla Tab junto con Enter para limpiar.
         </p>
       </CardContent>
     </Card>

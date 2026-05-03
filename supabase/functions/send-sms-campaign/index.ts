@@ -62,7 +62,7 @@ serve(async (req) => {
       .eq('user_id', userData.user.id);
 
     const allowedRoles = ['admin', 'super_admin', 'gestor'];
-    if (!roles?.some((r: any) => allowedRoles.includes(r.role))) {
+    if (!roles?.some((r: Record<string, unknown>) => allowedRoles.includes(r.role as string))) {
       return new Response(JSON.stringify({ error: "Forbidden: insufficient role" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -123,11 +123,11 @@ serve(async (req) => {
             campaign_id: campaignId,
             content: message,
             status: 'failed',
-            error_message: (error as any)?.message,
+            error_message: error instanceof Error ? error.message : "Unknown error",
             company_id: companyId
           });
 
-        results.push({ phone: recipient.phone, status: 'failed', error: (error as any)?.message });
+        results.push({ phone: recipient.phone, status: 'failed', error: error instanceof Error ? error.message : "Unknown error" });
       }
     }
 
@@ -150,7 +150,7 @@ serve(async (req) => {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error en send-sms-campaign:", error);
     return new Response(
       JSON.stringify({ error: "Internal server error" }),

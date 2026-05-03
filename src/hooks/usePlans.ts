@@ -59,9 +59,9 @@ export const useCreatePlan = () => {
       queryClient.invalidateQueries({ queryKey: ['plans'] });
       toast.success('Plan creado exitosamente');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Error creating plan:', error);
-      toast.error('Error al crear plan: ' + error.message);
+      toast.error('Error al crear plan: ' + (error instanceof Error ? error.message : 'Error desconocido'));
     },
   });
 };
@@ -85,9 +85,9 @@ export const useUpdatePlan = () => {
       queryClient.invalidateQueries({ queryKey: ['plans'] });
       toast.success('Plan actualizado exitosamente');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Error updating plan:', error);
-      toast.error('Error al actualizar plan: ' + error.message);
+      toast.error('Error al actualizar plan: ' + (error instanceof Error ? error.message : 'Error desconocido'));
     },
   });
 };
@@ -108,9 +108,9 @@ export const useDeletePlan = () => {
       queryClient.invalidateQueries({ queryKey: ['plans'] });
       toast.success('Plan desactivado exitosamente');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Error deactivating plan:', error);
-      toast.error('Error al desactivar plan: ' + error.message);
+      toast.error('Error al desactivar plan: ' + (error instanceof Error ? error.message : 'Error desconocido'));
     },
   });
 };

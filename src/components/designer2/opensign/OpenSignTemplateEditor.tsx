@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import type { DragStartEvent, DragEndEvent } from "@dnd-kit/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTemplateBlocks, useUpdateTemplateBlock, useDeleteTemplateBlock, useCreateTemplateBlock } from "@/hooks/useTemplateBlocks";
 import { useTemplateFields, useUpdateTemplateField, useDeleteTemplateField, useCreateTemplateField } from "@/hooks/useTemplateFields";
@@ -10,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { uploadTemplateImage } from "@/lib/templateImageUpload";
 import { FIELD_LABELS } from "@/lib/widgetUtils";
 import { useWidgetDrag } from "@/hooks/useWidgetDrag";
-import type { TemplateBlock, TemplateField, FieldType, SignerRole, BlockType } from "@/types/templateDesigner";
+import type { TemplateBlock, TemplateField, FieldType, SignerRole, BlockType, TemplateBlockUpdate, TemplateFieldUpdate } from "@/types/templateDesigner";
 import type { Json } from "@/integrations/supabase/types";
 import { OpenSignPagesSidebar, type PageEntry } from "./OpenSignPagesSidebar";
 import { OpenSignCanvas } from "./OpenSignCanvas";
@@ -43,14 +44,13 @@ function serializeBlocksToHtml(blocks: TemplateBlock[]): string {
   const sorted = [...blocks].sort((a, b) => a.page - b.page || a.sort_order - b.sort_order);
   const parts: string[] = [];
   for (const b of sorted) {
-    const c = b.content as any;
     if (b.block_type === "heading") {
-      const level = c?.level || 2;
-      parts.push(`<h${level}>${c?.text || ""}</h${level}>`);
+      const level = b.content.level || 2;
+      parts.push(`<h${level}>${b.content.text || ""}</h${level}>`);
     } else if (b.block_type === "text") {
-      parts.push(c?.html || `<p>${c?.plain_text || ""}</p>`);
+      parts.push(b.content.html || `<p>${b.content.plain_text || ""}</p>`);
     } else if (b.block_type === "image") {
-      parts.push(`<img src="${c?.storage_path || c?.src || ""}" alt="${c?.alt || ""}" />`);
+      parts.push(`<img src="${b.content.storage_path || b.content.src || ""}" alt="${b.content.alt || ""}" />`);
     }
   }
   return parts.join("\n");
@@ -142,8 +142,9 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
       queryClient.invalidateQueries({ queryKey: ["template-assets", templateId] });
       queryClient.invalidateQueries({ queryKey: ["template-asset-pages"] });
       toast({ title: "Documento eliminado" });
-    } catch (err: any) {
-      toast({ title: "Error al eliminar", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast({ title: "Error al eliminar", description: message, variant: "destructive" });
     }
   }, [pdfAsset, blocks, templateId, queryClient, toast]);
 
@@ -159,12 +160,14 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
       template_id: templateId, block_type: "image" as BlockType, page: currentPage,
       x: 10, y: 10, w: 30, h: 20, z_index: 10, rotation: 0,
       is_locked: false, is_visible: true,
-      content: { src: "", alt: "", storage_path: "" } as any,
+      content: { src: "", alt: "", storage_path: "" } as unknown as Record<string, unknown>,
       style: {}, visibility_rules: { roles: ["titular", "adherente", "contratada"], conditions: [] },
       sort_order: blocks.length,
     }, {
-      onSuccess: (newBlock: any) => {
-        const blockId = newBlock?.id || newBlock?.[0]?.id;
+      onSuccess: (newBlock: unknown) => {
+        const blockArray = newBlock as unknown as TemplateBlock[];
+        const blockObj = newBlock as unknown as TemplateBlock;
+        const blockId = blockObj?.id || blockArray?.[0]?.id;
         if (blockId) {
           setPendingImageBlockId(blockId);
           setSelectedBlockId(blockId);
@@ -184,10 +187,20 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
     if (!targetBlockId) return;
     try {
       const result = await uploadTemplateImage(file, templateId);
-      updateBlock.mutate({ id: targetBlockId, content: { ...((blocks.find(b => b.id === targetBlockId)?.content as any) || {}), src: result.signedUrl, storage_path: result.storagePath, alt: file.name } } as any);
+      const existing = blocks.find(b => b.id === targetBlockId);
+      updateBlock.mutate({
+        id: targetBlockId,
+        content: {
+          ...(existing?.content as unknown as Record<string, unknown> || {}),
+          src: result.signedUrl,
+          storage_path: result.storagePath,
+          alt: file.name,
+        } as unknown as Record<string, unknown>,
+      });
       toast({ title: "Imagen subida" });
-    } catch (err: any) {
-      toast({ title: "Error al subir imagen", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      toast({ title: "Error al subir imagen", description: message, variant: "destructive" });
     } finally {
       setPendingImageBlockId(null);
     }
@@ -196,16 +209,16 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   /* ─── Drag-and-drop ─── */
   const { handleDragStart: onDragStart, handleDragEnd: onDragEnd } = useWidgetDrag({
     templateId, currentPage, activeRole, zoom,
-    onCreateField: (params) => createField.mutate(params as any),
+    onCreateField: (params) => createField.mutate(params as unknown as Parameters<typeof createField.mutate>[0]),
   });
 
-  const handleDragStart = useCallback((event: any) => {
+  const handleDragStart = useCallback((event: DragStartEvent) => {
     const data = event.active.data.current as WidgetDragData | undefined;
     if (data?.type === "widget") setActiveDragData(data);
     onDragStart(event);
   }, [onDragStart]);
 
-  const handleDragEnd = useCallback((event: any) => {
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
     setActiveDragData(null);
     onDragEnd(event);
   }, [onDragEnd]);
@@ -233,14 +246,14 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
           visibility_rules: b.visibility_rules as unknown as Json,
         }));
         for (let i = 0; i < rows.length; i += CHUNK) {
-          const { error: bErr } = await supabase.from("template_blocks").insert(rows.slice(i, i + CHUNK) as any);
+          const { error: bErr } = await supabase.from("template_blocks").insert(rows.slice(i, i + CHUNK) as unknown as Record<string, unknown>[]);
           if (bErr) throw bErr;
         }
       }
 
       if (canMigrateFields && signatureFields.length > 0) {
         const fieldRows = signatureFields.map((f) => ({ ...f, meta: f.meta as unknown as Json }));
-        const { error: fErr } = await supabase.from("template_fields").insert(fieldRows as any);
+        const { error: fErr } = await supabase.from("template_fields").insert(fieldRows as unknown as Record<string, unknown>[]);
         if (fErr) throw fErr;
       }
 
@@ -251,9 +264,10 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
 
       setCurrentPage(1); setSelectedBlockId(null); setSelectedFieldId(null); setPlacementActive(false);
       toast({ title: "Migración completada" });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Migration error:", err);
-      toast({ title: "Error en migración", description: err.message, variant: "destructive" });
+      const message = err instanceof Error ? err.message : String(err);
+      toast({ title: "Error en migración", description: message, variant: "destructive" });
     } finally {
       setMigrating(false);
     }
@@ -323,7 +337,7 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   /* ─── Block handlers ─── */
   const handleUpdateBlock = useCallback((updates: Partial<TemplateBlock>) => {
     if (!selectedBlockId) return;
-    updateBlock.mutate({ id: selectedBlockId, ...updates } as any);
+    updateBlock.mutate({ id: selectedBlockId, ...updates } as unknown as TemplateBlockUpdate);
   }, [selectedBlockId, updateBlock]);
 
   const handleDeleteBlock = useCallback((id: string) => {
@@ -346,21 +360,21 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
 
   const handleToggleLock = useCallback((id: string) => {
     const block = blocks.find((b) => b.id === id);
-    if (block) updateBlock.mutate({ id, is_locked: !block.is_locked } as any);
+    if (block) updateBlock.mutate({ id, is_locked: !block.is_locked });
   }, [blocks, updateBlock]);
 
   const handleToggleVisibility = useCallback((id: string) => {
     const block = blocks.find((b) => b.id === id);
-    if (block) updateBlock.mutate({ id, is_visible: !block.is_visible } as any);
+    if (block) updateBlock.mutate({ id, is_visible: !block.is_visible });
   }, [blocks, updateBlock]);
 
   const handleUpdatePosition = useCallback((id: string, x: number, y: number, w: number, h: number) => {
-    updateBlock.mutate({ id, x, y, w, h } as any);
+    updateBlock.mutate({ id, x, y, w, h });
   }, [updateBlock]);
 
   const handleAddBlock = useCallback((type: BlockType) => {
     if (type === "signature_block") return;
-    const defaults: Record<string, any> = {
+    const defaults: Record<string, { content: Record<string, unknown>; style: Record<string, unknown> }> = {
       text: { content: { kind: "rich_text", html: "<p>Nuevo texto</p>", plain_text: "Nuevo texto", semantic_role: "paragraph", placeholder_refs: [] }, style: { fontSize: 12, fontWeight: 400, textAlign: "left" } },
       heading: { content: { kind: "heading", level: 2, text: "Título", placeholder_refs: [] }, style: { fontSize: 18, fontWeight: 700, textAlign: "center" } },
     };
@@ -369,7 +383,7 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
       template_id: templateId, block_type: type, page: currentPage,
       x: 0, y: 0, w: 100, h: 10, z_index: 0, rotation: 0,
       is_locked: false, is_visible: true,
-      content: d.content, style: d.style,
+      content: d.content as unknown as Record<string, unknown>, style: d.style,
       visibility_rules: { roles: ["titular", "adherente", "contratada"], conditions: [] },
       sort_order: blocks.length,
     });
@@ -378,7 +392,7 @@ export const OpenSignTemplateEditor: React.FC<OpenSignTemplateEditorProps> = ({
   /* ─── Field handlers ─── */
   const handleUpdateField = useCallback((updates: Partial<TemplateField>) => {
     if (!selectedFieldId) return;
-    updateField.mutate({ id: selectedFieldId, ...updates } as any);
+    updateField.mutate({ id: selectedFieldId, ...updates } as unknown as TemplateFieldUpdate);
   }, [selectedFieldId, updateField]);
 
   const handleDeleteField = useCallback((id: string) => {
