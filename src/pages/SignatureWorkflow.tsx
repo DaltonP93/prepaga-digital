@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, FileText, Users, Send, Copy, Check, MessageCircle, Download, RefreshCw, Eye, Clock, CheckCircle, Info, Monitor, Smartphone, Tablet, Globe, Building, ShieldCheck } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ArrowLeft, FileText, Users, Send, Copy, Check, MessageCircle, Download, RefreshCw, Eye, Clock, CheckCircle, Info, Monitor, Smartphone, Tablet, Globe, Building, ShieldCheck, AlertCircle } from 'lucide-react';
 import { useSalesList } from '@/hooks/useSales';
 import { useSignatureLinks, useResendSignatureLink } from '@/hooks/useSignatureLinks';
 import { useBeneficiaries } from '@/hooks/useBeneficiaries';
@@ -661,7 +662,8 @@ const SignatureWorkflow = () => {
           const isCompleted = link.status === 'completado';
           const isExpired = !isCompleted && new Date(link.expires_at) < new Date();
           const isRevoked = link.status === 'revocado';
-          const isActive = !isCompleted && !isExpired && !isRevoked;
+          const isWaitingTurn = link.is_active === false && link.status === 'pendiente';
+          const isActive = !isWaitingTurn && !isCompleted && !isExpired && !isRevoked;
 
           return (
             <div key={link.id} className="border rounded-lg p-4 space-y-3">
@@ -679,6 +681,15 @@ const SignatureWorkflow = () => {
                   {isCompleted ? '✓ Firmado' : isExpired ? 'Expirado' : isRevoked ? 'Revocado' : link.status === 'visualizado' ? 'Visualizado' : 'Pendiente'}
                 </Badge>
               </div>
+
+              {isWaitingTurn && (
+                <Alert className="border-orange-200 bg-orange-50">
+                  <AlertCircle className="h-4 w-4 text-orange-500" />
+                  <AlertDescription className="text-sm text-orange-700">
+                    Este enlace todavia no esta disponible. Se activara cuando terminen las firmas anteriores.
+                  </AlertDescription>
+                </Alert>
+              )}
 
               {/* Timeline de rastreo */}
               <div className="flex items-center gap-1 text-xs">

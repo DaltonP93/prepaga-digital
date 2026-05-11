@@ -119,6 +119,23 @@ export const useCreateSignatureLink = () => {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + expirationDays);
 
+      let revokeQuery = supabase
+        .from('signature_links')
+        .update({
+          status: 'revocado',
+          is_active: false,
+          expires_at: new Date().toISOString(),
+        } as any)
+        .eq('sale_id', saleId)
+        .eq('recipient_type', recipientType)
+        .eq('is_active', true)
+        .in('status', ['pendiente', 'visualizado', 'enviado', 'firmado_parcial', 'expirado']);
+
+      revokeQuery = beneficiaryId ? revokeQuery.eq('recipient_id', beneficiaryId) : revokeQuery.is('recipient_id', null);
+
+      const { error: revokeError } = await revokeQuery;
+      if (revokeError) throw revokeError;
+
       const { data, error } = await supabase
         .from('signature_links')
         .insert({
@@ -239,6 +256,7 @@ export const useRevokeSignatureLink = () => {
         .from('signature_links')
         .update({
           status: 'revocado',
+          is_active: false,
           expires_at: new Date().toISOString(),
         })
         .eq('id', linkId);
@@ -276,9 +294,30 @@ export const useResendSignatureLink = () => {
         .from('signature_links')
         .update({
           status: 'revocado',
+          is_active: false,
           expires_at: new Date().toISOString(),
         })
         .eq('id', oldLink.id);
+
+      let revokeDuplicatesQuery = supabase
+        .from('signature_links')
+        .update({
+          status: 'revocado',
+          is_active: false,
+          expires_at: new Date().toISOString(),
+        } as any)
+        .eq('sale_id', oldLink.sale_id)
+        .eq('recipient_type', oldLink.recipient_type)
+        .eq('is_active', true)
+        .neq('id', oldLink.id)
+        .in('status', ['pendiente', 'visualizado', 'enviado', 'firmado_parcial', 'expirado']);
+
+      revokeDuplicatesQuery = oldLink.recipient_id
+        ? revokeDuplicatesQuery.eq('recipient_id', oldLink.recipient_id)
+        : revokeDuplicatesQuery.is('recipient_id', null);
+
+      const { error: revokeDuplicatesError } = await revokeDuplicatesQuery;
+      if (revokeDuplicatesError) throw revokeDuplicatesError;
 
       // 2. Reset document statuses for this recipient instead of deleting them
       // This preserves the generated documents so they don't need to be regenerated

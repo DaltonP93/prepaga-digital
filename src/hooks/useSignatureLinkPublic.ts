@@ -92,6 +92,7 @@ export const useSignatureLinkByToken = (token: string) => {
         .select('id,sale_id,package_id,recipient_type,recipient_id,recipient_email,recipient_phone,recipient_name,expires_at,accessed_at,access_count,status,completed_at,created_at,updated_at,signwell_signing_url,is_active,step_order')
         .eq('token', token)
         .gt('expires_at', new Date().toISOString())
+        .neq('status', 'revocado')
         .single();
 
       if (linkError) {
@@ -213,6 +214,9 @@ export const useSubmitSignatureLink = () => {
           completed_at: new Date().toISOString(),
         })
         .eq('id', linkId)
+        .eq('is_active', true)
+        .neq('status', 'revocado')
+        .gt('expires_at', new Date().toISOString())
         .select('id,sale_id,recipient_type,recipient_id,status,completed_at')
         .single();
 

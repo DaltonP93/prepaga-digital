@@ -3,7 +3,11 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 // --- Inlined: _shared/public-app-url.ts ---
 function getPublicAppUrl(): string {
-  const configured = (Deno.env.get("PUBLIC_APP_URL") || "").trim();
+  const configured = (
+    Deno.env.get("PUBLIC_APP_URL") ||
+    Deno.env.get("SITE_URL") ||
+    ""
+  ).trim();
   return (configured || "https://prepaga.saa.com.py").replace(/\/+$/, "");
 }
 function getSignatureLinkUrl(token: string): string {
@@ -257,27 +261,45 @@ async function activateNextStep(
   // Only check if the completing link is step 1
   if (link.step_order !== 1) return false
 
-  // Check if ALL step 1 links are completed
+  // Check if ALL current step 1 links are completed. Legacy/revoked/expired
+  // duplicates must not block activation of the contratada step.
   const { data: step1Links } = await supabase
     .from('signature_links')
     .select('id, status')
     .eq('sale_id', link.sale_id)
     .eq('step_order', 1)
+    .eq('is_active', true)
     .neq('status', 'revocado')
+    .gt('expires_at', new Date().toISOString())
 
-  if (!step1Links) return false
+  if (!step1Links || step1Links.length === 0) return false
 
   const allStep1Done = step1Links.every((l: any) => l.status === 'completado')
   if (!allStep1Done) return false
 
-  // Activate step 2 links (contratada)
+  // Reuse an existing contratada link before creating a new one. Older active
+  // duplicates are revoked to avoid sending or displaying conflicting tokens.
   let { data: step2Links } = await supabase
     .from('signature_links')
-    .select('id, recipient_email, recipient_phone, recipient_name, token')
+    .select('id, recipient_email, recipient_phone, recipient_name, token, created_at, is_active, status')
     .eq('sale_id', link.sale_id)
     .eq('step_order', 2)
-    .eq('is_active', false)
-    .neq('status', 'revocado')
+    .eq('recipient_type', 'contratada')
+    .in('status', ['pendiente', 'visualizado', 'enviado', 'firmado_parcial'])
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false })
+
+  if (step2Links && step2Links.length > 1) {
+    const keepLink = step2Links[0]
+    const duplicateIds = step2Links.slice(1).map((l: any) => l.id)
+    if (duplicateIds.length > 0) {
+      await supabase
+        .from('signature_links')
+        .update({ status: 'revocado', is_active: false, expires_at: new Date().toISOString() })
+        .in('id', duplicateIds)
+    }
+    step2Links = [keepLink]
+  }
 
   // If no step 2 link exists, create it from company_settings (mode=link)
   if (!step2Links || step2Links.length === 0) {
@@ -326,13 +348,12 @@ async function activateNextStep(
 
   if (!step2Links || step2Links.length === 0) return false
 
-  // Activate them
+  // Activate the current contratada link.
+  const step2Ids = step2Links.map((l: any) => l.id)
   await supabase
     .from('signature_links')
     .update({ is_active: true })
-    .eq('sale_id', link.sale_id)
-    .eq('step_order', 2)
-    .eq('is_active', false)
+    .in('id', step2Ids)
 
   // Send WhatsApp notification to contratada (only if auto-send is enabled)
   for (const s2Link of step2Links) {

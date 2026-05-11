@@ -79,7 +79,7 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
       expiresAt.setDate(expiresAt.getDate() + (recipientType === 'contratada' ? 3 : expirationDays));
 
       const isContratada = recipientType === 'contratada';
-
+      const now = new Date().toISOString();
       const insertData: Record<string, any> = {
         sale_id: saleId,
         token,
@@ -92,6 +92,21 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
         step_order: isContratada ? 2 : 1,
         is_active: !isContratada,
       };
+
+      const { error: revokeError } = await supabase
+        .from('signature_links')
+        .update({
+          status: 'revocado',
+          is_active: false,
+          expires_at: now,
+        } as any)
+        .eq('sale_id', saleId)
+        .eq('recipient_type', insertData.recipient_type)
+        .is('recipient_id', null)
+        .eq('is_active', true)
+        .in('status', ['pendiente', 'visualizado', 'enviado', 'firmado_parcial', 'expirado']);
+
+      if (revokeError) throw revokeError;
 
       const { data, error } = await supabase
         .from('signature_links')
@@ -346,6 +361,7 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
             <h4 className="font-medium">Enlaces generados ({signatureLinks.length})</h4>
             {signatureLinks.map((link: any) => {
               const isInactive = link.is_active === false && link.status === 'pendiente';
+              const canUseLink = !isInactive && link.status === 'pendiente' && new Date(link.expires_at) >= new Date();
 
               return (
                 <div key={link.id} className={`p-4 border rounded-lg ${isInactive ? 'bg-muted/40 border-dashed' : ''}`}>
@@ -376,10 +392,10 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => copyLink(link.token)}>
+                      <Button variant="outline" size="sm" onClick={() => copyLink(link.token)} disabled={!canUseLink}>
                         <Copy className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => window.open(getSignatureLinkPath(link.token), '_blank')}>
+                      <Button variant="outline" size="sm" onClick={() => window.open(getSignatureLinkPath(link.token), '_blank')} disabled={!canUseLink}>
                         <ExternalLink className="h-4 w-4" />
                       </Button>
                       {link.status === 'pendiente' && link.is_active !== false && (
