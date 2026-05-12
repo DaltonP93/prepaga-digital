@@ -330,6 +330,33 @@ SELECT
 
 ---
 
+## Protocolo de Trabajo con Múltiples Agentes (OBLIGATORIO)
+
+> Para CUALQUIER corrección o cambio no trivial, seguir el flujo de 6 fases
+> definido en [AGENTS.md](AGENTS.md#protocolo-de-trabajo--múltiples-agentes-obligatorio).
+
+**Resumen rápido**:
+
+1. **Analizar** — agente `Explore` mapea el bug e inventaria puntos afectados.
+2. **Planificar** — agente `Plan` diseña estrategia, orden, riesgos.
+3. **Desarrollar** — agente implementa.
+4. **Testear** — agente `Explore` **independiente** verifica regresiones.
+5. **Corregir** — aplicar lo que el test encontró.
+6. **Deploy** — el agente principal hace migration + commit + push (no se delega infra).
+
+**Reglas clave**:
+
+- Paralelizar agentes cuando son independientes (una sola tool call con múltiples `Agent` blocks).
+- Cada prompt de agente debe ser **autocontenido**: paths absolutos, líneas exactas, qué reportar, límite de palabras.
+- El agente de Fase 4 (Test) **NO puede ser el mismo** que hizo Fase 3 (Develop).
+- Cambios triviales (1 línea, typo, rename obvio) están exentos.
+- Fixes en **defensa en profundidad** siempre que se pueda (UI + lógica + DB constraint).
+- Datos sensibles (DB writes, migrations, push) los maneja el agente principal, no se delegan.
+
+Ver detalles completos, ejemplos y tabla de "aplica/no aplica" en [AGENTS.md](AGENTS.md).
+
+---
+
 ## Configuración de la Contratada
 
 ```

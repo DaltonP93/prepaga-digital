@@ -240,6 +240,55 @@ Variables disponibles en templates: `{{clientName}}`, `{{companyName}}`, `{{sign
 
 ---
 
+## Protocolo de Trabajo — Múltiples Agentes (OBLIGATORIO)
+
+> **Regla operativa**: Toda corrección o cambio NO TRIVIAL debe seguir este flujo
+> usando agentes especializados. No avanzar a la siguiente fase sin completar la previa.
+
+### Las 6 fases
+
+| Fase | Agente recomendado | Rol |
+|---|---|---|
+| **1. Analizar** | `Explore` o `general-purpose` | Mapear el bug en el codebase, inventariar TODOS los puntos afectados, identificar edge cases. |
+| **2. Planificar** | `Plan` | Diseñar la estrategia de fix: orden de cambios, archivos, migraciones, riesgos, rollback. |
+| **3. Desarrollar** | `general-purpose` (o el agente principal si es chico) | Implementar los cambios. |
+| **4. Testear** | `Explore` **independiente** del que desarrolló | Verificar consistencia, buscar regresiones, validar que el fix resuelve el bug raíz, no solo el síntoma. |
+| **5. Corregir** | `general-purpose` | Aplicar lo que el agente de test encontró. |
+| **6. Deploy** | Agente principal (no delegar) | Migration + commit + push + verificación post-deploy. |
+
+### Reglas
+
+1. **Paralelizar fases independientes** — ej: analizar frontend + DB schema simultáneamente en una sola tool call con múltiples agentes.
+2. **Cada agente con prompt autocontenido** — paths absolutos, líneas exactas, qué buscar, qué reportar, límite de palabras.
+3. **Nunca delegar la SÍNTESIS** — el agente principal sintetiza los hallazgos antes de pasar a la siguiente fase. Prohibido escribir prompts tipo "basado en tus hallazgos, implementá".
+4. **Verificación independiente** — el agente de Fase 4 (Test) NO puede ser el mismo que hizo Fase 3 (Develop). Evita sesgo de confirmación.
+5. **Cambios triviales (1 línea, typo, rename obvio) están exentos** — gastar agentes ahí es ruido. Ante la duda, usar agentes.
+6. **Datos sensibles los maneja el agente principal** — DB writes, migrations, `git push`, secrets. Los subagentes pueden leer/proponer, no ejecutar en infraestructura.
+7. **Siempre con red de seguridad** — los fixes deben aplicarse en defensa en profundidad cuando sea posible (UI + lógica + DB constraint), no en un solo punto.
+
+### Ejemplo de invocación correcta
+
+```
+# Fase 1: dos agentes Explore en PARALELO (una sola tool call con dos Agent blocks)
+- Agent 1: inventario de puntos donde se lee/escribe campo X en frontend
+- Agent 2: inventario de puntos donde se lee/escribe campo X en edge functions
+
+# Fase 4: agente Explore independiente verifica el commit
+- Lee archivos modificados, busca regresiones, reporta hallazgos
+```
+
+### Cuándo SÍ y cuándo NO
+
+| Aplica el protocolo | NO aplica |
+|---|---|
+| Bug en producción | Cambiar un copy/texto |
+| Refactor de >1 archivo | Renombrar una variable local |
+| Cambio de schema DB | Agregar console.log temporal |
+| Nueva edge function | Bump de versión en package.json |
+| Cambio que toca firma/PDF/WhatsApp | Formateo (prettier/eslint --fix) |
+
+---
+
 ## Contactos del Proyecto
 
 | Rol | Email |
