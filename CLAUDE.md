@@ -312,7 +312,48 @@ Al crear ventas, el sistema puede agregar al titular como beneficiario con `rela
 ## Comandos Útiles
 
 ### Restaurar generate-base-pdf (cuando Lovable la sobreescribe)
-Decirle a Claude: **"Restaurá generate-base-pdf"**
+
+**Síntoma**: Los PDFs salen sin encabezado ni zócalo.
+**Causa**: Lovable usa `displayHeaderFooter: true` en el renderer, que no soporta imágenes base64. La versión correcta de producción (v82+) usa **tabla HTML con `<thead>/<tfoot>`** y `displayHeaderFooter: false`.
+
+Hay 3 caminos para restaurarla, en orden de preferencia:
+
+#### Opción A — Pedírselo a Claude (más simple)
+Decirle: **"Restaurá generate-base-pdf"**
+
+Claude tiene el código correcto guardado en contexto y lo redespliega usando la API de Supabase MCP (`mcp__supabase__deploy_edge_function`) en ~30 segundos.
+
+#### Opción B — Supabase CLI (recomendada si Claude no está disponible)
+
+Tener el código correcto guardado localmente y desplegar con:
+
+```bash
+supabase functions deploy generate-base-pdf \
+  --project-ref ejiycfqxgtrzaysgpzmx \
+  --no-verify-jwt
+```
+
+#### Opción C — Script de restauración rápida
+
+Crear `restore-generate-pdf.sh`:
+
+```bash
+#!/bin/bash
+echo "Restaurando generate-base-pdf v82 (thead/tfoot con branding)..."
+
+supabase functions deploy generate-base-pdf \
+  --project-ref ejiycfqxgtrzaysgpzmx \
+  --no-verify-jwt \
+  --import-map ./supabase/functions/generate-base-pdf/deno.json
+
+echo "✅ Función restaurada correctamente"
+```
+
+Ejecutar: `bash restore-generate-pdf.sh`
+
+**Verificación post-restore**: generar un PDF de prueba y confirmar que el encabezado/zócalo aparecen. Si no aparecen, la versión desplegada NO es la correcta — revisar que el archivo local tenga `displayHeaderFooter: false` y `margin: 0` con tabla `thead/tfoot`.
+
+> ⚠️ **No commitear cambios a `supabase/functions/generate-base-pdf/index.ts`** después de restaurar. La fuente de verdad es la **versión desplegada**, no el archivo del repo. Si el archivo local difiere de v82+, descartar los cambios locales con `git checkout supabase/functions/generate-base-pdf/`. Restaurar ≠ modificar.
 
 ### Regenerar PDFs con branding
 ```
