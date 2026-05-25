@@ -473,13 +473,16 @@ export const useSubmitSignatureLink = () => {
 
         // Query documents to sign — filtered by role
         // IMPORTANT: always filter requires_signature = true to exclude annexes
+        // BUG FIX: Use 'neq(is_final, true)' instead of 'eq(is_final, false)'
+        // because some documents are created with is_final: null (not set),
+        // and null != false in PostgreSQL, causing them to be missed.
         let docsQuery = signatureClient
           .from('documents')
           .select('*')
           .eq('sale_id', data.sale_id)
           .neq('document_type', 'firma')
           .neq('document_type', 'anexo')
-          .eq('is_final', false)
+          .neq('is_final', true)
           .eq('requires_signature', true);
 
         if (recipientType === 'adherente' && recipientId) {

@@ -513,7 +513,20 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
             return [];
           }
 
+          // BUG FIX: Reset ALL health fields before loading each adherent's data.
+          // Without this reset, titular's health answers leak into adherents
+          // because benResponsesMap inherits from responsesMap (last saved answers).
           const benResponsesMap: Record<string, any> = { ...responsesMap };
+          for (let i = 1; i <= 7; i++) {
+            benResponsesMap[`ddjj_pregunta_${i}`] = 'No';
+          }
+          benResponsesMap['ddjj_fuma'] = 'No';
+          benResponsesMap['ddjj_vapea'] = 'No';
+          benResponsesMap['ddjj_alcohol'] = 'No';
+          benResponsesMap['ddjj_menstruacion'] = 'N/A';
+          benResponsesMap['ddjj_peso'] = '';
+          benResponsesMap['ddjj_altura'] = '';
+
           const benDetail = b.preexisting_conditions_detail || '';
           const benLines = benDetail.split('; ');
           for (const line of benLines) {
@@ -526,8 +539,11 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
               benResponsesMap['ddjj_fuma'] = habits.includes('Fuma') ? 'Sí' : 'No';
               benResponsesMap['ddjj_vapea'] = habits.includes('Vapea') ? 'Sí' : 'No';
               benResponsesMap['ddjj_alcohol'] = habits.includes('alcohólicas') ? 'Sí' : 'No';
+            } else if (line.startsWith('Última menstruación') || line.startsWith('Ultima menstruacion')) {
+              benResponsesMap['ddjj_menstruacion'] = line.split(':').slice(1).join(':').trim() || 'N/A';
             }
           }
+          // Load health questions strictly from this beneficiary's own data
           for (let i = 1; i <= 7; i++) {
             const questionPrefix = `${i}.`;
             const matchingLine = benLines.find(l => l.trim().startsWith(questionPrefix));
@@ -535,13 +551,10 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
               benResponsesMap[`ddjj_pregunta_${i}`] = matchingLine.includes(':')
                 ? 'Sí: ' + matchingLine.split(':').slice(1).join(':').trim()
                 : 'Sí';
-            } else if (!benResponsesMap[`ddjj_pregunta_${i}`]) {
-              benResponsesMap[`ddjj_pregunta_${i}`] = b.has_preexisting_conditions ? '' : 'No';
+            } else {
+              benResponsesMap[`ddjj_pregunta_${i}`] = 'No'; // never inherit from titular
             }
           }
-          if (!benResponsesMap['ddjj_fuma']) benResponsesMap['ddjj_fuma'] = 'No';
-          if (!benResponsesMap['ddjj_vapea']) benResponsesMap['ddjj_vapea'] = 'No';
-          if (!benResponsesMap['ddjj_alcohol']) benResponsesMap['ddjj_alcohol'] = 'No';
 
           return ddjiTemplates.map(async (ddjiTemplate) => {
             const beneficiaryContext = createEnhancedTemplateContext(
@@ -887,7 +900,20 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
             return [];
           }
 
+          // BUG FIX: Reset ALL health fields before loading each adherent's data.
+          // Without this reset, titular's health answers leak into adherents
+          // because benResponsesMap inherits from responsesMap (last saved answers).
           const benResponsesMap: Record<string, any> = { ...responsesMap };
+          for (let i = 1; i <= 7; i++) {
+            benResponsesMap[`ddjj_pregunta_${i}`] = 'No';
+          }
+          benResponsesMap['ddjj_fuma'] = 'No';
+          benResponsesMap['ddjj_vapea'] = 'No';
+          benResponsesMap['ddjj_alcohol'] = 'No';
+          benResponsesMap['ddjj_menstruacion'] = 'N/A';
+          benResponsesMap['ddjj_peso'] = '';
+          benResponsesMap['ddjj_altura'] = '';
+
           const benDetail = b.preexisting_conditions_detail || '';
           const benLines = benDetail.split('; ');
           for (const line of benLines) {
@@ -900,8 +926,11 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
               benResponsesMap['ddjj_fuma'] = habits.includes('Fuma') ? 'Sí' : 'No';
               benResponsesMap['ddjj_vapea'] = habits.includes('Vapea') ? 'Sí' : 'No';
               benResponsesMap['ddjj_alcohol'] = habits.includes('alcohólicas') ? 'Sí' : 'No';
+            } else if (line.startsWith('Última menstruación') || line.startsWith('Ultima menstruacion')) {
+              benResponsesMap['ddjj_menstruacion'] = line.split(':').slice(1).join(':').trim() || 'N/A';
             }
           }
+          // Load health questions strictly from this beneficiary's own data
           for (let i = 1; i <= 7; i++) {
             const questionPrefix = `${i}.`;
             const matchingLine = benLines.find(l => l.trim().startsWith(questionPrefix));
@@ -909,13 +938,10 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
               benResponsesMap[`ddjj_pregunta_${i}`] = matchingLine.includes(':')
                 ? 'Sí: ' + matchingLine.split(':').slice(1).join(':').trim()
                 : 'Sí';
-            } else if (!benResponsesMap[`ddjj_pregunta_${i}`]) {
-              benResponsesMap[`ddjj_pregunta_${i}`] = b.has_preexisting_conditions ? '' : 'No';
+            } else {
+              benResponsesMap[`ddjj_pregunta_${i}`] = 'No'; // never inherit from titular
             }
           }
-          if (!benResponsesMap['ddjj_fuma']) benResponsesMap['ddjj_fuma'] = 'No';
-          if (!benResponsesMap['ddjj_vapea']) benResponsesMap['ddjj_vapea'] = 'No';
-          if (!benResponsesMap['ddjj_alcohol']) benResponsesMap['ddjj_alcohol'] = 'No';
 
           return ddjiTpls.map(async (ddji) => {
             const benCtx = createEnhancedTemplateContext(
