@@ -316,8 +316,9 @@ Al crear ventas, el sistema puede agregar al titular como beneficiario con `rela
 
 **Fix (2 capas, defensa en profundidad)**:
 
-1. **DB** — restaurar la política aditiva (no borra nada):
+1. **DB** — restaurar las políticas aditivas (no borran nada). Hay DOS: lectura (SELECT) y edición admin (UPDATE):
 ```sql
+-- Lectura: propio + misma empresa + super_admin (arregla 406 y nombres en blanco)
 DROP POLICY IF EXISTS "profiles_select_same_company_or_admin" ON public.profiles;
 CREATE POLICY "profiles_select_same_company_or_admin"
 ON public.profiles FOR SELECT
@@ -326,7 +327,26 @@ USING (
   OR (company_id IS NOT NULL AND company_id = public.get_user_company_id(auth.uid()))
   OR public.get_user_role(auth.uid()) = 'super_admin'::app_role
 );
+
+-- Edición: admin/super_admin pueden editar/desactivar usuarios de su empresa
+-- (sin esto, useUpdateUser/useDeleteUser actualizan 0 filas EN SILENCIO).
+DROP POLICY IF EXISTS "profiles_update_admin_same_company" ON public.profiles;
+CREATE POLICY "profiles_update_admin_same_company"
+ON public.profiles FOR UPDATE
+USING (
+  user_id = auth.uid()
+  OR public.get_user_role(auth.uid()) = 'super_admin'::app_role
+  OR (public.get_user_role(auth.uid()) = 'admin'::app_role
+      AND company_id IS NOT NULL AND company_id = public.get_user_company_id(auth.uid()))
+)
+WITH CHECK (
+  user_id = auth.uid()
+  OR public.get_user_role(auth.uid()) = 'super_admin'::app_role
+  OR (public.get_user_role(auth.uid()) = 'admin'::app_role
+      AND company_id IS NOT NULL AND company_id = public.get_user_company_id(auth.uid()))
+);
 ```
+> Nota: la creación de usuarios (INSERT) la hace la edge function `create-user` con service role (bypassa RLS), por eso la política `... insert own` no rompe el alta.
 2. **Front** — leer perfiles de solo-visualización con `.maybeSingle()` (nunca `.single()`) y degradar con gracia (ya aplicado en `useSale.ts` y `useSales.ts`). Así, aunque la RLS se rompa de nuevo, la página no se queda en blanco.
 
 ---
