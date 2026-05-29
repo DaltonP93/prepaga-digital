@@ -361,6 +361,38 @@ WITH CHECK (
 > el acceso "propio" queda cubierto por `user_id = (select auth.uid())` en cada política.
 2. **Front** — leer perfiles de solo-visualización con `.maybeSingle()` (nunca `.single()`) y degradar con gracia (ya aplicado en `useSale.ts` y `useSales.ts`). Así, aunque la RLS se rompa de nuevo, la página no se queda en blanco.
 
+### 6. Warnings de performance de Supabase (`auth_rls_initplan` + `duplicate_index`)
+
+**Síntoma**: El panel de advisors de Supabase muestra cientos de warnings de performance.
+
+**Limpieza aplicada (2026-05, sin pérdida de datos, sin cambio de comportamiento)**:
+
+- **`auth_rls_initplan`** (eran 164 en ~78 tablas): toda llamada `auth.uid()` dentro de las
+  políticas RLS se envolvió en un sub-select `(select auth.uid())`. Esto hace que Postgres la
+  evalúe **una vez por query** (InitPlan) en lugar de **una vez por fila**. Es puramente de
+  performance: la lógica de acceso es idéntica (`auth.uid()` es STABLE). Se aplicó con
+  `ALTER POLICY` (no DROP/CREATE → nunca hay una ventana sin la política). Verificación:
+  `0 políticas con auth.uid() sin envolver`.
+- **`duplicate_index`** (eran 4): se eliminaron índices byte-idénticos redundantes con
+  `DROP INDEX CONCURRENTLY`, conservando el documentado de cada par
+  (`audit_comments`: se quedó `_sale_id`/`_user_id`; `document_print_versions`: se quedó
+  `idx_document_print_versions_document_id`/`_sale_id`). Cada FK conserva exactamente un índice.
+- También se envolvió `current_setting('request.headers', true)` en `(select ...)` en las 2
+  políticas públicas por token de `signature_links` (acceso anónimo del firmante intacto).
+
+**Resultado**: warnings de performance ~498 → ~326. Los 168 eliminados son 100% behavior-preserving.
+
+> **Qué NO se tocó (a propósito, son invasivos / cambian semántica)**:
+> - `unindexed_foreign_keys` (86): agregar índices es invasivo y puede no aportar nada si la FK no se filtra.
+> - `unused_index` (34): las estadísticas pueden engañar; borrar un índice puede degradar queries reales.
+> - `multiple_permissive_policies` (205): fusionar políticas cambia la lógica de seguridad → riesgo alto.
+> - `auth_db_connections_absolute` (1): informativo, no accionable por SQL.
+
+> ⚠️ Si un deploy de Lovable o una migración vuelve a dejar `auth.uid()` "desnudo" en las políticas,
+> los warnings `auth_rls_initplan` reaparecen. Re-aplicar el envoltorio con el `DO` block que recorre
+> `pg_policies` y reemplaza `auth.uid()` → `(select auth.uid())` vía `ALTER POLICY` (ejecutar por
+> `execute_sql`, NO por `apply_migration` — esa capa rompe los backslashes del regex).
+
 ---
 
 ## Comandos Útiles
