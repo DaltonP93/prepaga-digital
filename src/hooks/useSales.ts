@@ -465,7 +465,7 @@ export const useGenerateSignatureLink = () => {
           .from('profiles')
           .select('first_name, last_name, email')
           .eq('id', sale.salesperson_id)
-          .single();
+          .maybeSingle();
         salesperson = profile;
       }
 

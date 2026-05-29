@@ -20,17 +20,18 @@ export const useSale = (saleId: string) => {
 
       if (error) throw error;
 
+      // El perfil del vendedor es solo dato de visualización. Usamos maybeSingle()
+      // (no .single()) para que 0 filas devuelvan null en vez de 406 Not Acceptable,
+      // y nunca lanzamos: si no se puede leer el perfil, la venta igual debe cargar.
       const salespersonPromise = data.salesperson_id
         ? supabase
             .from('profiles')
             .select('first_name, last_name, email')
             .eq('id', data.salesperson_id)
-            .single()
+            .maybeSingle()
         : Promise.resolve({ data: null, error: null } as const);
 
-      const [{ data: salesperson, error: salespersonError }] = await Promise.all([salespersonPromise]);
-
-      if (salespersonError) throw salespersonError;
+      const [{ data: salesperson }] = await Promise.all([salespersonPromise]);
 
       return { ...data, salesperson, profiles: salesperson };
     },
