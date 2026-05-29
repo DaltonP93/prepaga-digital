@@ -281,6 +281,7 @@ Las siguientes tablas tienen `ON DELETE CASCADE` desde `sales`:
 - `auditor_sales_view` usa `security_invoker = true`
 - `sales_completed_view` filtra solo estados productivos (excluye borrador, enviado, pendiente, rechazado, cancelado)
 - Los perfiles de la misma empresa son visibles entre usuarios del mismo `company_id`
+  - Esto depende de la política `profiles_select_same_company_or_admin` en `profiles`. Si esa política desaparece (queda solo `... select own`), todo query de perfil ajeno devuelve 0 filas y rompe el front (ver Bug Conocido #5). Restaurar con el SQL del bug #5.
 - El vendedor solo puede ver/editar sus propias ventas
 
 ---
@@ -306,6 +307,27 @@ Al escribir el bloque de firma en `documents.content`, el nombre del firmante a 
 Al crear ventas, el sistema puede agregar al titular como beneficiario con `relationship = 'Titular'`, lo que genera un signature_link de adherente fantasma.
 
 **Fix**: No crear beneficiarios con `relationship = 'Titular'` — el titular ya está en `sales.client_id`.
+
+### 5. RLS de `profiles` se reduce a "solo mi perfil" → 406 y pantalla en blanco
+
+**Síntoma**: La consola se inunda de `GET /rest/v1/profiles?select=first... 406 (Not Acceptable)` y al hacer clic en "Gestionar Firma" (u otras vistas que muestran el vendedor) la página se queda igual / en blanco.
+
+**Causa**: Un deploy o migración deja en `profiles` solo la política `... select own` (`user_id = auth.uid()`). Entonces leer el perfil de **otro** usuario (ej. el vendedor de una venta ajena) devuelve 0 filas; con `.single()` PostgREST responde **406** y el query de la venta lanza, dejando `selectedSale` vacío.
+
+**Fix (2 capas, defensa en profundidad)**:
+
+1. **DB** — restaurar la política aditiva (no borra nada):
+```sql
+DROP POLICY IF EXISTS "profiles_select_same_company_or_admin" ON public.profiles;
+CREATE POLICY "profiles_select_same_company_or_admin"
+ON public.profiles FOR SELECT
+USING (
+  user_id = auth.uid()
+  OR (company_id IS NOT NULL AND company_id = public.get_user_company_id(auth.uid()))
+  OR public.get_user_role(auth.uid()) = 'super_admin'::app_role
+);
+```
+2. **Front** — leer perfiles de solo-visualización con `.maybeSingle()` (nunca `.single()`) y degradar con gracia (ya aplicado en `useSale.ts` y `useSales.ts`). Así, aunque la RLS se rompa de nuevo, la página no se queda en blanco.
 
 ---
 
