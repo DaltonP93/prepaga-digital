@@ -393,6 +393,38 @@ WITH CHECK (
 > `pg_policies` y reemplaza `auth.uid()` → `(select auth.uid())` vía `ALTER POLICY` (ejecutar por
 > `execute_sql`, NO por `apply_migration` — esa capa rompe los backslashes del regex).
 
+### 7. Firmante anónimo → `42501 permission denied for table profiles` ("Enlace no válido")
+
+**Síntoma**: Al abrir un enlace de firma válido (`/firmar/{token}`), la página muestra
+**"Enlace no válido, ha expirado o ya fue utilizado"** aunque el `signature_link` esté
+`pendiente`, `is_active=true` y NO expirado. La consola muestra
+`Error fetching sale data: {code: '42501', message: 'permission denied for table profiles'}`
+y `401` en `GET /rest/v1/sales?select=...`.
+
+**Causa (NO es por el wrap de `auth.uid()` — el form "desnudo" falla igual)**: El firmante
+público usa el rol **`anon`** (`useSignatureLinkPublic.ts`, cliente con la publishable key +
+header `x-signature-token`). La consulta de `sales` (y sus embeds `clients`, `companies`,
+`beneficiaries`, `plans`) evalúa políticas RLS `TO public` como **"Users can view company sales"**,
+cuyo `USING` referencia `profiles` con un subquery (`company_id IN (SELECT company_id FROM profiles ...)`).
+Postgres verifica el privilegio sobre `profiles` **en tiempo de plan** para cualquier política
+aplicable, y `anon` **no tenía** `GRANT SELECT` sobre `profiles` (sí lo tiene sobre `sales`,
+`clients`, etc.) → `42501`. El grant de `anon` sobre `profiles` se perdió en algún deploy/migración.
+
+**Fix (1 línea, sin cambiar lógica ni exponer datos)**:
+```sql
+GRANT SELECT ON public.profiles TO anon;
+```
+Es seguro: `profiles` tiene RLS activo y sus 3 políticas exigen `auth.uid()` (que es `NULL` para
+`anon`), por lo que **`anon` sigue viendo 0 filas de `profiles`** (verificado). El grant solo
+permite que el chequeo de permisos en tiempo de plan pase, para que el disyunto del token
+(`id = get_sale_id_from_signature_token()`) haga visible la venta. Verificación como `anon` con
+el header del token: `profiles` visibles = 0, `sales/clients/companies/beneficiaries` = 1.
+
+> ⚠️ Si la firma pública vuelve a romperse con `42501 permission denied for table profiles`,
+> re-aplicar el `GRANT SELECT ON public.profiles TO anon;`. Alternativa más quirúrgica (no aplicada):
+> scopear las políticas "company" `{public}` que referencian `profiles` a `{authenticated}` — pero
+> son muchas (sales, clients, companies, beneficiaries, documents...) y el GRANT las arregla todas.
+
 ---
 
 ## Comandos Útiles
