@@ -692,12 +692,15 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
   }
 
   // ===== STEP 2: Legacy aliases =====
+  // NOTA: titular_nombre, titular_ci, etc. usan 'contratante'.
+  // Si signer_type = 'responsable_pago' → datos del responsable.
+  // Si signer_type = 'titular'/null → datos del cliente (sin cambio).
   const legacyAliases: Record<string, string> = {
-    '{{titular_nombre}}': context.cliente.nombreCompleto,
-    '{{titular_email}}': context.cliente.email,
-    '{{titular_telefono}}': context.cliente.telefono,
-    '{{titular_ci}}': context.cliente.ci,
-    '{{titular_dni}}': context.cliente.ci,
+    '{{titular_nombre}}': context.contratante.nombreCompleto,
+    '{{titular_email}}': context.contratante.email,
+    '{{titular_telefono}}': context.contratante.telefono,
+    '{{titular_ci}}': context.contratante.ci,
+    '{{titular_dni}}': context.contratante.ci,
     '{{titular_direccion}}': context.cliente.direccion,
     '{{titular_ciudad}}': context.cliente.ciudad,
     '{{titular_provincia}}': context.cliente.provincia,
