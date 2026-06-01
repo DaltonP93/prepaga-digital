@@ -164,6 +164,19 @@ export interface EnhancedTemplateContext {
     nombre: string;
     dni: string;
   };
+  // contratante: quien firma por parte del cliente.
+  // Es el responsable de pago si signer_type = 'responsable_pago', o el titular si no.
+  contratante: {
+    nombre: string;
+    apellido: string;
+    nombreCompleto: string;
+    ci: string;
+    dni: string;
+    email: string;
+    telefono: string;
+    relacion: string;
+    esResponsable: boolean;
+  };
 }
 
 /**
@@ -444,6 +457,36 @@ export function createEnhancedTemplateContext(
       nombre: companySettings?.contratada_signer_name || company?.name || '',
       dni: companySettings?.contratada_signer_dni || '',
     },
+    // contratante: quien firma el contrato por parte del cliente.
+    // Si signer_type = 'responsable_pago', usa los datos del responsable.
+    // Si no, usa los datos del titular (cliente).
+    contratante: (() => {
+      const isResponsable = (sale as any)?.signer_type === 'responsable_pago';
+      if (isResponsable && (sale as any)?.signer_name) {
+        return {
+          nombre: (sale as any).signer_name || '',
+          apellido: '',
+          nombreCompleto: (sale as any).signer_name || '',
+          ci: (sale as any).signer_dni || '',
+          dni: (sale as any).signer_dni || '',
+          email: (sale as any).signer_email || '',
+          telefono: (sale as any).signer_phone || '',
+          relacion: (sale as any).signer_relationship || 'Responsable de Pago',
+          esResponsable: true,
+        };
+      }
+      return {
+        nombre: client?.first_name || '',
+        apellido: client?.last_name || '',
+        nombreCompleto: `${client?.first_name || ''} ${client?.last_name || ''}`.trim(),
+        ci: client?.dni || '',
+        dni: client?.dni || '',
+        email: client?.email || '',
+        telefono: client?.phone || '',
+        relacion: 'Titular',
+        esResponsable: false,
+      };
+    })(),
   };
 }
 

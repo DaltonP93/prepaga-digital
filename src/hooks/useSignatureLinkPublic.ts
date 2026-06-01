@@ -506,15 +506,26 @@ export const useSubmitSignatureLink = () => {
           let saleClientInfo: any = null;
           let saleBeneficiaries: any[] = [];
           let companySettings: any = null;
+          let saleSignerInfo: any = null; // responsable de pago si aplica
           try {
             const { data: saleInfo } = await signatureClient
               .from('sales')
-              .select('company_id, companies:company_id(name, tax_id, address, phone, email), clients:client_id(first_name, last_name, dni), beneficiaries(id, first_name, last_name, dni)')
+              .select('company_id, signer_type, signer_name, signer_dni, signer_phone, signer_email, signer_relationship, companies:company_id(name, tax_id, address, phone, email), clients:client_id(first_name, last_name, dni), beneficiaries(id, first_name, last_name, dni)')
               .eq('id', data.sale_id)
               .single();
             companyInfo = (saleInfo as any)?.companies || null;
             saleClientInfo = (saleInfo as any)?.clients || null;
             saleBeneficiaries = (saleInfo as any)?.beneficiaries || [];
+            // Si hay responsable de pago, guardarlo para usarlo en el bloque de firma
+            if ((saleInfo as any)?.signer_type === 'responsable_pago' && (saleInfo as any)?.signer_name) {
+              saleSignerInfo = {
+                nombre: (saleInfo as any).signer_name,
+                ci: (saleInfo as any).signer_dni || '',
+                email: (saleInfo as any).signer_email || '',
+                telefono: (saleInfo as any).signer_phone || '',
+                relacion: (saleInfo as any).signer_relationship || 'Responsable de Pago',
+              };
+            }
 
             // Fetch contratada signer info via SECURITY DEFINER RPC
             try {
@@ -606,6 +617,11 @@ export const useSubmitSignatureLink = () => {
                 signerName = companySettings?.contratada_signer_name || (data as any)?.recipient_name || 'Representante Legal';
                 signerCI = companySettings?.contratada_signer_dni || '';
                 roleLabel = 'CONTRATADA';
+              } else if (saleSignerInfo) {
+                // Responsable de pago firma en lugar del titular
+                signerName = saleSignerInfo.nombre;
+                signerCI = saleSignerInfo.ci;
+                roleLabel = 'CONTRATANTE';
               } else if (saleClientInfo) {
                 signerName = `${saleClientInfo.first_name || ''} ${saleClientInfo.last_name || ''}`.trim();
                 signerCI = saleClientInfo.dni || '';
