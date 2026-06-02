@@ -84,24 +84,49 @@ const SignatureWorkflow = () => {
       queryClient.invalidateQueries({ queryKey: ['signature-workflow-steps', saleId] });
     };
 
-    // Primary: realtime subscription
-    const channel = supabase
-      .channel(`sig-workflow-${saleId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'signature_links', filter: `sale_id=eq.${saleId}` }, invalidateAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'documents', filter: `sale_id=eq.${saleId}` }, invalidateAll)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sales', filter: `id=eq.${saleId}` }, invalidateAll)
-      .subscribe();
+    // Primary: realtime subscription (solo activa con la pestaña visible).
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    const startChannel = () => {
+      if (channel) return;
+      channel = supabase
+        .channel(`sig-workflow-${saleId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'signature_links', filter: `sale_id=eq.${saleId}` }, invalidateAll)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'documents', filter: `sale_id=eq.${saleId}` }, invalidateAll)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'sales', filter: `id=eq.${saleId}` }, invalidateAll)
+        .subscribe();
+    };
+    const stopChannel = () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+        channel = null;
+      }
+    };
 
-    // Fallback: polling cada 60s (el realtime de arriba es el mecanismo principal
-    // y actualiza al instante). Se omite cuando la pestaña no está visible para no
+    // Fallback: polling cada 60s (el realtime es el mecanismo principal y
+    // actualiza al instante). Se omite cuando la pestaña no está visible para no
     // generar carga ni consumir E/S de disco innecesariamente en la instancia.
     const pollInterval = setInterval(() => {
       if (document.visibilityState === 'visible') invalidateAll();
     }, 60000);
 
+    // Pausar/retomar realtime según visibilidad de la pestaña.
+    // Una pestaña en segundo plano dejaba a Realtime sondeando el WAL sin parar.
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        startChannel();
+        invalidateAll(); // refrescar al volver, por si hubo cambios mientras estaba oculta
+      } else {
+        stopChannel();
+      }
+    };
+
+    if (document.visibilityState === 'visible') startChannel();
+    document.addEventListener('visibilitychange', handleVisibility);
+
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
       clearInterval(pollInterval);
-      supabase.removeChannel(channel);
+      stopChannel();
     };
   }, [saleId, queryClient]);
 

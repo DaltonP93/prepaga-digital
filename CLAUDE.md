@@ -425,6 +425,33 @@ el header del token: `profiles` visibles = 0, `sales/clients/companies/beneficia
 > scopear las políticas "company" `{public}` que referencian `profiles` a `{authenticated}` — pero
 > son muchas (sales, clients, companies, beneficiaries, documents...) y el GRANT las arregla todas.
 
+### 8. "Disk IO Budget depleting" / CPU-RAM altas en `t4g.micro` (Realtime + polling 24/7)
+
+**Síntoma**: El panel muestra **"Project is depleting its Disk IO Budget"**, CPU/RAM ~59% y
+~48k **Database Requests/24h** con una barra **constante todo el día** (incluso de madrugada),
+aunque la actividad de negocio sea mínima.
+
+**Diagnóstico (con `pg_stat_statements`)**: La base está ocupada **~0,4%** — NO está
+sobrecargada. El mayor consumidor (≈49% del tiempo) es el **poller de Supabase Realtime
+leyendo el WAL** (`SELECT wal->>... `), que sondea sin parar **mientras haya una suscripción
+Realtime activa**. El segundo es el **polling REST** del Flujo de Firmas. El cuello de botella
+real es el **presupuesto de E/S (IOPS) del `t4g.micro`**, drenado por ese goteo constante.
+
+**Causa raíz**: `useRealTimeNotifications` (montado en `NotificationCenter`, presente en TODAS
+las páginas) abre un canal con ~17 suscripciones `postgres_changes`. Cualquier pestaña logueada
+abierta —aunque esté en segundo plano— mantenía a Realtime sondeando el WAL las 24 h.
+
+**Fix aplicado (código, sin costo, sin tocar la DB)**:
+- `useRealTimeNotifications.ts`: la suscripción Realtime ahora se **suelta cuando la pestaña
+  está oculta** (`visibilitychange`) y se retoma al volver. Es el cambio decisivo (es global).
+- `SignatureWorkflow.tsx`: idem para su canal Realtime; además el polling de respaldo bajó de
+  **10s → 60s** y se omite con la pestaña oculta.
+
+> ⚠️ Si Lovable revierte estos archivos y el warning de E/S reaparece: re-aplicar el pausado por
+> `document.visibilityState`/`visibilitychange` en ambos. Mitigación operativa inmediata: **no
+> dejar pestañas del sistema abiertas 24/7**. Si aun así persiste con uso real alto, recién ahí
+> evaluar subir de `MICRO` → `SMALL` (más IOPS base) — es lo único que cuesta dinero.
+
 ---
 
 ## Comandos Útiles

@@ -25,7 +25,9 @@ export const useRealTimeNotifications = () => {
       invalidateTimeouts.set(key, nextTimeout);
     };
 
-    const channel = supabase
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    const buildChannel = () => supabase
       .channel('realtime-all-changes')
       .on(
         'postgres_changes',
@@ -196,9 +198,35 @@ export const useRealTimeNotifications = () => {
         setIsConnected(status === 'SUBSCRIBED');
       });
 
-    return () => {
+    const startChannel = () => {
+      if (!channel) channel = buildChannel();
+    };
+    const stopChannel = () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+        channel = null;
+      }
       invalidateTimeouts.forEach((timeout) => clearTimeout(timeout));
-      supabase.removeChannel(channel);
+      invalidateTimeouts.clear();
+      setIsConnected(false);
+    };
+
+    // Mantener la suscripción Realtime SOLO mientras la pestaña está visible.
+    // Pestañas en segundo plano dejaban a Realtime sondeando el WAL las 24 h,
+    // drenando el presupuesto de E/S de disco de la instancia (sin que nadie
+    // estuviera mirando). Al volver a la pestaña, se vuelve a suscribir y las
+    // queries se refrescan solas (invalidación de react-query).
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') startChannel();
+      else stopChannel();
+    };
+
+    if (document.visibilityState === 'visible') startChannel();
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      stopChannel();
     };
   }, [queryClient, toast]);
 
