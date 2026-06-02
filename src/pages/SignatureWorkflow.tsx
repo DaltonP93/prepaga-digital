@@ -92,8 +92,12 @@ const SignatureWorkflow = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sales', filter: `id=eq.${saleId}` }, invalidateAll)
       .subscribe();
 
-    // Fallback: polling every 10 seconds
-    const pollInterval = setInterval(invalidateAll, 10000);
+    // Fallback: polling cada 60s (el realtime de arriba es el mecanismo principal
+    // y actualiza al instante). Se omite cuando la pestaña no está visible para no
+    // generar carga ni consumir E/S de disco innecesariamente en la instancia.
+    const pollInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') invalidateAll();
+    }, 60000);
 
     return () => {
       clearInterval(pollInterval);
