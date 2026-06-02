@@ -163,6 +163,34 @@ export const useUpdateClient = () => {
         .single();
 
       if (error) throw error;
+
+      // Si se actualizó el teléfono, sincronizar en signature_links pendientes.
+      // Esto soluciona el caso donde el link se crea sin teléfono y luego se agrega.
+      if (updates.phone !== undefined && data?.phone) {
+        try {
+          // Obtener las ventas del cliente
+          const { data: salesData } = await supabase
+            .from('sales')
+            .select('id')
+            .eq('client_id', id);
+
+          if (salesData && salesData.length > 0) {
+            const saleIds = salesData.map((s: any) => s.id);
+            // Actualizar recipient_phone en todos los links pendientes del titular
+            await supabase
+              .from('signature_links')
+              .update({ recipient_phone: data.phone })
+              .in('sale_id', saleIds)
+              .eq('recipient_type', 'titular')
+              .in('status', ['pendiente', 'visto'])
+              .is('recipient_phone', null); // Solo los que no tienen teléfono
+          }
+        } catch (syncError) {
+          // No bloquear la actualización del cliente si falla la sincronización
+          console.error('Error sincronizando teléfono en signature_links:', syncError);
+        }
+      }
+
       return data;
     },
     onSuccess: () => {
