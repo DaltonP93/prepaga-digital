@@ -278,7 +278,8 @@ function createBeneficiaryContext(beneficiary: any): BeneficiaryContext {
     genero: beneficiary.gender || '',
     // Alias en inglés para compatibilidad con templates que usan {{gender}} o {{sexo}}
     gender: beneficiary.gender || '',
-    sexo: beneficiary.gender || '',
+    // sexo: abreviado para la columna SEXO de la tabla de beneficiarios (M/F)
+    sexo: beneficiary.gender === 'Masculino' ? 'M' : beneficiary.gender === 'Femenino' ? 'F' : (beneficiary.gender || ''),
     estadoCivil: beneficiary.marital_status || '',
     ocupacion: beneficiary.occupation || '',
     tienePreexistencias: beneficiary.has_preexisting_conditions || false,
@@ -384,7 +385,7 @@ export function createEnhancedTemplateContext(
       edad: calculateAge(client?.birth_date),
       genero: (client as any)?.gender || '',
       gender: (client as any)?.gender || '',
-      sexo: (client as any)?.gender || '',
+      sexo: (client as any)?.gender === 'Masculino' ? 'M' : (client as any)?.gender === 'Femenino' ? 'F' : ((client as any)?.gender || ''),
     },
     plan: {
       nombre: plan?.name || '',
