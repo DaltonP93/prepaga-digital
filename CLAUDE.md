@@ -452,6 +452,30 @@ abierta —aunque esté en segundo plano— mantenía a Realtime sondeando el WA
 > dejar pestañas del sistema abiertas 24/7**. Si aun así persiste con uso real alto, recién ahí
 > evaluar subir de `MICRO` → `SMALL` (más IOPS base) — es lo único que cuesta dinero.
 
+### 9. Desarrollo local pegaba contra PRODUCCIÓN (causa real del consumo 24/7)
+
+**Síntoma**: Carga constante 24/7 en la base productiva (Realtime + polling) incluso de
+madrugada, sin usuarios reales. Causa: el **entorno local** (`npm run dev`) se conectaba a la
+base de **producción** porque `src/integrations/supabase/client.ts` tenía la URL/anon-key de
+prod **hardcodeadas** (no leía variables de entorno). Dejar el dev server local levantado =
+mandar Realtime/polling a prod sin querer.
+
+**Fix aplicado**: `client.ts` ahora lee `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY`
+con **fallback a producción** (si no hay env vars, usa prod → el build de Lovable no se afecta).
+
+**Cómo aislar dev de prod en tu máquina** (elegir UNA opción):
+- **Supabase local (recomendado, ya hay `supabase/config.toml`)**: `supabase start` levanta
+  Postgres+API locales; tomar la URL (`http://localhost:54321`) y la anon key que imprime, y
+  ponerlas en `.env.local` (ya ignorado por `*.local` en `.gitignore`).
+- **Proyecto Supabase de dev aparte (free)**: crear otro proyecto y poner sus URL/anon-key en
+  `.env.local`.
+
+`.env.local` tiene prioridad sobre `.env` en Vite, así que `npm run dev` usará la base de dev.
+Mitigación inmediata sin setup: **no dejar `npm run dev` corriendo** apuntando a prod.
+
+> ⚠️ La clave que aparece en `client.ts`/`.env` es la `anon` **pública** (protegida por RLS), no
+> es un secreto. NO poner nunca la `service_role` key en el front ni en archivos versionados.
+
 ---
 
 ## Comandos Útiles
