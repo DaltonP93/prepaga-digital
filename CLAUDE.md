@@ -460,8 +460,12 @@ base de **producción** porque `src/integrations/supabase/client.ts` tenía la U
 prod **hardcodeadas** (no leía variables de entorno). Dejar el dev server local levantado =
 mandar Realtime/polling a prod sin querer.
 
-**Fix aplicado**: `client.ts` ahora lee `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY`
-con **fallback a producción** (si no hay env vars, usa prod → el build de Lovable no se afecta).
+**Fix aplicado**: `client.ts` usa los valores de prod hardcodeados en **cualquier `vite build`**
+(producción), y SOLO en `vite dev` (`import.meta.env.DEV === true`) permite sobreescribir con
+`VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` desde `.env.local`. Así es **imposible** que
+un build de producción (Docker/Lovable, modos default/us/br) apunte a otra base por accidente.
+Verificado en el bundle (`npm run build`): solo aparece la URL de prod (ejiy) como conexión;
+`.env.local`/localhost NO se filtran al build (`.dockerignore` excluye `*.local`).
 
 **Cómo aislar dev de prod en tu máquina** (elegir UNA opción):
 - **Supabase local (recomendado, ya hay `supabase/config.toml`)**: `supabase start` levanta
