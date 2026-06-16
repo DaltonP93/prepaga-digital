@@ -267,21 +267,11 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
 
   const onSubmit = async (data: ClientFormData) => {
     try {
-      // Validación de campos de ubicación obligatorios (solo para nuevo cliente)
-      if (!isEditing) {
-        const missingFields: string[] = [];
-        if (!data.city?.trim()) missingFields.push("Ciudad");
-        if (!data.province?.trim()) missingFields.push("Departamento");
-        if (!data.address?.trim()) missingFields.push("Dirección");
-        if (!data.barrio?.trim()) missingFields.push("Barrio");
-        if (!data.latitude?.trim() || !data.longitude?.trim()) missingFields.push("Ubicación en el mapa");
-
-        if (missingFields.length > 0) {
-          setActiveTab("location");
-          toast.error(`Completá los campos de ubicación: ${missingFields.join(", ")}`);
-          return;
-        }
-      }
+      // Ubicación NO bloqueante (deshabilitado temporalmente a pedido):
+      // antes exigía Ciudad/Departamento/Dirección/Barrio/coordenadas para crear un
+      // cliente nuevo, lo que impedía cargar desde el celular sin GPS. Ahora los campos
+      // de ubicación son opcionales y NO frenan el guardado. Para re-activar la
+      // obligatoriedad, restaurar el bloque `if (!isEditing) { ...missingFields... }`.
 
       const latitude = parseCoordinate(data.latitude, -90, 90, "Latitud");
       const longitude = parseCoordinate(data.longitude, -180, 180, "Longitud");
