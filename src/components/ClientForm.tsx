@@ -383,8 +383,8 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
 
             <TabsContent value="location" className="space-y-3 pt-2">
               {!isEditing && (
-                <p className="text-xs text-destructive font-medium">
-                  Todos los campos de ubicación son obligatorios para crear un cliente.
+                <p className="text-xs text-muted-foreground">
+                  Los campos de ubicación son opcionales. Podés cargarlos si querés, pero no son obligatorios para crear el cliente.
                 </p>
               )}
               <div className="grid grid-cols-2 gap-3">
