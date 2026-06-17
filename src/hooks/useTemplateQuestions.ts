@@ -38,8 +38,9 @@ export const useTemplateQuestions = (templateId?: string) => {
       question_type: string;
       is_required: boolean;
       sort_order?: number;
+      placeholder_name?: string | null;
     }) => {
-      
+
       const { data: question, error: questionError } = await supabase
         .from('template_questions')
         .insert({
@@ -48,6 +49,7 @@ export const useTemplateQuestions = (templateId?: string) => {
           question_type: questionData.question_type,
           is_required: questionData.is_required,
           sort_order: questionData.sort_order ?? 0,
+          placeholder_name: questionData.placeholder_name || null,
         })
         .select()
         .single();
@@ -77,6 +79,7 @@ export const useTemplateQuestions = (templateId?: string) => {
         question_type: string;
         is_required: boolean;
         sort_order: number;
+        placeholder_name: string | null;
       }>;
     }) => {
       const { data, error } = await supabase

@@ -18,7 +18,20 @@ const questionSchema = z.object({
   question_text: z.string().min(1, "El texto de la pregunta es obligatorio"),
   question_type: z.enum(["yes_no", "text", "number", "select_single", "select_multiple"]),
   is_required: z.boolean().default(true),
+  // Nombre corto que se usa en el documento como {{respuestas.<placeholder_name>}}.
+  // Opcional; si se deja vacío, el placeholder usa el ID de la pregunta.
+  placeholder_name: z.string().optional(),
 });
+
+// Normaliza un placeholder a un identificador limpio (minúsculas, sin espacios ni acentos)
+const sanitizePlaceholder = (value?: string): string =>
+  (value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(new RegExp('[\\u0300-\\u036f]', 'g'), '')
+    .replace(/[^a-z0-9_]+/g, '_')
+    .replace(/^_+|_+$/g, '');
 
 const optionSchema = z.object({
   option_text: z.string().min(1, "El texto de la opción es obligatorio"),
@@ -65,6 +78,7 @@ export const QuestionBuilder = ({ templateId }: QuestionBuilderProps) => {
       question_text: "",
       question_type: "yes_no",
       is_required: true,
+      placeholder_name: "",
     },
   });
 
@@ -84,6 +98,7 @@ export const QuestionBuilder = ({ templateId }: QuestionBuilderProps) => {
         question_type: data.question_type,
         is_required: data.is_required,
         sort_order: questions.length,
+        placeholder_name: sanitizePlaceholder(data.placeholder_name) || null,
       };
 
       const createdQuestion = await createQuestion.mutateAsync(questionData);
@@ -145,7 +160,14 @@ export const QuestionBuilder = ({ templateId }: QuestionBuilderProps) => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
-                <CardTitle className="text-base">{question.question_text}</CardTitle>
+                <div>
+                  <CardTitle className="text-base">{question.question_text}</CardTitle>
+                  {(question as any).placeholder_name && (
+                    <code className="text-xs text-muted-foreground">
+                      {`{{respuestas.${(question as any).placeholder_name}}}`}
+                    </code>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="outline">{getQuestionTypeLabel(question.question_type)}</Badge>
@@ -209,6 +231,29 @@ export const QuestionBuilder = ({ templateId }: QuestionBuilderProps) => {
                       <FormControl>
                         <Textarea {...field} placeholder="Ingrese el texto de la pregunta" />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="placeholder_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nombre para el documento (placeholder)</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="ej: id_samap, fecha_parto, monto_cuota"
+                          onBlur={(e) => field.onChange(sanitizePlaceholder(e.target.value))}
+                        />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground">
+                        Se usa en el documento como{" "}
+                        <code>{`{{respuestas.${sanitizePlaceholder(form.watch("placeholder_name")) || "nombre"}}}`}</code>
+                        . Solo letras, números y guion bajo. Si lo dejás vacío, se usa el ID interno.
+                      </p>
                       <FormMessage />
                     </FormItem>
                   )}
