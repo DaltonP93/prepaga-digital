@@ -19,13 +19,22 @@ interface SalePlanFieldsTabProps {
  * que guarda en template_responses; el motor de generación ya fusiona esas respuestas
  * en el documento vía {{respuestas.<placeholder_name>}}.
  */
+// La DDJJ de salud tiene su propia pestaña dedicada (SaleDDJJTab). La excluimos de
+// "Campos del Plan" para no duplicar las preguntas de salud en ventas normales.
+const normName = (s?: string) =>
+  (s || '').toLowerCase().normalize('NFD').replace(new RegExp('[\\u0300-\\u036f]', 'g'), '');
+const isHealthDDJJ = (name?: string) => {
+  const n = normName(name);
+  return n.includes('ddjj') || (n.includes('declaracion') && n.includes('salud'));
+};
+
 const SalePlanFieldsTab: React.FC<SalePlanFieldsTabProps> = ({ saleId, disabled }) => {
   const { data: templatesWithQuestions = [], isLoading } = useQuery({
     queryKey: ['sale-plan-fields', saleId],
     queryFn: async () => {
       if (!saleId) return [] as { id: string; name: string }[];
 
-      // Templates asociados a esta venta
+      // Templates asociados a esta venta (excluyendo la DDJJ de salud)
       const { data: st, error: stErr } = await supabase
         .from('sale_templates')
         .select('template_id, templates:template_id(id, name)')
@@ -34,7 +43,7 @@ const SalePlanFieldsTab: React.FC<SalePlanFieldsTabProps> = ({ saleId, disabled 
 
       const attached = (st || [])
         .map((r: any) => ({ id: r.templates?.id || r.template_id, name: r.templates?.name || 'Template' }))
-        .filter((t: any) => !!t.id);
+        .filter((t: any) => !!t.id && !isHealthDDJJ(t.name));
       const ids = Array.from(new Set(attached.map((t) => t.id)));
       if (ids.length === 0) return [];
 

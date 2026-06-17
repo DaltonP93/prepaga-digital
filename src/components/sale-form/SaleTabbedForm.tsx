@@ -64,10 +64,21 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
       if (!sale?.id) return false;
       const { data: st, error: stErr } = await supabase
         .from('sale_templates')
-        .select('template_id')
+        .select('template_id, templates:template_id(id, name)')
         .eq('sale_id', sale.id);
       if (stErr) return false;
-      const ids = (st || []).map((r: any) => r.template_id).filter(Boolean);
+      // Excluir la DDJJ de salud (tiene su propia pestaña). Solo cuenta como
+      // "campos del plan" un template NO-DDJJ que tenga preguntas configuradas.
+      const norm = (s: string) =>
+        (s || '').toLowerCase().normalize('NFD').replace(new RegExp('[\\u0300-\\u036f]', 'g'), '');
+      const isHealthDDJJ = (name: string) => {
+        const n = norm(name);
+        return n.includes('ddjj') || (n.includes('declaracion') && n.includes('salud'));
+      };
+      const ids = (st || [])
+        .map((r: any) => ({ id: r.templates?.id || r.template_id, name: r.templates?.name || '' }))
+        .filter((t: any) => t.id && !isHealthDDJJ(t.name))
+        .map((t: any) => t.id);
       if (ids.length === 0) return false;
       const { count } = await supabase
         .from('template_questions')
