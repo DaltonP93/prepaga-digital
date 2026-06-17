@@ -23,6 +23,7 @@ import SaleAdherentsTab from './SaleAdherentsTab';
 import SaleDocumentsTab from './SaleDocumentsTab';
 import SaleDDJJTab from './SaleDDJJTab';
 import SaleTemplatesTab from './SaleTemplatesTab';
+import SalePlanFieldsTab from './SalePlanFieldsTab';
 
 interface SaleTabbedFormProps {
   sale?: any;
@@ -51,6 +52,28 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
+    },
+    enabled: !!sale?.id,
+  });
+
+  // ¿Esta venta usa algún template con campos personalizados (template_questions)?
+  // Si no, la pestaña "Campos del Plan" no se muestra → ventas normales quedan idénticas.
+  const { data: hasPlanFields = false } = useQuery({
+    queryKey: ['sale-has-plan-fields', sale?.id],
+    queryFn: async () => {
+      if (!sale?.id) return false;
+      const { data: st, error: stErr } = await supabase
+        .from('sale_templates')
+        .select('template_id')
+        .eq('sale_id', sale.id);
+      if (stErr) return false;
+      const ids = (st || []).map((r: any) => r.template_id).filter(Boolean);
+      if (ids.length === 0) return false;
+      const { count } = await supabase
+        .from('template_questions')
+        .select('id', { count: 'exact', head: true })
+        .in('template_id', ids);
+      return (count || 0) > 0;
     },
     enabled: !!sale?.id,
   });
@@ -118,7 +141,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
 
   const handleTabChange = (newTab: string) => {
     // Validate current tab before allowing navigation forward
-    const tabOrder = ['basico', 'adherentes', 'documentos', 'ddjj', 'templates', 'auditoria'];
+    const tabOrder = ['basico', 'adherentes', 'documentos', 'ddjj', 'datos_plan', 'templates', 'auditoria'];
     const currentIndex = tabOrder.indexOf(activeTab);
     const newIndex = tabOrder.indexOf(newTab);
 
@@ -440,11 +463,14 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
       <Card>
         <CardContent className="pt-6">
           <Tabs value={activeTab} onValueChange={handleTabChange}>
-            <TabsList className="grid w-full grid-cols-2 gap-1.5 h-auto sm:h-11 sm:grid-cols-5 lg:grid-cols-6">
+            <TabsList className="grid w-full grid-cols-2 gap-1.5 h-auto sm:h-11 sm:grid-cols-5 lg:grid-cols-7">
               <TabsTrigger value="basico">Básico</TabsTrigger>
               <TabsTrigger value="adherentes" disabled={!isEditing}>Adherentes</TabsTrigger>
               <TabsTrigger value="documentos" disabled={!isEditing}>Documentos</TabsTrigger>
               <TabsTrigger value="ddjj" disabled={!isEditing}>DDJJ Salud</TabsTrigger>
+              {hasPlanFields && (
+                <TabsTrigger value="datos_plan" disabled={!isEditing}>Campos del Plan</TabsTrigger>
+              )}
               <TabsTrigger value="templates" disabled={!isEditing}>Templates</TabsTrigger>
               {isEditing && isAuditorOrAbove && (
                 <TabsTrigger value="auditoria">Auditoría</TabsTrigger>
@@ -481,6 +507,12 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
               </TabsContent>
 
               </fieldset>
+
+              {hasPlanFields && (
+                <TabsContent value="datos_plan">
+                  <SalePlanFieldsTab saleId={sale?.id} disabled={isAuditLocked} />
+                </TabsContent>
+              )}
 
               <TabsContent value="templates">
                 <SaleTemplatesTab
