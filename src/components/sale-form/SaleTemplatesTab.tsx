@@ -75,6 +75,18 @@ const normalizeResponsePlaceholder = (value?: string | null): string => {
   return normalized;
 };
 
+// Formatea el valor de una respuesta para el documento. Las preguntas tipo 'date'
+// se guardan como YYYY-MM-DD (input date) y se muestran como dd/MM/yyyy, igual que
+// el resto de los contratos. Parseo por split (no new Date()) para evitar el
+// corrimiento de un día por timezone (bug conocido #1).
+const formatResponseValue = (value: any, questionType?: string | null): any => {
+  if (questionType === 'date' && typeof value === 'string') {
+    const m = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  }
+  return value;
+};
+
 const insertDocumentsWithFallback = async (documents: Record<string, any>[]) => {
   if (documents.length === 0) return;
 
@@ -314,7 +326,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           .in('id', templateIds),
         supabase
           .from('template_responses')
-          .select('*, template_questions:question_id(placeholder_name)')
+          .select('*, template_questions:question_id(placeholder_name, question_type)')
           .eq('sale_id', saleId),
         supabase
           .from('template_attachments' as any)
@@ -357,11 +369,12 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         const placeholderName = tr.template_questions?.placeholder_name;
         const normalizedPlaceholder = normalizeResponsePlaceholder(placeholderName);
         if (tr.response_value !== null && tr.response_value !== undefined) {
+          const formatted = formatResponseValue(tr.response_value, tr.template_questions?.question_type);
           if (normalizedPlaceholder) {
-            responsesMap[normalizedPlaceholder] = tr.response_value;
+            responsesMap[normalizedPlaceholder] = formatted;
           }
           if (tr.question_id) {
-            responsesMap[tr.question_id] = tr.response_value;
+            responsesMap[tr.question_id] = formatted;
           }
         }
       });
@@ -733,7 +746,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           .in('id', tplIds),
         supabase
           .from('template_responses')
-          .select('*, template_questions:question_id(placeholder_name)')
+          .select('*, template_questions:question_id(placeholder_name, question_type)')
           .eq('sale_id', saleId),
         supabase
           .from('template_attachments' as any)
@@ -764,8 +777,9 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       (templateResponses || []).forEach((tr: any) => {
         const ph = normalizeResponsePlaceholder(tr.template_questions?.placeholder_name);
         if (tr.response_value !== null && tr.response_value !== undefined) {
-          if (ph) responsesMap[ph] = tr.response_value;
-          if (tr.question_id) responsesMap[tr.question_id] = tr.response_value;
+          const formatted = formatResponseValue(tr.response_value, tr.template_questions?.question_type);
+          if (ph) responsesMap[ph] = formatted;
+          if (tr.question_id) responsesMap[tr.question_id] = formatted;
         }
       });
 
