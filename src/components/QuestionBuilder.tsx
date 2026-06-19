@@ -16,7 +16,7 @@ import { Tables } from "@/integrations/supabase/types";
 
 const questionSchema = z.object({
   question_text: z.string().min(1, "El texto de la pregunta es obligatorio"),
-  question_type: z.enum(["yes_no", "text", "number", "select_single", "select_multiple"]),
+  question_type: z.enum(["yes_no", "text", "number", "date", "select_single", "select_multiple"]),
   is_required: z.boolean().default(true),
   // Nombre corto que se usa en el documento como {{respuestas.<placeholder_name>}}.
   // Opcional; si se deja vacío, el placeholder usa el ID de la pregunta.
@@ -52,6 +52,7 @@ const questionTypes = [
   { value: "yes_no", label: "Sí/No" },
   { value: "text", label: "Texto libre" },
   { value: "number", label: "Número" },
+  { value: "date", label: "Fecha" },
   { value: "select_single", label: "Selección única" },
   { value: "select_multiple", label: "Selección múltiple" },
 ];

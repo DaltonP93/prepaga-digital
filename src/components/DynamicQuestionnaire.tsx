@@ -190,6 +190,15 @@ export const DynamicQuestionnaire = ({
             />
           )}
 
+          {question.question_type === "date" && (
+            <Input
+              type="date"
+              value={currentValue}
+              onChange={(e) => handleResponseChange(question.id, e.target.value)}
+              disabled={readOnly}
+            />
+          )}
+
           {question.question_type === "select_single" && (
             <RadioGroup
               value={currentValue}
