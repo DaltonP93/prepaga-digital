@@ -257,13 +257,17 @@ async function activateNextStep(
   // Only check if the completing link is step 1
   if (link.step_order !== 1) return false
 
-  // Check if ALL step 1 links are completed
+  // Check if ALL step 1 links are completed.
+  // Se excluyen links genéricos recipient_type='cliente' (huérfanos, sin firmante real):
+  // nunca se completan y bloqueaban la activación de la contratada. Solo titular/adherente
+  // (los firmantes reales de step 1) cuentan para el gate.
   const { data: step1Links } = await supabase
     .from('signature_links')
-    .select('id, status')
+    .select('id, status, recipient_type')
     .eq('sale_id', link.sale_id)
     .eq('step_order', 1)
     .neq('status', 'revocado')
+    .neq('recipient_type', 'cliente')
 
   if (!step1Links) return false
 

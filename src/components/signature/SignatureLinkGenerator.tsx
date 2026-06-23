@@ -314,15 +314,11 @@ export const SignatureLinkGenerator: React.FC<SignatureLinkGeneratorProps> = ({
                   className="w-24"
                 />
               </div>
-              <Button
-                variant="outline"
-                onClick={() => generateLink.mutate('cliente')}
-                disabled={generateLink.isPending}
-                size="sm"
-              >
-                <Link className="h-4 w-4 mr-2" />
-                + Enlace Cliente
-              </Button>
+              {/* Botón "+ Enlace Cliente" REMOVIDO: generaba un signature_link genérico
+                  recipient_type='cliente' (step_order=1) huérfano que quedaba 'pendiente'
+                  y bloqueaba la activación de la contratada (activateNextStep exige TODOS
+                  los step_order=1 completados). El flujo correcto usa titular/adherente/
+                  contratada generados automáticamente. */}
               {showContratadaButton && (
                 <Button
                   variant="secondary"

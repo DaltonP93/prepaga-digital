@@ -206,6 +206,10 @@ export const useSubmitSignatureLink = () => {
       } catch {
       }
 
+      // CAS (compare-and-swap) atómico: solo marca 'completado' si AÚN NO lo está.
+      // Si el titular hace doble/triple clic (o hay submits concurrentes), solo el
+      // PRIMERO obtiene la fila; los demás reciben 0 filas y se cortan abajo, evitando
+      // que se generen documentos firmados duplicados (bug de 3 contratos/DDJJ).
       const { data, error } = await signatureClient
         .from('signature_links')
         .update({
@@ -213,12 +217,20 @@ export const useSubmitSignatureLink = () => {
           completed_at: new Date().toISOString(),
         })
         .eq('id', linkId)
+        .neq('status', 'completado')
         .select('id,sale_id,recipient_type,recipient_id,status,completed_at')
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error updating signature link:', error);
         throw error;
+      }
+
+      // 0 filas → el enlace ya estaba 'completado' (otro submit ganó la carrera).
+      // Salimos sin re-generar documentos (idempotencia).
+      if (!data) {
+        console.warn('Firma ya procesada para este enlace; se omite para no duplicar documentos.');
+        return { id: linkId, alreadyCompleted: true } as any;
       }
 
       // Log workflow step
