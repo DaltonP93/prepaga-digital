@@ -219,3 +219,75 @@ b5056be fix: cargar perfil del vendedor con maybeSingle para evitar 406 y págin
 (Cambios solo-DB de la sesión —sin commit— : políticas RLS de `profiles`, wrap initplan, drop de
 índices duplicados, `GRANT SELECT ON profiles TO anon`, template Plan Materno + 5 preguntas,
 reset de contraseña de cacosta. La fuente de verdad de estos es la BASE, no el repo.)
+
+---
+
+## 6. Flujo de firma — bugs, fixes y un incidente (sesión 2026-06/07)
+
+### 6.1 Cómo funciona el flujo de firma (modelo mental para la próxima IA)
+- **Roles firmantes:** `titular`, `adherente` (uno por beneficiario con `signature_required`), `contratada`
+  (representante legal de la empresa). NO existe rol "gerente" ni "cliente" en el flujo real.
+- **Orden (`step_order`):** step 1 = titular + adherentes (en paralelo); step 2 = contratada (última).
+- **Activación de la contratada:** la edge function `finalize-signature-link` → `activateNextStep`
+  se dispara cuando un firmante completa. Exige que **TODOS** los links `step_order=1` (no revocados)
+  estén `completado`; recién ahí crea/activa el link step 2 (contratada) y le manda WhatsApp.
+- **Sellado del contrato:** el contrato SOLO se sella (PAdES) **cuando firma la contratada**
+  (`triggerPadesSigning` regenera el base PDF con el bloque de firma de la contratada y lo sella).
+  Titular/adherentes NO disparan el sellado del contrato (sí el de su DDJJ).
+- **Venta al 100%:** trigger DB `auto_advance_sale_status` (AFTER UPDATE en `signature_links`) llama a
+  `check_all_signatures_completed(sale_id)`: cuenta TODOS los `signature_links` de la venta con
+  `status != 'revocado'` y exige que el 100% esté `completado`. Si sí → `UPDATE sales SET
+  status='completado', all_signatures_completed=true, signature_completed_at=NOW()`.
+  ⚠️ **Los links `expirado` SIGUEN CONTANDO** (solo se excluyen los `revocado`): un link expirado
+  sin firmar bloquea el 100% para siempre → hay que generar uno NUEVO (no reactivar el vencido).
+
+### 6.2 Bug: contratada nunca se activa + documentos firmados duplicados (venta 2026-000114)
+- **Causa contratada bloqueada:** alguien apretó el botón **"+ Enlace Cliente"** del
+  `SignatureLinkGenerator`, que creaba un `signature_link` genérico `recipient_type='cliente'`,
+  `step_order=1`, huérfano (sin firmante), que quedaba `pendiente` para siempre → `activateNextStep`
+  nunca veía "todos step 1 completados" → contratada nunca se activaba.
+- **Causa duplicados:** el guardado de firma del titular corría 3 veces (doble/triple clic) y no era
+  idempotente → 3 contratos finales + 3 DDJJ idénticos.
+- **Remediación de esa venta (DB):** borré duplicados dejando 1 de cada, revoqué el link 'cliente',
+  y disparé `finalize-signature-link` con el token del ADHERENTE completado → activó la contratada.
+
+### 6.3 Los 3 fixes de prevención (commit `4cf2a57`)
+1. **`SignatureLinkGenerator.tsx`**: removido el botón "+ Enlace Cliente" (frontend → necesita
+   redeploy Docker).
+2. **`finalize-signature-link` (edge, DESPLEGADA v57 — viva ya)**: en `activateNextStep`, el query de
+   step 1 agrega `.neq('recipient_type', 'cliente')` → un link 'cliente' huérfano ya no bloquea.
+   El fuente TS está en `supabase/functions/finalize-signature-link/index.ts` (repo == desplegado).
+3. **`useSignatureLinkPublic.ts`**: el guardado de firma usa **CAS atómico**
+   (`.neq('status','completado')` + `.maybeSingle()`); si el link ya está `completado`, corta sin
+   re-generar documentos → no más duplicados (frontend → necesita redeploy Docker).
+
+### 6.4 ⚠️ INCIDENTE (venta 2026-000139) — aprendizaje crítico
+- **Qué pasé:** para "avisarle por WhatsApp" a la contratada (Eder Arguello), llamé
+  `finalize-signature-link` con el **token de la contratada**. ESO FUE UN ERROR: esa función, con un
+  token `contratada`, **dispara el sellado PAdES del contrato** asumiendo que ya firmó. Selló el PDF
+  con el placeholder "Pendiente firma de la empresa" en vez del bloque real de Eder.
+- **Recuperación:** `UPDATE documents SET base_pdf_url=NULL, base_pdf_hash=NULL, signed_pdf_url=NULL`
+  en el contrato final → volvió al estado "esperando firma real". Luego Eder firmó de verdad por el
+  enlace y el PDF quedó sellado correctamente (verificado: bloque `data-signer="contratada"` presente,
+  sin placeholder).
+- **REGLAS para la próxima IA (no repetir):**
+  - **NUNCA llamar `finalize-signature-link` con el token de la `contratada`** salvo que realmente
+    haya firmado — sella el contrato prematuramente. Para reenviar el link, usar el botón "Reenviar"
+    del Flujo de Firma (frontend), NO la edge function.
+  - **`send-whatsapp` NO se puede llamar con la anon key sola** → responde `401 {"error":"Invalid
+    token"}`. Requiere un JWT de usuario real O la `service_role` key (que NO se debe usar a mano).
+    Por eso el envío directo de WhatsApp desde acá no funciona; el envío correcto lo hace el sistema
+    internamente (o el usuario desde la pantalla).
+
+### 6.5 Estado de la venta 2026-000139 al cierre
+- Titular (Cornelio Martínez) ✅ firmado. Contratada (Eder Arguello) ✅ firmada (PDF correcto).
+- **Falta:** la **adherente Gladys Cabrera** (cónyuge) — su link `expirado` sin abrir (`access_count=0`).
+  Para llegar al 100% hay que **generar un enlace NUEVO** para ella (el viejo venció y no se puede
+  reactivar). Cuando firme, el trigger marca la venta `completado` automáticamente.
+
+### 6.6 Referencias útiles (IDs de esta sección)
+- Venta 2026-000114: `916b808e-be37-4123-880b-d28fce1ee961`
+- Venta 2026-000139: `25cd035f-93a1-434e-be20-b9c4dce9787a` (adherente Gladys: `83c1ca11-3019-4d51-9acb-d72c1d71bc5e`)
+- Config contratada (company_settings): `mode='link'`, Eder Arguello,
+  email `eder.arguello@sanatorioadventista.com.py`, tel `976122957`, `auto_whatsapp=true`.
+- Commit del flujo de firma: `4cf2a57`. Edge `finalize-signature-link` = **v57**. `generate-base-pdf` sigue **v82** (intacta).
