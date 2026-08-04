@@ -37,7 +37,6 @@ import { useRoutePermissions } from '@/hooks/useRoutePermissions';
 import { useMenuVisibility } from '@/hooks/useMenuConfig';
 import { useBranding } from './CompanyBrandingProvider';
 import { useState } from 'react';
-import { useCommissionSettings } from '@/hooks/useCommissions';
 
 export function AppSidebar() {
   const location = useLocation();
@@ -45,7 +44,6 @@ export function AppSidebar() {
   const { isVisible: isMenuVisible } = useMenuVisibility();
   const { logoUrl, companyName } = useBranding();
   const [logoBroken, setLogoBroken] = useState(false);
-  const commissionSettings = useCommissionSettings();
 
   // Apply base permissions first, then menu config override
   const applyMenuConfig = (items: (MainNavItem & { routeKey: string })[]) => {
@@ -126,7 +124,10 @@ export function AppSidebar() {
       title: "Comisiones",
       url: "/comisiones",
       icon: HandCoins,
-      visible: permissions.canViewCommissions && commissionSettings.data?.is_enabled === true,
+      // El acceso operativo sigue bloqueado en la página hasta que exista una
+      // configuración activa; mantener el ítem visible evita que el módulo
+      // parezca ausente mientras se completa esa configuración.
+      visible: permissions.canViewCommissions,
       routeKey: 'commissions',
     },
     {
