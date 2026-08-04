@@ -1,0 +1,52 @@
+import { spawnSync } from 'node:child_process';
+
+const US_REF = 'ykducvvcjzdpoojxlsig';
+const BR_REF = 'ejiycfqxgtrzaysgpzmx';
+const dbUrl = process.env.SUPABASE_US_DB_URL || '';
+const apply = process.argv.includes('--apply');
+
+function fail(message) {
+  console.error(`[commission-us-guard] ${message}`);
+  process.exit(1);
+}
+
+if (!dbUrl) fail('SUPABASE_US_DB_URL is required.');
+if (dbUrl.includes(BR_REF)) fail('Safety stop: the URL references BR production.');
+
+let parsed;
+try {
+  parsed = new URL(dbUrl);
+} catch {
+  fail('SUPABASE_US_DB_URL is not a valid URL.');
+}
+if (!['postgres:', 'postgresql:'].includes(parsed.protocol)) {
+  fail('Only postgres:// or postgresql:// URLs are accepted.');
+}
+const username = decodeURIComponent(parsed.username);
+const isDirect = parsed.hostname === `db.${US_REF}.supabase.co` && username === 'postgres';
+const isPooler = parsed.hostname.endsWith('.pooler.supabase.com') && username === `postgres.${US_REF}`;
+if (!isDirect && !isPooler) {
+  fail(`Safety stop: DSN host/user do not identify US test ${US_REF}.`);
+}
+
+const runner = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+const baseArgs = ['--yes', 'supabase@2.111.0', 'db', 'push', '--db-url', dbUrl];
+
+console.log(`[commission-us-guard] Target verified: US test ${US_REF}.`);
+console.log('[commission-us-guard] Running mandatory dry-run...');
+const dryRun = spawnSync(runner, [...baseArgs, '--dry-run'], { stdio: 'inherit', shell: false });
+if (dryRun.status !== 0) fail('Dry-run failed; no migration was applied.');
+
+if (!apply) {
+  console.log('[commission-us-guard] Dry-run complete. Use --apply only after reviewing it.');
+  process.exit(0);
+}
+
+if (process.env.CONFIRM_SUPABASE_US !== US_REF) {
+  fail(`Set CONFIRM_SUPABASE_US=${US_REF} to authorize the apply step.`);
+}
+
+console.log('[commission-us-guard] Applying migrations to US test...');
+const result = spawnSync(runner, baseArgs, { stdio: 'inherit', shell: false });
+if (result.status !== 0) fail('Migration failed.');
+console.log('[commission-us-guard] Migration completed on US test.');

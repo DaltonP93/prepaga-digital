@@ -15,6 +15,7 @@ import {
   BarChart3,
   Settings,
   AlertCircle,
+  HandCoins,
 } from "lucide-react";
 
 import {
@@ -36,6 +37,7 @@ import { useRoutePermissions } from '@/hooks/useRoutePermissions';
 import { useMenuVisibility } from '@/hooks/useMenuConfig';
 import { useBranding } from './CompanyBrandingProvider';
 import { useState } from 'react';
+import { useCommissionSettings } from '@/hooks/useCommissions';
 
 export function AppSidebar() {
   const location = useLocation();
@@ -43,6 +45,7 @@ export function AppSidebar() {
   const { isVisible: isMenuVisible } = useMenuVisibility();
   const { logoUrl, companyName } = useBranding();
   const [logoBroken, setLogoBroken] = useState(false);
+  const commissionSettings = useCommissionSettings();
 
   // Apply base permissions first, then menu config override
   const applyMenuConfig = (items: (MainNavItem & { routeKey: string })[]) => {
@@ -118,6 +121,13 @@ export function AppSidebar() {
       icon: BarChart3,
       visible: permissions.canViewAnalytics,
       routeKey: 'analytics',
+    },
+    {
+      title: "Comisiones",
+      url: "/comisiones",
+      icon: HandCoins,
+      visible: permissions.canViewCommissions && commissionSettings.data?.is_enabled === true,
+      routeKey: 'commissions',
     },
     {
       title: "Incidencias",

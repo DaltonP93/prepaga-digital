@@ -11,6 +11,9 @@
     "build:us": "vite build --mode us",
     "build:br": "vite build --mode br",
     "build:dev": "vite build --mode development",
+    "commission:db:dry-run:us": "node scripts/commission-us-guard.mjs",
+    "commission:db:push:us": "node scripts/commission-us-guard.mjs --apply",
+    "commission:function:deploy:us": "npx supabase@2.111.0 functions deploy generate-commission-pdf --project-ref ykducvvcjzdpoojxlsig --no-verify-jwt",
     "lint": "eslint .",
     "preview": "vite preview"
   },
