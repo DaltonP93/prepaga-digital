@@ -54,6 +54,23 @@ export const useCommissionSettings = () => {
   });
 };
 
+export const useSaveCommissionSettings = () => {
+  const { profile } = useSimpleAuthContext();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Pick<CommissionSettings, 'accrual_event' | 'liquidation_prefix' | 'is_enabled'>) => {
+      if (!profile?.company_id) throw new Error('No se encontró la empresa del usuario.');
+      const prefix = input.liquidation_prefix.trim();
+      if (!prefix) throw new Error('El prefijo de liquidación es obligatorio.');
+      const { data, error } = await commissionFrom('commission_settings').upsert({ company_id: profile.company_id, accrual_event: input.accrual_event, liquidation_prefix: prefix, is_enabled: input.is_enabled } as never, { onConflict: 'company_id' }).select().single();
+      if (error) throw error;
+      return data as unknown as CommissionSettings;
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.settings(profile?.company_id) }); toast.success('Configuración de comisiones guardada'); },
+    onError: (error) => toast.error(messageOf(error)),
+  });
+};
+
 export const useCommissionCatalog = () => {
   const { profile } = useSimpleAuthContext();
   const companyId = profile?.company_id;

@@ -147,7 +147,7 @@ const App = () => {
                   <Route path="signature-workflow" element={<SignatureWorkflow />} />
                   <Route path="signature-workflow/:saleId" element={<SignatureWorkflow />} />
                   <Route path="analytics" element={<Analytics />} />
-                  <Route path="comisiones" element={<RoleProtectedRoute allowedRoles={['super_admin', 'admin', 'financiero', 'supervisor', 'auditor', 'vendedor']}><Commissions /></RoleProtectedRoute>} />
+                  <Route path="comisiones" element={<RoleProtectedRoute allowedRoles={['super_admin', 'admin', 'financiero', 'supervisor', 'auditor']}><Commissions /></RoleProtectedRoute>} />
                   <Route path="comisiones/:id" element={<RoleProtectedRoute allowedRoles={['super_admin', 'admin', 'financiero', 'supervisor', 'auditor', 'vendedor']}><CommissionPeriodDetail /></RoleProtectedRoute>} />
                   <Route path="incidents" element={<Incidents />} />
                   <Route path="incidents/new" element={<IncidentNew />} />
