@@ -186,7 +186,7 @@ const SignatureWorkflow = () => {
       if (!selectedSaleCompanyId) return null;
       const { data, error } = await supabase
         .from('company_settings')
-        .select('contratada_signature_mode, contratada_signer_name, contratada_signer_email, contratada_signer_dni, contratada_signer_phone')
+        .select('contratada_signature_mode, contratada_signer_name, contratada_signer_email, contratada_signer_dni, contratada_signer_phone, pdf_header_image_url, pdf_footer_image_url')
         .eq('company_id', selectedSaleCompanyId)
         .maybeSingle();
       if (error) return null;
@@ -317,29 +317,78 @@ const SignatureWorkflow = () => {
     }
   };
 
-  const handleDownloadContent = (doc: any) => {
-    if (!doc?.content) return;
+  const handleDownloadContent = async (doc: any) => {
+    if (!doc) return;
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+    const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    const session = (await supabase.auth.getSession()).data.session;
+    const authHeaders = {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${session?.access_token || SUPABASE_KEY}`,
+    };
+
+    // Tier 1: PDF firmado / versión impresa con branding (ya generado en la base)
+    if (doc.signed_pdf_url) {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/get-document-download-url`, {
+          method: 'POST', headers: authHeaders,
+          body: JSON.stringify({ document_id: doc.id, kind: 'signed' }),
+        });
+        const result = await res.json();
+        if (result.url) { window.open(result.url, '_blank'); return; }
+      } catch {}
+    }
+
+    // Tier 2: PDF base con branding (generado aunque todavía no esté firmado)
+    if (doc.base_pdf_url) {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/get-document-download-url`, {
+          method: 'POST', headers: authHeaders,
+          body: JSON.stringify({ document_id: doc.id, kind: 'base' }),
+        });
+        const result = await res.json();
+        if (result.url) { window.open(result.url, '_blank'); return; }
+      } catch {}
+    }
+
+    // Tier 3: último recurso — contenido HTML crudo, con branding armado en el momento
+    if (!doc.content) return;
+    const headerImg = (companySettings as any)?.pdf_header_image_url || '';
+    const footerImg = (companySettings as any)?.pdf_footer_image_url || '';
     const htmlContent = `<!doctype html>
 <html lang="es">
-<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>${doc.name}</title>
+<head><meta charset="utf-8" /><title>${doc.name}</title>
 <style>
-  @page { size: A4; margin: 20mm; }
-  body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 12px; line-height: 1.6; color: #333; margin: 0; padding: 20px; }
-  img { max-width: 280px; }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-  @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+  @media print { @page { size: A4; margin: 0; } }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 12px; line-height: 1.6; color: #333; background: #fff; }
+  table.print-shell { width: 100%; border-collapse: collapse; border-spacing: 0; table-layout: fixed; }
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+  .header-cell { padding: 0; height: 22mm; vertical-align: middle; overflow: hidden; }
+  .header-cell img { max-width: 100%; max-height: 20mm; height: auto; object-fit: contain; display: block; margin: 0 auto; }
+  .footer-cell { padding: 0; height: 14mm; vertical-align: middle; overflow: hidden; }
+  .footer-cell img { max-width: 100%; max-height: 12mm; height: auto; object-fit: contain; display: block; margin: 0 auto; }
+  .content-cell { padding: 5mm 20mm; vertical-align: top; }
+  .content-cell img { max-width: 280px; }
+  .content-cell table { width: 100%; border-collapse: collapse; }
+  .content-cell th, .content-cell td { border: 1px solid #ddd; padding: 8px; text-align: left; }
 </style>
 </head>
-<body>${DOMPurify.sanitize(doc.content || '', { FORCE_BODY: true })}</body>
+<body>
+  <table class="print-shell">
+    <thead><tr><th class="header-cell">${headerImg ? `<img src="${headerImg}" alt="Encabezado" />` : ''}</th></tr></thead>
+    <tfoot><tr><td class="footer-cell">${footerImg ? `<img src="${footerImg}" alt="Pie" />` : ''}</td></tr></tfoot>
+    <tbody><tr><td class="content-cell">${DOMPurify.sanitize(doc.content || '', { FORCE_BODY: true })}</td></tr></tbody>
+  </table>
+</body>
 </html>`;
     const printWindow = window.open('', '_blank');
     if (printWindow) {
       printWindow.document.write(htmlContent);
       printWindow.document.close();
-      printWindow.onload = () => {
-        printWindow.print();
-      };
+      printWindow.onload = () => { printWindow.print(); };
     }
   };
 
@@ -436,7 +485,7 @@ const SignatureWorkflow = () => {
       if (doc.file_url) {
         await openDocumentFile(doc.file_url);
       } else if (doc.content) {
-        handleDownloadContent(doc);
+        await handleDownloadContent(doc);
       }
     }
   };
@@ -1153,7 +1202,7 @@ const SignatureWorkflow = () => {
                               if (doc.file_url) {
                                 await openDocumentFile(doc.file_url);
                               } else {
-                                handleDownloadContent(doc);
+                                await handleDownloadContent(doc);
                               }
                             }}
                           >

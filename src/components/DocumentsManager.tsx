@@ -45,7 +45,7 @@ export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) =>
     queryFn: async () => {
       const { data, error } = await supabase
         .from('documents')
-        .select('id, name, document_type, created_at, file_url, content, is_final, signed_pdf_url, status, beneficiary_id')
+        .select('id, name, document_type, created_at, file_url, content, is_final, signed_pdf_url, base_pdf_url, status, beneficiary_id')
         .eq('sale_id', saleId)
         .neq('document_type', 'firma')
         .order('created_at', { ascending: false });
@@ -154,44 +154,60 @@ export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) =>
       <!DOCTYPE html>
       <html><head><meta charset="utf-8"><title>${title}</title>
       <style>
-        @page { size: A4; margin: 28mm 15mm 25mm 15mm; }
-        body { font-family: Arial, sans-serif; font-size: 12px; margin: 0; padding: 0; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-        table { width: 100%; border-collapse: collapse; }
-        td, th { border: 1px solid #ccc; padding: 6px 8px; font-size: 11px; }
-        h1,h2,h3 { margin: 8px 0; }
-        .page-header { position: fixed; top: -28mm; left: 0; right: 0; height: 24mm; display: flex; align-items: center; justify-content: center; padding: 2mm 0; }
-        .page-header img { max-width: 100%; max-height: 22mm; height: auto; object-fit: contain; }
-        .page-footer { position: fixed; bottom: -22mm; left: 0; right: 0; height: 18mm; display: flex; align-items: center; justify-content: center; }
-        .page-footer img { max-width: 100%; max-height: 16mm; height: auto; object-fit: contain; }
+        @media print { @page { size: A4; margin: 0; } }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { font-family: Arial, sans-serif; font-size: 12px; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        table.print-shell { width: 100%; border-collapse: collapse; border-spacing: 0; table-layout: fixed; }
+        thead { display: table-header-group; }
+        tfoot { display: table-footer-group; }
+        .header-cell { padding: 0; height: 24mm; vertical-align: middle; overflow: hidden; }
+        .header-cell img { max-width: 100%; max-height: 22mm; height: auto; object-fit: contain; display: block; margin: 0 auto; }
+        .footer-cell { padding: 0; height: 16mm; vertical-align: middle; overflow: hidden; }
+        .footer-cell img { max-width: 100%; max-height: 14mm; height: auto; object-fit: contain; display: block; margin: 0 auto; }
+        .content-cell { padding: 5mm 15mm; vertical-align: top; }
+        .content-cell table { width: 100%; border-collapse: collapse; }
+        .content-cell td, .content-cell th { border: 1px solid #ccc; padding: 6px 8px; font-size: 11px; }
+        .content-cell h1,h2,h3 { margin: 8px 0; }
       </style></head>
       <body>
-        ${headerImg ? `<div class="page-header"><img src="${headerImg}" alt="Header" /></div>` : ''}
-        ${footerImg ? `<div class="page-footer"><img src="${footerImg}" alt="Footer" /></div>` : ''}
-        ${htmlContent}
+        <table class="print-shell">
+          <thead><tr><th class="header-cell">${headerImg ? `<img src="${headerImg}" alt="Header" />` : ''}</th></tr></thead>
+          <tfoot><tr><td class="footer-cell">${footerImg ? `<img src="${footerImg}" alt="Footer" />` : ''}</td></tr></tfoot>
+          <tbody><tr><td class="content-cell">${htmlContent}</td></tr></tbody>
+        </table>
       </body></html>
     `);
     printWindow.document.close();
   };
 
-  const handleDownload = async (document: { id: string; file_url: string | null; name: string; content?: string | null; signed_pdf_url?: string | null; document_type?: string | null }) => {
-    // Tier 1: signed PDF via edge function
+  const handleDownload = async (document: { id: string; file_url: string | null; name: string; content?: string | null; signed_pdf_url?: string | null; base_pdf_url?: string | null; document_type?: string | null }) => {
+    // Tier 1: PDF firmado (o versión impresa con branding) vía edge function
     if (document.signed_pdf_url) {
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData?.session?.access_token;
-        if (token) {
-          const res = await supabase.functions.invoke('get-document-download-url', {
-            body: { document_id: document.id, kind: 'signed' },
-          });
-          if (res.data?.url) {
-            window.open(res.data.url, '_blank', 'noopener,noreferrer');
-            return;
-          }
+        const res = await supabase.functions.invoke('get-document-download-url', {
+          body: { document_id: document.id, kind: 'signed' },
+        });
+        if (res.data?.url) {
+          window.open(res.data.url, '_blank', 'noopener,noreferrer');
+          return;
         }
       } catch {}
     }
 
-    // Tier 2: file_url from storage
+    // Tier 2: PDF base con branding (aunque todavía no esté firmado)
+    if (document.base_pdf_url) {
+      try {
+        const res = await supabase.functions.invoke('get-document-download-url', {
+          body: { document_id: document.id, kind: 'base' },
+        });
+        if (res.data?.url) {
+          window.open(res.data.url, '_blank', 'noopener,noreferrer');
+          return;
+        }
+      } catch {}
+    }
+
+    // Tier 3: file_url from storage
     if (document.file_url) {
       const { data, error } = await supabase.storage
         .from('documents')
@@ -202,7 +218,7 @@ export const DocumentsManager: React.FC<DocumentsManagerProps> = ({ saleId }) =>
       }
     }
 
-    // Tier 3: HTML content (skip firma docs — su content es JSON, no HTML)
+    // Tier 4: HTML content (skip firma docs — su content es JSON, no HTML)
     if (document.content && document.document_type !== 'firma') {
       openHtmlContentWindow(document.content, document.name);
       return;
