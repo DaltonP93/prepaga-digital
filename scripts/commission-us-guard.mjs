@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
+import { resolve4 } from 'node:dns/promises';
 
 const US_REF = 'ykducvvcjzdpoojxlsig';
 const BR_REF = 'ejiycfqxgtrzaysgpzmx';
@@ -50,6 +51,22 @@ function resolveNpx() {
   const npxCli = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npx-cli.js');
   if (existsSync(npxCli)) return { command: process.execPath, prefix: [npxCli] };
   return { command: 'npx.cmd', prefix: [] };
+}
+
+// Supabase publica db.<ref>.supabase.co solo con registro AAAA (IPv6). Desde una
+// red IPv4 la conexion directa falla con un getaddrinfo ENOTFOUND que no explica
+// nada. Se detecta antes de invocar al CLI y se indica la salida concreta.
+if (isDirect) {
+  try {
+    await resolve4(parsed.hostname);
+  } catch {
+    fail(
+      `${parsed.hostname} no tiene registro IPv4 (Supabase lo publica solo por IPv6).\n` +
+        '  Usa la cadena del Session pooler (puerto 5432), que si resuelve por IPv4:\n' +
+        `  postgresql://postgres.${US_REF}:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres\n` +
+        '  Dashboard > proyecto > Connect > Session pooler.',
+    );
+  }
 }
 
 const { command: runner, prefix } = resolveNpx();
