@@ -16,7 +16,7 @@
 -- 1) Tipo de promotor. El código '86' replica el "Tip Prom 86" del reporte
 --    legado. Agregá más filas si manejás varias categorías de promotor.
 INSERT INTO public.commission_promoter_types (company_id, code, name, default_percent, is_active)
-SELECT DISTINCT p.company_id, '86', 'Promotor', NULL, true
+SELECT DISTINCT p.company_id, '86', 'Promotor', NULL::numeric, true
 FROM public.plans p
 WHERE p.is_active
 ON CONFLICT (company_id, code) DO NOTHING;
