@@ -36,3 +36,9 @@ CLAUDE.md
 .mcp.json
 AGENTS.md
 nul
+# Artefactos generados por graphify (se regeneran con `graphify update .`)
+graphify-out/
+
+# Config local de otros asistentes de IA
+.codex/
+.opencode/
