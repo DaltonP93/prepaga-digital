@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 import type {
   CommissionItem,
   CommissionPeriod,
@@ -16,11 +17,16 @@ import type {
   CommissionSalespersonConfig,
 } from '@/types/commissions';
 
-// Temporary typed boundary until the generated Supabase types include commission_*.
-// The cast changes TypeScript's table-name union only; payloads/results remain explicitly typed below.
-const commissionFrom = (table: string) => supabase.from(table as 'plans');
-const commissionRpc = async <T>(name: string, args: Record<string, unknown>): Promise<T> => {
-  const { data, error } = await supabase.rpc(name as 'get_user_company_id', args as never);
+// Los tipos generados ya incluyen las tablas y RPC commission_*, asi que estos
+// helpers son solo azucar sintactico: el nombre de tabla/funcion se infiere como
+// literal y TypeScript valida las columnas de verdad. Antes se casteaba a 'plans'
+// y a 'get_user_company_id', lo que ocultaba errores reales de columnas.
+type CommissionTable = Extract<keyof Database['public']['Tables'], `commission_${string}`>;
+type CommissionRpc = Extract<keyof Database['public']['Functions'], `commission_${string}`>;
+
+const commissionFrom = <T extends CommissionTable>(table: T) => supabase.from(table);
+const commissionRpc = async <T>(name: CommissionRpc, args: Record<string, unknown>): Promise<T> => {
+  const { data, error } = await supabase.rpc(name, args as never);
   if (error) throw error;
   return data as unknown as T;
 };
