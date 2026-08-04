@@ -145,35 +145,34 @@ const SignatureView = () => {
       <html lang="es">
       <head>
         <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>${doc.name}</title>
         <style>
-          @page { size: A4; margin: 28mm 15mm 25mm 15mm; }
-          body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 12px; line-height: 1.6; color: #333; margin: 0; padding: 0; }
-          img { max-width: 280px; }
-          table { width: 100%; border-collapse: collapse; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-          .page-header {
-            position: fixed; top: -28mm; left: 0; right: 0; height: 24mm;
-            display: flex; align-items: center; justify-content: center; padding: 2mm 0;
-          }
-          .page-header img { max-width: 100%; max-height: 22mm; height: auto; object-fit: contain; }
-          .page-footer {
-            position: fixed; bottom: -22mm; left: 0; right: 0; height: 18mm;
-            display: flex; align-items: center; justify-content: center;
-          }
-          .page-footer img { max-width: 100%; max-height: 16mm; height: auto; object-fit: contain; }
-          @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+          @media print { @page { size: A4; margin: 0; } }
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          html, body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 12px; line-height: 1.6; color: #333; background: #fff; }
+          table.print-shell { width: 100%; border-collapse: collapse; border-spacing: 0; table-layout: fixed; }
+          thead { display: table-header-group; }
+          tfoot { display: table-footer-group; }
+          .header-cell { padding: 0; height: 22mm; vertical-align: middle; overflow: hidden; }
+          .header-cell img { max-width: 100%; max-height: 20mm; height: auto; object-fit: contain; display: block; margin: 0 auto; }
+          .footer-cell { padding: 0; height: 14mm; vertical-align: middle; overflow: hidden; }
+          .footer-cell img { max-width: 100%; max-height: 12mm; height: auto; object-fit: contain; display: block; margin: 0 auto; }
+          .content-cell { padding: 5mm 20mm; vertical-align: top; }
+          .content-cell img { max-width: 280px; }
+          .content-cell table { width: 100%; border-collapse: collapse; }
+          .content-cell th, .content-cell td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         </style>
       </head>
       <body>
-        <div class="page-header">
-          ${headerImg ? `<img src="${headerImg}" alt="${companyName}" />` : logoUrl ? `<img src="${logoUrl}" alt="${companyName}" />` : `<span style="font-weight:700;font-size:18px;">${companyName}</span>`}
-        </div>
-        <div class="page-footer">
-          ${footerImg ? `<img src="${footerImg}" alt="${companyName}" />` : `<span style="font-size:8px;color:#777;">${companyName} ${(comp as any)?.phone ? '| ' + (comp as any).phone : ''} ${(comp as any)?.email ? '| ' + (comp as any).email : ''}</span>`}
-        </div>
-        ${DOMPurify.sanitize(doc.content || '', { FORCE_BODY: true })}
+        <table class="print-shell">
+          <thead><tr><th class="header-cell">
+            ${headerImg ? `<img src="${headerImg}" alt="${companyName}" />` : logoUrl ? `<img src="${logoUrl}" alt="${companyName}" />` : `<div style="display:flex;align-items:center;justify-content:center;height:22mm;font-weight:700;font-size:18px;">${companyName}</div>`}
+          </th></tr></thead>
+          <tfoot><tr><td class="footer-cell">
+            ${footerImg ? `<img src="${footerImg}" alt="${companyName}" />` : `<div style="display:flex;align-items:center;justify-content:center;height:14mm;font-size:8px;color:#777;">${companyName} ${(comp as any)?.phone ? '| ' + (comp as any).phone : ''} ${(comp as any)?.email ? '| ' + (comp as any).email : ''}</div>`}
+          </td></tr></tfoot>
+          <tbody><tr><td class="content-cell">${DOMPurify.sanitize(doc.content || '', { FORCE_BODY: true })}</td></tr></tbody>
+        </table>
       </body>
       </html>
     `;
