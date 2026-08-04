@@ -8,7 +8,7 @@
     "dev:us": "vite --mode us",
     "dev:br": "vite --mode br",
     "build": "vite build",
-    "build:us": "vite build --mode us",
+    "build:us": "vite build --mode us && node scripts/verify-us-bundle.mjs",
     "build:br": "vite build --mode br",
     "build:dev": "vite build --mode development",
     "commission:db:dry-run:us": "node scripts/commission-us-guard.mjs",
