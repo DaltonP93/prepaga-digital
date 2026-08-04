@@ -3,28 +3,21 @@
 -- NO es una migración: son datos, no esquema. Por eso vive en seeds/ y no en
 -- migrations/ — si estuviera en migrations/ se aplicaría sola en producción.
 --
--- Motivo: commission_calculate_sale exige dos configuraciones que hoy NO tienen
--- pantalla en la app (sólo se leen, nunca se escriben):
---   - commission_promoter_types  -> sin fila: error 'salesperson_not_configured'
---   - commission_plan_settings   -> sin fila: error 'plan_not_configured'
--- Mientras no exista esa UI, se cargan por SQL.
+-- Motivo: commission_calculate_sale exige el mapeo de cada plan a
+-- INDIVIDUAL/GRUPAL (commission_plan_settings) y esa tabla todavía no tiene
+-- pantalla en la app: useCommissions.ts sólo hace SELECT sobre ella. Sin la
+-- fila, el cálculo devuelve 'plan_not_configured'.
+--
+-- Habilitar vendedores SÍ tiene UI (pestaña Reglas > "Habilitar vendedor").
 --
 -- Es idempotente: se puede correr varias veces sin duplicar nada.
 -- El company_id se deriva de los planes existentes, para no depender de un UUID
 -- hardcodeado que podría no coincidir en test.
 
--- 1) Tipo de promotor. El código '86' replica el "Tip Prom 86" del reporte
---    legado. Agregá más filas si manejás varias categorías de promotor.
-INSERT INTO public.commission_promoter_types (company_id, code, name, default_percent, is_active)
-SELECT DISTINCT p.company_id, '86', 'Promotor', NULL::numeric, true
-FROM public.plans p
-WHERE p.is_active
-ON CONFLICT (company_id, code) DO NOTHING;
-
--- 2) Mapeo plan -> INDIVIDUAL / GRUPAL, para todos los planes activos.
---    Se siembra todo como INDIVIDUAL: los planes actuales (Alfa, Beta, Kids,
---    Senior, Seven, Alfa Ambulatorio) son productos individuales. Si alguno es
---    grupal (empresarial/corporativo), cambialo con el UPDATE de más abajo.
+-- Mapeo plan -> INDIVIDUAL / GRUPAL, para todos los planes activos.
+-- Se siembra todo como INDIVIDUAL: los planes actuales (Alfa, Beta, Kids,
+-- Senior, Seven, Alfa Ambulatorio) son productos individuales. Si alguno es
+-- grupal (empresarial/corporativo), cambialo con el UPDATE de más abajo.
 INSERT INTO public.commission_plan_settings (company_id, plan_id, group_type, is_active)
 SELECT p.company_id, p.id, 'INDIVIDUAL', true
 FROM public.plans p
@@ -37,10 +30,8 @@ ON CONFLICT (company_id, plan_id) DO NOTHING;
 --   FROM public.plans p
 --  WHERE p.id = ps.plan_id AND p.name ILIKE '%empresarial%';
 
--- 3) Verificación: qué quedó configurado y qué falta.
-SELECT 'tipos de promotor' AS item, count(*)::text AS valor FROM public.commission_promoter_types
-UNION ALL
-SELECT 'planes mapeados', count(*)::text FROM public.commission_plan_settings
+-- Verificación: qué quedó configurado y qué falta.
+SELECT 'planes mapeados' AS item, count(*)::text AS valor FROM public.commission_plan_settings
 UNION ALL
 SELECT 'planes activos sin mapear', count(*)::text
   FROM public.plans p

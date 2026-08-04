@@ -8,8 +8,6 @@ export interface CommissionPeriodPdf {
   total_amount: number;
   currency_code: string;
   salesperson_name: string;
-  promoter_type_code: string | null;
-  promoter_type_name: string | null;
 }
 
 export interface CommissionItemPdf {
@@ -115,7 +113,6 @@ export function buildCommissionHtml(
   <tbody><tr><td class="content-cell">
     <div class="meta">
       <div><strong>Promotor</strong>${escapeHtml(period.salesperson_name)}</div>
-      <div><strong>Tip Prom</strong>${escapeHtml(period.promoter_type_code ?? "—")} ${escapeHtml(period.promoter_type_name ?? "")}</div>
       <div><strong>N° Liquidación</strong>${escapeHtml(period.liquidation_number)}</div>
       <div><strong>Período</strong>${formatDateOnly(period.period_start)} al ${formatDateOnly(period.period_end)}</div>
       <div><strong>Concepto</strong>${escapeHtml(period.concept)}</div>

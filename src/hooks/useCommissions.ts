@@ -10,7 +10,6 @@ import type {
   CommissionPreviewItem,
   CommissionPreviewParams,
   CommissionProfileOption,
-  CommissionPromoterType,
   CommissionRule,
   CommissionRuleInput,
   CommissionSettings,
@@ -84,18 +83,16 @@ export const useCommissionCatalog = () => {
     queryKey: queryKeys.catalog(companyId),
     enabled: Boolean(companyId),
     queryFn: async () => {
-      const [salespeople, plans, promoterTypes, planSettings] = await Promise.all([
+      const [salespeople, plans, planSettings] = await Promise.all([
         commissionRpc<CommissionSalespersonConfig[]>('commission_list_salespeople', { p_company_id: companyId! }),
         supabase.from('plans').select('id,name').eq('company_id', companyId!).eq('is_active', true).order('name'),
-        commissionFrom('commission_promoter_types').select('*').eq('company_id', companyId!).eq('is_active', true).order('name'),
         commissionFrom('commission_plan_settings').select('*,plans:plan_id(id,name)').eq('company_id', companyId!).eq('is_active', true),
       ]);
-      const error = plans.error || promoterTypes.error || planSettings.error;
+      const error = plans.error || planSettings.error;
       if (error) throw error;
       return {
         profiles: salespeople.map(({ salesperson_id, display_name, email }) => ({ id: salesperson_id, display_name, email })) as CommissionProfileOption[],
         plans: (plans.data || []) as Array<{ id: string; name: string }>,
-        promoterTypes: (promoterTypes.data || []) as unknown as CommissionPromoterType[],
         planSettings: (planSettings.data || []) as unknown as CommissionPlanSetting[],
       };
     },
@@ -111,7 +108,7 @@ export const useCommissionRules = () => {
     queryFn: async (): Promise<CommissionRule[]> => {
       const { data, error } = await commissionFrom('commission_rules').select(`
         *, salesperson:salesperson_id(id,first_name,last_name),
-        promoter_type:promoter_type_id(id,code,name), plan:plan_id(id,name)
+        plan:plan_id(id,name)
       `).eq('company_id', companyId!).order('priority', { ascending: false }).order('valid_from', { ascending: false });
       if (error) throw error;
       return (data || []) as unknown as CommissionRule[];
@@ -133,7 +130,7 @@ export const useSaveCommissionSalesperson = () => {
   const { profile } = useSimpleAuthContext();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { salesperson_id: string; promoter_type_id: string; is_active: boolean }) => {
+    mutationFn: async (input: { salesperson_id: string; is_active: boolean }) => {
       if (!profile?.company_id) throw new Error('Empresa no disponible');
       const { data, error } = await commissionFrom('commission_salespeople').upsert({ ...input, company_id: profile.company_id } as never, { onConflict: 'company_id,salesperson_id' }).select().single();
       if (error) throw error;

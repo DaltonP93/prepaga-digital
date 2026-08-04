@@ -7,7 +7,7 @@ DECLARE v_missing text;
 BEGIN
   SELECT string_agg(expected.name, ', ' ORDER BY expected.name) INTO v_missing
   FROM (VALUES
-    ('commission_promoter_types'), ('commission_salespeople'), ('commission_plan_settings'),
+    ('commission_salespeople'), ('commission_plan_settings'),
     ('commission_rules'), ('commission_settings'), ('commission_periods'), ('commission_items')
   ) expected(name)
   WHERE to_regclass('public.' || expected.name) IS NULL;
@@ -86,7 +86,7 @@ DO $$
 DECLARE v_table text;
 BEGIN
   FOREACH v_table IN ARRAY ARRAY[
-    'commission_promoter_types', 'commission_salespeople', 'commission_plan_settings',
+    'commission_salespeople', 'commission_plan_settings',
     'commission_rules', 'commission_settings', 'commission_periods', 'commission_items'
   ] LOOP
     IF has_table_privilege('anon', 'public.' || v_table, 'SELECT')

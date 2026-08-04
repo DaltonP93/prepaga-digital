@@ -13,15 +13,6 @@ export interface CommissionSettings {
   updated_at?: string;
 }
 
-export interface CommissionPromoterType {
-  id: string;
-  company_id: string;
-  code: string;
-  name: string;
-  default_percent: number | null;
-  is_active: boolean;
-}
-
 export interface CommissionPlanSetting {
   id: string;
   company_id: string;
@@ -35,7 +26,6 @@ export interface CommissionRule {
   id: string;
   company_id: string;
   salesperson_id: string | null;
-  promoter_type_id: string | null;
   plan_id: string | null;
   sale_type: string | null;
   group_type: CommissionGroupType | null;
@@ -52,11 +42,10 @@ export interface CommissionRule {
   created_at?: string;
   updated_at?: string;
   salesperson?: { id: string; first_name: string | null; last_name: string | null } | null;
-  promoter_type?: Pick<CommissionPromoterType, 'id' | 'code' | 'name'> | null;
   plan?: { id: string; name: string } | null;
 }
 
-export type CommissionRuleInput = Omit<CommissionRule, 'id' | 'specificity' | 'created_by' | 'created_at' | 'updated_at' | 'salesperson' | 'promoter_type' | 'plan'>;
+export type CommissionRuleInput = Omit<CommissionRule, 'id' | 'specificity' | 'created_by' | 'created_at' | 'updated_at' | 'salesperson' | 'plan'>;
 
 export interface CommissionPeriod {
   id: string;
@@ -138,9 +127,6 @@ export interface CommissionSalespersonConfig {
   salesperson_id: string;
   display_name: string;
   email: string | null;
-  promoter_type_id: string | null;
-  promoter_type_code: string | null;
-  promoter_type_name: string | null;
   is_active: boolean;
 }
 

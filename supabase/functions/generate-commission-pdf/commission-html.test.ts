@@ -39,8 +39,6 @@ Deno.test("builds multipage-safe HTML with repeated branding shell", () => {
     total_amount: 864150,
     currency_code: "PYG",
     salesperson_name: "Vendedor Test",
-    promoter_type_code: "86",
-    promoter_type_name: "Promotor",
   }, items, {
     company_name: "SAMAP Test",
     company_address: null,

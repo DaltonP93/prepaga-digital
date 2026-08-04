@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
 
     const { data: period, error: periodError } = await admin
       .from("commission_periods")
-      .select("id, company_id, salesperson_id, liquidation_number, period_start, period_end, status, concept, total_amount, currency_code, salesperson_name, promoter_type_code, promoter_type_name")
+      .select("id, company_id, salesperson_id, liquidation_number, period_start, period_end, status, concept, total_amount, currency_code, salesperson_name")
       .eq("id", periodId)
       .maybeSingle();
     if (periodError) return json(500, { error: "Could not load commission period" });

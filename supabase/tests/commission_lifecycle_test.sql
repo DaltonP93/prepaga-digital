@@ -11,7 +11,6 @@ DECLARE
   v_sale_id uuid;
   v_plan_id uuid;
   v_sale_date date;
-  v_promoter_type_id uuid;
   v_plan_rule_id uuid;
   v_salesperson_rule_id uuid;
   v_resolved_rule_id uuid;
@@ -50,7 +49,6 @@ BEGIN
       SELECT 1 FROM public.commission_rules cr WHERE cr.company_id = s.company_id
     )
     AND NOT EXISTS (
-      SELECT 1 FROM public.commission_promoter_types pt
       WHERE pt.company_id = s.company_id AND pt.code = 'TEST-ROLLBACK'
     )
     AND NOT EXISTS (
@@ -91,13 +89,10 @@ BEGIN
     next_liquidation_number = EXCLUDED.next_liquidation_number,
     is_enabled = EXCLUDED.is_enabled;
 
-  INSERT INTO public.commission_promoter_types (company_id, code, name, is_active)
-  VALUES (v_company_id, 'TEST-ROLLBACK', 'Test rollback', true)
-  RETURNING id INTO v_promoter_type_id;
 
   INSERT INTO public.commission_salespeople (
-    company_id, salesperson_id, promoter_type_id, is_active
-  ) VALUES (v_company_id, v_salesperson_id, v_promoter_type_id, true);
+    company_id, salesperson_id, is_active
+  ) VALUES (v_company_id, v_salesperson_id, true);
 
   INSERT INTO public.commission_plan_settings (company_id, plan_id, group_type, is_active)
   VALUES (v_company_id, v_plan_id, 'INDIVIDUAL', true);

@@ -21,7 +21,7 @@ const todayLocal = () => {
   return `${year}-${month}-${day}`;
 };
 const emptyRule = (): Partial<CommissionRule> => ({
-  salesperson_id: null, promoter_type_id: null, plan_id: null, sale_type: null, group_type: null,
+  salesperson_id: null, plan_id: null, sale_type: null, group_type: null,
   calc_mode: 'percent', percent: 0, fixed_amount: null, base: 'sale_total_amount',
   valid_from: todayLocal(), valid_to: null, priority: 0, is_active: true,
 });
@@ -45,8 +45,7 @@ export function CommissionRulesPanel({ canManage }: { canManage: boolean }) {
   const submit = () => {
     if (!draft.valid_from || !draft.calc_mode || !draft.base) return;
     save.mutate({
-      id: draft.id, company_id: draft.company_id || '', salesperson_id: draft.salesperson_id || null,
-      promoter_type_id: draft.promoter_type_id || null, plan_id: draft.plan_id || null,
+      id: draft.id, company_id: draft.company_id || '', salesperson_id: draft.salesperson_id || null, plan_id: draft.plan_id || null,
       sale_type: draft.sale_type || null, group_type: draft.group_type || null,
       calc_mode: draft.calc_mode, percent: draft.calc_mode === 'percent' ? Number(draft.percent || 0) : null,
       fixed_amount: draft.calc_mode === 'fixed' ? Number(draft.fixed_amount || 0) : null,
@@ -65,7 +64,7 @@ export function CommissionRulesPanel({ canManage }: { canManage: boolean }) {
         <TableHeader><TableRow><TableHead>Alcance</TableHead><TableHead>Cálculo</TableHead><TableHead>Vigencia</TableHead><TableHead>Prioridad</TableHead><TableHead>Estado</TableHead>{canManage && <TableHead />}</TableRow></TableHeader>
         <TableBody>
           {(rules.data || []).map((rule) => <TableRow key={rule.id} className={!rule.is_active ? 'opacity-50' : ''}>
-            <TableCell className="min-w-52"><div className="font-medium">{rule.plan?.name || rule.group_type || 'Todos los planes'}</div><div className="text-xs text-muted-foreground">{rule.salesperson ? commissionPersonName(rule.salesperson) : 'Todos los vendedores'} · {rule.promoter_type?.name || 'Todo tipo'}</div></TableCell>
+            <TableCell className="min-w-52"><div className="font-medium">{rule.plan?.name || rule.group_type || 'Todos los planes'}</div><div className="text-xs text-muted-foreground">{rule.salesperson ? commissionPersonName(rule.salesperson) : 'Todos los vendedores'} · {rule.sale_type || 'Todo tipo de venta'}</div></TableCell>
             <TableCell>{rule.calc_mode === 'percent' ? `${rule.percent ?? 0}%` : `${Number(rule.fixed_amount || 0).toLocaleString('es-PY')} fijo`}<div className="text-xs text-muted-foreground">Base: {rule.base}</div></TableCell>
             <TableCell>{rule.valid_from}<div className="text-xs text-muted-foreground">hasta {rule.valid_to || 'sin límite'}</div></TableCell>
             <TableCell>{rule.priority}</TableCell><TableCell>{rule.is_active ? 'Activa' : 'Inactiva'}</TableCell>
@@ -79,7 +78,6 @@ export function CommissionRulesPanel({ canManage }: { canManage: boolean }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Vendedor"><Select value={draft.salesperson_id || ALL} onValueChange={(v) => set('salesperson_id', v === ALL ? null : v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todos</SelectItem>{catalog.data?.profiles.map((p) => <SelectItem key={p.id} value={p.id}>{commissionPersonName(p)}</SelectItem>)}</SelectContent></Select></Field>
         <Field label="Plan"><Select value={draft.plan_id || ALL} onValueChange={(v) => set('plan_id', v === ALL ? null : v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todos</SelectItem>{catalog.data?.plans.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></Field>
-        <Field label="Tipo promotor"><Select value={draft.promoter_type_id || ALL} onValueChange={(v) => set('promoter_type_id', v === ALL ? null : v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todos</SelectItem>{catalog.data?.promoterTypes.map((p) => <SelectItem key={p.id} value={p.id}>{p.code} · {p.name}</SelectItem>)}</SelectContent></Select></Field>
         <Field label="Tipo de grupo"><Select value={draft.group_type || ALL} onValueChange={(v) => set('group_type', v === ALL ? null : v as CommissionGroupType)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todos</SelectItem><SelectItem value="INDIVIDUAL">Individual</SelectItem><SelectItem value="GRUPAL">Grupal</SelectItem></SelectContent></Select></Field>
         <Field label="Modo"><Select value={draft.calc_mode} onValueChange={(v) => set('calc_mode', v as CommissionCalcMode)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="percent">Porcentaje</SelectItem><SelectItem value="fixed">Monto fijo</SelectItem></SelectContent></Select></Field>
         <Field label={draft.calc_mode === 'percent' ? 'Porcentaje' : 'Monto fijo'}><Input type="number" min="0" step="0.01" value={draft.calc_mode === 'percent' ? draft.percent ?? '' : draft.fixed_amount ?? ''} onChange={(e) => draft.calc_mode === 'percent' ? set('percent', Number(e.target.value)) : set('fixed_amount', Number(e.target.value))} /></Field>
