@@ -40,7 +40,15 @@ export function CommissionPreview() {
         <div className="flex items-end"><Button className="w-full" variant="outline" disabled={!salespersonId || !periodStart || !periodEnd || invalidRange} onClick={() => setRequested(true)}><Calculator className="mr-2 h-4 w-4" />Calcular</Button></div>
       </div>
       {invalidRange && <p className="text-sm text-destructive">La fecha desde no puede ser posterior a la fecha hasta.</p>}
-      {requested && missing.length > 0 && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Hay {missing.length} venta(s) sin regla</AlertTitle><AlertDescription>Configure las reglas indicadas antes de generar la liquidación. No se asignará 0% automáticamente.</AlertDescription></Alert>}
+      {requested && missing.length > 0 && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Hay {missing.length} venta(s) sin regla</AlertTitle><AlertDescription className="space-y-2">
+        <p>Configure las reglas indicadas antes de generar la liquidación. No se asignará 0% automáticamente.</p>
+        <p className="text-xs">Causas frecuentes:</p>
+        <ul className="ml-4 list-disc space-y-1 text-xs">
+          <li><strong>La regla es posterior a la venta.</strong> «Válida desde» arranca en la fecha de hoy, así que una regla creada hoy no alcanza ventas de meses anteriores. Retrocedé esa fecha hasta antes de la venta más vieja del período.</li>
+          <li><strong>La regla está atada a otro vendedor o a otro plan.</strong> Poné «Todos» en el campo que corresponda.</li>
+          <li><strong>No hay regla de respaldo.</strong> Creá una con Plan = «Todos» y el porcentaje por defecto: se usa solo cuando el plan de la venta no tiene una regla propia.</li>
+        </ul>
+      </AlertDescription></Alert>}
       {requested && preview.isError && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>No se pudo calcular</AlertTitle><AlertDescription>{preview.error instanceof Error ? preview.error.message : 'Revise la configuración e intente nuevamente.'}</AlertDescription></Alert>}
       {requested && preview.data && <>
         <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Cliente</TableHead><TableHead>Plan</TableHead><TableHead>Regla</TableHead><TableHead className="text-right">Base</TableHead><TableHead className="text-right">Comisión</TableHead></TableRow></TableHeader><TableBody>

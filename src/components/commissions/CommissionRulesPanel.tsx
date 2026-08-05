@@ -76,15 +76,15 @@ export function CommissionRulesPanel({ canManage }: { canManage: boolean }) {
     </CardContent>
     <Dialog open={open} onOpenChange={setOpen}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>{draft.id ? 'Editar regla' : 'Nueva regla'}</DialogTitle></DialogHeader>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Vendedor"><Select value={draft.salesperson_id || ALL} onValueChange={(v) => set('salesperson_id', v === ALL ? null : v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todos</SelectItem>{catalog.data?.profiles.map((p) => <SelectItem key={p.id} value={p.id}>{commissionPersonName(p)}</SelectItem>)}</SelectContent></Select></Field>
-        <Field label="Plan"><Select value={draft.plan_id || ALL} onValueChange={(v) => set('plan_id', v === ALL ? null : v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todos</SelectItem>{catalog.data?.plans.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></Field>
+        <Field label="Vendedor" hint="«Todos» hace que la regla valga para cualquier vendedor."><Select value={draft.salesperson_id || ALL} onValueChange={(v) => set('salesperson_id', v === ALL ? null : v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todos</SelectItem>{catalog.data?.profiles.map((p) => <SelectItem key={p.id} value={p.id}>{commissionPersonName(p)}</SelectItem>)}</SelectContent></Select></Field>
+        <Field label="Plan" hint="«Todos» crea una regla de respaldo: se aplica solo cuando el plan de la venta no tiene una regla propia."><Select value={draft.plan_id || ALL} onValueChange={(v) => set('plan_id', v === ALL ? null : v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todos</SelectItem>{catalog.data?.plans.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></Field>
         <Field label="Tipo de grupo"><Select value={draft.group_type || ALL} onValueChange={(v) => set('group_type', v === ALL ? null : v as CommissionGroupType)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todos</SelectItem><SelectItem value="INDIVIDUAL">Individual</SelectItem><SelectItem value="GRUPAL">Grupal</SelectItem></SelectContent></Select></Field>
         <Field label="Modo"><Select value={draft.calc_mode} onValueChange={(v) => set('calc_mode', v as CommissionCalcMode)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="percent">Porcentaje</SelectItem><SelectItem value="fixed">Monto fijo</SelectItem></SelectContent></Select></Field>
         <Field label={draft.calc_mode === 'percent' ? 'Porcentaje' : 'Monto fijo'}><Input type="number" min="0" step="0.01" value={draft.calc_mode === 'percent' ? draft.percent ?? '' : draft.fixed_amount ?? ''} onChange={(e) => draft.calc_mode === 'percent' ? set('percent', Number(e.target.value)) : set('fixed_amount', Number(e.target.value))} /></Field>
         <Field label="Base"><Select value={draft.base} onValueChange={(v) => set('base', v as CommissionBase)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="sale_total_amount">Total de venta</SelectItem><SelectItem value="plan_price">Precio del plan</SelectItem><SelectItem value="per_adherent">Por adherente</SelectItem></SelectContent></Select></Field>
-        <Field label="Prioridad"><Input type="number" value={draft.priority ?? 0} onChange={(e) => set('priority', Number(e.target.value))} /></Field>
-        <Field label="Válida desde"><Input type="date" value={draft.valid_from || ''} onChange={(e) => set('valid_from', e.target.value)} /></Field>
-        <Field label="Válida hasta"><Input type="date" value={draft.valid_to || ''} onChange={(e) => set('valid_to', e.target.value || null)} /></Field>
+        <Field label="Prioridad" hint="Desempate manual: el número más alto gana. Dejalo igual en todas salvo que quieras que una regla general pise a una específica."><Input type="number" value={draft.priority ?? 0} onChange={(e) => set('priority', Number(e.target.value))} /></Field>
+        <Field label="Válida desde" hint="La regla NO alcanza ventas anteriores a esta fecha. Para liquidar meses pasados, retrocedela hasta antes de la venta más vieja."><Input type="date" value={draft.valid_from || ''} onChange={(e) => set('valid_from', e.target.value)} /></Field>
+        <Field label="Válida hasta" hint="Vacío = sin vencimiento."><Input type="date" value={draft.valid_to || ''} onChange={(e) => set('valid_to', e.target.value || null)} /></Field>
         <Field label="Tipo de venta (opcional)"><Input value={draft.sale_type || ''} onChange={(e) => set('sale_type', e.target.value || null)} placeholder="venta_nueva" /></Field>
         <div className="flex items-center gap-3 pt-7"><Switch checked={draft.is_active ?? true} onCheckedChange={(v) => set('is_active', v)} /><Label>Regla activa</Label></div>
       </div>
@@ -93,6 +93,6 @@ export function CommissionRulesPanel({ canManage }: { canManage: boolean }) {
   </Card>;
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="space-y-2"><Label>{label}</Label>{children}</div>;
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return <div className="space-y-2"><Label>{label}</Label>{children}{hint && <p className="text-xs text-muted-foreground">{hint}</p>}</div>;
 }
