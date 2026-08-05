@@ -4,6 +4,7 @@ import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import type {
+  CommissionBase,
   CommissionItem,
   CommissionPeriod,
   CommissionPlanSetting,
@@ -130,7 +131,7 @@ export const useSaveCommissionSalesperson = () => {
   const { profile } = useSimpleAuthContext();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { salesperson_id: string; is_active: boolean }) => {
+    mutationFn: async (input: { salesperson_id: string; is_active: boolean; default_percent?: number | null; default_base?: CommissionBase }) => {
       if (!profile?.company_id) throw new Error('Empresa no disponible');
       const { data, error } = await commissionFrom('commission_salespeople').upsert({ ...input, company_id: profile.company_id } as never, { onConflict: 'company_id,salesperson_id' }).select().single();
       if (error) throw error;
@@ -189,7 +190,7 @@ export const useCommissionPreview = (params: CommissionPreviewParams | null) => 
       p_from: params!.periodStart,
       p_to: params!.periodEnd,
     });
-    return rows.map((row) => ({ ...row, has_rule: !row.error_code && Boolean(row.rule_id) }));
+    return rows.map((row) => ({ ...row, has_rule: !row.error_code }));
   },
 });
 

@@ -128,6 +128,8 @@ export interface CommissionSalespersonConfig {
   display_name: string;
   email: string | null;
   is_active: boolean;
+  default_percent: number | null;
+  default_base: CommissionBase;
 }
 
 export const commissionPersonName = (profile?: CommissionProfileOption | null) =>
