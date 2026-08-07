@@ -340,12 +340,9 @@ export const useSubmitSignatureLink = () => {
               .eq('is_final', true)
               .is('beneficiary_id', null)
               .eq('document_type', 'contrato')
-              .order('created_at', { ascending: false })
-              .limit(1);
+              .order('created_at', { ascending: false });
 
             if (titularFinalDocs && titularFinalDocs.length > 0) {
-              const titularDoc = titularFinalDocs[0];
-              let finalContent = titularDoc.content || '';
               const nowIso = new Date().toISOString();
               const safeSignedAt = new Date().toLocaleString('es-PY');
 
@@ -394,6 +391,12 @@ export const useSubmitSignatureLink = () => {
                   </div>
                 `;
               }
+
+              // Fusionar la firma de la contratada en CADA contrato final de la venta.
+              // Antes se tomaba solo el más reciente (.limit(1)); con más de un documento
+              // tipo "contrato" (ej. Contrato de prestación + Plan Materno) uno quedaba sin firmar.
+              for (const titularDoc of titularFinalDocs) {
+              let finalContent = titularDoc.content || '';
 
               // Replace "Pendiente firma de la empresa" placeholder with actual contratada signature
               // Use a robust parser approach instead of regex (nested divs break lazy regex)
@@ -444,6 +447,7 @@ export const useSubmitSignatureLink = () => {
                   signature_data: signatureData,
                 } as any)
                 .eq('id', titularDoc.id);
+              } // fin del loop sobre los contratos finales
 
               // Update original doc status
               await signatureClient
