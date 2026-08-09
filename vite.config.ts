@@ -2,6 +2,20 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import fs from "fs";
+import { execSync } from "child_process";
+
+// Datos de trazabilidad del build. Si no hay git disponible (ej. el build dentro
+// de Docker, donde .dockerignore excluye .git) se degrada a 'unknown' sin romper.
+const readGitInfo = () => {
+  const run = (cmd: string) => {
+    try {
+      return execSync(cmd, { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+    } catch {
+      return "unknown";
+    }
+  };
+  return { commit: run("git rev-parse --short HEAD"), branch: run("git rev-parse --abbrev-ref HEAD") };
+};
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -33,10 +47,18 @@ export default defineConfig(({ mode }) => ({
           fs.writeFileSync(swPath, updated);
         }
 
-        // Genera build-version.json para que el cliente detecte updates
+        // Genera build-version.json para que el cliente detecte updates y para
+        // saber QUÉ commit está desplegado en cada entorno (prod y test).
+        const git = readGitInfo();
         fs.writeFileSync(
           path.resolve(__dirname, 'dist/build-version.json'),
-          JSON.stringify({ version: buildVersion, buildAt }, null, 2)
+          JSON.stringify({
+            version: buildVersion,
+            buildAt,
+            commit: git.commit,
+            branch: git.branch,
+            mode,
+          }, null, 2)
         );
       },
     },

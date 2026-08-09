@@ -11,6 +11,7 @@
     "build:us": "vite build --mode us",
     "build:br": "vite build --mode br",
     "build:dev": "vite build --mode development",
+    "deploy:test": "bash scripts/deploy-test.sh",
     "lint": "eslint .",
     "preview": "vite preview"
   },
