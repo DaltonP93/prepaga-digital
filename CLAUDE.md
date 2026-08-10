@@ -580,6 +580,61 @@ contratada_signature_mode: link
 contratada_signer_phone: 976122957
 ```
 
+## Módulo de Comisiones (solo en US test — NO está en producción)
+
+> Estado al 2026-08-04: desplegado **únicamente** en `ykducvvcjzdpoojxlsig` (US test).
+> En BR producción las tablas **no existen**. Plan y runbook completos en
+> [docs/PLAN-COMISIONES.md](docs/PLAN-COMISIONES.md) y
+> [docs/runbooks/commission-us-test.md](docs/runbooks/commission-us-test.md).
+
+### Tablas
+
+| Tabla | Descripción |
+|---|---|
+| `commission_settings` | Config por empresa: `is_enabled`, `accrual_event`, prefijo y secuencia de liquidación |
+| `commission_salespeople` | Vendedores habilitados + `default_percent` / `default_base` de respaldo |
+| `commission_plan_settings` | Mapeo plan → `INDIVIDUAL` / `GRUPAL`. **Sin UI todavía**: se carga por SQL |
+| `commission_rules` | Matriz de reglas: vendedor, plan, tipo de venta, tipo de grupo |
+| `commission_periods` | Liquidaciones |
+| `commission_items` | Ítems liquidados, con snapshot inmutable |
+
+### Reglas del módulo que NO hay que romper
+
+- **`commission_items.sale_id` es `ON DELETE RESTRICT`**, a diferencia de todo lo
+  demás que cascadea desde `sales`. Borrar una venta no puede borrar un ítem ya
+  liquidado: es dato contable.
+- **`commission_periods` y `commission_items` sólo se mutan vía RPC.** Un trigger
+  (`commission_require_rpc_mutation`) rechaza cualquier INSERT/UPDATE/DELETE
+  directo que no venga de las funciones del módulo.
+- **Nunca se asume 0%.** Sin regla aplicable y sin `default_percent`, el cálculo
+  devuelve `no_rule` y bloquea la generación del período.
+- **Resolución de reglas**: `priority DESC`, luego especificidad, luego
+  `valid_from DESC`, luego `id`. Determinista, sin empates al azar.
+- **Redondeo** según `company_currency_settings.decimal_places`, default **0**
+  (guaraníes enteros).
+- `rule_snapshot.source` distingue `'rule'` de `'salesperson_default'`.
+
+### Deploy — nunca a producción por accidente
+
+`supabase/config.toml` apunta a **BR producción**, así que cualquier `db push` o
+`functions deploy` sin `--project-ref` va a prod. Usar siempre los scripts:
+
+```bash
+npm.cmd run commission:db:dry-run:us
+npm.cmd run commission:db:push:us
+npm.cmd run commission:function:deploy:us
+```
+
+El wrapper `scripts/commission-us-guard.mjs` rechaza el ref de BR, exige
+`CONFIRM_SUPABASE_US` y siempre corre un dry-run antes de aplicar.
+
+> Notas de entorno Windows, aprendidas a golpes:
+> - En PowerShell usar **`npm.cmd`/`npx.cmd`**: los `.ps1` están bloqueados por ExecutionPolicy.
+> - `SUPABASE_US_DB_URL` debe ser la del **Session pooler** (puerto 5432). La conexión
+>   directa `db.<ref>.supabase.co` sólo tiene registro IPv6 y no resuelve desde IPv4.
+> - Al regenerar `types.ts` usar `| Out-File -Encoding utf8`; el `>` de PowerShell 5.1
+>   escribe UTF-16LE y rompe el archivo.
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.

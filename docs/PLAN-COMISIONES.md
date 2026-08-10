@@ -1,10 +1,77 @@
 # Plan — Módulo de Liquidación de Comisiones
 
-> **Estado**: propuesta, sin código escrito. Documento vivo.
-> **Fecha**: 2026-08-03
-> **Rama propuesta**: `feat/liquidacion-comisiones`
+> **Estado**: **implementado y desplegado en US test.** Producción sin tocar.
+> **Fecha del plan**: 2026-08-03 · **Última actualización**: 2026-08-04
+> **Rama**: `feat/liquidacion-comisiones`
 > **Entorno de desarrollo**: Supabase **US test** (`ykducvvcjzdpoojxlsig`)
 > **Destino final**: Supabase **BR producción** (`ejiycfqxgtrzaysgpzmx`) — ver §9
+
+---
+
+## 0. Estado de implementación (2026-08-04)
+
+Las secciones 1-9 son el plan original. Esta sección registra **qué se construyó
+de verdad** y en qué se apartó del plan. Ante una diferencia, manda esta sección.
+
+### Desplegado en US test
+
+7 tablas `commission_*`, 15 funciones RPC, políticas RLS por rol y la edge
+function `generate-commission-pdf`. Verificado el 2026-08-04: en test las tablas
+responden **401** (existen, sin acceso anónimo) y en **producción 404** (no
+existen). El frontend de pruebas corre en http://194.26.100.138:9292 apuntando a
+US test.
+
+### Tres desvíos del plan original
+
+**1. El "tipo de promotor" se eliminó por completo.** El plan lo proponía como
+dimensión de la matriz (§4.1.1, §4.1.3) tomándolo del reporte legado
+("Tip Prom 86"). Decisión de negocio: en SAMAP **el promotor es el vendedor**, la
+categoría no representa nada. Se borró la tabla y las columnas en
+`commission_salespeople`, `commission_rules` y `commission_periods`, más el
+bloque "Tip Prom" del PDF. La matriz quedó en **cuatro** dimensiones: vendedor,
+plan, tipo de venta y tipo de grupo.
+
+**2. Porcentaje por defecto por vendedor.** No estaba en el plan. Cuando ninguna
+regla cubre una venta, se aplica `commission_salespeople.default_percent` sobre
+`default_base`. **La regla siempre manda**; el defecto es sólo respaldo. Sin
+porcentaje cargado se sigue devolviendo `no_rule` y la liquidación queda
+bloqueada — nunca se asume 0% en silencio. El ítem guarda
+`rule_snapshot.source = 'salesperson_default'` para poder auditarlo.
+
+**3. Redondeo a los decimales de la moneda.** El cálculo redondeaba a 2 decimales
+aunque el guaraní es entero, así que los ítems impresos no sumaban el total
+impreso. Ahora usa `company_currency_settings.decimal_places` con **default 0**.
+
+### Preguntas de §5, resueltas
+
+- **Base del cálculo**: parametrizable por regla. En la práctica hay que usar
+  *Monto total de la venta*, porque **4 de los 6 planes tienen `price = 0`**.
+- **"Sec"**: sigue sin significado confirmado. Se persiste `NULL` a propósito, en
+  vez de inventarle un sentido.
+- **"Tip Prom"**: eliminado, ver desvío 1.
+- **Promotores externos**: no aplica; todos son vendedores del sistema.
+
+### Bugs encontrados y corregidos durante la puesta en marcha
+
+| Síntoma | Causa real |
+|---|---|
+| HTTP 400 en `list_salespeople`, selector de vendedor vacío | `profiles.email` es `varchar` y el `RETURNS TABLE` lo declaraba `text`. `RETURN QUERY` exige tipos exactos → `42804` → 400 |
+| "Dry-run failed" sin ninguna causa | `spawnSync` no puede ejecutar `.cmd` en Windows desde el parche de CVE-2024-27980; el guard además descartaba `result.error` |
+| `getaddrinfo ENOTFOUND` contra la base | `db.<ref>.supabase.co` sólo publica AAAA (IPv6). Desde IPv4 hay que usar el **Session pooler** |
+| `types.ts` ilegible tras regenerarlo | El `>` de Windows PowerShell 5.1 escribe UTF-16LE. Usar `Out-File -Encoding utf8` |
+| Ítems sin regla desaparecían al generar el período | `commission_generate_period` hacía `JOIN` sobre `commission_rules`; ahora es `LEFT JOIN` |
+
+### Lo que falta
+
+- **UI para `commission_plan_settings`** (mapeo plan → INDIVIDUAL/GRUPAL). Es la
+  única configuración que todavía exige SQL: ver
+  [seeds/commission_bootstrap_us_test.sql](../supabase/seeds/commission_bootstrap_us_test.sql).
+- **`per_adherent`** sigue declarado como base pero sin fórmula: devuelve
+  `per_adherent_not_defined`. Es el caso "alta de adherentes" a futuro.
+- Cargar precio a los 4 planes que están en 0, si se quiere usar base
+  *Precio del plan*.
+- Promoción a producción: el runbook de §9 sigue vigente, con la salvedad de que
+  ya no hay tabla de tipos de promotor que crear.
 
 ---
 
