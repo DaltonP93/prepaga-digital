@@ -56,39 +56,6 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
     enabled: !!sale?.id,
   });
 
-  // ¿Esta venta usa algún template con campos personalizados (template_questions)?
-  // Si no, la pestaña "Campos del Plan" no se muestra → ventas normales quedan idénticas.
-  const { data: hasPlanFields = false } = useQuery({
-    queryKey: ['sale-has-plan-fields', sale?.id],
-    queryFn: async () => {
-      if (!sale?.id) return false;
-      const { data: st, error: stErr } = await supabase
-        .from('sale_templates')
-        .select('template_id, templates:template_id(id, name)')
-        .eq('sale_id', sale.id);
-      if (stErr) return false;
-      // Excluir la DDJJ de salud (tiene su propia pestaña). Solo cuenta como
-      // "campos del plan" un template NO-DDJJ que tenga preguntas configuradas.
-      const norm = (s: string) =>
-        (s || '').toLowerCase().normalize('NFD').replace(new RegExp('[\\u0300-\\u036f]', 'g'), '');
-      const isHealthDDJJ = (name: string) => {
-        const n = norm(name);
-        return n.includes('ddjj') || (n.includes('declaracion') && n.includes('salud'));
-      };
-      const ids = (st || [])
-        .map((r: any) => ({ id: r.templates?.id || r.template_id, name: r.templates?.name || '' }))
-        .filter((t: any) => t.id && !isHealthDDJJ(t.name))
-        .map((t: any) => t.id);
-      if (ids.length === 0) return false;
-      const { count } = await supabase
-        .from('template_questions')
-        .select('id', { count: 'exact', head: true })
-        .in('template_id', ids);
-      return (count || 0) > 0;
-    },
-    enabled: !!sale?.id,
-  });
-
   const isEditing = !!sale?.id;
   const currentStatus = (sale?.status || 'borrador') as SaleStatus;
   const isEditAllowed = !isEditing || canEditState(currentStatus);
@@ -139,6 +106,80 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     // Clear tab errors when user makes changes
     setTabErrors({});
+  };
+
+  // ── Campos personalizados por PLAN (ej. "Plan Materno") ──────────────────
+  // La pestaña "Campos del Plan" se muestra SOLO si el plan seleccionado tiene
+  // un template homónimo con preguntas configuradas. Para el resto de los
+  // planes la pantalla queda exactamente igual que antes.
+  const { data: planTemplate = null } = useQuery({
+    queryKey: ['plan-custom-fields-template', formData.plan_id],
+    queryFn: async () => {
+      if (!formData.plan_id) return null;
+      const { data: plan } = await supabase
+        .from('plans').select('name').eq('id', formData.plan_id).maybeSingle();
+      if (!plan?.name) return null;
+
+      const norm = (s: string) =>
+        (s || '').toLowerCase().normalize('NFD')
+          .replace(new RegExp('[\\u0300-\\u036f]', 'g'), '').trim();
+      const planName = norm(plan.name);
+      const isHealthDDJJ = (n: string) =>
+        n.includes('ddjj') || (n.includes('declaracion') && n.includes('salud'));
+
+      const { data: tpls } = await supabase
+        .from('templates').select('id, name').eq('is_active', true);
+
+      const candidatos = (tpls || []).filter((t: any) => {
+        const n = norm(t.name);
+        if (isHealthDDJJ(n)) return false;
+        return n === planName || n.includes(planName) || planName.includes(n);
+      });
+
+      // Solo cuenta si además tiene preguntas configuradas
+      for (const c of candidatos) {
+        const { count } = await supabase
+          .from('template_questions')
+          .select('id', { count: 'exact', head: true })
+          .eq('template_id', c.id);
+        if ((count || 0) > 0) return c as { id: string; name: string };
+      }
+      return null;
+    },
+    enabled: !!formData.plan_id,
+  });
+
+  const hasPlanFields = !!planTemplate;
+
+  // Campos obligatorios del plan que todavía están sin completar
+  const { data: camposFaltantes = [] } = useQuery({
+    queryKey: ['plan-fields-missing', sale?.id, planTemplate?.id],
+    queryFn: async () => {
+      if (!sale?.id || !planTemplate?.id) return [] as string[];
+      const [{ data: preguntas }, { data: respuestas }] = await Promise.all([
+        supabase.from('template_questions')
+          .select('id, question_text, is_required').eq('template_id', planTemplate.id),
+        supabase.from('template_responses')
+          .select('question_id, response_value')
+          .eq('sale_id', sale.id).eq('template_id', planTemplate.id),
+      ]);
+      const porPregunta = new Map(
+        (respuestas || []).map((r: any) => [r.question_id, String(r.response_value ?? '').trim()])
+      );
+      return (preguntas || [])
+        .filter((q: any) => q.is_required && !porPregunta.get(q.id))
+        .map((q: any) => q.question_text as string);
+    },
+    enabled: !!sale?.id && !!planTemplate?.id,
+  });
+
+  // Bloquea el avance de estado si faltan campos obligatorios del plan.
+  const bloqueadoPorCamposDelPlan = hasPlanFields && camposFaltantes.length > 0;
+  const avisarCamposFaltantes = () => {
+    toast.error(
+      `Faltan campos obligatorios de ${planTemplate?.name}: ${camposFaltantes.join(', ')}`
+    );
+    setActiveTab('datos_plan');
   };
 
   const validateBasicTab = (): string | null => {
@@ -281,6 +322,11 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
               onClick={async () => {
                 if (!formData.client_id || !formData.plan_id) {
                   toast.error('Debe tener cliente y plan asignados antes de enviar a auditoría');
+                  return;
+                }
+                // No permitir avanzar de estado si faltan campos obligatorios del plan
+                if (bloqueadoPorCamposDelPlan) {
+                  avisarCamposFaltantes();
                   return;
                 }
                 try {
@@ -480,7 +526,12 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
               <TabsTrigger value="documentos" disabled={!isEditing}>Documentos</TabsTrigger>
               <TabsTrigger value="ddjj" disabled={!isEditing}>DDJJ Salud</TabsTrigger>
               {hasPlanFields && (
-                <TabsTrigger value="datos_plan" disabled={!isEditing}>Campos del Plan</TabsTrigger>
+                <TabsTrigger value="datos_plan" disabled={!isEditing}>
+                  Campos del Plan
+                  {bloqueadoPorCamposDelPlan && (
+                    <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-destructive" title="Faltan campos obligatorios" />
+                  )}
+                </TabsTrigger>
               )}
               <TabsTrigger value="templates" disabled={!isEditing}>Templates</TabsTrigger>
               {isEditing && isAuditorOrAbove && (
@@ -521,7 +572,12 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
 
               {hasPlanFields && (
                 <TabsContent value="datos_plan">
-                  <SalePlanFieldsTab saleId={sale?.id} disabled={isAuditLocked} />
+                  <SalePlanFieldsTab
+                    saleId={sale?.id}
+                    templateId={planTemplate?.id}
+                    templateName={planTemplate?.name}
+                    disabled={isAuditLocked}
+                  />
                 </TabsContent>
               )}
 

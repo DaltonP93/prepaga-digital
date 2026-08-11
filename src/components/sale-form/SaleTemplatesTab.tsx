@@ -63,6 +63,20 @@ const isAnexoPlanName = (value?: string | null) => {
   return lower.includes('anexo plan') || (lower.includes('anexo') && lower.includes('plan'));
 };
 
+// Clasificación por CONTENIDO (no solo por nombre).
+// Los anexos reales (Plan Alfa/Kids/Senior/BETA, Anexo PLAN SEVEN) son imágenes
+// estáticas de 0,6–3 MB: no tienen variables ni campos de firma. En cambio un
+// documento firmable (CONTRATO, DDJJ, Plan Materno) sí los tiene. Antes la
+// categoría se decidía SOLO por el nombre, y "Plan Materno" —al no contener
+// "contrato" ni "ddjj"— caía como anexo: no se interpolaba (salían los {{...}}
+// crudos) y quedaba excluido de la firma PAdES.
+const hasTemplateVariables = (content?: string | null): boolean => /\{\{/.test(content || '');
+
+const hasSignatureFields = (content?: string | null): boolean => {
+  const c = content || '';
+  return /\{\{\s*firma_/i.test(c) || /data-signature-field/i.test(c);
+};
+
 const normalizeResponsePlaceholder = (value?: string | null): string => {
   if (!value) return '';
   let normalized = value.trim();
@@ -467,7 +481,9 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           const isDDJJ = norm.includes('ddjj') || norm.includes('declaracion') || (template as any).document_type === 'ddjj_salud';
           const isContrato = norm.includes('contrato');
           const isAnexoPlan = isAnexoPlanName(template.name);
-          const isAnexo = isAnexoPlan || (!isDDJJ && !isContrato);
+          // Un template con campos de firma NUNCA es anexo, aunque su nombre no
+          // diga "contrato"/"ddjj" (ej: "Plan Materno").
+          const isAnexo = (isAnexoPlan || (!isDDJJ && !isContrato)) && !hasSignatureFields(template.content);
 
           const pdfAttachment = isAnexo ? templatePdfAttachmentMap.get(template.id) : null;
           if (isAnexo && pdfAttachment) {
@@ -491,7 +507,9 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           }
 
           let normalizedContent: string;
-          if (isAnexo && hasDesignerContent) {
+          // Solo se omite la interpolación en anexos SIN variables (imágenes estáticas
+          // de MB: interpolarlas sería costoso y no habría nada que reemplazar).
+          if (isAnexo && hasDesignerContent && !hasTemplateVariables(template.content)) {
             normalizedContent = template.content || '';
           } else {
             normalizedContent = interpolateEnhancedTemplate(template.content || '', context);
@@ -857,7 +875,10 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           const hasContent = !!template.content?.trim();
           const isDDJJ = isDDJJTemplate(template);
           const isContrato = normalizeAccents(template.name).includes('contrato');
-          const isAnexo = isAnexoPlanName(template.name) || (!isDDJJ && !isContrato);
+          // Un template con campos de firma NUNCA es anexo, aunque su nombre no
+          // diga "contrato"/"ddjj" (ej: "Plan Materno").
+          const isAnexo = (isAnexoPlanName(template.name) || (!isDDJJ && !isContrato))
+            && !hasSignatureFields(template.content);
           const pdfAttachment = isAnexo ? templatePdfAttachmentMap.get(template.id) : null;
 
           if (isAnexo && pdfAttachment) {
@@ -883,7 +904,8 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           let rendered: string;
           if (!hasContent && isAnexo) {
             rendered = '<p>Documento de anexo.</p>';
-          } else if (isAnexo && hasContent) {
+          } else if (isAnexo && hasContent && !hasTemplateVariables(template.content)) {
+            // Solo se omite la interpolación en anexos SIN variables (estáticos de MB).
             rendered = template.content || '';
           } else {
             rendered = interpolateEnhancedTemplate(template.content || '', context);
