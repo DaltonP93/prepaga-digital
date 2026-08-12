@@ -79,6 +79,19 @@ const SignatureView = () => {
     }
   }, [verification.otpPolicy]);
 
+  // La política de la empresa (company_otp_policy.require_otp_for_signature) decide
+  // si hace falta verificar identidad por OTP antes de firmar. El switch ya existía
+  // en Configuración pero esta pantalla no lo consultaba: el OTP se pedía siempre.
+  // OJO: la edge function `signature-otp` (action=get_policy) devuelve el campo como
+  // `require_otp`, mientras que la tabla lo llama `require_otp_for_signature`;
+  // se contemplan ambos nombres. Por defecto se exige (si la política no cargó).
+  const otpPolicyRaw = verification.otpPolicy as unknown as
+    { require_otp?: boolean; require_otp_for_signature?: boolean } | null;
+  const otpRequerido =
+    (otpPolicyRaw?.require_otp ?? otpPolicyRaw?.require_otp_for_signature) !== false;
+  // Se puede avanzar a firmar si se verificó por OTP, o si la empresa no lo exige.
+  const identidadResuelta = verification.isVerified || !otpRequerido;
+
   const handleDownloadSignedContent = async (doc: any) => {
     const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
     const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -797,7 +810,8 @@ const SignatureView = () => {
               </Card>
             ) : (
               <>
-                {/* STEP 1: Identity Verification (OTP) */}
+                {/* STEP 1: Identity Verification (OTP) — solo si la empresa lo exige */}
+                {otpRequerido && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -972,9 +986,10 @@ const SignatureView = () => {
                     )}
                   </CardContent>
                 </Card>
+                )}
 
                 {/* STEP 2: Legal Consent */}
-                {verification.isVerified && (
+                {identidadResuelta && (
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
