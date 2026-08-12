@@ -18,6 +18,7 @@ DECLARE
   v_period_id uuid;
   v_status text;
   v_total numeric;
+  v_error_code text;
   v_annul_blocked boolean := false;
 BEGIN
   SELECT s.company_id, s.salesperson_id, s.id, s.plan_id, s.sale_date
@@ -47,9 +48,6 @@ BEGIN
     )
     AND NOT EXISTS (
       SELECT 1 FROM public.commission_rules cr WHERE cr.company_id = s.company_id
-    )
-    AND NOT EXISTS (
-      WHERE pt.company_id = s.company_id AND pt.code = 'TEST-ROLLBACK'
     )
     AND NOT EXISTS (
       SELECT 1 FROM public.sales other
@@ -175,6 +173,48 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'Paid period contains an unsettled item';
   END IF;
+
+  -- ---------------------------------------------------------------------
+  -- Porcentaje por defecto del vendedor: se usa SOLO cuando ninguna regla
+  -- aplica, y la regla siempre le gana.
+  -- ---------------------------------------------------------------------
+  UPDATE public.commission_rules SET is_active = false WHERE company_id = v_company_id;
+
+  -- Sin reglas y sin porcentaje por defecto -> no_rule (nunca 0% implicito).
+  UPDATE public.commission_salespeople SET default_percent = NULL
+  WHERE company_id = v_company_id AND salesperson_id = v_salesperson_id;
+
+  SELECT r.error_code INTO v_error_code
+  FROM public.commission_calculate_sale(v_sale_id) r;
+  IF v_error_code IS DISTINCT FROM 'no_rule' THEN
+    RAISE EXCEPTION 'Sin regla y sin default se esperaba no_rule, se obtuvo %', v_error_code;
+  END IF;
+
+  -- Con porcentaje por defecto -> calcula, sin regla asociada.
+  UPDATE public.commission_salespeople
+     SET default_percent = 7, default_base = 'sale_total_amount'
+   WHERE company_id = v_company_id AND salesperson_id = v_salesperson_id;
+
+  SELECT r.error_code, r.percent, r.rule_id
+    INTO v_error_code, v_resolved_percent, v_resolved_rule_id
+  FROM public.commission_calculate_sale(v_sale_id) r;
+  IF v_error_code IS NOT NULL OR v_resolved_percent <> 7 OR v_resolved_rule_id IS NOT NULL THEN
+    RAISE EXCEPTION 'Default del vendedor no aplico: error %, percent %, rule %',
+      v_error_code, v_resolved_percent, v_resolved_rule_id;
+  END IF;
+
+  -- Con una regla vigente, la regla manda sobre el default.
+  UPDATE public.commission_rules SET is_active = true
+   WHERE id = v_salesperson_rule_id;
+
+  SELECT r.percent, r.rule_id INTO v_resolved_percent, v_resolved_rule_id
+  FROM public.commission_calculate_sale(v_sale_id) r;
+  IF v_resolved_rule_id IS DISTINCT FROM v_salesperson_rule_id OR v_resolved_percent <> 20 THEN
+    RAISE EXCEPTION 'La regla no gano sobre el default: rule %, percent %',
+      v_resolved_rule_id, v_resolved_percent;
+  END IF;
+
+  RAISE NOTICE 'commission lifecycle test: OK (todas las aserciones pasaron)';
 END $$;
 
 ROLLBACK;
