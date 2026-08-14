@@ -79,6 +79,14 @@ export interface BeneficiaryContext {
   montoFormateado: string;
   requiereFirma: boolean;
   estadoFirma: string;
+  /** "Fecha de Ingreso": columna del Anexo de Incorporación de Adherente. */
+  fechaIngreso: string;
+  /**
+   * "V.I." por adherente. Vacío cuando el adherente no lo tiene definido;
+   * en ese caso el alias del template cae a la vigencia de la VENTA, que es
+   * el comportamiento que existía hasta ahora.
+   */
+  vigenciaInmediata: string;
 }
 
 export interface EnhancedTemplateContext {
@@ -288,6 +296,13 @@ function createBeneficiaryContext(beneficiary: any): BeneficiaryContext {
     montoFormateado: formatCurrency(beneficiary.amount || 0),
     requiereFirma: beneficiary.signature_required !== false,
     estadoFirma: 'pendiente', // Will be updated from signature_links
+    fechaIngreso: formatDate(beneficiary.entry_date),
+    // Se deja vacío si la columna es NULL para que el alias herede la
+    // vigencia de la venta (ver buildBenAliases).
+    vigenciaInmediata:
+      beneficiary.immediate_coverage === true ? 'Sí'
+      : beneficiary.immediate_coverage === false ? 'No'
+      : '',
   };
 }
 
@@ -516,7 +531,13 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
   // Must run BEFORE other replacements so {{titular.edad}}, {{vigencia_inmediata}}, etc.
   // get replaced PER-BENEFICIARY inside each expanded row, not globally beforehand.
 
-  const beneficiaryPlaceholderNames = 'first_name|last_name|_index|index|indice|birth_date|dni|ci|gender|amount|relationship|edad|titular\\.edad|age|formatted_amount|email|phone|document_number|vigencia_inmediata|tipo_venta|venta\\.vigenciaInmediata|venta\\.tipoVenta|nombre|apellido|nombreCompleto|fechaNacimiento|genero|parentesco|montoFormateado|monto|ocupacion|estadoCivil|barrio';
+  // Nombres que disparan la auto-expansión de una fila <tr> por adherente.
+  // Se usa anclado (`\{\{(?:...)\}\}`), así que agregar nombres es seguro; aun
+  // así, las variantes más largas van ANTES que sus prefijos por claridad
+  // (vigencia_inmediata_adherente antes que vigencia_inmediata).
+  // OJO: `address` estaba en los alias pero NO acá, así que una fila que solo
+  // usara {{address}} no auto-expandía. Corregido.
+  const beneficiaryPlaceholderNames = 'first_name|last_name|_index|index|indice|birth_date|dni|ci|gender|amount|relationship|edad|titular\\.edad|age|formatted_amount|email|phone|document_number|vigencia_inmediata_adherente|vigencia_inmediata|tipo_venta|venta\\.vigenciaInmediata|venta\\.tipoVenta|nombre|apellido|nombreCompleto|fechaNacimiento|genero|parentesco|montoFormateado|monto|ocupacion|estadoCivil|barrio|address|telefono|direccion|domicilio|fecha_ingreso|fechaIngreso';
 
   const buildBenAliases = (beneficiary: BeneficiaryContext, index: number): Record<string, string> => ({
     '{{first_name}}': beneficiary.nombre,
@@ -553,6 +574,15 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     '{{barrio}}': beneficiary.barrio,
     '{{occupation}}': beneficiary.ocupacion,
     '{{marital_status}}': beneficiary.estadoCivil,
+    '{{telefono}}': beneficiary.telefono,
+    '{{direccion}}': beneficiary.direccion,
+    '{{domicilio}}': beneficiary.direccion,
+    // Columnas propias del Anexo de Incorporación de Adherente
+    '{{fecha_ingreso}}': beneficiary.fechaIngreso,
+    '{{fechaIngreso}}': beneficiary.fechaIngreso,
+    // Si el adherente no tiene V.I. propia, hereda la de la venta.
+    '{{vigencia_inmediata_adherente}}':
+      beneficiary.vigenciaInmediata || context.venta.vigenciaInmediata,
     '{{vigencia_inmediata}}': context.venta.vigenciaInmediata,
     '{{tipo_venta}}': context.venta.tipoVenta,
     '{{venta.vigenciaInmediata}}': context.venta.vigenciaInmediata,
@@ -881,6 +911,11 @@ export function getEnhancedTemplateVariables(): { category: string; variables: {
         { key: '{{amount}}', description: 'Monto formateado - alias inglés (dentro del loop)' },
         { key: '{{vigencia_inmediata}}', description: 'Vigencia inmediata de la venta (dentro del loop)' },
         { key: '{{tipo_venta}}', description: 'Tipo de venta (dentro del loop)' },
+        { key: '{{telefono}}', description: 'Teléfono del adherente (dentro del loop)' },
+        { key: '{{domicilio}}', description: 'Domicilio del adherente (dentro del loop)' },
+        { key: '{{barrio}}', description: 'Barrio del adherente (dentro del loop)' },
+        { key: '{{fecha_ingreso}}', description: 'Fecha de ingreso del adherente (dentro del loop)' },
+        { key: '{{vigencia_inmediata_adherente}}', description: 'V.I. del adherente; si no tiene, hereda la de la venta (dentro del loop)' },
       ],
     },
     {

@@ -28,12 +28,34 @@ type BeneficiaryFormData = {
   barrio: string;
   city: string;
   amount: number;
+  /** "Fecha de Ingreso": columna del Anexo de Incorporación de Adherente. */
+  entry_date: string;
+  /**
+   * "V.I." del anexo. Vacío = heredar la vigencia de la venta (se guarda
+   * como NULL), que es como se comportaron siempre los adherentes.
+   */
+  immediate_coverage: '' | 'si' | 'no';
 };
 
 const emptyForm: BeneficiaryFormData = {
   first_name: '', last_name: '', dni: '', relationship: '', birth_date: '',
   gender: '', phone: '', email: '', address: '', barrio: '', city: '', amount: 0,
+  entry_date: '', immediate_coverage: '',
 };
+
+/**
+ * Las columnas `date` de Postgres no aceptan cadena vacía (da
+ * "invalid input syntax for type date"), así que se mandan como NULL.
+ */
+const toPayload = (data: BeneficiaryFormData) => ({
+  ...data,
+  birth_date: data.birth_date || null,
+  entry_date: data.entry_date || null,
+  immediate_coverage:
+    data.immediate_coverage === 'si' ? true
+    : data.immediate_coverage === 'no' ? false
+    : null,
+});
 
 const formatAmountInput = (value: number) => {
   if (!value) return '';
@@ -136,6 +158,24 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({ data, onChange, onSav
           <Label>Ciudad</Label>
           <Input value={data.city} onChange={(e) => onChange({ ...data, city: e.target.value })} placeholder="Ciudad" />
         </div>
+        <div className="space-y-2">
+          <Label>Fecha de Ingreso</Label>
+          <Input type="date" value={data.entry_date} onChange={(e) => onChange({ ...data, entry_date: e.target.value })} />
+        </div>
+        <div className="space-y-2">
+          <Label>Vigencia Inmediata (V.I.)</Label>
+          <Select
+            value={data.immediate_coverage || 'heredar'}
+            onValueChange={(v) => onChange({ ...data, immediate_coverage: v === 'heredar' ? '' : (v as 'si' | 'no') })}
+          >
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="heredar">Según la venta</SelectItem>
+              <SelectItem value="si">Sí</SelectItem>
+              <SelectItem value="no">No</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>
@@ -171,7 +211,7 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
   const handleAdd = async () => {
     if (!validateForm(newBeneficiary)) return;
     try {
-      await createBeneficiary.mutateAsync({ ...newBeneficiary, sale_id: saleId });
+      await createBeneficiary.mutateAsync({ ...toPayload(newBeneficiary), sale_id: saleId });
       setNewBeneficiary({ ...emptyForm });
       setShowForm(false);
     } catch (error) {
@@ -194,13 +234,18 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
       barrio: b.barrio || '',
       city: b.city || '',
       amount: b.amount || 0,
+      entry_date: b.entry_date || '',
+      immediate_coverage:
+        b.immediate_coverage === true ? 'si'
+        : b.immediate_coverage === false ? 'no'
+        : '',
     });
   };
 
   const handleSaveEdit = async () => {
     if (!editingId || !validateForm(editData)) return;
     try {
-      await updateBeneficiary.mutateAsync({ id: editingId, ...editData });
+      await updateBeneficiary.mutateAsync({ id: editingId, ...toPayload(editData) });
       setEditingId(null);
     } catch (error) {
       console.error('Error updating beneficiary:', error);

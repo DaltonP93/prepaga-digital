@@ -656,7 +656,12 @@ const SignatureView = () => {
           const isAnnex = (d: any) => {
             // Never treat a signed final contract as an annex
             if (d.document_type === 'contrato' && (d.signed_pdf_url || d.is_final)) return false;
-            return d.requires_signature === false || d.document_type === 'anexo' || d.document_type?.includes('anexo');
+            // Comparación EXACTA, nunca includes(): 'anexo' es el adjunto no
+            // firmable heredado. Con includes(), cualquier tipo futuro que
+            // contenga la palabra (ej. 'anexo_incorporacion') quedaría marcado
+            // como no firmable y NUNCA se firmaría — es el mismo síntoma que
+            // tuvo el Plan Materno. Verificado: el código solo escribe 'anexo'.
+            return d.requires_signature === false || d.document_type === 'anexo';
           };
           const annexDocs = documents?.filter((d: any) => isAnnex(d)) || [];
           const docsToSign = documents?.filter((d: any) => !isAnnex(d)) || [];
