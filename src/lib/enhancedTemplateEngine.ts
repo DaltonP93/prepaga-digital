@@ -134,6 +134,12 @@ export interface EnhancedTemplateContext {
     fechaFormateada: string;
     total: number;
     totalFormateado: string;
+    /**
+     * Cuota mensual del GRUPO completo. Solo difiere de totalFormateado en las
+     * operaciones de Incorporación de Adherente, donde el total de la venta es
+     * solo el de las personas que entran (y es la base de la comisión).
+     */
+    totalGrupoFormateado: string;
     totalLetras: string;
     vendedor: string;
     vendedorEmail: string;
@@ -429,6 +435,9 @@ export function createEnhancedTemplateContext(
       fechaFormateada: formatDate(sale?.sale_date || now, "d 'de' MMMM 'de' yyyy"),
       total: effectiveTotal,
       totalFormateado: formatCurrency(effectiveTotal),
+      totalGrupoFormateado: formatCurrency(
+        Number((sale as any)?.group_monthly_total ?? effectiveTotal) || 0,
+      ),
       totalLetras: numberToWordsES(effectiveTotal) + ' GUARANÍES',
       vendedor: sale?.salesperson ? `${sale.salesperson.first_name || ''} ${sale.salesperson.last_name || ''}`.trim() : '',
       vendedorEmail: sale?.salesperson?.email || '',
@@ -745,6 +754,7 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     '{{id_cliente}}': context.cliente.idCliente,
     '{{titular_id_cliente}}': context.cliente.idCliente,
     '{{monto_total}}': context.venta.totalFormateado,
+    '{{monto_total_grupo}}': context.venta.totalGrupoFormateado,
     '{{monto_total_letras}}': context.venta.totalLetras,
     '{{razon_social}}': context.facturacion.razonSocial,
     '{{ruc}}': context.facturacion.ruc,
@@ -837,6 +847,7 @@ export function getEnhancedTemplateVariables(): { category: string; variables: {
         { key: '{{venta.fechaFormateada}}', description: 'Fecha formateada (ej: 5 de febrero de 2026)' },
         { key: '{{venta.total}}', description: 'Total de la venta (número)' },
         { key: '{{venta.totalFormateado}}', description: 'Total formateado en Gs.' },
+        { key: '{{monto_total_grupo}}', description: 'Cuota mensual del grupo completo (Anexo de Incorporación)' },
         { key: '{{venta.totalLetras}}', description: 'Total en letras (ej: CINCUENTA MIL GUARANÍES)' },
         { key: '{{venta.vendedor}}', description: 'Nombre del vendedor' },
         { key: '{{venta.numeroContrato}}', description: 'Número de contrato' },

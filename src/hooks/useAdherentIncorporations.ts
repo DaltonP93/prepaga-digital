@@ -49,6 +49,45 @@ export interface IncorporationAdherentInput {
 // después de aplicar las migraciones), así que se accede sin tipar.
 const db = supabase as any;
 
+/**
+ * Devuelve la venta enriquecida con `group_monthly_total`: la cuota mensual
+ * del GRUPO COMPLETO una vez incorporadas las personas del anexo.
+ *
+ * El documento pide "la cuota mensual ... por todo el grupo de personas que
+ * conforman el contrato", pero el anexo se genera en el contexto de la
+ * venta-operación, cuyo total es solo el de las personas que entran.
+ *
+ * No se resuelve inflando el total de la operación porque ESE total es la base
+ * de cálculo de la comisión: si se lo llevara al total del grupo, el vendedor
+ * cobraría comisión sobre el contrato entero y no sobre la incorporación.
+ *
+ * Para cualquier venta que no sea una incorporación devuelve la venta tal cual.
+ */
+export const attachGroupMonthlyTotal = async (sale: any): Promise<any> => {
+  if (!sale || sale.sale_type !== SALE_TYPE_INCORPORACION) return sale;
+
+  const { data: inc } = await db
+    .from('adherent_incorporations')
+    .select('parent_sale_id')
+    .eq('operation_sale_id', sale.id)
+    .not('parent_sale_id', 'is', null)
+    .limit(1)
+    .maybeSingle();
+
+  if (!inc?.parent_sale_id) return sale;
+
+  const { data: parent } = await supabase
+    .from('sales')
+    .select('total_amount')
+    .eq('id', inc.parent_sale_id)
+    .maybeSingle();
+
+  return {
+    ...sale,
+    group_monthly_total: Number(parent?.total_amount || 0) + Number(sale.total_amount || 0),
+  };
+};
+
 /** Incorporaciones de un contrato madre, con su venta-operación. */
 export const useAdherentIncorporations = (parentSaleId?: string) => {
   return useQuery({

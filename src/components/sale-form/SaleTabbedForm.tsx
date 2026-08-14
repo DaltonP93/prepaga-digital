@@ -101,6 +101,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
     contract_start_date: contractStartDate,
     immediate_coverage: (sale as any)?.immediate_coverage || false,
     sale_type: (sale as any)?.sale_type || 'venta_nueva',
+    employee_signature_mode: (sale as any)?.employee_signature_mode || 'individual',
   });
 
   const handleChange = (field: string, value: any) => {
@@ -243,6 +244,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           contract_start_date: formData.contract_start_date || null,
           immediate_coverage: formData.immediate_coverage,
           sale_type: formData.sale_type,
+          employee_signature_mode: formData.employee_signature_mode,
         } as any);
         // Recalculate total_amount = titular_amount + sum(adherentes) after save
         const { data: adherentes } = await supabase
@@ -281,6 +283,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           contract_start_date: formData.contract_start_date || null,
           immediate_coverage: formData.immediate_coverage,
           sale_type: formData.sale_type,
+          employee_signature_mode: formData.employee_signature_mode,
         } as any);
         toast.success('Venta creada exitosamente');
         navigate(`/sales/${result.id}/edit`);
