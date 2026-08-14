@@ -109,6 +109,8 @@ export interface EnhancedTemplateContext {
     genero: string;
     gender: string;
     sexo: string;
+    /** "ID CLIENTE Nº" del Anexo de Incorporación (clients.external_id). */
+    idCliente: string;
   };
   plan: {
     nombre: string;
@@ -401,6 +403,7 @@ export function createEnhancedTemplateContext(
       genero: (client as any)?.gender || '',
       gender: (client as any)?.gender || '',
       sexo: (client as any)?.gender === 'Masculino' ? 'M' : (client as any)?.gender === 'Femenino' ? 'F' : ((client as any)?.gender || ''),
+      idCliente: (client as any)?.external_id || '',
     },
     plan: {
       nombre: plan?.name || '',
@@ -739,6 +742,8 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     '{{titular_barrio}}': context.cliente.barrio,
     '{{titular_fecha_nacimiento}}': context.cliente.fechaNacimiento,
     '{{titular_edad}}': String(context.cliente.edad),
+    '{{id_cliente}}': context.cliente.idCliente,
+    '{{titular_id_cliente}}': context.cliente.idCliente,
     '{{monto_total}}': context.venta.totalFormateado,
     '{{monto_total_letras}}': context.venta.totalLetras,
     '{{razon_social}}': context.facturacion.razonSocial,

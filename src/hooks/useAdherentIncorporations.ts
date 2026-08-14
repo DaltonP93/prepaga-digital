@@ -177,12 +177,11 @@ export const useCreateAdherentIncorporation = () => {
             coverage_start_date: a.entry_date || null,
             status: 'borrador',
             source: 'manual',
-            // Se llena recién al activar, con el adherente real de la venta madre.
+            // Adherente que vive en la venta-operación mientras se firma.
+            operation_beneficiary_id: createdBeneficiaries?.[i]?.id || null,
+            // Se llena recién al activar (por trigger), con el adherente
+            // definitivo creado en la venta madre.
             activated_beneficiary_id: null,
-            // Referencia al beneficiario provisorio de la venta-operación.
-            notes: createdBeneficiaries?.[i]?.id
-              ? `beneficiario_operacion:${createdBeneficiaries[i].id}`
-              : null,
           }))
         );
 
