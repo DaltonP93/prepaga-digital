@@ -340,7 +340,13 @@ export function createEnhancedTemplateContext(
   const titularAmount = (sale?.total_amount || 0) - adherentSum;
   const effectiveTitularAmount = titularAmount > 0 ? titularAmount : (sale?.total_amount || plan?.price || 0);
 
-  const titularFallback = !hasPrimaryBeneficiary && client
+  // En una operación de Incorporación de Adherente el documento debe listar
+  // SOLO a quienes se incorporan: el titular ya figura en el contrato madre y
+  // no va como una fila más de la tabla del anexo. Para el resto de las ventas
+  // se sigue anteponiendo el titular, como siempre.
+  const esIncorporacionDeAdherente = (sale as any)?.sale_type === 'alta_adherente';
+
+  const titularFallback = !hasPrimaryBeneficiary && client && !esIncorporacionDeAdherente
     ? {
         first_name: client?.first_name || '',
         last_name: client?.last_name || '',
