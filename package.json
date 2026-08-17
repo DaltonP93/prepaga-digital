@@ -16,7 +16,8 @@
     "commission:function:deploy:us": "npx supabase@2.111.0 functions deploy generate-commission-pdf --project-ref ykducvvcjzdpoojxlsig --no-verify-jwt",
     "deploy:test": "bash scripts/deploy-test.sh",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:engine": "bash scripts/test-engine.sh"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.2",

@@ -90,7 +90,10 @@ export const useCreateAllSignatureLinks = () => {
       // 3. Generar enlaces para adherentes que requieren firma
       if (sale.beneficiaries && Array.isArray(sale.beneficiaries) && sale.beneficiaries.length > 0) {
         for (const beneficiary of sale.beneficiaries) {
-          if (beneficiary.signature_required !== false && beneficiary.email) {
+          // Contratos de EMPRESA en modo 'representante': firma solo el
+          // representante legal, no cada empleado. 'individual' = de siempre.
+          const empleadosFirman = (sale as any)?.employee_signature_mode !== 'representante';
+          if (empleadosFirman && beneficiary.signature_required !== false && beneficiary.email) {
             const adhToken = generateUUID();
             const adhExpiresAt = new Date();
             adhExpiresAt.setDate(adhExpiresAt.getDate() + 1);

@@ -24,6 +24,7 @@ import SaleDocumentsTab from './SaleDocumentsTab';
 import SaleDDJJTab from './SaleDDJJTab';
 import SaleTemplatesTab from './SaleTemplatesTab';
 import SalePlanFieldsTab from './SalePlanFieldsTab';
+import SaleIncorporationsTab from './SaleIncorporationsTab';
 
 interface SaleTabbedFormProps {
   sale?: any;
@@ -100,6 +101,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
     contract_start_date: contractStartDate,
     immediate_coverage: (sale as any)?.immediate_coverage || false,
     sale_type: (sale as any)?.sale_type || 'venta_nueva',
+    employee_signature_mode: (sale as any)?.employee_signature_mode || 'individual',
   });
 
   const handleChange = (field: string, value: any) => {
@@ -193,7 +195,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
 
   const handleTabChange = (newTab: string) => {
     // Validate current tab before allowing navigation forward
-    const tabOrder = ['basico', 'adherentes', 'documentos', 'ddjj', 'datos_plan', 'templates', 'auditoria'];
+    const tabOrder = ['basico', 'adherentes', 'documentos', 'ddjj', 'datos_plan', 'templates', 'incorporaciones', 'auditoria'];
     const currentIndex = tabOrder.indexOf(activeTab);
     const newIndex = tabOrder.indexOf(newTab);
 
@@ -242,6 +244,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           contract_start_date: formData.contract_start_date || null,
           immediate_coverage: formData.immediate_coverage,
           sale_type: formData.sale_type,
+          employee_signature_mode: formData.employee_signature_mode,
         } as any);
         // Recalculate total_amount = titular_amount + sum(adherentes) after save
         const { data: adherentes } = await supabase
@@ -280,6 +283,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           contract_start_date: formData.contract_start_date || null,
           immediate_coverage: formData.immediate_coverage,
           sale_type: formData.sale_type,
+          employee_signature_mode: formData.employee_signature_mode,
         } as any);
         toast.success('Venta creada exitosamente');
         navigate(`/sales/${result.id}/edit`);
@@ -520,7 +524,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
       <Card>
         <CardContent className="pt-6">
           <Tabs value={activeTab} onValueChange={handleTabChange}>
-            <TabsList className="grid w-full grid-cols-2 gap-1.5 h-auto sm:h-11 sm:grid-cols-5 lg:grid-cols-7">
+            <TabsList className="grid w-full grid-cols-2 gap-1.5 h-auto sm:h-11 sm:grid-cols-4 lg:grid-cols-8">
               <TabsTrigger value="basico">Básico</TabsTrigger>
               <TabsTrigger value="adherentes" disabled={!isEditing}>Adherentes</TabsTrigger>
               <TabsTrigger value="documentos" disabled={!isEditing}>Documentos</TabsTrigger>
@@ -534,6 +538,10 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                 </TabsTrigger>
               )}
               <TabsTrigger value="templates" disabled={!isEditing}>Templates</TabsTrigger>
+              {/* Solo tiene sentido incorporar adherentes a un contrato ya firmado. */}
+              {isEditing && (currentStatus === 'firmado' || currentStatus === 'completado') && (
+                <TabsTrigger value="incorporaciones">Incorporaciones</TabsTrigger>
+              )}
               {isEditing && isAuditorOrAbove && (
                 <TabsTrigger value="auditoria">Auditoría</TabsTrigger>
               )}
@@ -589,6 +597,18 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                   disabled={isTemplatesLocked}
                 />
               </TabsContent>
+
+              {/*
+                Va FUERA del <fieldset disabled={isAuditLocked}> a propósito: el
+                contrato firmado sigue siendo de solo lectura, pero incorporar un
+                adherente es una acción aparte y acotada, que no modifica la venta
+                madre sino que crea su propia operación.
+              */}
+              {isEditing && (currentStatus === 'firmado' || currentStatus === 'completado') && (
+                <TabsContent value="incorporaciones">
+                  <SaleIncorporationsTab saleId={sale?.id} saleStatus={sale?.status} />
+                </TabsContent>
+              )}
 
               {isEditing && isAuditorOrAbove && (
                 <TabsContent value="auditoria">

@@ -16,6 +16,7 @@ import { useBeneficiaries } from '@/hooks/useBeneficiaries';
 import { validateSaleTransition } from '@/lib/workflowValidator';
 import { DocumentPreviewDialog } from '@/components/documents/DocumentPreviewDialog';
 import { useRolePermissions } from '@/hooks/useRolePermissions';
+import { attachGroupMonthlyTotal } from '@/hooks/useAdherentIncorporations';
 
 interface SaleTemplatesTabProps {
   saleId?: string;
@@ -354,7 +355,9 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       if (templateContentsResult.error) throw templateContentsResult.error;
       if (attachmentsResult.error) throw attachmentsResult.error;
 
-      const sale = saleResult.data;
+      // Se le adosa la cuota del grupo completo para el Anexo de Incorporación.
+      // Para cualquier otra venta devuelve el objeto sin tocar.
+      const sale = await attachGroupMonthlyTotal(saleResult.data);
       const client = sale?.clients as any;
       const plan = sale?.plans as any;
       const company = sale?.companies as any;
@@ -538,9 +541,14 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           || (t as any).document_type === 'ddjj_salud';
       });
 
+      // Contratos de EMPRESA: con employee_signature_mode='representante' firma
+      // solo el representante legal y no se genera DDJJ ni enlace por empleado.
+      // 'individual' (el valor por defecto) es el comportamiento de siempre.
+      const empleadosFirman = (sale as any)?.employee_signature_mode !== 'representante';
+
       const beneficiaryDocuments = (
         await Promise.all((effectiveBeneficiaries || []).flatMap((b) => {
-          if (b.signature_required === false || b.is_primary || ddjiTemplates.length === 0) {
+          if (!empleadosFirman || b.signature_required === false || b.is_primary || ddjiTemplates.length === 0) {
             return [];
           }
 
@@ -647,7 +655,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
 
       // Validate adherentes have documents before creating links
       const adherentesNeedingLinks = (effectiveBeneficiaries || []).filter(
-        (b) => b.signature_required !== false && !b.is_primary
+        (b) => empleadosFirman && b.signature_required !== false && !b.is_primary
       );
       if (adherentesNeedingLinks.length > 0) {
         const idsWithDocs = new Set(
@@ -782,7 +790,9 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       if (templateContentsResult.error) throw templateContentsResult.error;
       if (attachmentsResult.error) throw attachmentsResult.error;
 
-      const sale = saleResult.data;
+      // Se le adosa la cuota del grupo completo para el Anexo de Incorporación.
+      // Para cualquier otra venta devuelve el objeto sin tocar.
+      const sale = await attachGroupMonthlyTotal(saleResult.data);
       const client = sale?.clients as any;
       const plan = sale?.plans as any;
       const company = sale?.companies as any;

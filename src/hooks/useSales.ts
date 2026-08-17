@@ -7,6 +7,7 @@ import { validateSaleTransition } from '@/lib/workflowValidator';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { generateUUID } from '@/lib/utils';
 import { getSignatureLinkUrl } from '@/lib/appUrls';
+import { excludeIncorporationSales } from '@/lib/saleFilters';
 
 const ADMIN_ROLES = ['super_admin', 'admin', 'supervisor', 'gestor', 'auditor'];
 
@@ -96,6 +97,10 @@ export const useSales = () => {
           sale_documents(id)
         `)
         .order('created_at', { ascending: false });
+
+      // Las ventas-operación de incorporación de adherente no son ventas
+      // comerciales: no van en el listado ni en los totales.
+      query = excludeIncorporationSales(query);
 
       // Vendedores only see their own sales
       if (!isAdminRole && user?.id) {

@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
+import { buildClientNamePayload } from "@/lib/clientUtils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,6 +23,10 @@ interface ClientFormProps {
 }
 
 interface ClientFormData {
+  /** 'persona' (por defecto) o 'empresa'. */
+  client_type: string;
+  razon_social?: string;
+  ruc?: string;
   first_name: string;
   last_name: string;
   email: string;
@@ -74,6 +79,8 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
     formState: { errors },
   } = useForm<ClientFormData>();
 
+  const clientTypeValue = watch("client_type") || "persona";
+  const esEmpresa = clientTypeValue === "empresa";
   const latitudeValue = watch("latitude");
   const longitudeValue = watch("longitude");
   const genderValue = watch("gender");
@@ -221,6 +228,9 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
 
     if (client) {
       reset({
+        client_type: (client as any).client_type || "persona",
+        razon_social: (client as any).razon_social || "",
+        ruc: (client as any).ruc || "",
         first_name: client.first_name || "",
         last_name: client.last_name || "",
         email: client.email || "",
@@ -240,6 +250,9 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
     }
 
     reset({
+      client_type: "persona",
+      razon_social: "",
+      ruc: "",
       first_name: "",
       last_name: "",
       email: "",
@@ -283,7 +296,12 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
       data.phone = normalizePhone(data.phone);
       data.birth_date = normalizeDateInputValue(data.birth_date) || undefined;
 
-      const { latitude: _lat, longitude: _lng, ...cleanData } = data;
+      const { latitude: _lat, longitude: _lng, ...rest } = data;
+      // Para una EMPRESA la razón social se guarda TAMBIÉN en first_name
+      // (con last_name vacío). Así los 77 lugares que componen el nombre como
+      // first_name + last_name siguen mostrándolo bien sin tocar 42 archivos,
+      // y no hace falta quitarle el NOT NULL a esas columnas.
+      const cleanData = { ...rest, ...buildClientNamePayload(rest) };
 
       if (isEditing && client) {
         await updateClient.mutateAsync({ id: client.id, ...cleanData });
@@ -313,18 +331,66 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
             </TabsList>
 
             <TabsContent value="data" className="space-y-4 pt-2">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="first_name">Nombre</Label>
-                  <Input id="first_name" {...register("first_name", { required: "El nombre es requerido" })} />
-                  {errors.first_name && <span className="text-xs text-destructive">{errors.first_name.message}</span>}
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="last_name">Apellido</Label>
-                  <Input id="last_name" {...register("last_name", { required: "El apellido es requerido" })} />
-                  {errors.last_name && <span className="text-xs text-destructive">{errors.last_name.message}</span>}
-                </div>
+              <div className="space-y-1.5">
+                <Label>Tipo de cliente</Label>
+                <Select
+                  value={clientTypeValue}
+                  onValueChange={(v) => setValue("client_type", v, { shouldDirty: true })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="persona">Persona física</SelectItem>
+                    <SelectItem value="empresa">Empresa</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+
+              {esEmpresa ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="razon_social">Razón Social</Label>
+                    <Input
+                      id="razon_social"
+                      {...register("razon_social", {
+                        validate: (v) =>
+                          !esEmpresa || (v || "").trim() !== "" || "La razón social es requerida",
+                      })}
+                    />
+                    {errors.razon_social && (
+                      <span className="text-xs text-destructive">{errors.razon_social.message}</span>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="ruc">RUC</Label>
+                    <Input id="ruc" placeholder="80012345-6" {...register("ruc")} />
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="first_name">Nombre</Label>
+                    <Input
+                      id="first_name"
+                      {...register("first_name", {
+                        validate: (v) =>
+                          esEmpresa || (v || "").trim() !== "" || "El nombre es requerido",
+                      })}
+                    />
+                    {errors.first_name && <span className="text-xs text-destructive">{errors.first_name.message}</span>}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="last_name">Apellido</Label>
+                    <Input
+                      id="last_name"
+                      {...register("last_name", {
+                        validate: (v) =>
+                          esEmpresa || (v || "").trim() !== "" || "El apellido es requerido",
+                      })}
+                    />
+                    {errors.last_name && <span className="text-xs text-destructive">{errors.last_name.message}</span>}
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <Label htmlFor="email">Email</Label>
@@ -339,17 +405,23 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
                     <Input id="phone" className="rounded-l-none" placeholder="992950125" {...register("phone")} />
                   </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="dni">C.I.</Label>
-                  <Input id="dni" {...register("dni")} />
-                </div>
+                {!esEmpresa && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="dni">C.I.</Label>
+                    <Input id="dni" {...register("dni")} />
+                  </div>
+                )}
               </div>
 
+              {/* Fecha de nacimiento, género y estado civil no aplican a una empresa. */}
+              {!esEmpresa && (
               <div className="space-y-1.5">
                 <Label htmlFor="birth_date">Fecha de Nacimiento</Label>
                 <Input id="birth_date" type="date" {...register("birth_date")} />
               </div>
+              )}
 
+              {!esEmpresa && (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Género</Label>
@@ -379,6 +451,7 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
                   </Select>
                 </div>
               </div>
+              )}
             </TabsContent>
 
             <TabsContent value="location" className="space-y-3 pt-2">

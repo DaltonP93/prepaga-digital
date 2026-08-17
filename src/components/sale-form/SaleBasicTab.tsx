@@ -31,6 +31,8 @@ interface SaleBasicTabProps {
     contract_start_date: string;
     immediate_coverage: boolean;
     sale_type: string;
+    /** 'individual' (por defecto) o 'representante'. Contratos de empresa. */
+    employee_signature_mode?: string;
   };
   onChange: (field: string, value: any) => void;
   companyId?: string;
@@ -210,6 +212,25 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
               <SelectItem value="reingreso">Reingreso</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Firma de los adherentes</Label>
+          <Select
+            value={formData.employee_signature_mode || 'individual'}
+            onValueChange={(v) => onChange('employee_signature_mode', v)}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="individual">Cada uno firma su DDJJ</SelectItem>
+              <SelectItem value="representante">Firma solo el representante</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Para contratos de empresa con muchos empleados. "Firma solo el representante"
+            no genera DDJJ ni enlace de firma por cada persona.
+          </p>
         </div>
       </div>
 

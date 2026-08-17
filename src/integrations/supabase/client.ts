@@ -22,7 +22,11 @@ const TEST_US_PROJECT_REF = "ykducvvcjzdpoojxlsig";
 // expresión deja de ser plegable y la URL de BR termina embebida en el bundle de
 // test — lo detecta scripts/verify-us-bundle.mjs.
 const isDev = import.meta.env.DEV === true;
-const isTestBuild = !isDev && import.meta.env.VITE_ENV_TARGET === 'test';
+// Se aceptan las DOS señales de build de test: el modo `us` (npm run build:us,
+// scripts de comisiones) y VITE_ENV_TARGET=test (npm run deploy:test). Ambas se
+// comparan crudas, sin .trim()/.toLowerCase(), para que sigan siendo plegables.
+const isTestBuild =
+  !isDev && (import.meta.env.MODE === 'us' || import.meta.env.VITE_ENV_TARGET === 'test');
 const allowEnvOverride = isDev || isTestBuild;
 
 const envUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
@@ -71,7 +75,8 @@ export const SUPABASE_PUBLISHABLE_KEY = isTestBuild
     ? envKey
     : PROD_SUPABASE_PUBLISHABLE_KEY;
 
-// 'test' | 'production' — informativo, útil para diagnóstico y para el badge de entorno.
+// 'test' | 'production' — informativo, para diagnóstico, trazabilidad del build
+// y el badge de entorno.
 export const ENV_TARGET = allowEnvOverride && envUrl ? 'test' : 'production';
 export const SUPABASE_PROJECT_REF =
   SUPABASE_URL.match(/^https:\/\/([a-z0-9]+)\.supabase\.co$/i)?.[1] ?? null;
