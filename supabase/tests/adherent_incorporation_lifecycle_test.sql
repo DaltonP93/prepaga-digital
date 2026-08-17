@@ -56,9 +56,12 @@ BEGIN
   --    vez de un 23514 críptico a mitad del test.
   --
   --    Valores que usa el código hoy:
-  --      status 'borrador'   -> useAdherentIncorporations.ts (INSERT)
-  --      status 'completado' -> activate_adherent_incorporation() (trigger)
-  --      source 'manual'     -> useAdherentIncorporations.ts (INSERT)
+  --      status 'draft'      -> useAdherentIncorporations.ts (INSERT)
+  --      status 'completed'  -> activate_adherent_incorporation() (trigger)
+  --      source 'existing_sale' -> useAdherentIncorporations.ts (INSERT)
+  --
+  --    OJO: sales.status SI va en espanol ('borrador','completado'). El
+  --    vocabulario en ingles es solo de adherent_incorporations.
   -- ---------------------------------------------------------------------
   SELECT pg_get_constraintdef(oid) INTO v_def
   FROM pg_constraint
@@ -67,14 +70,8 @@ BEGIN
 
   IF v_def IS NOT NULL THEN
     v_permitidos := regexp_replace(v_def, '^.*ARRAY\[|\]\)\)$', '', 'g');
-    IF v_def NOT LIKE '%''borrador''%' OR v_def NOT LIKE '%''completado''%' THEN
-      RAISE EXCEPTION E'DRIFT de esquema en adherent_incorporations.status\n'
-        '  La base acepta: %\n'
-        '  El codigo escribe: ''borrador'' (hook) y ''completado'' (trigger)\n'
-        '  El flujo de incorporacion NO puede funcionar contra esta base.\n'
-        '  Origen probable: la migracion usa CREATE TABLE IF NOT EXISTS y la\n'
-        '  tabla ya existia con otro vocabulario, asi que su definicion se\n'
-        '  ignoro en silencio.', v_permitidos;
+    IF v_def NOT LIKE '%''draft''%' OR v_def NOT LIKE '%''completed''%' THEN
+      RAISE EXCEPTION 'DRIFT en adherent_incorporations.status -- la base acepta: % -- el codigo escribe ''draft'' (hook) y ''completed'' (trigger)', v_permitidos;
     END IF;
   END IF;
 
@@ -83,11 +80,9 @@ BEGIN
   WHERE conrelid = 'public.adherent_incorporations'::regclass
     AND conname = 'adherent_incorporations_source_check';
 
-  IF v_def IS NOT NULL AND v_def NOT LIKE '%''manual''%' THEN
+  IF v_def IS NOT NULL AND v_def NOT LIKE '%''existing_sale''%' THEN
     v_permitidos := regexp_replace(v_def, '^.*ARRAY\[|\]\)\)$', '', 'g');
-    RAISE EXCEPTION E'DRIFT de esquema en adherent_incorporations.source\n'
-      '  La base acepta: %\n'
-      '  El codigo escribe: ''manual''', v_permitidos;
+    RAISE EXCEPTION 'DRIFT en adherent_incorporations.source -- la base acepta: % -- el codigo escribe ''existing_sale''', v_permitidos;
   END IF;
 
   -- ---------------------------------------------------------------------
@@ -140,12 +135,12 @@ BEGIN
     v_company_id, v_client_id, v_op_id, v_parent_id, v_plan_id,
     'TEST-ROLLBACK Titular', 'TEST-ROLLBACK', 'Adherente Uno',
     '9999001', 'Hijo/a', c_monto,
-    (CURRENT_DATE + INTERVAL '1 year')::date, v_op_ben_id, 'borrador'
+    (CURRENT_DATE + INTERVAL '1 year')::date, v_op_ben_id, 'draft'
   ) RETURNING id INTO v_inc_id;
 
   SELECT status, activated_beneficiary_id INTO v_inc_status, v_ben_id
   FROM public.adherent_incorporations WHERE id = v_inc_id;
-  IF v_inc_status <> 'borrador' OR v_ben_id IS NOT NULL THEN
+  IF v_inc_status <> 'draft' OR v_ben_id IS NOT NULL THEN
     RAISE EXCEPTION 'Alta inicial incorrecta: status %, beneficiario %', v_inc_status, v_ben_id;
   END IF;
 
@@ -158,7 +153,7 @@ BEGIN
     INTO v_inc_status, v_inc_completed, v_ben_id
   FROM public.adherent_incorporations ai WHERE ai.id = v_inc_id;
 
-  IF v_inc_status <> 'completado' THEN
+  IF v_inc_status <> 'completed' THEN
     RAISE EXCEPTION 'La incorporación no quedó completada: %', v_inc_status;
   END IF;
   IF v_inc_completed IS NULL THEN
@@ -241,7 +236,7 @@ BEGIN
       v_company_id, v_client_id, v_op3_id, v_parent_id, v_plan_id,
       'TEST-ROLLBACK Empresa', 'TEST-MULTI', 'Funcionario ' || v_count,
       '99992' || v_count, 'Funcionario', c_monto,
-      (CURRENT_DATE + INTERVAL '1 year')::date, v_op_ben_id, 'borrador'
+      (CURRENT_DATE + INTERVAL '1 year')::date, v_op_ben_id, 'draft'
     );
   END LOOP;
 
@@ -256,7 +251,7 @@ BEGIN
 
   SELECT count(*) INTO v_count
   FROM public.adherent_incorporations
-  WHERE operation_sale_id = v_op3_id AND status = 'completado'
+  WHERE operation_sale_id = v_op3_id AND status = 'completed'
     AND activated_beneficiary_id IS NOT NULL;
   IF v_count <> 3 THEN
     RAISE EXCEPTION 'Las 3 incorporaciones debían quedar completadas, hay %', v_count;
@@ -296,7 +291,7 @@ BEGIN
     v_company_id, v_client_id, v_op_fb_id, v_parent_id, v_plan_id,
     'TEST-ROLLBACK Titular', 'TEST-FALLBACK', 'Sin Vinculo',
     '9999003', c_monto, CURRENT_DATE,
-    (CURRENT_DATE + INTERVAL '1 year')::date, NULL, 'borrador'
+    (CURRENT_DATE + INTERVAL '1 year')::date, NULL, 'draft'
   );
 
   UPDATE public.sales SET status = 'completado' WHERE id = v_op_fb_id;
@@ -358,7 +353,7 @@ BEGIN
   SELECT status, activated_beneficiary_id
     INTO v_inc_status, v_ben_id
   FROM public.adherent_incorporations WHERE id = v_normal_inc_id;
-  IF v_inc_status <> 'borrador' OR v_ben_id IS NOT NULL THEN
+  IF v_inc_status <> 'draft' OR v_ben_id IS NOT NULL THEN
     RAISE EXCEPTION 'La puerta de salida falló: la venta normal activó la incorporación';
   END IF;
 

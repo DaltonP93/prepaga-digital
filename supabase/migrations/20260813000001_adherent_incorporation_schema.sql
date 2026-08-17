@@ -68,8 +68,14 @@ CREATE TABLE IF NOT EXISTS public.adherent_incorporations (
   coverage_end_date   date NOT NULL,
 
   -- Trazabilidad del circuito
-  status  text NOT NULL DEFAULT 'borrador',
-  source  text NOT NULL DEFAULT 'manual',
+  -- Vocabulario en INGLES, igual al que ya tiene la base de test. No confundir
+  -- con sales.status, que va en espanol. Los CHECK se declaran aca para que una
+  -- base NUEVA (produccion) quede identica a test; ver tambien la migracion
+  -- 20260817000001, que corrige el trigger.
+  status  text NOT NULL DEFAULT 'draft'
+    CHECK (status IN ('draft', 'sent', 'signed', 'completed', 'cancelled')),
+  source  text NOT NULL DEFAULT 'existing_sale'
+    CHECK (source IN ('existing_sale', 'external_sale')),
   document_id       uuid REFERENCES public.documents(id) ON DELETE SET NULL,
   signature_link_id uuid REFERENCES public.signature_links(id) ON DELETE SET NULL,
   -- Se completa recién cuando la firma termina: es el adherente REAL

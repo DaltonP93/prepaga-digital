@@ -215,8 +215,13 @@ export const useCreateAdherentIncorporation = () => {
             adherent_phone: a.phone || null,
             adherent_amount: Number(a.amount) || 0,
             coverage_start_date: a.entry_date || null,
-            status: 'borrador',
-            source: 'manual',
+            // Vocabulario de adherent_incorporations: la tabla usa estados en
+            // INGLÉS ('draft','sent','signed','completed','cancelled') y
+            // source en ('existing_sale','external_sale'). No confundir con
+            // sales.status, que sí es en español. Escribir 'borrador'/'manual'
+            // acá revienta con 23514 (adherent_incorporations_status_check).
+            status: 'draft',
+            source: 'existing_sale',
             // Adherente que vive en la venta-operación mientras se firma.
             operation_beneficiary_id: createdBeneficiaries?.[i]?.id || null,
             // Se llena recién al activar (por trigger), con el adherente
