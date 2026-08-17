@@ -56,7 +56,7 @@ export const useDashboardStats = () => {
             total_amount,
             status,
             created_at,
-            clients:client_id(first_name, last_name),
+            clients:client_id(first_name, last_name, client_type, razon_social, ruc, dni),
             plans:plan_id(name),
             companies:company_id(name)
           `)

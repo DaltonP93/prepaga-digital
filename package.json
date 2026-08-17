@@ -17,7 +17,7 @@
     "deploy:test": "bash scripts/deploy-test.sh",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:engine": "bash scripts/test-engine.sh"
+    "test:engine": "node scripts/test-engine.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.2",

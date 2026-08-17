@@ -8,7 +8,7 @@ import { SimpleAuthProvider } from "@/components/SimpleAuthProvider";
 import { CompanyBrandingProvider } from "@/components/CompanyBrandingProvider";
 
 // Helper: retry dynamic imports once then force-reload on chunk errors
-function lazyRetry<T extends ComponentType<Record<string, unknown>>>(importFn: () => Promise<{ default: T }>) {
+function lazyRetry<P>(importFn: () => Promise<{ default: ComponentType<P> }>) {
   return lazy(() =>
     importFn().catch((error: unknown) => {
       // If chunk failed to load, reload the page once

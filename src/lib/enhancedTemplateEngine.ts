@@ -200,6 +200,8 @@ export interface EnhancedTemplateContext {
     nombreCompleto: string;
     ci: string;
     dni: string;
+    documento?: string;
+    documentoLabel?: string;
     email: string;
     telefono: string;
     relacion: string;
@@ -840,6 +842,10 @@ export function getEnhancedTemplateVariables(): { category: string; variables: {
         { key: '{{cliente.telefono}}', description: 'Teléfono del cliente' },
         { key: '{{cliente.ci}}', description: 'C.I. del cliente' },
         { key: '{{cliente.dni}}', description: 'C.I. del cliente (alias)' },
+        { key: '{{cliente.documento}}', description: 'RUC para empresas o C.I. para personas' },
+        { key: '{{cliente.documentoLabel}}', description: 'Etiqueta del documento: RUC o C.I.' },
+        { key: '{{cliente.ruc}}', description: 'RUC del cliente empresa' },
+        { key: '{{cliente.razonSocial}}', description: 'Razón social del cliente empresa' },
         { key: '{{cliente.direccion}}', description: 'Dirección del cliente' },
         { key: '{{cliente.ciudad}}', description: 'Ciudad del cliente' },
         { key: '{{cliente.provincia}}', description: 'Provincia/Departamento del cliente' },

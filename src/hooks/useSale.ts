@@ -10,7 +10,7 @@ export const useSale = (saleId: string) => {
         .from('sales')
         .select(`
           *,
-          clients:client_id(first_name, last_name, email, phone, dni),
+          clients:client_id(first_name, last_name, email, phone, dni, client_type, razon_social, ruc),
           plans:plan_id(name, price, description, coverage_details),
           companies:company_id(name),
           templates:template_id(name, description)

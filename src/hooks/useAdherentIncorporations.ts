@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { getClientDisplayName, getClientDocument } from '@/lib/clientUtils';
 
 /**
  * Incorporación de Adherente ("Anexo de Incorporación de Adherente").
@@ -125,7 +126,7 @@ export const useCreateAdherentIncorporation = () => {
         .from('sales')
         .select(`
           id, company_id, client_id, plan_id, salesperson_id, immediate_coverage,
-          clients:client_id ( first_name, last_name, dni, email, phone )
+          clients:client_id ( first_name, last_name, dni, client_type, razon_social, ruc, email, phone )
         `)
         .eq('id', parentSaleId)
         .maybeSingle();
@@ -136,7 +137,7 @@ export const useCreateAdherentIncorporation = () => {
       const cliente: any = (parent as any).clients || {};
       // Mayúsculas del titular tal cual están: no transformar (bug conocido
       // de nombres en minúscula en el bloque de firma).
-      const titularName = `${cliente.first_name || ''} ${cliente.last_name || ''}`.trim();
+      const titularName = getClientDisplayName(cliente);
 
       const totalAdherentes = adherents.reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
 
@@ -202,7 +203,7 @@ export const useCreateAdherentIncorporation = () => {
             parent_sale_id: parentSaleId,
             plan_id: (parent as any).plan_id,
             titular_name: titularName,
-            titular_document: cliente.dni || null,
+            titular_document: getClientDocument(cliente) || null,
             titular_email: cliente.email || null,
             titular_phone: cliente.phone || null,
             adherent_first_name: a.first_name,

@@ -10,6 +10,7 @@ import { useClients } from '@/hooks/useClients';
 import { usePlans } from '@/hooks/usePlans';
 import { ClientForm } from '@/components/ClientForm';
 import { useCurrencySettings } from '@/hooks/useCurrencySettings';
+import { getClientDisplayName, getClientDocument, getClientDocumentLabel } from '@/lib/clientUtils';
 interface SaleBasicTabProps {
   formData: {
     client_id: string;
@@ -72,7 +73,8 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
 
   const filteredClients = useMemo(() => (
     clients?.filter(client =>
-      `${client.first_name} ${client.last_name}`.toLowerCase().includes(searchClient.toLowerCase()) ||
+      getClientDisplayName(client).toLowerCase().includes(searchClient.toLowerCase()) ||
+      getClientDocument(client).toLowerCase().includes(searchClient.toLowerCase()) ||
       client.email?.toLowerCase().includes(searchClient.toLowerCase())
     ) || []
   ), [clients, searchClient]);
@@ -131,7 +133,7 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
                 </div>
                 {filteredClients.map((client) => (
                   <SelectItem key={client.id} value={client.id}>
-                    {client.first_name} {client.last_name} {client.dni ? `- C.I.: ${client.dni}` : ''}
+                    {getClientDisplayName(client)} {getClientDocument(client) ? `- ${getClientDocumentLabel(client)}: ${getClientDocument(client)}` : ''}
                   </SelectItem>
                 ))}
               </SelectContent>

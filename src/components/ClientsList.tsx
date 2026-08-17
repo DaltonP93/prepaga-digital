@@ -125,7 +125,7 @@ export function ClientsList() {
               <Input
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar por nombre, email, teléfono o DNI/CI"
+                placeholder="Buscar por nombre, razón social, RUC/C.I., email o teléfono"
                 className="pl-9"
               />
             </div>
@@ -162,7 +162,7 @@ export function ClientsList() {
                 <TableHead>Nombre</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Teléfono</TableHead>
-                <TableHead>DNI/CI</TableHead>
+                <TableHead>RUC/C.I.</TableHead>
                 <TableHead>Fecha Nac.</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>

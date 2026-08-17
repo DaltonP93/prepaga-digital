@@ -89,7 +89,7 @@ export const useSales = () => {
         .from('sales')
         .select(`
           *,
-          clients:client_id(first_name, last_name, email, phone, dni),
+          clients:client_id(first_name, last_name, email, phone, dni, client_type, razon_social, ruc),
           plans:plan_id(name, price, description, coverage_details),
           companies:company_id(name),
           templates:template_id(name, description),
@@ -171,7 +171,7 @@ export function useSalesList(paramsOrEnabled: SalesListParams | boolean = {}) {
           signature_expires_at,
           salesperson_id,
           company_id,
-          clients:client_id(first_name, last_name, email),
+          clients:client_id(first_name, last_name, email, client_type, razon_social, ruc, dni),
           plans:plan_id(name)
         `)
         .order('created_at', { ascending: false });
@@ -246,7 +246,7 @@ export const useSalesLookup = (enabled = true) => {
         .select(`
           id,
           contract_number,
-          clients:client_id(first_name, last_name)
+          clients:client_id(first_name, last_name, client_type, razon_social, ruc, dni)
         `)
         .order('created_at', { ascending: false });
 
@@ -371,7 +371,7 @@ export const useGenerateQuestionnaireLink = () => {
         .from('sales')
         .select(`
           *,
-          clients:client_id(first_name, last_name, email),
+          clients:client_id(first_name, last_name, email, client_type, razon_social, ruc, dni),
           templates:template_id(name, question_count:template_questions(count))
         `)
         .eq('id', saleId)
@@ -453,7 +453,7 @@ export const useGenerateSignatureLink = () => {
         .from('sales')
         .select(`
           *,
-          clients:client_id(first_name, last_name, email, phone),
+          clients:client_id(first_name, last_name, email, phone, client_type, razon_social, ruc, dni),
           plans:plan_id(name, price),
           templates:template_id(name),
           template_responses(id)
@@ -515,7 +515,7 @@ export const useGenerateSignatureLink = () => {
           .eq('id', saleId)
           .select(`
             *,
-            clients:client_id(first_name, last_name, email, phone),
+            clients:client_id(first_name, last_name, email, phone, client_type, razon_social, ruc, dni),
             plans:plan_id(name, price)
           `)
           .single();
@@ -604,7 +604,7 @@ export const useValidateSaleForSignature = () => {
         .from('sales')
         .select(`
           *,
-          clients:client_id(first_name, last_name, email),
+          clients:client_id(first_name, last_name, email, client_type, razon_social, ruc, dni),
           plans:plan_id(name, price),
           templates:template_id(name),
           template_responses(id)

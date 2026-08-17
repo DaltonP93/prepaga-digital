@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -7,30 +7,10 @@
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.1"
   }
   public: {
     Tables: {
@@ -49,13 +29,14 @@ export type Database = {
           client_id: string
           company_id: string
           completed_at: string | null
-          coverage_end_date: string
+          coverage_end_date: string | null
           coverage_start_date: string | null
           created_at: string
           created_by: string | null
           document_id: string | null
           id: string
           notes: string | null
+          operation_beneficiary_id: string | null
           operation_sale_id: string
           parent_sale_id: string | null
           plan_id: string | null
@@ -82,13 +63,14 @@ export type Database = {
           client_id: string
           company_id: string
           completed_at?: string | null
-          coverage_end_date: string
+          coverage_end_date?: string | null
           coverage_start_date?: string | null
           created_at?: string
           created_by?: string | null
           document_id?: string | null
           id?: string
           notes?: string | null
+          operation_beneficiary_id?: string | null
           operation_sale_id: string
           parent_sale_id?: string | null
           plan_id?: string | null
@@ -115,13 +97,14 @@ export type Database = {
           client_id?: string
           company_id?: string
           completed_at?: string | null
-          coverage_end_date?: string
+          coverage_end_date?: string | null
           coverage_start_date?: string | null
           created_at?: string
           created_by?: string | null
           document_id?: string | null
           id?: string
           notes?: string | null
+          operation_beneficiary_id?: string | null
           operation_sale_id?: string
           parent_sale_id?: string | null
           plan_id?: string | null
@@ -164,23 +147,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "adherent_incorporations_operation_beneficiary_id_fkey"
+            columns: ["operation_beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiaries"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "adherent_incorporations_operation_sale_id_fkey"
             columns: ["operation_sale_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "auditor_sales_view"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "adherent_incorporations_operation_sale_id_fkey"
             columns: ["operation_sale_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "sales"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "adherent_incorporations_operation_sale_id_fkey"
             columns: ["operation_sale_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "sales_completed_view"
             referencedColumns: ["id"]
           },
@@ -459,10 +449,12 @@ export type Database = {
           document_number: string | null
           document_type: string | null
           email: string | null
+          entry_date: string | null
           first_name: string
           gender: string | null
           has_preexisting_conditions: boolean | null
           id: string
+          immediate_coverage: boolean | null
           is_primary: boolean | null
           last_name: string
           marital_status: string | null
@@ -493,10 +485,12 @@ export type Database = {
           document_number?: string | null
           document_type?: string | null
           email?: string | null
+          entry_date?: string | null
           first_name: string
           gender?: string | null
           has_preexisting_conditions?: boolean | null
           id?: string
+          immediate_coverage?: boolean | null
           is_primary?: boolean | null
           last_name: string
           marital_status?: string | null
@@ -527,10 +521,12 @@ export type Database = {
           document_number?: string | null
           document_type?: string | null
           email?: string | null
+          entry_date?: string | null
           first_name?: string
           gender?: string | null
           has_preexisting_conditions?: boolean | null
           id?: string
+          immediate_coverage?: boolean | null
           is_primary?: boolean | null
           last_name?: string
           marital_status?: string | null
@@ -647,11 +643,13 @@ export type Database = {
           barrio: string | null
           birth_date: string | null
           city: string | null
+          client_type: string
           company_id: string
           country_id: string | null
           created_at: string | null
           dni: string | null
           email: string | null
+          external_id: string | null
           first_name: string
           gender: string | null
           id: string
@@ -662,6 +660,8 @@ export type Database = {
           phone: string | null
           postal_code: string | null
           province: string | null
+          razon_social: string | null
+          ruc: string | null
           updated_at: string | null
         }
         Insert: {
@@ -669,11 +669,13 @@ export type Database = {
           barrio?: string | null
           birth_date?: string | null
           city?: string | null
+          client_type?: string
           company_id: string
           country_id?: string | null
           created_at?: string | null
           dni?: string | null
           email?: string | null
+          external_id?: string | null
           first_name: string
           gender?: string | null
           id?: string
@@ -684,6 +686,8 @@ export type Database = {
           phone?: string | null
           postal_code?: string | null
           province?: string | null
+          razon_social?: string | null
+          ruc?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -691,11 +695,13 @@ export type Database = {
           barrio?: string | null
           birth_date?: string | null
           city?: string | null
+          client_type?: string
           company_id?: string
           country_id?: string | null
           created_at?: string | null
           dni?: string | null
           email?: string | null
+          external_id?: string | null
           first_name?: string
           gender?: string | null
           id?: string
@@ -706,6 +712,8 @@ export type Database = {
           phone?: string | null
           postal_code?: string | null
           province?: string | null
+          razon_social?: string | null
+          ruc?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -742,7 +750,7 @@ export type Database = {
           percent: number | null
           period_id: string
           plan_name: string
-          rule_id: string
+          rule_id: string | null
           rule_snapshot: Json
           sale_date: string
           sale_id: string
@@ -764,7 +772,7 @@ export type Database = {
           percent?: number | null
           period_id: string
           plan_name: string
-          rule_id: string
+          rule_id?: string | null
           rule_snapshot: Json
           sale_date: string
           sale_id: string
@@ -786,7 +794,7 @@ export type Database = {
           percent?: number | null
           period_id?: string
           plan_name?: string
-          rule_id?: string
+          rule_id?: string | null
           rule_snapshot?: Json
           sale_date?: string
           sale_id?: string
@@ -863,9 +871,6 @@ export type Database = {
           paid_by: string | null
           period_end: string
           period_start: string
-          promoter_type_code: string
-          promoter_type_id: string
-          promoter_type_name: string
           salesperson_email: string | null
           salesperson_id: string
           salesperson_name: string
@@ -890,9 +895,6 @@ export type Database = {
           paid_by?: string | null
           period_end: string
           period_start: string
-          promoter_type_code: string
-          promoter_type_id: string
-          promoter_type_name: string
           salesperson_email?: string | null
           salesperson_id: string
           salesperson_name: string
@@ -917,9 +919,6 @@ export type Database = {
           paid_by?: string | null
           period_end?: string
           period_start?: string
-          promoter_type_code?: string
-          promoter_type_id?: string
-          promoter_type_name?: string
           salesperson_email?: string | null
           salesperson_id?: string
           salesperson_name?: string
@@ -932,13 +931,6 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "commission_periods_promoter_type_id_fkey"
-            columns: ["promoter_type_id"]
-            isOneToOne: false
-            referencedRelation: "commission_promoter_types"
             referencedColumns: ["id"]
           },
           {
@@ -995,47 +987,6 @@ export type Database = {
           },
         ]
       }
-      commission_promoter_types: {
-        Row: {
-          code: string
-          company_id: string
-          created_at: string
-          default_percent: number | null
-          id: string
-          is_active: boolean
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          code: string
-          company_id: string
-          created_at?: string
-          default_percent?: number | null
-          id?: string
-          is_active?: boolean
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          code?: string
-          company_id?: string
-          created_at?: string
-          default_percent?: number | null
-          id?: string
-          is_active?: boolean
-          name?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "commission_promoter_types_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       commission_rules: {
         Row: {
           base: string
@@ -1050,7 +1001,6 @@ export type Database = {
           percent: number | null
           plan_id: string | null
           priority: number
-          promoter_type_id: string | null
           sale_type: string | null
           salesperson_id: string | null
           specificity: number | null
@@ -1071,7 +1021,6 @@ export type Database = {
           percent?: number | null
           plan_id?: string | null
           priority?: number
-          promoter_type_id?: string | null
           sale_type?: string | null
           salesperson_id?: string | null
           specificity?: number | null
@@ -1092,7 +1041,6 @@ export type Database = {
           percent?: number | null
           plan_id?: string | null
           priority?: number
-          promoter_type_id?: string | null
           sale_type?: string | null
           salesperson_id?: string | null
           specificity?: number | null
@@ -1116,13 +1064,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "commission_rules_promoter_type_id_fkey"
-            columns: ["promoter_type_id"]
-            isOneToOne: false
-            referencedRelation: "commission_promoter_types"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "commission_rules_salesperson_id_fkey"
             columns: ["salesperson_id"]
             isOneToOne: false
@@ -1135,27 +1076,30 @@ export type Database = {
         Row: {
           company_id: string
           created_at: string
+          default_base: string
+          default_percent: number | null
           id: string
           is_active: boolean
-          promoter_type_id: string
           salesperson_id: string
           updated_at: string
         }
         Insert: {
           company_id: string
           created_at?: string
+          default_base?: string
+          default_percent?: number | null
           id?: string
           is_active?: boolean
-          promoter_type_id: string
           salesperson_id: string
           updated_at?: string
         }
         Update: {
           company_id?: string
           created_at?: string
+          default_base?: string
+          default_percent?: number | null
           id?: string
           is_active?: boolean
-          promoter_type_id?: string
           salesperson_id?: string
           updated_at?: string
         }
@@ -1165,13 +1109,6 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "commission_salespeople_promoter_type_id_fkey"
-            columns: ["promoter_type_id"]
-            isOneToOne: false
-            referencedRelation: "commission_promoter_types"
             referencedColumns: ["id"]
           },
           {
@@ -3394,6 +3331,7 @@ export type Database = {
           contract_pdf_url: string | null
           contract_start_date: string | null
           created_at: string | null
+          employee_signature_mode: string
           id: string
           immediate_coverage: boolean | null
           notes: string | null
@@ -3440,6 +3378,7 @@ export type Database = {
           contract_pdf_url?: string | null
           contract_start_date?: string | null
           created_at?: string | null
+          employee_signature_mode?: string
           id?: string
           immediate_coverage?: boolean | null
           notes?: string | null
@@ -3486,6 +3425,7 @@ export type Database = {
           contract_pdf_url?: string | null
           contract_start_date?: string | null
           created_at?: string | null
+          employee_signature_mode?: string
           id?: string
           immediate_coverage?: boolean | null
           notes?: string | null
@@ -5778,9 +5718,6 @@ export type Database = {
           paid_by: string | null
           period_end: string
           period_start: string
-          promoter_type_code: string
-          promoter_type_id: string
-          promoter_type_name: string
           salesperson_email: string | null
           salesperson_id: string
           salesperson_name: string
@@ -5845,9 +5782,6 @@ export type Database = {
           paid_by: string | null
           period_end: string
           period_start: string
-          promoter_type_code: string
-          promoter_type_id: string
-          promoter_type_name: string
           salesperson_email: string | null
           salesperson_id: string
           salesperson_name: string
@@ -5875,12 +5809,11 @@ export type Database = {
       commission_list_salespeople: {
         Args: { p_company_id: string }
         Returns: {
+          default_base: string
+          default_percent: number
           display_name: string
           email: string
           is_active: boolean
-          promoter_type_code: string
-          promoter_type_id: string
-          promoter_type_name: string
           salesperson_id: string
         }[]
       }
@@ -5904,9 +5837,6 @@ export type Database = {
           paid_by: string | null
           period_end: string
           period_start: string
-          promoter_type_code: string
-          promoter_type_id: string
-          promoter_type_name: string
           salesperson_email: string | null
           salesperson_id: string
           salesperson_name: string
@@ -6215,9 +6145,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       app_role: [
@@ -6250,4 +6177,3 @@ export const Constants = {
     },
   },
 } as const
-

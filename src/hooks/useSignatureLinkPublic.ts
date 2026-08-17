@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@supabase/supabase-js';
 import { useToast } from '@/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
+import { getClientDisplayName, getClientDocument, getClientDocumentLabel } from '@/lib/clientUtils';
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || '').trim();
 const SUPABASE_PUBLISHABLE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '').trim();
@@ -57,6 +58,9 @@ interface SignatureLinkData {
       email: string | null;
       phone: string | null;
       dni: string | null;
+      client_type?: string | null;
+      razon_social?: string | null;
+      ruc?: string | null;
     } | null;
     plans: {
       name: string;
@@ -122,7 +126,10 @@ export const useSignatureLinkByToken = (token: string) => {
             last_name,
             email,
             phone,
-            dni
+            dni,
+            client_type,
+            razon_social,
+            ruc
           ),
           plans:plan_id (
             name,
@@ -526,7 +533,7 @@ export const useSubmitSignatureLink = () => {
           try {
             const { data: saleInfo } = await signatureClient
               .from('sales')
-              .select('company_id, signer_type, signer_name, signer_dni, signer_phone, signer_email, signer_relationship, companies:company_id(name, tax_id, address, phone, email), clients:client_id(first_name, last_name, dni), beneficiaries(id, first_name, last_name, dni)')
+              .select('company_id, signer_type, signer_name, signer_dni, signer_phone, signer_email, signer_relationship, companies:company_id(name, tax_id, address, phone, email), clients:client_id(first_name, last_name, dni, client_type, razon_social, ruc), beneficiaries(id, first_name, last_name, dni)')
               .eq('id', data.sale_id)
               .single();
             companyInfo = (saleInfo as any)?.companies || null;
@@ -620,6 +627,7 @@ export const useSubmitSignatureLink = () => {
 
               let signerName = '';
               let signerCI = '';
+              let signerDocumentLabel = 'C.I.';
               let roleLabel = 'CONTRATANTE';
 
               if (recipientType === 'adherente' && recipientId && saleBeneficiaries.length > 0) {
@@ -639,8 +647,9 @@ export const useSubmitSignatureLink = () => {
                 signerCI = saleSignerInfo.ci;
                 roleLabel = 'CONTRATANTE';
               } else if (saleClientInfo) {
-                signerName = `${saleClientInfo.first_name || ''} ${saleClientInfo.last_name || ''}`.trim();
-                signerCI = saleClientInfo.dni || '';
+                signerName = getClientDisplayName(saleClientInfo);
+                signerCI = getClientDocument(saleClientInfo);
+                signerDocumentLabel = getClientDocumentLabel(saleClientInfo);
                 roleLabel = 'CONTRATANTE';
               }
 
@@ -670,7 +679,7 @@ export const useSubmitSignatureLink = () => {
                     <div style="border-top:1px solid #333;width:80%;margin:6px 0 4px 0;"></div>
                     <p style="margin:0;text-align:center;font-weight:bold;font-size:10px;">${roleLabel}</p>
                     <p style="margin:2px 0 0 0;font-size:10px;">Aclaración: ${signerName || '.............................'}</p>
-                    <p style="margin:2px 0 0 0;font-size:10px;">C.I.Nº: ${signerCI || '.............................'}</p>
+                    <p style="margin:2px 0 0 0;font-size:10px;">${signerDocumentLabel} Nº: ${signerCI || '.............................'}</p>
                   </div>
                 `;
               } else {
@@ -683,7 +692,7 @@ export const useSubmitSignatureLink = () => {
                     <div style="border-top:1px solid #555;width:80%;margin:0 0 6px 0;"></div>
                     <p style="margin:0;font-size:11px;font-weight:bold;">${roleLabel}</p>
                     <p style="margin:4px 0 0 0;font-size:11px;">Aclaración: ${signerName || '.............................'}</p>
-                    <p style="margin:2px 0 0 0;font-size:11px;">C.I.Nº: ${signerCI || '.............................'}</p>
+                    <p style="margin:2px 0 0 0;font-size:11px;">${signerDocumentLabel} Nº: ${signerCI || '.............................'}</p>
                   </div>
                 `;
               }

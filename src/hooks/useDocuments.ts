@@ -30,7 +30,7 @@ export const useDocuments = () => {
             id, 
             status, 
             contract_number,
-            clients:client_id(first_name, last_name),
+            clients:client_id(first_name, last_name, client_type, razon_social, ruc, dni),
             plans:plan_id(name)
           )
         `)
@@ -201,7 +201,7 @@ export const useDocumentsList = ({
             id,
             status,
             contract_number,
-            clients:client_id(first_name, last_name),
+            clients:client_id(first_name, last_name, client_type, razon_social, ruc, dni),
             plans:plan_id(name)
           `)
           .in("id", saleIds);
@@ -252,7 +252,7 @@ export const useDocument = (documentId?: string | null) => {
             id,
             status,
             contract_number,
-            clients:client_id(first_name, last_name),
+            clients:client_id(first_name, last_name, client_type, razon_social, ruc, dni),
             plans:plan_id(name)
           )
         `)

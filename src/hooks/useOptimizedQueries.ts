@@ -31,7 +31,7 @@ export const useOptimizedDashboard = () => {
             total_amount,
             status,
             created_at,
-            clients:client_id(first_name, last_name),
+            clients:client_id(first_name, last_name, client_type, razon_social, ruc, dni),
             plans:plan_id(name)
           `)
           .order('created_at', { ascending: false })
@@ -97,8 +97,8 @@ export const useOptimizedSearch = (searchTerm: string, table: 'clients' | 'sales
       if (table === 'clients') {
         const { data, error } = await supabase
           .from('clients')
-          .select('id, first_name, last_name, email, dni')
-          .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,dni.ilike.%${searchTerm}%`)
+          .select('id, first_name, last_name, email, dni, client_type, razon_social, ruc')
+          .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,razon_social.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,dni.ilike.%${searchTerm}%,ruc.ilike.%${searchTerm}%`)
           .limit(10);
 
         if (error) throw error;

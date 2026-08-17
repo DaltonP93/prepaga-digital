@@ -14,6 +14,7 @@ import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { formatCurrency } from '@/lib/utils';
 import { formatDateOnly } from '@/lib/dateOnly';
 import { getDocumentAccessUrl } from '@/lib/assetUrlHelper';
+import { getClientDisplayName, getClientDocument, getClientDocumentLabel } from '@/lib/clientUtils';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   CheckCircle, XCircle, Clock, AlertCircle, Eye, Search,
@@ -205,7 +206,7 @@ export const AuditorDashboard: React.FC = () => {
           contract_number,
           contract_start_date,
           created_at,
-          clients:client_id (id, first_name, last_name),
+          clients:client_id (id, first_name, last_name, client_type, razon_social, ruc, dni),
           plans:plan_id (id, name)
         `)
         .order('created_at', { ascending: false });
@@ -260,7 +261,7 @@ export const AuditorDashboard: React.FC = () => {
           contract_start_date,
           immediate_coverage,
           sale_type,
-          clients:client_id (id, first_name, last_name, email, phone, dni, birth_date, address, barrio, city),
+          clients:client_id (id, first_name, last_name, client_type, razon_social, ruc, email, phone, dni, birth_date, address, barrio, city),
           plans:plan_id (id, name)
         `)
         .eq('id', selectedSaleId);
@@ -788,7 +789,7 @@ export const AuditorDashboard: React.FC = () => {
             <CardContent className="space-y-3">
               <div>
                 <span className="font-medium">Nombre: </span>
-                {selectedSale.clients?.first_name} {selectedSale.clients?.last_name}
+                {getClientDisplayName(selectedSale.clients)}
               </div>
               <div>
                 <span className="font-medium">Email: </span>
@@ -799,8 +800,8 @@ export const AuditorDashboard: React.FC = () => {
                 {selectedSale.clients?.phone || 'No especificado'}
               </div>
               <div>
-                <span className="font-medium">C.I.: </span>
-                {selectedSale.clients?.dni || 'No especificado'}
+                <span className="font-medium">{getClientDocumentLabel(selectedSale.clients)}: </span>
+                {getClientDocument(selectedSale.clients) || 'No especificado'}
               </div>
               {selectedSale.clients?.birth_date && (
                 <div>

@@ -24,6 +24,9 @@ DECLARE
   v_parent_status   text;
   v_total_antes     numeric;
   v_total_despues   numeric;
+  v_total_esperado  numeric;
+  v_suma_benef      numeric;
+  v_tiene_titular   boolean;
 
   v_op_id           uuid;
   v_inc_id          uuid;
@@ -38,6 +41,7 @@ DECLARE
   v_op3_id          uuid;
   v_op_fb_id        uuid;
   v_normal_id       uuid;
+  v_normal_inc_id   uuid;
   v_count           integer;
 
   -- Monto distintivo para poder rastrear el efecto en el total.
@@ -94,9 +98,11 @@ BEGIN
     INTO v_parent_id, v_company_id, v_client_id, v_plan_id, v_salesperson_id,
          v_parent_status, v_total_antes
   FROM public.sales s
+  JOIN public.clients c ON c.id = s.client_id
   WHERE s.status::text IN ('firmado', 'completado')
     AND COALESCE(s.sale_type, '') <> 'alta_adherente'
     AND s.client_id IS NOT NULL
+    AND c.client_type = 'empresa'
     AND NOT EXISTS (
       SELECT 1 FROM public.adherent_incorporations ai WHERE ai.parent_sale_id = s.id
     )
@@ -104,7 +110,7 @@ BEGIN
   LIMIT 1;
 
   IF v_parent_id IS NULL THEN
-    RAISE EXCEPTION 'No hay una venta firmada/completada libre para usar como contrato madre';
+    RAISE EXCEPTION 'No hay una venta firmada/completada de una empresa libre para usar como contrato madre';
   END IF;
   RAISE NOTICE 'Contrato madre: % (estado %, total inicial %)',
     v_parent_id, v_parent_status, v_total_antes;
@@ -177,11 +183,23 @@ BEGIN
     RAISE EXCEPTION 'El adherente ya firmó el anexo: signature_required debe ser false';
   END IF;
 
-  -- La cuota del contrato madre tiene que haberse recalculado.
+  -- La cuota del contrato madre tiene que haberse recalculado al valor exacto
+  -- que determina la función: suma de beneficiarios si hay titular; si no,
+  -- titular_amount más la suma de beneficiarios.
+  SELECT COALESCE(bool_or(COALESCE(b.is_primary, false)), false),
+         COALESCE(SUM(COALESCE(b.amount, 0)), 0)
+    INTO v_tiene_titular, v_suma_benef
+  FROM public.beneficiaries b
+  WHERE b.sale_id = v_parent_id;
+  SELECT CASE WHEN v_tiene_titular THEN v_suma_benef
+              ELSE COALESCE(s.titular_amount, 0) + v_suma_benef END
+    INTO v_total_esperado
+  FROM public.sales s WHERE s.id = v_parent_id;
   SELECT COALESCE(total_amount, 0) INTO v_total_despues
   FROM public.sales WHERE id = v_parent_id;
-  IF v_total_despues IS NOT DISTINCT FROM v_total_antes THEN
-    RAISE EXCEPTION 'El total del contrato madre no se recalculó (sigue en %)', v_total_antes;
+  IF v_total_despues IS DISTINCT FROM v_total_esperado THEN
+    RAISE EXCEPTION 'El total del contrato madre es incorrecto: % (esperado %)',
+      v_total_despues, v_total_esperado;
   END IF;
   RAISE NOTICE 'Total del madre: % -> %', v_total_antes, v_total_despues;
 
@@ -244,6 +262,22 @@ BEGIN
     RAISE EXCEPTION 'Las 3 incorporaciones debían quedar completadas, hay %', v_count;
   END IF;
 
+  SELECT COALESCE(bool_or(COALESCE(b.is_primary, false)), false),
+         COALESCE(SUM(COALESCE(b.amount, 0)), 0)
+    INTO v_tiene_titular, v_suma_benef
+  FROM public.beneficiaries b
+  WHERE b.sale_id = v_parent_id;
+  SELECT CASE WHEN v_tiene_titular THEN v_suma_benef
+              ELSE COALESCE(s.titular_amount, 0) + v_suma_benef END
+    INTO v_total_esperado
+  FROM public.sales s WHERE s.id = v_parent_id;
+  SELECT COALESCE(total_amount, 0) INTO v_total_despues
+  FROM public.sales WHERE id = v_parent_id;
+  IF v_total_despues IS DISTINCT FROM v_total_esperado THEN
+    RAISE EXCEPTION 'El total después de 3 funcionarios es incorrecto: % (esperado %)',
+      v_total_despues, v_total_esperado;
+  END IF;
+
   -- ---------------------------------------------------------------------
   -- 6. Camino de respaldo: sin operation_beneficiary_id
   -- ---------------------------------------------------------------------
@@ -269,9 +303,32 @@ BEGIN
 
   SELECT count(*) INTO v_count
   FROM public.beneficiaries b
-  WHERE b.sale_id = v_parent_id AND b.first_name = 'TEST-FALLBACK';
+  WHERE b.sale_id = v_parent_id
+    AND b.first_name = 'TEST-FALLBACK'
+    AND b.last_name = 'Sin Vinculo'
+    AND b.dni = '9999003'
+    AND b.relationship IS NULL
+    AND b.amount = c_monto
+    AND COALESCE(b.is_primary, false) = false
+    AND COALESCE(b.signature_required, true) = false;
   IF v_count <> 1 THEN
-    RAISE EXCEPTION 'El camino de respaldo perdió a la persona: % filas', v_count;
+    RAISE EXCEPTION 'El camino de respaldo perdió o alteró a la persona: % filas válidas', v_count;
+  END IF;
+
+  SELECT COALESCE(bool_or(COALESCE(b.is_primary, false)), false),
+         COALESCE(SUM(COALESCE(b.amount, 0)), 0)
+    INTO v_tiene_titular, v_suma_benef
+  FROM public.beneficiaries b
+  WHERE b.sale_id = v_parent_id;
+  SELECT CASE WHEN v_tiene_titular THEN v_suma_benef
+              ELSE COALESCE(s.titular_amount, 0) + v_suma_benef END
+    INTO v_total_esperado
+  FROM public.sales s WHERE s.id = v_parent_id;
+  SELECT COALESCE(total_amount, 0) INTO v_total_despues
+  FROM public.sales WHERE id = v_parent_id;
+  IF v_total_despues IS DISTINCT FROM v_total_esperado THEN
+    RAISE EXCEPTION 'El total después del fallback es incorrecto: % (esperado %)',
+      v_total_despues, v_total_esperado;
   END IF;
 
   -- ---------------------------------------------------------------------
@@ -283,12 +340,33 @@ BEGIN
           'venta_nueva', 'borrador', CURRENT_DATE, c_monto)
   RETURNING id INTO v_normal_id;
 
+  -- Asociar una incorporación deliberadamente inválida a una venta normal
+  -- permite probar la puerta de salida real del trigger, no sólo la ausencia
+  -- de filas espontáneas.
+  INSERT INTO public.adherent_incorporations (
+    company_id, client_id, operation_sale_id, parent_sale_id, plan_id,
+    titular_name, adherent_first_name, adherent_last_name,
+    adherent_document_number, adherent_amount, coverage_end_date, status
+  ) VALUES (
+    v_company_id, v_client_id, v_normal_id, v_parent_id, v_plan_id,
+    'TEST-ROLLBACK Titular', 'TEST-NORMAL', 'No Activar',
+    '9999004', c_monto, (CURRENT_DATE + INTERVAL '1 year')::date, 'borrador'
+  ) RETURNING id INTO v_normal_inc_id;
+
   UPDATE public.sales SET status = 'completado' WHERE id = v_normal_id;
 
+  SELECT status, activated_beneficiary_id
+    INTO v_inc_status, v_ben_id
+  FROM public.adherent_incorporations WHERE id = v_normal_inc_id;
+  IF v_inc_status <> 'borrador' OR v_ben_id IS NOT NULL THEN
+    RAISE EXCEPTION 'La puerta de salida falló: la venta normal activó la incorporación';
+  END IF;
+
   SELECT count(*) INTO v_count
-  FROM public.adherent_incorporations WHERE operation_sale_id = v_normal_id;
+  FROM public.beneficiaries
+  WHERE sale_id = v_parent_id AND first_name = 'TEST-NORMAL';
   IF v_count <> 0 THEN
-    RAISE EXCEPTION 'Una venta normal generó % incorporación(es)', v_count;
+    RAISE EXCEPTION 'Una venta normal generó % beneficiario(s)', v_count;
   END IF;
 
   RAISE NOTICE 'adherent incorporation lifecycle test: OK (7/7 escenarios)';

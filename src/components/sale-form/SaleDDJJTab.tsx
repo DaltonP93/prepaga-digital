@@ -13,6 +13,7 @@ import { useBeneficiaries } from '@/hooks/useBeneficiaries';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { getClientDisplayName, getClientDocument, getClientDocumentLabel, isCompanyClient } from '@/lib/clientUtils';
 
 interface SaleDDJJTabProps {
   saleId?: string;
@@ -112,6 +113,9 @@ interface VirtualTitular {
   first_name: string;
   last_name: string;
   dni: string | null;
+  client_type?: string | null;
+  razon_social?: string | null;
+  ruc?: string | null;
   is_primary: boolean;
   relationship: string | null;
   has_preexisting_conditions: boolean | null;
@@ -139,7 +143,7 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
       if (!sale?.client_id) return null;
       const { data: client } = await supabase
         .from('clients')
-        .select('first_name, last_name, dni, birth_date, gender, marital_status, phone, email, address, city, province, postal_code')
+        .select('first_name, last_name, dni, client_type, razon_social, ruc, birth_date, gender, marital_status, phone, email, address, city, province, postal_code')
         .eq('id', sale.client_id)
         .single();
       return client ? { ...client, clientId: sale.client_id } : null;
@@ -166,9 +170,12 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
     if (!hasPrimaryBeneficiary && saleClient) {
       const virtualTitular: VirtualTitular = {
         id: 'virtual-titular',
-        first_name: saleClient.first_name,
-        last_name: saleClient.last_name,
-        dni: saleClient.dni,
+        first_name: getClientDisplayName(saleClient),
+        last_name: isCompanyClient(saleClient) ? '' : saleClient.last_name,
+        dni: getClientDocument(saleClient),
+        client_type: (saleClient as any).client_type,
+        razon_social: (saleClient as any).razon_social,
+        ruc: (saleClient as any).ruc,
         is_primary: true,
         relationship: null,
         has_preexisting_conditions: null,
@@ -287,9 +294,10 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
           .from('beneficiaries')
           .insert({
             sale_id: saleId,
-            first_name: saleClient.first_name,
-            last_name: saleClient.last_name,
-            dni: saleClient.dni,
+            first_name: getClientDisplayName(saleClient),
+            last_name: isCompanyClient(saleClient) ? '' : saleClient.last_name,
+            dni: getClientDocument(saleClient),
+            document_number: getClientDocument(saleClient),
             birth_date: saleClient.birth_date,
             gender: (saleClient as any).gender ?? null,
             marital_status: (saleClient as any).marital_status ?? null,
@@ -300,7 +308,10 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
             province: saleClient.province,
             postal_code: saleClient.postal_code,
             is_primary: true,
-            relationship: 'Titular',
+            // El titular ya está referenciado por sales.client_id; no crear
+            // un beneficiario con relationship='Titular' porque generaría un
+            // enlace de firma de adherente fantasma.
+            relationship: null,
             has_preexisting_conditions: hasPreexisting,
             preexisting_conditions_detail: detailParts.length > 0 ? detailParts.join('; ') : null,
           })
@@ -514,7 +525,13 @@ const SaleDDJJTab: React.FC<SaleDDJJTabProps> = ({ saleId }) => {
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
                   {currentBeneficiary.is_primary ? 'Titular' : currentBeneficiary.relationship || 'Adherente'}{' '}
-                  {currentBeneficiary.dni ? `• C.I.: ${currentBeneficiary.dni}` : ''}
+                  {(() => {
+                    const documentClient = currentBeneficiary.is_primary ? (saleClient || currentBeneficiary) : currentBeneficiary;
+                    const document = currentBeneficiary.is_primary
+                      ? getClientDocument(documentClient)
+                      : currentBeneficiary.dni;
+                    return document ? `• ${currentBeneficiary.is_primary ? getClientDocumentLabel(documentClient) : 'C.I.'}: ${document}` : '';
+                  })()}
                   {' '}— Paso {currentStep + 1} de {sortedBeneficiaries.length}
                 </p>
               </div>

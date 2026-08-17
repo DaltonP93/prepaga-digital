@@ -17,6 +17,7 @@ import {
 import DOMPurify from 'dompurify';
 import { formatCurrency } from "@/lib/utils";
 import { useSignatureVerification, generateDocumentHash, buildEvidenceBundle } from "@/hooks/useSignatureVerification";
+import { getClientDocument, getClientDocumentLabel, isCompanyClient } from "@/lib/clientUtils";
 
 const SignatureView = () => {
   const { token } = useParams<{ token: string }>();
@@ -625,7 +626,13 @@ const SignatureView = () => {
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <p className="font-medium">{client.first_name} {client.last_name}</p>
-                {client.dni && <p className="text-muted-foreground">C.I.: {client.dni}</p>}
+                {(() => {
+                  // El enlace de titular puede pertenecer a una empresa. Los
+                  // enlaces de adherente/contratada deben seguir mostrando C.I.
+                  const document = isTitular ? getClientDocument(client) : client.dni;
+                  const label = isTitular ? getClientDocumentLabel(client) : 'C.I.';
+                  return document ? <p className="text-muted-foreground">{label}: {document}</p> : null;
+                })()}
                 {isTitular && client.email && <p className="text-muted-foreground">{client.email}</p>}
               </CardContent>
             </Card>
