@@ -301,7 +301,18 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
       // (con last_name vacío). Así los 77 lugares que componen el nombre como
       // first_name + last_name siguen mostrándolo bien sin tocar 42 archivos,
       // y no hace falta quitarle el NOT NULL a esas columnas.
-      const cleanData = { ...rest, ...buildClientNamePayload(rest) };
+      const cleanData = {
+        ...rest,
+        ...buildClientNamePayload(rest),
+        // `gender` y `marital_status` tienen CHECK en la base: aceptan NULL o
+        // uno de sus valores, pero NO la cadena vacía. El formulario los
+        // inicializa en "" y para una empresa ni siquiera se muestran, así que
+        // sin esta normalización el INSERT falla con 23514
+        // (clients_gender_check). Afecta también a una persona a la que no se
+        // le eligió género.
+        gender: rest.gender?.trim() ? rest.gender : null,
+        marital_status: rest.marital_status?.trim() ? rest.marital_status : null,
+      };
 
       if (isEditing && client) {
         await updateClient.mutateAsync({ id: client.id, ...cleanData });
