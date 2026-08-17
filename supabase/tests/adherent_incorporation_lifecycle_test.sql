@@ -22,6 +22,7 @@ DECLARE
   v_salesperson_id  uuid;
   v_parent_id       uuid;
   v_parent_status   text;
+  v_parent_source   text;
   v_total_antes     numeric;
   v_total_despues   numeric;
   v_total_esperado  numeric;
@@ -105,18 +106,67 @@ BEGIN
   LIMIT 1;
 
   IF v_parent_id IS NULL THEN
-    RAISE EXCEPTION 'No hay una venta firmada/completada de una empresa libre para usar como contrato madre';
+    -- US Test puede no tener todavía una venta cerrada de una empresa. En
+    -- ese caso se crea un contrato madre mínimo dentro de esta transacción.
+    -- ROLLBACK lo elimina junto con todos los datos de la prueba; no se
+    -- depende de datos comerciales reales para validar el trigger.
+    SELECT c.id INTO v_company_id
+    FROM public.companies c
+    ORDER BY c.created_at NULLS LAST, c.id
+    LIMIT 1;
+
+    IF v_company_id IS NULL THEN
+      RAISE EXCEPTION 'US Test no tiene ninguna empresa para crear el fixture transaccional';
+    END IF;
+
+    SELECT p.id INTO v_plan_id
+    FROM public.plans p
+    WHERE p.company_id = v_company_id
+    ORDER BY p.created_at NULLS LAST, p.id
+    LIMIT 1;
+
+    IF v_plan_id IS NULL THEN
+      INSERT INTO public.plans (company_id, name, price, is_active)
+      VALUES (v_company_id, 'TEST-ROLLBACK Plan', c_monto, true)
+      RETURNING id INTO v_plan_id;
+    END IF;
+
+    INSERT INTO public.clients (
+      company_id, first_name, last_name, client_type, razon_social, ruc, is_active
+    ) VALUES (
+      v_company_id, 'TEST-ROLLBACK Empresa', '', 'empresa',
+      'TEST-ROLLBACK Empresa', 'TEST-RUC-ROLLBACK', true
+    )
+    RETURNING id INTO v_client_id;
+
+    INSERT INTO public.sales (
+      company_id, client_id, plan_id, status, sale_type,
+      total_amount, titular_amount, sale_date, contract_number, request_number
+    ) VALUES (
+      v_company_id, v_client_id, v_plan_id, 'firmado', 'venta_nueva',
+      c_monto, c_monto, CURRENT_DATE,
+      'TEST-ROLLBACK-CONTRACT', 'TEST-ROLLBACK-REQUEST'
+    )
+    RETURNING id INTO v_parent_id;
+
+    v_parent_status := 'firmado';
+    v_total_antes := c_monto;
+    v_parent_source := 'fixture transaccional';
+  ELSE
+    v_parent_source := 'venta existente';
   END IF;
-  RAISE NOTICE 'Contrato madre: % (estado %, total inicial %)',
-    v_parent_id, v_parent_status, v_total_antes;
+  RAISE NOTICE 'Contrato madre: % (%, estado %, total inicial %)',
+    v_parent_id, v_parent_source, v_parent_status, v_total_antes;
 
   -- ---------------------------------------------------------------------
   -- 2. Alta con UN adherente
   -- ---------------------------------------------------------------------
   INSERT INTO public.sales (company_id, client_id, plan_id, salesperson_id,
-                            sale_type, status, sale_date, total_amount)
+                            sale_type, status, sale_date, total_amount,
+                            contract_number, request_number)
   VALUES (v_company_id, v_client_id, v_plan_id, v_salesperson_id,
-          'alta_adherente', 'borrador', CURRENT_DATE, c_monto)
+          'alta_adherente', 'borrador', CURRENT_DATE, c_monto,
+          'TEST-ROLLBACK-OP1', 'TEST-ROLLBACK-REQ1')
   RETURNING id INTO v_op_id;
 
   -- El adherente vive primero en la venta-operación (es quien firma el anexo).
@@ -215,9 +265,11 @@ BEGIN
   -- 5. VARIOS funcionarios en un mismo anexo (migración 000002)
   -- ---------------------------------------------------------------------
   INSERT INTO public.sales (company_id, client_id, plan_id, salesperson_id,
-                            sale_type, status, sale_date, total_amount)
+                            sale_type, status, sale_date, total_amount,
+                            contract_number, request_number)
   VALUES (v_company_id, v_client_id, v_plan_id, v_salesperson_id,
-          'alta_adherente', 'borrador', CURRENT_DATE, c_monto * 3)
+          'alta_adherente', 'borrador', CURRENT_DATE, c_monto * 3,
+          'TEST-ROLLBACK-OP3', 'TEST-ROLLBACK-REQ3')
   RETURNING id INTO v_op3_id;
 
   FOR v_count IN 1..3 LOOP
@@ -277,9 +329,11 @@ BEGIN
   -- 6. Camino de respaldo: sin operation_beneficiary_id
   -- ---------------------------------------------------------------------
   INSERT INTO public.sales (company_id, client_id, plan_id, salesperson_id,
-                            sale_type, status, sale_date, total_amount)
+                            sale_type, status, sale_date, total_amount,
+                            contract_number, request_number)
   VALUES (v_company_id, v_client_id, v_plan_id, v_salesperson_id,
-          'alta_adherente', 'borrador', CURRENT_DATE, c_monto)
+          'alta_adherente', 'borrador', CURRENT_DATE, c_monto,
+          'TEST-ROLLBACK-OPFB', 'TEST-ROLLBACK-REQFB')
   RETURNING id INTO v_op_fb_id;
 
   INSERT INTO public.adherent_incorporations (
@@ -330,9 +384,11 @@ BEGIN
   -- 7. Puerta de salida: una venta normal no dispara nada
   -- ---------------------------------------------------------------------
   INSERT INTO public.sales (company_id, client_id, plan_id, salesperson_id,
-                            sale_type, status, sale_date, total_amount)
+                            sale_type, status, sale_date, total_amount,
+                            contract_number, request_number)
   VALUES (v_company_id, v_client_id, v_plan_id, v_salesperson_id,
-          'venta_nueva', 'borrador', CURRENT_DATE, c_monto)
+          'venta_nueva', 'borrador', CURRENT_DATE, c_monto,
+          'TEST-ROLLBACK-NORMAL', 'TEST-ROLLBACK-REQNORMAL')
   RETURNING id INTO v_normal_id;
 
   -- Asociar una incorporación deliberadamente inválida a una venta normal
