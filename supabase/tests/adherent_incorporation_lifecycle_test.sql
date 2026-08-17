@@ -42,7 +42,50 @@ DECLARE
 
   -- Monto distintivo para poder rastrear el efecto en el total.
   c_monto           numeric := 123456;
+
+  v_def             text;
+  v_permitidos      text;
 BEGIN
+  -- ---------------------------------------------------------------------
+  -- 0. Preflight: el vocabulario que escribe el CÓDIGO tiene que ser el que
+  --    acepta la BASE. Se chequea primero para fallar con un mensaje útil en
+  --    vez de un 23514 críptico a mitad del test.
+  --
+  --    Valores que usa el código hoy:
+  --      status 'borrador'   -> useAdherentIncorporations.ts (INSERT)
+  --      status 'completado' -> activate_adherent_incorporation() (trigger)
+  --      source 'manual'     -> useAdherentIncorporations.ts (INSERT)
+  -- ---------------------------------------------------------------------
+  SELECT pg_get_constraintdef(oid) INTO v_def
+  FROM pg_constraint
+  WHERE conrelid = 'public.adherent_incorporations'::regclass
+    AND conname = 'adherent_incorporations_status_check';
+
+  IF v_def IS NOT NULL THEN
+    v_permitidos := regexp_replace(v_def, '^.*ARRAY\[|\]\)\)$', '', 'g');
+    IF v_def NOT LIKE '%''borrador''%' OR v_def NOT LIKE '%''completado''%' THEN
+      RAISE EXCEPTION E'DRIFT de esquema en adherent_incorporations.status\n'
+        '  La base acepta: %\n'
+        '  El codigo escribe: ''borrador'' (hook) y ''completado'' (trigger)\n'
+        '  El flujo de incorporacion NO puede funcionar contra esta base.\n'
+        '  Origen probable: la migracion usa CREATE TABLE IF NOT EXISTS y la\n'
+        '  tabla ya existia con otro vocabulario, asi que su definicion se\n'
+        '  ignoro en silencio.', v_permitidos;
+    END IF;
+  END IF;
+
+  SELECT pg_get_constraintdef(oid) INTO v_def
+  FROM pg_constraint
+  WHERE conrelid = 'public.adherent_incorporations'::regclass
+    AND conname = 'adherent_incorporations_source_check';
+
+  IF v_def IS NOT NULL AND v_def NOT LIKE '%''manual''%' THEN
+    v_permitidos := regexp_replace(v_def, '^.*ARRAY\[|\]\)\)$', '', 'g');
+    RAISE EXCEPTION E'DRIFT de esquema en adherent_incorporations.source\n'
+      '  La base acepta: %\n'
+      '  El codigo escribe: ''manual''', v_permitidos;
+  END IF;
+
   -- ---------------------------------------------------------------------
   -- 1. Precondición: un contrato madre ya cerrado, sin incorporaciones
   -- ---------------------------------------------------------------------

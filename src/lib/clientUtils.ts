@@ -35,6 +35,16 @@ export const getClientDocument = (client: any): string => {
 };
 
 /**
+ * Etiqueta del documento, para no rotular "C.I." el RUC de una empresa.
+ *
+ * OJO: sirve para lo que se arma desde código (PDFs generados, sello de firma,
+ * pantallas). Las plantillas HTML ya guardadas en base tienen "C.I." escrito a
+ * mano y este helper no las alcanza.
+ */
+export const getClientDocumentLabel = (client: any): string =>
+  isCompanyClient(client) ? 'RUC' : 'C.I.';
+
+/**
  * Arma los campos de nombre a guardar, manteniendo el espejo que hace que
  * todo el código existente siga funcionando sin modificaciones.
  */

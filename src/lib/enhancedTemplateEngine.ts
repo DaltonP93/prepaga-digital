@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatCurrency as formatPygCurrency } from '@/lib/utils';
 import { getSignatureLinkUrl } from '@/lib/appUrls';
+import { getClientDisplayName, getClientDocument, getClientDocumentLabel, isCompanyClient } from '@/lib/clientUtils';
 
 /**
  * Convert a number to words in Spanish (Guaranies)
@@ -96,8 +97,19 @@ export interface EnhancedTemplateContext {
     nombreCompleto: string;
     email: string;
     telefono: string;
+    /** Documento del titular. Para una EMPRESA lleva el RUC, no el dni. */
     ci: string;
+    /** Igual que `ci`. Se conserva porque hay plantillas en produccion que lo usan. */
     dni: string;
+    /** Alias explicito de `ci`/`dni`, para plantillas nuevas. */
+    documento: string;
+    /** 'RUC' para empresas, 'C.I.' para personas. */
+    documentoLabel: string;
+    /** Solo empresas; cadena vacia para personas. */
+    ruc: string;
+    /** Solo empresas; cadena vacia para personas. */
+    razonSocial: string;
+    esEmpresa: boolean;
     direccion: string;
     ciudad: string;
     provincia: string;
@@ -350,8 +362,8 @@ export function createEnhancedTemplateContext(
     ? {
         first_name: client?.first_name || '',
         last_name: client?.last_name || '',
-        document_number: client?.dni || '',
-        dni: client?.dni || '',
+        document_number: getClientDocument(client),
+        dni: getClientDocument(client),
         email: client?.email || '',
         phone: client?.phone || '',
         birth_date: client?.birth_date || null,
@@ -399,11 +411,19 @@ export function createEnhancedTemplateContext(
     cliente: {
       nombre: client?.first_name || '',
       apellido: client?.last_name || '',
-      nombreCompleto: `${client?.first_name || ''} ${client?.last_name || ''}`.trim(),
+      nombreCompleto: getClientDisplayName(client),
       email: client?.email || '',
       telefono: client?.phone || '',
-      ci: client?.dni || '',
-      dni: client?.dni || '',
+      // Documento segun el tipo de cliente: RUC para empresas, C.I. para
+      // personas. Se mantienen `ci` y `dni` porque hay plantillas en produccion
+      // que los usan; para una persona el valor es exactamente el de antes.
+      ci: getClientDocument(client),
+      dni: getClientDocument(client),
+      documento: getClientDocument(client),
+      documentoLabel: getClientDocumentLabel(client),
+      ruc: isCompanyClient(client) ? (client?.ruc || '') : '',
+      razonSocial: isCompanyClient(client) ? (client?.razon_social || '') : '',
+      esEmpresa: isCompanyClient(client),
       direccion: client?.address || '',
       ciudad: client?.city || '',
       provincia: client?.province || '',
@@ -513,8 +533,10 @@ export function createEnhancedTemplateContext(
         nombre: client?.first_name || '',
         apellido: client?.last_name || '',
         nombreCompleto: `${client?.first_name || ''} ${client?.last_name || ''}`.trim(),
-        ci: client?.dni || '',
-        dni: client?.dni || '',
+        ci: getClientDocument(client),
+        dni: getClientDocument(client),
+        documento: getClientDocument(client),
+        documentoLabel: getClientDocumentLabel(client),
         email: client?.email || '',
         telefono: client?.phone || '',
         relacion: 'Titular',

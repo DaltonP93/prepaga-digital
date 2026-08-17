@@ -1,5 +1,6 @@
 import { buildClientNamePayload, getClientDisplayName, getClientDocument, isCompanyClient } from '@/lib/clientUtils';
 import { excludeIncorporationSales, SALE_TYPE_INCORPORACION } from '@/lib/saleFilters';
+import { createEnhancedTemplateContext } from '@/lib/enhancedTemplateEngine';
 
 let ok = 0, fail = 0;
 const check = (nombre: string, real: any, esperado: any) => {
@@ -52,6 +53,32 @@ check('gender solo espacios -> null', normalizarOpcional('   '), null);
 check('gender undefined -> null', normalizarOpcional(undefined), null);
 check('gender con valor se respeta', normalizarOpcional('Masculino'), 'Masculino');
 check('marital_status vacío -> null', normalizarOpcional(''), null);
+
+console.log('\n=== Motor de plantillas: documento del titular ===');
+const ctxDe = (cliente: any) =>
+  (createEnhancedTemplateContext(cliente, { name: 'Plan Beta', price: 310000 }, { name: 'SAMAP' },
+    { id: 's1', total_amount: 310000, sale_date: '2026-08-17' }, []) as any).cliente;
+
+const ctxEmpresa = ctxDe({
+  client_type: 'empresa', razon_social: 'Frigorífico SA', ruc: '80012345-6',
+  first_name: 'Frigorífico SA', last_name: '', dni: null,
+});
+check('empresa: {{cliente.documento}} = RUC', ctxEmpresa.documento, '80012345-6');
+check('empresa: la etiqueta dice RUC', ctxEmpresa.documentoLabel, 'RUC');
+check('empresa: {{cliente.ci}} y {{cliente.dni}} llevan el RUC (plantillas viejas)',
+  [ctxEmpresa.ci, ctxEmpresa.dni], ['80012345-6', '80012345-6']);
+check('empresa: nombreCompleto = razón social', ctxEmpresa.nombreCompleto, 'Frigorífico SA');
+check('empresa: expone razonSocial y esEmpresa',
+  [ctxEmpresa.razonSocial, ctxEmpresa.esEmpresa], ['Frigorífico SA', true]);
+
+const ctxPersona = ctxDe({
+  client_type: 'persona', first_name: 'RIKA', last_name: 'HIRANO', dni: '3616083',
+});
+check('persona: documento = C.I., sin cambios', ctxPersona.documento, '3616083');
+check('persona: la etiqueta sigue diciendo C.I.', ctxPersona.documentoLabel, 'C.I.');
+check('persona: ci/dni intactos', [ctxPersona.ci, ctxPersona.dni], ['3616083', '3616083']);
+check('persona: nombreCompleto sin cambios', ctxPersona.nombreCompleto, 'RIKA HIRANO');
+check('persona: ruc y razonSocial vacíos', [ctxPersona.ruc, ctxPersona.razonSocial], ['', '']);
 
 console.log('\n=== Filtro de ventas-operación ===');
 let capturado = '';
