@@ -29,6 +29,30 @@ check('documento de empresa = RUC', getClientDocument(empresaGuardada), '8001234
 check('documento de persona = C.I.', getClientDocument({ client_type: 'persona', dni: '3616083' }), '3616083');
 check('isCompanyClient', [isCompanyClient(empresaGuardada), isCompanyClient({ client_type: 'persona' })], [true, false]);
 
+console.log('\n=== Empresa: casos borde del documento ===');
+check('empresa SIN ruc cargado -> vacío, no cae al dni',
+  getClientDocument({ client_type: 'empresa', razon_social: 'Sin RUC SA', ruc: null, dni: '3616083' }), '');
+check('empresa con ruc vacío -> vacío',
+  getClientDocument({ client_type: 'empresa', ruc: '', dni: '3616083' }), '');
+check('persona sin dni -> vacío',
+  getClientDocument({ client_type: 'persona', dni: null }), '');
+check('cliente nulo no explota',
+  [getClientDocument(null), getClientDisplayName(null), isCompanyClient(null)], ['', '', false]);
+check('razón social con espacios se recorta al mostrar',
+  getClientDisplayName({ client_type: 'empresa', razon_social: '  Frigorífico SA  ' }), 'Frigorífico SA');
+
+console.log('\n=== Campos con CHECK en la base: nunca cadena vacía ===');
+// clients_gender_check y clients_marital_status_check aceptan NULL o un valor de
+// la lista, pero NO ''. El formulario los inicializa en '' y para una empresa ni
+// siquiera se muestran, así que hay que normalizarlos antes del INSERT.
+// Esto replica la normalización de ClientForm.tsx (fix del error 23514).
+const normalizarOpcional = (v?: string | null) => (v?.trim() ? v : null);
+check('gender vacío -> null', normalizarOpcional(''), null);
+check('gender solo espacios -> null', normalizarOpcional('   '), null);
+check('gender undefined -> null', normalizarOpcional(undefined), null);
+check('gender con valor se respeta', normalizarOpcional('Masculino'), 'Masculino');
+check('marital_status vacío -> null', normalizarOpcional(''), null);
+
 console.log('\n=== Filtro de ventas-operación ===');
 let capturado = '';
 const queryFalsa = { or: (f: string) => { capturado = f; return 'query'; } };
