@@ -1,5 +1,5 @@
 import { buildClientNamePayload, getClientDisplayName, getClientDocument, isCompanyClient } from '@/lib/clientUtils';
-import { excludeIncorporationSales, SALE_TYPE_INCORPORACION } from '@/lib/saleFilters';
+import { excludeIncorporationSales, PLAN_MATERNO_TEMPLATE, resolvePlanFieldsTemplateName, SALE_TYPE_INCORPORACION } from '@/lib/saleFilters';
 import { createEnhancedTemplateContext } from '@/lib/enhancedTemplateEngine';
 
 let ok = 0, fail = 0;
@@ -79,6 +79,24 @@ check('persona: la etiqueta sigue diciendo C.I.', ctxPersona.documentoLabel, 'C.
 check('persona: ci/dni intactos', [ctxPersona.ci, ctxPersona.dni], ['3616083', '3616083']);
 check('persona: nombreCompleto sin cambios', ctxPersona.nombreCompleto, 'RIKA HIRANO');
 check('persona: ruc y razonSocial vacíos', [ctxPersona.ruc, ctxPersona.razonSocial], ['', '']);
+
+console.log('\n=== Adicional Plan Materno: qué campos se habilitan ===');
+check('con el adicional marcado manda Plan Materno, sin importar el plan',
+  resolvePlanFieldsTemplateName({ maternity_bonus: true }, 'Beta'), 'Plan Materno');
+check('con el adicional y SIN plan elegido igual habilita',
+  resolvePlanFieldsTemplateName({ maternity_bonus: true }, null), 'Plan Materno');
+check('sin adicional cae al plan elegido (comportamiento anterior)',
+  resolvePlanFieldsTemplateName({ maternity_bonus: false }, 'Beta'), 'Beta');
+check('sin adicional ni plan no habilita nada',
+  resolvePlanFieldsTemplateName({ maternity_bonus: false }, null), null);
+check('venta sin el campo se comporta como sin adicional',
+  resolvePlanFieldsTemplateName({}, 'Senior Plus'), 'Senior Plus');
+check('venta nula no explota',
+  resolvePlanFieldsTemplateName(null, 'Alfa'), 'Alfa');
+check('nombre de plan solo con espacios no habilita',
+  resolvePlanFieldsTemplateName({ maternity_bonus: false }, '   '), null);
+check('la constante coincide con el template real de la base',
+  PLAN_MATERNO_TEMPLATE, 'Plan Materno');
 
 console.log('\n=== Filtro de ventas-operación ===');
 let capturado = '';

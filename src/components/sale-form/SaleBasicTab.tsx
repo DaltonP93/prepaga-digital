@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { useClients } from '@/hooks/useClients';
@@ -32,6 +33,8 @@ interface SaleBasicTabProps {
     contract_start_date: string;
     immediate_coverage: boolean;
     sale_type: string;
+    /** Adicional Plan Materno. Habilita la pestaña "Campos del Plan". */
+    maternity_bonus?: boolean;
     /** 'individual' (por defecto) o 'representante'. Contratos de empresa. */
     employee_signature_mode?: string;
   };
@@ -187,6 +190,29 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
           className="h-4 w-4"
         />
         <Label htmlFor="requires_adherents">¿Requiere adherentes/grupo familiar?</Label>
+      </div>
+
+      {/* Adicional Plan Materno.
+          Va acá, al inicio de la venta, porque el Plan Materno NO es un plan
+          por si mismo: se contrata SOBRE otro plan. Al tildarlo se habilita la
+          pestaña "Campos del Plan" con las preguntas del template homonimo,
+          sea cual sea el plan elegido. */}
+      <div className="space-y-2">
+        <Label>Adicionales</Label>
+        <label className="flex items-start gap-3 rounded-xl border border-input bg-background/80 p-3.5 cursor-pointer">
+          <Checkbox
+            checked={!!formData.maternity_bonus}
+            onCheckedChange={(v) => onChange('maternity_bonus', v === true)}
+            className="mt-0.5"
+          />
+          <span className="space-y-1">
+            <span className="block text-sm font-medium leading-none">Incluye Plan Materno</span>
+            <span className="block text-xs text-muted-foreground">
+              Se contrata junto al plan elegido. Al marcarlo se habilita la pestaña
+              “Campos del Plan” para completar los datos que exige el Plan Materno.
+            </span>
+          </span>
+        </label>
       </div>
 
       {/* Vigencia Inmediata & Tipo de Venta */}

@@ -17,6 +17,7 @@ import { SALE_STATUS_LABELS } from '@/types/workflow';
 import type { SaleStatus } from '@/types/workflow';
 import { toast } from 'sonner';
 import { isSaleLocked, isPrivilegedRole } from '@/lib/saleUtils';
+import { resolvePlanFieldsTemplateName } from '@/lib/saleFilters';
 import { ChangeStatusModal } from './ChangeStatusModal';
 import SaleBasicTab from './SaleBasicTab';
 import SaleAdherentsTab from './SaleAdherentsTab';
@@ -100,6 +101,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
     billing_phone: (sale as any)?.billing_phone || '',
     contract_start_date: contractStartDate,
     immediate_coverage: (sale as any)?.immediate_coverage || false,
+    maternity_bonus: Boolean((sale as { maternity_bonus?: boolean } | null)?.maternity_bonus),
     sale_type: (sale as any)?.sale_type || 'venta_nueva',
     employee_signature_mode: (sale as any)?.employee_signature_mode || 'individual',
   });
@@ -110,17 +112,32 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
     setTabErrors({});
   };
 
-  // ── Campos personalizados por PLAN (ej. "Plan Materno") ──────────────────
-  // La pestaña "Campos del Plan" se muestra SOLO si el plan seleccionado tiene
-  // un template homónimo con preguntas configuradas. Para el resto de los
-  // planes la pantalla queda exactamente igual que antes.
+  // ── Campos personalizados del plan ───────────────────────────────────────
+  // Dos caminos para habilitar la pestaña "Campos del Plan":
+  //
+  //   1. ADICIONAL Plan Materno: el vendedor tilda "Incluye Plan Materno" en la
+  //      pestaña Datos. El Plan Materno NO es un plan por si mismo —va siempre
+  //      ligado a otro— asi que sus campos se habilitan sobre CUALQUIER plan
+  //      contratado. Este camino tiene prioridad.
+  //   2. Por nombre del plan: si el plan elegido tiene un template homonimo con
+  //      preguntas, se usan esas. Se conserva para no romper otros planes que
+  //      hoy dependan de esto.
+  //
+  // Para el resto de los planes, sin adicional marcado, la pantalla queda
+  // exactamente igual que antes.
   const { data: planTemplate = null } = useQuery({
-    queryKey: ['plan-custom-fields-template', formData.plan_id],
+    queryKey: ['plan-custom-fields-template', formData.plan_id, formData.maternity_bonus],
     queryFn: async () => {
-      if (!formData.plan_id) return null;
-      const { data: plan } = await supabase
-        .from('plans').select('name').eq('id', formData.plan_id).maybeSingle();
-      if (!plan?.name) return null;
+      // El adicional manda: no depende del plan elegido (ver resolvePlanFieldsTemplateName).
+      let nombrePlan: string | null = null;
+      if (!formData.maternity_bonus && formData.plan_id) {
+        const { data: p } = await supabase
+          .from('plans').select('name').eq('id', formData.plan_id).maybeSingle();
+        nombrePlan = p?.name ?? null;
+      }
+      const nombreBuscado = resolvePlanFieldsTemplateName(formData, nombrePlan);
+      if (!nombreBuscado) return null;
+      const plan = { name: nombreBuscado };
 
       const norm = (s: string) =>
         (s || '').toLowerCase().normalize('NFD')
@@ -148,7 +165,9 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
       }
       return null;
     },
-    enabled: !!formData.plan_id,
+    // Con el adicional marcado corre aunque todavía no se eligió plan: los
+    // campos del Plan Materno no dependen del plan contratado.
+    enabled: !!formData.plan_id || !!formData.maternity_bonus,
   });
 
   const hasPlanFields = !!planTemplate;
@@ -243,6 +262,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           billing_phone: formData.billing_phone || null,
           contract_start_date: formData.contract_start_date || null,
           immediate_coverage: formData.immediate_coverage,
+          maternity_bonus: formData.maternity_bonus,
           sale_type: formData.sale_type,
           employee_signature_mode: formData.employee_signature_mode,
         } as any);
@@ -282,6 +302,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           billing_phone: formData.billing_phone || null,
           contract_start_date: formData.contract_start_date || null,
           immediate_coverage: formData.immediate_coverage,
+          maternity_bonus: formData.maternity_bonus,
           sale_type: formData.sale_type,
           employee_signature_mode: formData.employee_signature_mode,
         } as any);

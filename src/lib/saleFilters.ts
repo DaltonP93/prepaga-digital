@@ -24,3 +24,25 @@ export const SALE_TYPE_INCORPORACION = 'alta_adherente';
  */
 export const excludeIncorporationSales = (query: any) =>
   query.or(`sale_type.is.null,sale_type.neq.${SALE_TYPE_INCORPORACION}`);
+
+/** Template de campos personalizados del adicional Plan Materno. */
+export const PLAN_MATERNO_TEMPLATE = 'Plan Materno';
+
+/**
+ * Qué template de "Campos del Plan" corresponde a una venta.
+ *
+ * El Plan Materno NO es un plan por sí mismo: va siempre ligado a otro plan y
+ * se marca con el adicional `maternity_bonus` al inicio de la venta. Por eso el
+ * adicional tiene PRIORIDAD sobre el plan elegido: sus campos se habilitan sea
+ * cual sea el plan contratado.
+ *
+ * Sin adicional se cae al comportamiento anterior: buscar un template homónimo
+ * del plan.
+ */
+export const resolvePlanFieldsTemplateName = (
+  sale: { maternity_bonus?: boolean | null } | null | undefined,
+  planName?: string | null,
+): string | null => {
+  if (sale?.maternity_bonus) return PLAN_MATERNO_TEMPLATE;
+  return planName?.trim() || null;
+};
