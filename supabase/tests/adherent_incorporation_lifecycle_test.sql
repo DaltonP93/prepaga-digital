@@ -401,7 +401,7 @@ BEGIN
   ) VALUES (
     v_company_id, v_client_id, v_normal_id, v_parent_id, v_plan_id,
     'TEST-ROLLBACK Titular', 'TEST-NORMAL', 'No Activar',
-    '9999004', c_monto, (CURRENT_DATE + INTERVAL '1 year')::date, 'borrador'
+    '9999004', c_monto, (CURRENT_DATE + INTERVAL '1 year')::date, 'draft'
   ) RETURNING id INTO v_normal_inc_id;
 
   UPDATE public.sales SET status = 'completado' WHERE id = v_normal_id;
