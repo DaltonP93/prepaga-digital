@@ -1,6 +1,13 @@
 import { buildClientNamePayload, getClientDisplayName, getClientDocument, isCompanyClient } from '@/lib/clientUtils';
 import { excludeIncorporationSales, PLAN_MATERNO_TEMPLATE, resolvePlanFieldsTemplateName, SALE_TYPE_INCORPORACION } from '@/lib/saleFilters';
 import { createEnhancedTemplateContext } from '@/lib/enhancedTemplateEngine';
+import { canMutateBeneficiaries, isSaleLocked } from '@/lib/saleUtils';
+import {
+  getRelationshipLabel,
+  isPhoneRequired,
+  isRelationshipRequired,
+  validateBeneficiary,
+} from '@/lib/beneficiaryValidation';
 
 let ok = 0, fail = 0;
 const check = (nombre: string, real: any, esperado: any) => {
@@ -97,6 +104,53 @@ check('nombre de plan solo con espacios no habilita',
   resolvePlanFieldsTemplateName({ maternity_bonus: false }, '   '), null);
 check('la constante coincide con el template real de la base',
   PLAN_MATERNO_TEMPLATE, 'Plan Materno');
+
+console.log('\n=== Adherentes bloqueados con el contrato firmado ===');
+// Sin excepciones por rol: `canMutateBeneficiaries` no recibe el rol a propósito.
+// La vía legítima para sumar gente a un contrato firmado es la Incorporación.
+for (const estado of ['firmado', 'firmado_parcial', 'completado']) {
+  check(`${estado} -> bloqueado`, canMutateBeneficiaries({ status: estado }), false);
+}
+for (const estado of ['borrador', 'enviado', 'pendiente', 'en_auditoria', 'rechazado']) {
+  check(`${estado} -> se puede editar`, canMutateBeneficiaries({ status: estado }), true);
+}
+check('venta nula no bloquea (todavía no hay contrato)', canMutateBeneficiaries(null), true);
+check('estado desconocido no bloquea', canMutateBeneficiaries({ status: 'lo_que_sea' }), true);
+// `isSaleLocked` responde otra pregunta y SIGUE eximiendo a los roles
+// privilegiados; los dos helpers tienen que poder discrepar.
+check('un admin sobre un contrato firmado: isSaleLocked=false pero no puede tocar adherentes',
+  [isSaleLocked({ status: 'firmado' }, 'admin'), canMutateBeneficiaries({ status: 'firmado' })],
+  [false, false]);
+
+console.log('\n=== Validación del adherente: misma regla en los dos formularios ===');
+const personaOk = { first_name: 'Ana', last_name: 'Lopez', relationship: 'hijo', phone: '981123456' };
+check('persona completa es válida', validateBeneficiary(personaOk), null);
+check('persona sin parentesco falla',
+  validateBeneficiary({ ...personaOk, relationship: '' }), 'El parentesco es obligatorio');
+check('EMPRESA sin cargo es válida (el cargo es opcional)',
+  validateBeneficiary({ ...personaOk, relationship: '' }, { isCompany: true }), null);
+check('el rótulo cambia según el titular',
+  [getRelationshipLabel(), getRelationshipLabel({ isCompany: true })], ['Parentesco', 'Cargo']);
+check('obligatoriedad del vínculo',
+  [isRelationshipRequired(), isRelationshipRequired({ isCompany: true })], [true, false]);
+// El teléfono se pide sólo a quien tiene que firmar: el OTP va por WhatsApp.
+// Antes un formulario lo exigía siempre y el otro nunca.
+check('sin teléfono y con firma requerida falla',
+  validateBeneficiary({ ...personaOk, phone: '' }),
+  'El teléfono es obligatorio para quien tiene que firmar');
+check('sin teléfono pero sin firma requerida es válido',
+  validateBeneficiary({ ...personaOk, phone: '', signature_required: false }), null);
+check('signature_required sin definir se toma como true (default de la base)',
+  isPhoneRequired({}), true);
+check('nombre de una sola letra falla',
+  validateBeneficiary({ ...personaOk, first_name: 'A' }),
+  'El nombre debe tener al menos 2 caracteres');
+check('nombre solo con espacios falla',
+  validateBeneficiary({ ...personaOk, first_name: '   ' }),
+  'El nombre debe tener al menos 2 caracteres');
+check('apellido faltante falla',
+  validateBeneficiary({ ...personaOk, last_name: '' }),
+  'El apellido debe tener al menos 2 caracteres');
 
 console.log('\n=== Filtro de ventas-operación ===');
 let capturado = '';

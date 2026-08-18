@@ -480,6 +480,55 @@ Mitigación inmediata sin setup: **no dejar `npm run dev` corriendo** apuntando 
 > ⚠️ La clave que aparece en `client.ts`/`.env` es la `anon` **pública** (protegida por RLS), no
 > es un secreto. NO poner nunca la `service_role` key en el front ni en archivos versionados.
 
+### 10. `sales.total_amount` se calculaba en CUATRO lugares con fórmulas distintas
+
+**Síntoma**: a una venta le falta plata en el total, típicamente **exactamente el monto del
+titular**. Aparece y desaparece según el orden en que se guardó, así que es difícil de reproducir.
+
+**Causa**: había cuatro implementaciones del mismo cálculo:
+
+| Dónde | Fórmula | ¿Correcta? |
+|---|---|---|
+| `recalculate_sale_total_amount(p_sale_id uuid)` | contempla `is_primary` | ✅ |
+| `useBeneficiaries.ts` (frontend) | idéntica a la anterior | ✅ |
+| **`recalculate_sale_total_amount()`** (la del trigger) | **`SUM(amount)` a secas** | ❌ |
+| **`SaleTabbedForm.tsx`** (al guardar la venta) | **`titular_amount + Σ(no primarios)`** | ❌ |
+
+El trigger `trg_recalculate_sale_total` dispara en cada alta/edición/baja de adherente y pisaba
+el total ignorando `titular_amount`: si el titular no existe como fila beneficiaria, **su monto
+desaparece**. La cuarta fórmula sólo coincidía con la de la base cuando el monto del primario
+era igual a `titular_amount`.
+
+Verificado en test antes de arreglarlo: de 22 ventas, 2 tenían el total mal, y en una de ellas
+faltaban exactamente los 275.000 del titular.
+
+**Fix aplicado** (`20260818000001_fix_total_amount_single_source.sql`): la versión con argumento
+queda como **única fuente de verdad**; la del trigger sólo delega en ella; las dos del frontend
+se eliminaron (`SaleTabbedForm` ahora llama a la RPC). Incluye backfill con `RAISE NOTICE`.
+
+> ⚠️ Si un deploy de Lovable reintroduce el cálculo en `useBeneficiaries.ts` o en
+> `SaleTabbedForm.tsx`, el bug vuelve. El total lo calcula **sólo la base**.
+
+### 11. Adherentes editables en contratos ya firmados
+
+**Síntoma**: se podían agregar, editar o borrar adherentes de un contrato `firmado` o
+`completado`, dejando la base diciendo una cosa y el PDF con firma PAdES otra.
+
+**Causa**: el bloqueo era sólo visual (una prop `disabled` que escondía botones) y
+`BeneficiariesManager` ni siquiera la recibía. Además `isSaleLocked` exime a 5 roles.
+
+**Fix aplicado**, en tres capas: `canMutateBeneficiaries` (`src/lib/saleUtils.ts`, **sin
+excepciones por rol**), una guarda en los hooks de `useBeneficiaries`, y el trigger
+`trg_beneficiaries_block_when_sale_signed` (`20260818000002`).
+
+Las 4 funciones del sistema que **deben** poder escribir en un contrato firmado
+(`activate_adherent_incorporation`, `complete_adherent_incorporation`, `approve_sale_addendum`,
+`try_complete_sale_addendum_for_link`) están eximidas con
+`ALTER FUNCTION ... SET app.allow_signed_beneficiary_mutation = 'on'`, sin tocar sus cuerpos.
+
+> ⚠️ Si se agrega otra función del sistema que modifique adherentes de un contrato firmado, hay
+> que eximirla igual o fallará con `42501`.
+
 ---
 
 ## Comandos Útiles

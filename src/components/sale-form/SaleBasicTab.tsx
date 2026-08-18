@@ -11,7 +11,7 @@ import { useClients } from '@/hooks/useClients';
 import { usePlans } from '@/hooks/usePlans';
 import { ClientForm } from '@/components/ClientForm';
 import { useCurrencySettings } from '@/hooks/useCurrencySettings';
-import { getClientDisplayName, getClientDocument, getClientDocumentLabel } from '@/lib/clientUtils';
+import { getClientDisplayName, getClientDocument, getClientDocumentLabel, isCompanyClient } from '@/lib/clientUtils';
 interface SaleBasicTabProps {
   formData: {
     client_id: string;
@@ -56,12 +56,26 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
   const decimalSeparator = settings?.decimal_separator || ',';
   const decimalPlaces = settings?.decimal_places ?? 0;
 
+  const titularEsEmpresa = isCompanyClient(
+    clients?.find((c: any) => c.id === formData.client_id),
+  );
+
   // Auto-set company from logged-in user (always)
   useEffect(() => {
     if (companyId) {
       onChange('company_id', companyId);
     }
   }, [companyId]);
+
+  // Si el titular no es una empresa, el modo de firma vuelve a 'individual':
+  // el campo ni siquiera se muestra, y sin esto una venta que empezó apuntando
+  // a una empresa y después cambió de titular se guardaba con 'representante',
+  // que aguas abajo suprime las DDJJ y los enlaces de firma de cada adherente.
+  useEffect(() => {
+    if (!titularEsEmpresa && formData.employee_signature_mode !== 'individual') {
+      onChange('employee_signature_mode', 'individual');
+    }
+  }, [titularEsEmpresa, formData.employee_signature_mode]);
 
   // Auto-select newly created client when modal closes
   useEffect(() => {
@@ -241,25 +255,30 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-2">
-          <Label>Firma de los adherentes</Label>
-          <Select
-            value={formData.employee_signature_mode || 'individual'}
-            onValueChange={(v) => onChange('employee_signature_mode', v)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="individual">Cada uno firma su DDJJ</SelectItem>
-              <SelectItem value="representante">Firma solo el representante</SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            Para contratos de empresa con muchos empleados. "Firma solo el representante"
-            no genera DDJJ ni enlace de firma por cada persona.
-          </p>
-        </div>
+        {/* Sólo tiene sentido en contratos de empresa: es la opción de que firme
+            el representante legal en vez de cada empleado. En una venta a
+            persona física aparecía igual y no significaba nada. */}
+        {titularEsEmpresa && (
+          <div className="space-y-2">
+            <Label>Firma de los adherentes</Label>
+            <Select
+              value={formData.employee_signature_mode || 'individual'}
+              onValueChange={(v) => onChange('employee_signature_mode', v)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="individual">Cada uno firma su DDJJ</SelectItem>
+                <SelectItem value="representante">Firma solo el representante</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Para contratos de empresa con muchos empleados. "Firma solo el representante"
+              no genera DDJJ ni enlace de firma por cada persona.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Total Amount */}

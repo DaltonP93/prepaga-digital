@@ -9,6 +9,8 @@ import { Plus, Trash2, Users, AlertCircle, Pencil } from 'lucide-react';
 import { useBeneficiaries, useCreateBeneficiary, useDeleteBeneficiary, useUpdateBeneficiary } from '@/hooks/useBeneficiaries';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
+import { getRelationshipLabel, isRelationshipRequired, validateBeneficiary } from '@/lib/beneficiaryValidation';
+import { useSaleClientType } from '@/hooks/useSaleClientType';
 
 interface SaleAdherentsTabProps {
   saleId?: string;
@@ -67,13 +69,10 @@ const parseAmountInput = (value: string) => {
   return digitsOnly ? Number(digitsOnly) : 0;
 };
 
-const validateForm = (data: BeneficiaryFormData): boolean => {
-  if (!data.first_name || !data.last_name) {
-    toast.error('Nombre y apellido son obligatorios');
-    return false;
-  }
-  if (!data.phone) {
-    toast.error('El número de teléfono es obligatorio para el adherente');
+const validateForm = (data: BeneficiaryFormData, isCompany: boolean): boolean => {
+  const error = validateBeneficiary(data, { isCompany });
+  if (error) {
+    toast.error(error);
     return false;
   }
   return true;
@@ -87,9 +86,10 @@ interface BeneficiaryFormProps {
   saving: boolean;
   title: string;
   saveLabel: string;
+  isCompany: boolean;
 }
 
-const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({ data, onChange, onSave, onCancel, saving, title, saveLabel }) => (
+const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({ data, onChange, onSave, onCancel, saving, title, saveLabel, isCompany }) => (
   <Card>
     <CardHeader>
       <CardTitle className="text-base">{title}</CardTitle>
@@ -109,17 +109,30 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({ data, onChange, onSav
           <Input value={data.dni} onChange={(e) => onChange({ ...data, dni: e.target.value })} placeholder="Nº Documento" />
         </div>
         <div className="space-y-2">
-          <Label>Parentesco</Label>
-          <Select value={data.relationship} onValueChange={(v) => onChange({ ...data, relationship: v })}>
-            <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="conyuge">Cónyuge</SelectItem>
-              <SelectItem value="hijo">Hijo/a</SelectItem>
-              <SelectItem value="padre">Padre/Madre</SelectItem>
-              <SelectItem value="hermano">Hermano/a</SelectItem>
-              <SelectItem value="otro">Otro</SelectItem>
-            </SelectContent>
-          </Select>
+          <Label>
+            {getRelationshipLabel({ isCompany })}
+            {isRelationshipRequired({ isCompany }) ? ' *' : ''}
+          </Label>
+          {/* En una empresa los adherentes son funcionarios: el vínculo es el
+              cargo, texto libre, y la lista de parentescos no aplica. */}
+          {isCompany ? (
+            <Input
+              value={data.relationship}
+              onChange={(e) => onChange({ ...data, relationship: e.target.value })}
+              placeholder="Ej: Gerente de Operaciones"
+            />
+          ) : (
+            <Select value={data.relationship} onValueChange={(v) => onChange({ ...data, relationship: v })}>
+              <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="conyuge">Cónyuge</SelectItem>
+                <SelectItem value="hijo">Hijo/a</SelectItem>
+                <SelectItem value="padre">Padre/Madre</SelectItem>
+                <SelectItem value="hermano">Hermano/a</SelectItem>
+                <SelectItem value="otro">Otro</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
         </div>
         <div className="space-y-2">
           <Label>Fecha de Nacimiento</Label>
@@ -190,6 +203,7 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
   const createBeneficiary = useCreateBeneficiary();
   const deleteBeneficiary = useDeleteBeneficiary();
   const updateBeneficiary = useUpdateBeneficiary();
+  const { isCompany } = useSaleClientType(saleId);
 
   const [showForm, setShowForm] = useState(false);
   const [newBeneficiary, setNewBeneficiary] = useState<BeneficiaryFormData>({ ...emptyForm });
@@ -209,7 +223,7 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
   }
 
   const handleAdd = async () => {
-    if (!validateForm(newBeneficiary)) return;
+    if (!validateForm(newBeneficiary, isCompany)) return;
     try {
       await createBeneficiary.mutateAsync({ ...toPayload(newBeneficiary), sale_id: saleId });
       setNewBeneficiary({ ...emptyForm });
@@ -243,7 +257,7 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
   };
 
   const handleSaveEdit = async () => {
-    if (!editingId || !validateForm(editData)) return;
+    if (!editingId || !validateForm(editData, isCompany)) return;
     try {
       await updateBeneficiary.mutateAsync({ id: editingId, ...toPayload(editData) });
       setEditingId(null);
@@ -284,6 +298,7 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
           saving={createBeneficiary.isPending}
           title="Nuevo Adherente"
           saveLabel="Guardar Adherente"
+          isCompany={isCompany}
         />
       )}
 
@@ -302,6 +317,7 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
                 saving={updateBeneficiary.isPending}
                 title="Editar Adherente"
                 saveLabel="Guardar Cambios"
+                isCompany={isCompany}
               />
             ) : (
               <Card key={b.id}>

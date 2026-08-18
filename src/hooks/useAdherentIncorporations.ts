@@ -256,3 +256,173 @@ export const useCreateAdherentIncorporation = () => {
     },
   });
 };
+
+/** Estados desde los que todavía se puede tocar una incorporación. */
+const EDITABLE_STATUS = 'draft';
+const CANCELABLE_STATUSES = ['draft', 'sent'];
+
+/**
+ * Corrige los datos del adherente de una incorporación que todavía está en
+ * borrador (típicamente un error de tipeo detectado antes de enviar a firmar).
+ *
+ * Escribe en los DOS lados: la fila de `adherent_incorporations` (que es el
+ * snapshot con el que se arma el anexo) y el beneficiario de la venta-operación
+ * (que es el que firma y el que después se copia al contrato madre). Si sólo se
+ * tocara uno, el documento y la persona incorporada dirían cosas distintas.
+ *
+ * Después de `draft` no se puede editar: el anexo ya se generó y puede estar
+ * firmado. Ahí el camino es cancelar y crear una nueva.
+ */
+export const useUpdateAdherentIncorporation = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      adherent,
+    }: {
+      id: string;
+      adherent: IncorporationAdherentInput;
+    }) => {
+      const { data: actual, error: readError } = await db
+        .from('adherent_incorporations')
+        .select('id, status, operation_beneficiary_id, parent_sale_id')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (readError) throw readError;
+      if (!actual) throw new Error('No se encontró la incorporación.');
+      if (actual.status !== EDITABLE_STATUS) {
+        throw new Error(
+          'La incorporación ya fue enviada a firmar y no se puede editar. Cancelala y creá una nueva.',
+        );
+      }
+
+      const { error: incError } = await db
+        .from('adherent_incorporations')
+        .update({
+          adherent_first_name: adherent.first_name,
+          adherent_last_name: adherent.last_name,
+          adherent_document_number: adherent.dni || null,
+          adherent_birth_date: adherent.birth_date || null,
+          adherent_relationship: adherent.relationship || null,
+          adherent_email: adherent.email || null,
+          adherent_phone: adherent.phone || null,
+          adherent_amount: Number(adherent.amount) || 0,
+          coverage_start_date: adherent.entry_date || null,
+        })
+        .eq('id', id);
+
+      if (incError) throw incError;
+
+      if (actual.operation_beneficiary_id) {
+        // El trigger de `beneficiaries` recalcula solo el total de la
+        // venta-operación, que es la base de cálculo de la comisión.
+        const { error: benError } = await supabase
+          .from('beneficiaries')
+          .update({
+            first_name: adherent.first_name,
+            last_name: adherent.last_name,
+            dni: adherent.dni || null,
+            document_number: adherent.dni || null,
+            relationship: adherent.relationship || null,
+            birth_date: adherent.birth_date || null,
+            gender: adherent.gender || null,
+            phone: adherent.phone || null,
+            email: adherent.email || null,
+            address: adherent.address || null,
+            barrio: adherent.barrio || null,
+            city: adherent.city || null,
+            amount: Number(adherent.amount) || 0,
+            entry_date: adherent.entry_date || null,
+            immediate_coverage: adherent.immediate_coverage ?? null,
+          } as any)
+          .eq('id', actual.operation_beneficiary_id);
+
+        if (benError) throw benError;
+      }
+
+      return actual;
+    },
+    onSuccess: (actual: any) => {
+      queryClient.invalidateQueries({ queryKey: ['adherent-incorporations', actual?.parent_sale_id] });
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      toast({ title: 'Incorporación actualizada' });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'No se pudo actualizar la incorporación.',
+        variant: 'destructive',
+      });
+    },
+  });
+};
+
+/**
+ * Cancela una incorporación que todavía no se activó.
+ *
+ * NO borra nada: deja la fila en `cancelled` y la venta-operación en
+ * `cancelado`. Una incorporación ya activada no se cancela desde acá — sus
+ * adherentes ya están en el contrato madre y revertir eso es un problema
+ * contable, no de pantalla.
+ */
+export const useCancelAdherentIncorporation = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const { data: actual, error: readError } = await db
+        .from('adherent_incorporations')
+        .select('id, status, operation_sale_id, parent_sale_id, activated_beneficiary_id')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (readError) throw readError;
+      if (!actual) throw new Error('No se encontró la incorporación.');
+      if (actual.activated_beneficiary_id || actual.status === 'completed') {
+        throw new Error(
+          'La incorporación ya fue activada: el adherente está en el contrato. No se puede cancelar.',
+        );
+      }
+      if (!CANCELABLE_STATUSES.includes(actual.status)) {
+        throw new Error(`No se puede cancelar una incorporación en estado "${actual.status}".`);
+      }
+
+      const { error: incError } = await db
+        .from('adherent_incorporations')
+        .update({ status: 'cancelled' })
+        .eq('id', id);
+
+      if (incError) throw incError;
+
+      if (actual.operation_sale_id) {
+        const { error: saleError } = await supabase
+          .from('sales')
+          .update({ status: 'cancelado' } as any)
+          .eq('id', actual.operation_sale_id);
+
+        if (saleError) throw saleError;
+      }
+
+      return actual;
+    },
+    onSuccess: (actual: any) => {
+      queryClient.invalidateQueries({ queryKey: ['adherent-incorporations', actual?.parent_sale_id] });
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      toast({
+        title: 'Incorporación cancelada',
+        description: 'Queda registrada como cancelada; no se borró nada.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'No se pudo cancelar la incorporación.',
+        variant: 'destructive',
+      });
+    },
+  });
+};

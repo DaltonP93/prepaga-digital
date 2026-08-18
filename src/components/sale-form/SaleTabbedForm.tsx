@@ -266,18 +266,14 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           sale_type: formData.sale_type,
           employee_signature_mode: formData.employee_signature_mode,
         } as any);
-        // Recalculate total_amount = titular_amount + sum(adherentes) after save
-        const { data: adherentes } = await supabase
-          .from('beneficiaries')
-          .select('amount, is_primary')
-          .eq('sale_id', sale.id);
-        const adherentesSum = (adherentes || [])
-          .filter((b: any) => !b.is_primary)
-          .reduce((sum: number, b: any) => sum + (Number(b.amount) || 0), 0);
-        await supabase
-          .from('sales')
-          .update({ total_amount: formData.titular_amount + adherentesSum })
-          .eq('id', sale.id);
+        // `titular_amount` acaba de cambiar, así que hay que recalcular el total.
+        // Se delega en la base, que es la única fuente de verdad (ver migración
+        // 20260818000001_fix_total_amount_single_source.sql). Acá había una
+        // cuarta fórmula propia — `titular_amount + Σ(no primarios)` — que sólo
+        // coincidía con la de la base cuando el monto del primario era igual a
+        // `titular_amount`; en cualquier otro caso pisaba el total con un valor
+        // distinto del que dejaba el trigger.
+        await supabase.rpc('recalculate_sale_total_amount', { p_sale_id: sale.id });
         toast.success('Venta actualizada');
       } else {
         const result = await createSale.mutateAsync({
