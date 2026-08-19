@@ -480,6 +480,70 @@ Mitigación inmediata sin setup: **no dejar `npm run dev` corriendo** apuntando 
 > ⚠️ La clave que aparece en `client.ts`/`.env` es la `anon` **pública** (protegida por RLS), no
 > es un secreto. NO poner nunca la `service_role` key en el front ni en archivos versionados.
 
+### 10. Bucle de links fantasma de la contratada ("Pendiente" aunque ya firmó)
+
+**Síntoma**: En **Gestionar Firma**, el card *Firma de la Contratada* muestra **Pendiente**
+aunque la contratada ya firmó, y **el estado cambia al recargar la página**. La venta queda
+`completado` y el contrato firmado, pero se generan contratos y WhatsApp duplicados.
+
+**Caso testigo**: venta `2026-000214` (SHEILA MAGALI TOLEDO BAEZ) — 6 signature_links de
+contratada, 2 contratos firmados, 2 avisos "documentación firmada" al titular.
+
+**Causa (cadena de 3 bugs)**:
+
+1. `useResendSignatureLink` (`src/hooks/useSignatureLinks.ts`) **no copiaba `step_order`** al
+   recrear el link. La columna `signature_links.step_order` tiene `DEFAULT 1`, así que un link
+   de **contratada regenerado nacía como step 1**.
+2. Al firmarse ese link, `activateNextStep` en `finalize-signature-link` lo tomaba como
+   "terminó el step 1" → activaba/creaba **otro** link de contratada step 2 pendiente → bucle.
+   Además buscaba el step 2 existente con `.eq('is_active', false)`; como los links ya nacen
+   `is_active=true`, nunca lo encontraba y caía en la rama "no existe → crear" (duplicaba).
+3. `getActiveLinks` (`src/pages/SignatureWorkflow.tsx`) deduplicaba por `recipient_type`
+   quedándose con **el primero** de un query ordenado sólo por `step_order` (sin desempate).
+   Con varios links del mismo recipient, Postgres no garantiza el orden → el card mostraba un
+   link distinto en cada recarga.
+
+Bonus: al regenerar el link de la **contratada**, el bloque de reset de documentos caía en la
+rama del *titular* y le ponía `is_final=false` + borraba sus documentos `firma`.
+
+**Fix aplicado (2026-08-19, defensa en profundidad)**:
+- `useSignatureLinks.ts`: hereda `step_order` y `recipient_name` del link viejo; no toca
+  documentos cuando el que se regenera es la contratada.
+- `SignatureWorkflow.tsx`: `getActiveLinks` prioriza `completado` > `pendiente` > `revocado`
+  y desempata por `created_at` (determinístico); el tipo `SignatureWorkflowLink` lleva
+  `step_order`/`recipient_name` para que el resend los pueda propagar.
+- `finalize-signature-link` **v58**: guarda anti-bucle (si ya existe un link de contratada
+  `completado`, no activa ni crea otro step 2) y se sacó el filtro `is_active=false`.
+- **DB (migración `20260819210000_guard_contratada_signature_links.sql`, APLICADA)**: 3 triggers
+  que hacen el fix independiente del código, para que **sobreviva a los deploys**:
+  - `trg_enforce_contratada_step_order` (BEFORE INSERT en `signature_links`): un link de
+    contratada siempre nace `step_order = 2`, aunque el front omita el campo. **Mata el bug raíz.**
+  - `trg_revoke_stale_contratada_links` (AFTER UPDATE en `signature_links`): al completarse la
+    contratada, revoca cualquier otro link de contratada vivo de esa venta.
+  - `trg_protect_closed_sale_documents` (BEFORE UPDATE/DELETE en `documents`): si la contratada
+    ya firmó, no se puede revertir `is_final`, borrar `signed_pdf_url` ni eliminar el documento.
+    **Falla con `RAISE EXCEPTION` + `hint`, nunca en silencio** (un bloqueo mudo haría perder
+    horas al que lo investigue).
+
+Verificado en producción con transacciones + `ROLLBACK`: insert con `step_order=1` → queda 2;
+el link hermano queda `revocado`/`is_active=false`; des-finalizar un doc de venta cerrada lanza
+`P0001`. Y los flujos legítimos siguen pasando: limpiar `base_pdf_url` al firmar la contratada,
+regenerar con branding, `is_final=true` idempotente, y el reset de documentos en ventas abiertas.
+
+> ⚠️ El fix del front sólo aplica tras **rebuild de la imagen Docker** (falta también en el repo
+> del cliente `Sistemas-saa/prepaga-digital`). Igual, con los 3 triggers el bug ya no se puede
+> reproducir aunque el front viejo siga corriendo.
+>
+> ⚠️ Efecto visible: apretar "Regenerar" sobre una venta ya cerrada ahora muestra un **error en
+> pantalla** en vez de resetear documentos en silencio. Es el comportamiento correcto.
+
+Consulta para detectar ventas afectadas:
+```sql
+select sale_id, count(*) from signature_links
+where recipient_type='contratada' and step_order = 1
+group by sale_id;
+```
+
 ---
 
 ## Comandos Útiles
@@ -579,3 +643,13 @@ contratada_signer_dni: 3616083
 contratada_signature_mode: link
 contratada_signer_phone: 976122957
 ```
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
