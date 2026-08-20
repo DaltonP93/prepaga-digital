@@ -523,11 +523,20 @@ excepciones por rol**), una guarda en los hooks de `useBeneficiaries`, y el trig
 
 Las 4 funciones del sistema que **deben** poder escribir en un contrato firmado
 (`activate_adherent_incorporation`, `complete_adherent_incorporation`, `approve_sale_addendum`,
-`try_complete_sale_addendum_for_link`) están eximidas con
-`ALTER FUNCTION ... SET app.allow_signed_beneficiary_mutation = 'on'`, sin tocar sus cuerpos.
+`try_complete_sale_addendum_for_link`) quedan eximidas **desde el propio trigger**, que mira la
+pila de llamadas con `GET DIAGNOSTICS ... PG_CONTEXT`. Ninguna de las 4 se toca.
+
+> El primer intento eximía con `ALTER FUNCTION ... SET app.allow_signed_beneficiary_mutation`,
+> y **nunca se pudo aplicar**: esa GUC es un *placeholder* y PostgreSQL exige superusuario para
+> fijarla por `ALTER FUNCTION/ROLE/DATABASE` → `42501: permission denied to set parameter`.
+> El módulo de comisiones no sufre esto porque usa `set_config(..., true)` **dentro** del cuerpo
+> de cada RPC, no `ALTER FUNCTION`. Acá no se podía copiar ese patrón: 3 de las 4 funciones no
+> están en el repo (sólo existen en la base) y un `CREATE OR REPLACE` a ciegas las rompería.
 
 > ⚠️ Si se agrega otra función del sistema que modifique adherentes de un contrato firmado, hay
-> que eximirla igual o fallará con `42501`.
+> que sumarla al regex de exención del trigger o fallará con `42501`. Debe ser **PL/pgSQL**: una
+> función en SQL plano no aparece en `PG_CONTEXT`. El preflight de la migración aborta si alguna
+> de las exentas no lo es, así que el trigger nunca queda instalado sin salida.
 
 ---
 

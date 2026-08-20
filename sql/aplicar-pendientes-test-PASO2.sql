@@ -1,3 +1,21 @@
+-- =====================================================================
+-- PASO 2 -- 20260818000002 (bloqueo de adherentes en contratos firmados)
+--
+-- Es lo unico que quedaba pendiente de la entrega A en test.
+-- El PASO 1 la habia dejado afuera porque su bloque de exenciones usaba
+-- ALTER FUNCTION ... SET sobre una GUC placeholder, y Supabase lo rechaza
+-- con 42501. La migracion se reescribio: la exencion ahora la resuelve el
+-- propio trigger leyendo la pila de llamadas (PG_CONTEXT), sin tocar
+-- ninguna de las 4 funciones del sistema.
+--
+-- Trae un PREFLIGHT que ABORTA todo si alguna de las 4 no existe o no es
+-- PL/pgSQL. Nunca deja el trigger instalado sin exenciones.
+--
+-- Correr TODO junto. Al final salen 3 filas de verificacion (deben decir OK)
+-- y el ledger de migraciones.
+-- =====================================================================
+
+
 -- Respaldo en la base del bloqueo de adherentes en contratos firmados.
 --
 -- Con el contrato firmado, la composición del grupo familiar ya quedó sellada en
@@ -186,3 +204,21 @@ SELECT 'las 4 funciones del sistema quedan exentas',
             AND (l.lanname = 'plpgsql'
                  OR array_to_string(p.proconfig, ',') LIKE '%allow_signed_beneficiary_mutation=on%')
        ) >= 4 THEN 'OK' ELSE 'ALGUNA QUEDARIA BLOQUEADA' END;
+
+
+-- =====================================================================
+-- LEDGER -- registrar en supabase_migrations lo que ya esta aplicado
+--
+-- Las del 17/08 y 18/08 se aplicaron a mano desde el editor, asi que no
+-- quedaron anotadas: hoy el ledger solo tiene las tres del 19/08. Sin esto,
+-- un `supabase db push` posterior intenta re-aplicarlas.
+-- Solo escribe el registro; no ejecuta nada de SQL.
+-- =====================================================================
+insert into supabase_migrations.schema_migrations (version) values
+  ('20260817000001'), ('20260817000002'),
+  ('20260818000001'), ('20260818000002'), ('20260818000003')
+on conflict (version) do nothing;
+
+select array_agg(version order by version) as ledger_final
+  from supabase_migrations.schema_migrations
+ where version >= '20260817';
