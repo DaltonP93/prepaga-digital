@@ -79,6 +79,20 @@ Si el branding deja de aparecer en los PDFs, es porque Lovable sobreescribió es
 | `waha-proxy` | 19 | Proxy para requests a WAHA |
 | `bulk-regen` | 4 | Temporal — regeneración bulk de PDFs |
 
+### ⚠️ Base de TEST (US, `ykducvvcjzdpoojxlsig`) — `finalize-signature-link` diverge del repo
+
+Lo desplegado en TEST (**v54**) incluye la **incorporación de adherentes**
+(`completeAdherentIncorporationIfNeeded` + RPC `complete_adherent_incorporation`), que **no existe
+en ninguna rama de este repo** — se desplegó directo, sin commitear. Producción **no** tiene esa
+tabla ni esa RPC (`adherent_incorporations` / `complete_adherent_incorporation` = 0 en BR), por eso
+esa lógica **no** se incorporó a `main`.
+
+> ⚠️ **Desplegar el archivo del repo sobre TEST borraría esa lógica.** Antes de redesplegar
+> `finalize-signature-link` en TEST, bajar la versión viva con
+> `mcp__claude_ai_Supabase__get_edge_function(project_id='ykducvvcjzdpoojxlsig', function_slug='finalize-signature-link')`
+> y aplicar los cambios **encima** de esa, no encima del archivo del repo. En producción no aplica:
+> ahí el archivo del repo es la fuente de verdad.
+
 ---
 
 ## Configuración WAHA / WhatsApp
@@ -543,6 +557,90 @@ select sale_id, count(*) from signature_links
 where recipient_type='contratada' and step_order = 1
 group by sale_id;
 ```
+
+### 11. Contrato final SIN la firma del titular + HTML corrupto `<div <div` + contratos duplicados
+
+**Síntoma**: una venta muestra **varios contratos "finales"** (caso real: 2026-000207 con 5, y hasta
+20 filas de contrato) y en todos el bloque de firma dice solo *"Firmado electrónicamente por: Eder
+Arguello / CONTRATADA"* — **la firma del cliente no aparece**. El HTML de esos documentos contiene el
+literal roto `<div <div class="text-center...">Firma del Cliente</div>`.
+
+**Causa A — regex que se comía el `>` de cierre** (`src/hooks/useSignatureLinkPublic.ts`):
+```ts
+// ❌ ANTES: [^<]* consume TODO hasta el siguiente '<', incluido el '>' de la etiqueta
+const rawAttrRegex = /data-signature-field\s*=\s*["']true["'][^<]*/gi;
+```
+Sobre un placeholder no reemplazado `<div data-signature-field="true" ... style="...">` borraba los
+atributos **y el `>`**, dejando `<div ` sin cerrar. Solo dañaba el campo que NO había sido
+reemplazado, por eso aparecía únicamente cuando firmaba la contratada sobre un contrato sin la firma
+del titular. **Fix**: usar `[^<>]*` + una guarda que descarta el replace si el resultado matchea
+`/<\w+\s+</`.
+
+**Causa B — fallback que reconstruía el contrato desde la plantilla en blanco**: si la búsqueda del
+contrato final del titular no encontraba nada, el código caía en un fallback que borraba los finales y
+rearmaba la firma de la contratada sobre el contrato **v1 sin firmar**. El gatillo era
+`useSignatureLinks.ts` (`useResendSignatureLink`, rama titular), que hacía
+`update({ is_final: false })` sobre **todos** los documentos generados, incluidos los ya firmados.
+**Fix**: (1) la búsqueda ya no filtra por `is_final`, elige el contrato cuyo `content` contenga
+`data-signer="titular"`; (2) con `recipientType === 'contratada'` y merge fallido se **lanza un error
+visible** en vez de borrar y regenerar, revirtiendo antes el CAS del `signature_link` para que la
+contratada pueda reintentar; (3) el reset del reenvío usa
+`.or('is_final.is.null,is_final.eq.false')` — ojo: `.neq('is_final', true)` NO alcanza las filas
+con `is_final IS NULL`, porque en SQL `NULL <> true` es NULL.
+
+**Causa C — "Enviar documentos" no era idempotente** (`SaleTemplatesTab.tsx`): `insert` plano sin
+candado; N clics = N contratos + N anexos + N signature_links. **Fix**: helper compartido
+`deleteUnsignedGeneratedDocuments()` (el mismo que ya usaba "Regenerar"), llamado también desde
+`handleSendDocuments` con el orden **validar → construir en memoria → borrar → insertar**, más un
+`useRef` anti-doble-clic y deduplicación de `signature_links`.
+
+> ⚠️ Las guardas `.is('signature_data', null)` y `.is('signed_at', null)` del helper son
+> **load-bearing**, no redundantes: `finalize-signature-link` sella con PAdES la DDJJ de adherente
+> aunque tenga `is_final` false/null, y `pades-sign-document` recién al final setea `signed_pdf_url`.
+> En ese intervalo el documento sería borrable y se perdería evidencia de una firma real.
+
+**Candado en DB** (migración `20260821120000`, sobrevive a un revert del front):
+```sql
+CREATE UNIQUE INDEX IF NOT EXISTS uq_documents_contrato_final_por_venta
+  ON public.documents (sale_id, name)
+  WHERE document_type = 'contrato' AND is_final = true AND beneficiary_id IS NULL;
+```
+
+> ⚠️ La clave **incluye `name`, y eso NO es opcional**. Desde `4a5479b` un template con campos de
+> firma nunca es anexo, así que **Plan Materno** se clasifica como `document_type='contrato'`: una
+> venta con Plan Materno tiene **dos** contratos finales legítimos, ambos con `beneficiary_id IS NULL`.
+> La versión original de este índice era sobre `(sale_id)` a secas y **rompía la firma de esas ventas**
+> con violación de unicidad apenas se desplegara el front con Plan Materno. Si en alguna base aparece
+> la variante vieja, reemplazarla: `DROP INDEX IF EXISTS public.uq_documents_contrato_final_por_venta;`
+> y volver a crearla con `(sale_id, name)`.
+
+**Queries de detección** (deben dar 0):
+```sql
+-- HTML corrupto
+SELECT count(*) FROM documents WHERE document_type='contrato' AND is_final=true AND content LIKE '%<div <%';
+-- Contrato final sin la firma del titular
+SELECT count(*) FROM documents WHERE document_type='contrato' AND is_final=true
+  AND content LIKE '%data-signer="contratada"%' AND content NOT LIKE '%data-signer="titular"%';
+-- Más de un contrato final por venta
+SELECT count(*) FROM (SELECT sale_id FROM documents WHERE document_type='contrato' AND is_final=true
+                      GROUP BY 1 HAVING count(*)>1) t;
+-- Bloque de contratada duplicado dentro del mismo documento
+SELECT count(*) FROM documents WHERE is_final=true
+  AND (length(content)-length(replace(content,'data-signer="contratada"','')))/24 > 1;
+```
+
+**Notas de la reparación (2026-08-20)**: se repararon 6 ventas (2026-000207, 000109, 000214, 000182,
+000033, 000005) creando un documento **nuevo** con el contenido correcto en vez de reutilizar ids
+existentes, para no sobrescribir ningún PDF ya sellado en `contracts/signed/`. Los duplicados se
+**archivaron** (`is_final=false` + sufijo `(ANULADO - duplicado)`), no se borraron. Backup completo en
+la tabla `documents_backup_20260820`. El trigger `trg_protect_closed_sale_documents` bloquea
+desmarcar `is_final` en ventas cerradas: para la reparación hay que deshabilitarlo y **reactivarlo
+dentro de la misma transacción**.
+
+> ⚠️ Ese mismo trigger también neutraliza la reconciliación automática que hace el flujo de firma
+> (marcar `is_final=false` los contratos sobrantes tras el merge de la contratada): falla y queda
+> logueada en consola. No es grave — la prevención real es la idempotencia de la Causa C — pero
+> tenerlo presente si aparece ese `console.error`.
 
 ---
 
