@@ -10,9 +10,30 @@ export interface CommissionPeriodPdf {
   salesperson_name: string;
 }
 
+/**
+ * Etiquetas de `sales.sale_type`.
+ *
+ * Esto es una edge function de Deno: NO puede importar de `src/`, así que el
+ * mapa se duplica acá a propósito. DEBE mantenerse alineado con
+ * `src/lib/saleTypes.ts` (fuente de verdad del catálogo en el front).
+ */
+const SALE_TYPE_LABELS: Record<string, string> = {
+  venta_nueva: "Venta Nueva",
+  reingreso: "Reingreso",
+  alta_adherente: "Incorporación de Adherente",
+  cambio_plan: "Cambio de Plan",
+};
+
+/** Nunca devuelve vacío por un valor desconocido: muestra el código crudo. */
+export function saleTypeLabel(value?: string | null): string {
+  if (!value) return "";
+  return SALE_TYPE_LABELS[value] ?? value;
+}
+
 export interface CommissionItemPdf {
   item_number: number;
   group_type: string;
+  sale_type: string | null;
   sale_date: string;
   commission_amount: number;
   client_display_id: string | null;
@@ -58,6 +79,7 @@ export function buildCommissionHtml(
     <tr>
       <td>${item.item_number}</td>
       <td>${escapeHtml(item.group_type)}</td>
+      <td>${escapeHtml(saleTypeLabel(item.sale_type))}</td>
       <td>${formatDateOnly(item.sale_date)}</td>
       <td class="amount">${formatNumber(item.commission_amount)}</td>
       <td>${escapeHtml(item.client_display_id ?? "")}</td>
@@ -97,11 +119,12 @@ export function buildCommissionHtml(
   .items tr { break-inside: avoid; page-break-inside: avoid; }
   .items th, .items td { border: 1px solid #9ca3af; padding: 4px; overflow-wrap: anywhere; }
   .items th { background: #e5e7eb; text-align: left; font-size: 8px; }
-  .items th:nth-child(1) { width: 4%; } .items th:nth-child(2) { width: 8%; }
-  .items th:nth-child(3) { width: 7%; } .items th:nth-child(4) { width: 9%; }
-  .items th:nth-child(5) { width: 8%; } .items th:nth-child(6) { width: 4%; }
-  .items th:nth-child(7) { width: 18%; } .items th:nth-child(8) { width: 14%; }
-  .items th:nth-child(9) { width: 5%; } .items th:nth-child(10) { width: 13%; }
+  .items th:nth-child(1) { width: 4%; } .items th:nth-child(2) { width: 7%; }
+  .items th:nth-child(3) { width: 10%; } .items th:nth-child(4) { width: 7%; }
+  .items th:nth-child(5) { width: 9%; } .items th:nth-child(6) { width: 8%; }
+  .items th:nth-child(7) { width: 4%; } .items th:nth-child(8) { width: 18%; }
+  .items th:nth-child(9) { width: 12%; } .items th:nth-child(10) { width: 5%; }
+  .items th:nth-child(11) { width: 12%; }
   .amount { text-align: right; font-variant-numeric: tabular-nums; }
   .totals { margin-top: 4mm; margin-left: auto; width: 52%; border-collapse: collapse; }
   .totals td { border: 1px solid #9ca3af; padding: 6px; }
@@ -119,7 +142,7 @@ export function buildCommissionHtml(
       <div><strong>Empresa</strong>${escapeHtml(branding.company_name)}</div>
     </div>
     <table class="items"><thead><tr>
-      <th>Item</th><th>Tipo</th><th>Fecha</th><th>Monto Comisión</th><th>Id Cliente</th>
+      <th>Item</th><th>Tipo</th><th>Tipo Venta</th><th>Fecha</th><th>Monto Comisión</th><th>Id Cliente</th>
       <th>Sec</th><th>Cliente</th><th>Plan</th><th>%</th><th>Concepto</th>
     </tr></thead><tbody>${itemRows}</tbody></table>
     <table class="totals"><tr><td>Total x Concepto</td><td class="amount">${escapeHtml(period.currency_code)} ${formatNumber(period.total_amount)}</td></tr></table>

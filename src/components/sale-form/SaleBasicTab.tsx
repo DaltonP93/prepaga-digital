@@ -12,6 +12,7 @@ import { usePlans } from '@/hooks/usePlans';
 import { ClientForm } from '@/components/ClientForm';
 import { useCurrencySettings } from '@/hooks/useCurrencySettings';
 import { getClientDisplayName, getClientDocument, getClientDocumentLabel, isCompanyClient } from '@/lib/clientUtils';
+import { MANUAL_SALE_TYPE_OPTIONS } from '@/lib/saleTypes';
 interface SaleBasicTabProps {
   formData: {
     client_id: string;
@@ -249,9 +250,15 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
             <SelectTrigger>
               <SelectValue placeholder="Seleccionar tipo" />
             </SelectTrigger>
+            {/* Solo los tipos que elige el vendedor. Los tipos de OPERACION
+                ('alta_adherente', 'cambio_plan') los pone el sistema al crear
+                la venta-operacion y no deben poder elegirse a mano. */}
             <SelectContent>
-              <SelectItem value="venta_nueva">Venta Nueva</SelectItem>
-              <SelectItem value="reingreso">Reingreso</SelectItem>
+              {MANUAL_SALE_TYPE_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

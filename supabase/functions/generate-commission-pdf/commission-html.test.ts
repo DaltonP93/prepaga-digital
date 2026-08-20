@@ -1,5 +1,5 @@
 import { assert, assertEquals, assertStringIncludes, assertThrows } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { buildCommissionHtml, escapeHtml, formatDateOnly } from "./commission-html.ts";
+import { buildCommissionHtml, escapeHtml, formatDateOnly, saleTypeLabel } from "./commission-html.ts";
 import { guaraniesInWords } from "./number-to-spanish.ts";
 
 Deno.test("escapes untrusted database values", () => {
@@ -22,6 +22,7 @@ Deno.test("builds multipage-safe HTML with repeated branding shell", () => {
   const items = Array.from({ length: 70 }, (_, index) => ({
     item_number: index + 1,
     group_type: "INDIVIDUAL",
+    sale_type: index === 1 ? "alta_adherente" : "venta_nueva",
     sale_date: "2026-08-04",
     commission_amount: 12345,
     client_display_id: `C-${index + 1}`,
@@ -53,4 +54,17 @@ Deno.test("builds multipage-safe HTML with repeated branding shell", () => {
   assert(!html.includes("Cliente <riesgoso>"));
   assertStringIncludes(html, "Cliente &lt;riesgoso&gt;");
   assertEquals((html.match(/<tr>/g) ?? []).length >= 70, true);
+  // La columna nueva "Tipo Venta" convive con la de group_type (INDIVIDUAL/GRUPAL).
+  assertStringIncludes(html, "<th>Tipo</th><th>Tipo Venta</th>");
+  assertStringIncludes(html, "<td>INDIVIDUAL</td>");
+  assertStringIncludes(html, "<td>Venta Nueva</td>");
+  assertStringIncludes(html, "<td>Incorporación de Adherente</td>");
+});
+
+Deno.test("etiqueta los tipos de venta y tolera valores desconocidos o nulos", () => {
+  assertEquals(saleTypeLabel("cambio_plan"), "Cambio de Plan");
+  assertEquals(saleTypeLabel("reingreso"), "Reingreso");
+  assertEquals(saleTypeLabel("tipo_viejo"), "tipo_viejo");
+  assertEquals(saleTypeLabel(null), "");
+  assertEquals(saleTypeLabel(undefined), "");
 });

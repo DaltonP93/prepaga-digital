@@ -17,6 +17,7 @@ import { validateSaleTransition } from '@/lib/workflowValidator';
 import { DocumentPreviewDialog } from '@/components/documents/DocumentPreviewDialog';
 import { useRolePermissions } from '@/hooks/useRolePermissions';
 import { attachGroupMonthlyTotal } from '@/hooks/useAdherentIncorporations';
+import { attachPlanChangeContext } from '@/hooks/usePlanChanges';
 
 interface SaleTemplatesTabProps {
   saleId?: string;
@@ -355,9 +356,13 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       if (templateContentsResult.error) throw templateContentsResult.error;
       if (attachmentsResult.error) throw attachmentsResult.error;
 
-      // Se le adosa la cuota del grupo completo para el Anexo de Incorporación.
-      // Para cualquier otra venta devuelve el objeto sin tocar.
-      const sale = await attachGroupMonthlyTotal(saleResult.data);
+      // Se le adosa la cuota del grupo completo para el Anexo de Incorporación
+      // y los datos del Cambio de Plan para el Formulario de Solicitud de
+      // Cambio. Cada helper devuelve la venta TAL CUAL cuando no es de su tipo,
+      // así que encadenarlos es inocuo para una venta normal.
+      // OJO: esto va IGUAL en handleSendDocuments y en handleRegenerateDocuments;
+      // si se toca uno solo, el documento sale distinto al regenerar.
+      const sale = await attachPlanChangeContext(await attachGroupMonthlyTotal(saleResult.data));
       const client = sale?.clients as any;
       const plan = sale?.plans as any;
       const company = sale?.companies as any;
@@ -790,9 +795,13 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       if (templateContentsResult.error) throw templateContentsResult.error;
       if (attachmentsResult.error) throw attachmentsResult.error;
 
-      // Se le adosa la cuota del grupo completo para el Anexo de Incorporación.
-      // Para cualquier otra venta devuelve el objeto sin tocar.
-      const sale = await attachGroupMonthlyTotal(saleResult.data);
+      // Se le adosa la cuota del grupo completo para el Anexo de Incorporación
+      // y los datos del Cambio de Plan para el Formulario de Solicitud de
+      // Cambio. Cada helper devuelve la venta TAL CUAL cuando no es de su tipo,
+      // así que encadenarlos es inocuo para una venta normal.
+      // OJO: esto va IGUAL en handleSendDocuments y en handleRegenerateDocuments;
+      // si se toca uno solo, el documento sale distinto al regenerar.
+      const sale = await attachPlanChangeContext(await attachGroupMonthlyTotal(saleResult.data));
       const client = sale?.clients as any;
       const plan = sale?.plans as any;
       const company = sale?.companies as any;

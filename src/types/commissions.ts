@@ -85,6 +85,8 @@ export interface CommissionItem {
   concept: string;
   rule_id: string | null;
   rule_snapshot: Record<string, unknown> | null;
+  /** Snapshot del `sales.sale_type` al liquidar. NULL en ítems anteriores al backfill. */
+  sale_type: string | null;
   is_settled: boolean;
 }
 
@@ -101,6 +103,7 @@ export interface CommissionPreviewItem {
   base_amount: number | null;
   commission_amount: number | null;
   has_rule: boolean;
+  sale_type: string | null;
   error_code?: string | null;
   calc_mode?: CommissionCalcMode | null;
   base_type?: CommissionBase | null;

@@ -1,6 +1,6 @@
 import { buildClientNamePayload, getClientDisplayName, getClientDocument, isCompanyClient } from '@/lib/clientUtils';
-import { excludeIncorporationSales, PLAN_MATERNO_TEMPLATE, resolvePlanFieldsTemplateName, SALE_TYPE_INCORPORACION } from '@/lib/saleFilters';
-import { createEnhancedTemplateContext } from '@/lib/enhancedTemplateEngine';
+import { excludeIncorporationSales, excludeOperationSales, PLAN_MATERNO_TEMPLATE, resolvePlanFieldsTemplateName, SALE_TYPE_CAMBIO_PLAN, SALE_TYPE_INCORPORACION } from '@/lib/saleFilters';
+import { createEnhancedTemplateContext, interpolateEnhancedTemplate } from '@/lib/enhancedTemplateEngine';
 import { canMutateBeneficiaries, isSaleLocked } from '@/lib/saleUtils';
 import {
   getRelationshipLabel,
@@ -155,9 +155,113 @@ check('apellido faltante falla',
 console.log('\n=== Filtro de ventas-operación ===');
 let capturado = '';
 const queryFalsa = { or: (f: string) => { capturado = f; return 'query'; } };
-excludeIncorporationSales(queryFalsa);
-check('incluye las ventas con sale_type NULL', capturado, `sale_type.is.null,sale_type.neq.${SALE_TYPE_INCORPORACION}`);
+excludeOperationSales(queryFalsa);
+check('excluye los DOS tipos de operacion, dejando pasar sale_type NULL', capturado,
+  `sale_type.is.null,and(sale_type.neq.${SALE_TYPE_INCORPORACION},sale_type.neq.${SALE_TYPE_CAMBIO_PLAN})`);
 check('NO usa un neq pelado', capturado.includes('is.null'), true);
+// Con dos tipos, los neq TIENEN que ir dentro de un and(). Sueltos dentro del or()
+// no excluirian nada: una venta 'alta_adherente' pasaria por cumplir neq.cambio_plan.
+check('los neq van agrupados en un and()',
+  /and\(sale_type\.neq\.[^,]+,sale_type\.neq\.[^)]+\)/.test(capturado), true);
+// El alias viejo debe seguir existiendo: lo usan los dashboards y reportes.
+capturado = '';
+excludeIncorporationSales(queryFalsa);
+check('el alias excludeIncorporationSales sigue excluyendo igual', capturado.includes('is.null'), true);
 
+console.log('\n=== Anexo de Vigencia Inmediata: quién entra en la tabla ===');
+// V.I. EFECTIVA = valor del adherente; si es null, hereda el de la VENTA.
+// (Misma semántica que SaleAdherentsTab: null NO es "no".)
+const clienteVI = { client_type: 'persona', first_name: 'RIKA', last_name: 'HIRANO', dni: '3616083' };
+const adherentesVI = [
+  { first_name: 'ANA', last_name: 'VI', document_number: '1', relationship: 'hijo', amount: 100000, immediate_coverage: true },
+  { first_name: 'BETO', last_name: 'NOVI', document_number: '2', relationship: 'hijo', amount: 100000, immediate_coverage: false },
+  { first_name: 'CARLA', last_name: 'HEREDA', document_number: '3', relationship: 'conyuge', amount: 100000, immediate_coverage: null },
+];
+const plantillaVI = '<ul>{{#beneficiarios_vi}}<li>{{indice}}-{{nombreCompleto}}</li>{{/beneficiarios_vi}}</ul>';
+const ctxVI = (immediate: boolean) =>
+  createEnhancedTemplateContext(
+    clienteVI, { name: 'Plan Beta', price: 300000 }, { name: 'SAMAP' },
+    { id: 's-vi', total_amount: 400000, sale_date: '2026-08-17', immediate_coverage: immediate },
+    adherentesVI, undefined, {}, {},
+  );
+
+const viVentaSi = interpolateEnhancedTemplate(plantillaVI, ctxVI(true));
+check('venta con V.I.: entran el titular (hereda), el adherente en true y el null (hereda)',
+  viVentaSi, '<ul><li>1-RIKA HIRANO</li><li>2-ANA VI</li><li>3-CARLA HEREDA</li></ul>');
+check('venta con V.I.: el adherente en false NO entra aunque la venta la tenga',
+  viVentaSi.includes('BETO'), false);
+
+const viVentaNo = interpolateEnhancedTemplate(plantillaVI, ctxVI(false));
+check('venta sin V.I.: solo entra el adherente con V.I. propia en true',
+  viVentaNo, '<ul><li>1-ANA VI</li></ul>');
+check('venta sin V.I.: el null hereda "no" y el titular tampoco entra',
+  [viVentaNo.includes('CARLA'), viVentaNo.includes('RIKA')], [false, false]);
+check('el loop de todos los beneficiarios sigue listando a los 4',
+  (interpolateEnhancedTemplate('<ul>{{#beneficiarios}}<li>{{nombre}}</li>{{/beneficiarios}}</ul>', ctxVI(false))
+    .match(/<li>/g) || []).length, 4);
+
+console.log('\n=== Cambio de Plan: la tabla es el SNAPSHOT, no los adherentes de hoy ===');
+// A propósito los nombres del snapshot NO coinciden con los beneficiarios
+// actuales del contrato: si el loop se equivocara de fuente, se notaría.
+const ventaCambio = {
+  id: 's-cambio', total_amount: 500000, sale_date: '2026-08-17',
+  sale_type: 'cambio_plan', immediate_coverage: false,
+  plan_change: {
+    reason: 'mayor_cobertura',
+    previous_plan_name: 'Plan Alfa', new_plan_name: 'Plan Beta',
+    previous_total_amount: 400000, new_total_amount: 500000,
+    new_contract_start_date: '2026-09-01',
+    observations: 'Pide cobertura odontológica.',
+    members: [
+      { name: 'RIKA HIRANO', previous_plan: 'Plan Alfa', previous_amount: 250000, new_amount: 300000 },
+      { name: 'CARLA HEREDA', previous_plan: 'Plan Alfa', previous_amount: 150000, new_amount: 200000 },
+    ],
+  },
+};
+const ctxCambio = createEnhancedTemplateContext(
+  clienteVI, { name: 'Plan Beta', price: 300000 }, { name: 'SAMAP' }, ventaCambio,
+  // Beneficiarios ACTUALES distintos del snapshot, para detectar la confusión.
+  [{ first_name: 'ZULMA', last_name: 'NUEVA', document_number: '9', relationship: 'hijo', amount: 100000 }],
+  undefined, {}, {},
+);
+const filasCambio = interpolateEnhancedTemplate(
+  '<table>{{#integrantes_anteriores}}<tr><td>{{indice}}</td><td>{{nombre}}</td>' +
+  '<td>{{planAnterior}}</td><td>{{montoAnteriorFormateado}}</td><td>{{montoNuevoFormateado}}</td></tr>' +
+  '{{/integrantes_anteriores}}</table>',
+  ctxCambio,
+);
+check('renderiza las 2 filas del snapshot', (filasCambio.match(/<tr>/g) || []).length, 2);
+check('la primera fila es la del snapshot, con su plan anterior',
+  filasCambio.includes('<td>1</td><td>RIKA HIRANO</td><td>Plan Alfa</td>'), true);
+check('NO renderiza a los adherentes actuales del contrato',
+  filasCambio.includes('ZULMA'), false);
+check('el motivo sale como etiqueta legible, no como código',
+  interpolateEnhancedTemplate('{{cambio.motivo}}', ctxCambio),
+  'Pasar a plan de mayor cobertura');
+check('la fecha de inicio no se corre un día (bug conocido #1)',
+  interpolateEnhancedTemplate('{{cambio.fechaInicioNuevoContrato}}', ctxCambio), '01/09/2026');
+check('planes y observaciones',
+  interpolateEnhancedTemplate('{{cambio.planAnterior}}|{{cambio.planNuevo}}|{{cambio.observaciones}}', ctxCambio),
+  'Plan Alfa|Plan Beta|Pide cobertura odontológica.');
+
+console.log('\n=== No regresión: una venta normal no ve nada de esto ===');
+const ctxNormal = createEnhancedTemplateContext(
+  clienteVI, { name: 'Plan Beta', price: 300000 }, { name: 'SAMAP' },
+  { id: 's-normal', total_amount: 400000, sale_date: '2026-08-17', immediate_coverage: false },
+  adherentesVI, undefined, {}, {},
+);
+const plantillaVieja =
+  '<p>{{titular_nombre}} | {{titular_ci}} | {{monto_total}} | {{plan.nombre}} | {{vigencia_inmediata}}</p>' +
+  '<table><tbody><tr><td>{{nombre}}</td><td>{{dni}}</td><td>{{montoFormateado}}</td></tr></tbody></table>';
+const renderVieja = interpolateEnhancedTemplate(plantillaVieja, ctxNormal);
+check('una plantilla sin variables nuevas renderiza el titular y las 4 filas de siempre',
+  [renderVieja.includes('RIKA HIRANO | 3616083'), (renderVieja.match(/<tr>/g) || []).length],
+  [true, 4]);
+check('sin cambio de plan, el bloque cambio queda vacío y no ensucia el texto',
+  interpolateEnhancedTemplate('[{{cambio.motivo}}][{{cambio.planAnterior}}][{{cambio.fechaInicioNuevoContrato}}]', ctxNormal),
+  '[][][]');
+check('sin cambio de plan, el loop de integrantes no imprime filas',
+  interpolateEnhancedTemplate('<table>{{#integrantes_anteriores}}<tr><td>{{nombre}}</td></tr>{{/integrantes_anteriores}}</table>', ctxNormal),
+  '<table></table>');
 console.log(`\nRESULTADO: ${ok} OK, ${fail} fallas`);
 process.exit(fail ? 1 : 0);

@@ -12,6 +12,7 @@ import { useCurrencySettings } from '@/hooks/useCurrencySettings';
 import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { formatDateOnly } from '@/lib/dateOnly';
 import { commissionPersonName } from '@/types/commissions';
+import { saleTypeLabel } from '@/lib/saleTypes';
 
 export function CommissionPreview() {
   const { profile } = useSimpleAuthContext();
@@ -51,11 +52,11 @@ export function CommissionPreview() {
       </AlertDescription></Alert>}
       {requested && preview.isError && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>No se pudo calcular</AlertTitle><AlertDescription>{preview.error instanceof Error ? preview.error.message : 'Revise la configuración e intente nuevamente.'}</AlertDescription></Alert>}
       {requested && preview.data && <>
-        <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Cliente</TableHead><TableHead>Plan</TableHead><TableHead>Regla</TableHead><TableHead className="text-right">Base</TableHead><TableHead className="text-right">Comisión</TableHead></TableRow></TableHeader><TableBody>
-          {preview.data.map((item) => <TableRow key={item.sale_id} className={!item.has_rule ? 'bg-destructive/10' : ''}><TableCell>{formatDateOnly(item.sale_date)}</TableCell><TableCell>{item.client_name}<div className="text-xs text-muted-foreground">{item.client_display_id || item.sale_id.slice(0, 8)}</div></TableCell><TableCell>{item.plan_name}</TableCell><TableCell>{item.has_rule
+        <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Cliente</TableHead><TableHead>Plan</TableHead><TableHead>Tipo de venta</TableHead><TableHead>Regla</TableHead><TableHead className="text-right">Base</TableHead><TableHead className="text-right">Comisión</TableHead></TableRow></TableHeader><TableBody>
+          {preview.data.map((item) => <TableRow key={item.sale_id} className={!item.has_rule ? 'bg-destructive/10' : ''}><TableCell>{formatDateOnly(item.sale_date)}</TableCell><TableCell>{item.client_name}<div className="text-xs text-muted-foreground">{item.client_display_id || item.sale_id.slice(0, 8)}</div></TableCell><TableCell>{item.plan_name}</TableCell><TableCell>{saleTypeLabel(item.sale_type) || '—'}</TableCell><TableCell>{item.has_rule
               ? <>{item.percent != null ? `${item.percent}%` : 'Fija'}{!item.rule_id && <div className="text-xs text-muted-foreground">% por defecto</div>}</>
               : <span className="font-medium text-destructive">Sin regla</span>}</TableCell><TableCell className="text-right">{item.base_amount == null ? '—' : formatCurrency(Number(item.base_amount))}</TableCell><TableCell className="text-right font-medium">{item.commission_amount == null ? '—' : formatCurrency(Number(item.commission_amount))}</TableCell></TableRow>)}
-          {!preview.data.length && <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">No hay ventas elegibles para este período.</TableCell></TableRow>}
+          {!preview.data.length && <TableRow><TableCell colSpan={7} className="py-8 text-center text-muted-foreground">No hay ventas elegibles para este período.</TableCell></TableRow>}
         </TableBody></Table></div>
         <div className="flex flex-col items-end gap-3 sm:flex-row sm:justify-end sm:items-center"><div className="text-right"><div className="text-sm text-muted-foreground">Total estimado</div><div className="text-xl font-semibold">{formatCurrency(total)}</div></div><Button disabled={!preview.data.length || missing.length > 0 || generate.isPending || !params} onClick={() => params && generate.mutate(params)}>Generar borrador</Button></div>
       </>}

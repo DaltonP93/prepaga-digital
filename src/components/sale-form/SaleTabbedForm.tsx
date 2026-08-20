@@ -26,6 +26,7 @@ import SaleDDJJTab from './SaleDDJJTab';
 import SaleTemplatesTab from './SaleTemplatesTab';
 import SalePlanFieldsTab from './SalePlanFieldsTab';
 import SaleIncorporationsTab from './SaleIncorporationsTab';
+import SalePlanChangeTab from './SalePlanChangeTab';
 
 interface SaleTabbedFormProps {
   sale?: any;
@@ -214,7 +215,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
 
   const handleTabChange = (newTab: string) => {
     // Validate current tab before allowing navigation forward
-    const tabOrder = ['basico', 'adherentes', 'documentos', 'ddjj', 'datos_plan', 'templates', 'incorporaciones', 'auditoria'];
+    const tabOrder = ['basico', 'adherentes', 'documentos', 'ddjj', 'datos_plan', 'templates', 'incorporaciones', 'cambio_plan', 'auditoria'];
     const currentIndex = tabOrder.indexOf(activeTab);
     const newIndex = tabOrder.indexOf(newTab);
 
@@ -541,7 +542,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
       <Card>
         <CardContent className="pt-6">
           <Tabs value={activeTab} onValueChange={handleTabChange}>
-            <TabsList className="grid w-full grid-cols-2 gap-1.5 h-auto sm:h-11 sm:grid-cols-4 lg:grid-cols-8">
+            <TabsList className="grid w-full grid-cols-2 gap-1.5 h-auto sm:h-11 sm:grid-cols-4 lg:grid-cols-9">
               <TabsTrigger value="basico">Básico</TabsTrigger>
               <TabsTrigger value="adherentes" disabled={!isEditing}>Adherentes</TabsTrigger>
               <TabsTrigger value="documentos" disabled={!isEditing}>Documentos</TabsTrigger>
@@ -558,6 +559,11 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
               {/* Solo tiene sentido incorporar adherentes a un contrato ya firmado. */}
               {isEditing && (currentStatus === 'firmado' || currentStatus === 'completado') && (
                 <TabsTrigger value="incorporaciones">Incorporaciones</TabsTrigger>
+              )}
+              {/* Mismo criterio que incorporaciones: solo se cambia el plan de
+                  un contrato ya firmado. */}
+              {isEditing && (currentStatus === 'firmado' || currentStatus === 'completado') && (
+                <TabsTrigger value="cambio_plan">Cambio de Plan</TabsTrigger>
               )}
               {isEditing && isAuditorOrAbove && (
                 <TabsTrigger value="auditoria">Auditoría</TabsTrigger>
@@ -624,6 +630,14 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
               {isEditing && (currentStatus === 'firmado' || currentStatus === 'completado') && (
                 <TabsContent value="incorporaciones">
                   <SaleIncorporationsTab saleId={sale?.id} saleStatus={sale?.status} />
+                </TabsContent>
+              )}
+
+              {/* Va FUERA del fieldset por el mismo motivo que incorporaciones:
+                  el cambio de plan es su propia operación, no edita la venta madre. */}
+              {isEditing && (currentStatus === 'firmado' || currentStatus === 'completado') && (
+                <TabsContent value="cambio_plan">
+                  <SalePlanChangeTab saleId={sale?.id} saleStatus={sale?.status} />
                 </TabsContent>
               )}
 

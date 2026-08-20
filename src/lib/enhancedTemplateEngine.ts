@@ -88,6 +88,23 @@ export interface BeneficiaryContext {
    * el comportamiento que existía hasta ahora.
    */
   vigenciaInmediata: string;
+  /**
+   * Valor CRUDO de `beneficiaries.immediate_coverage`: true | false | null.
+   * `null` NO es "no": significa "hereda la vigencia de la venta" (misma
+   * semántica que SaleAdherentsTab). Por eso no se normaliza a boolean: el
+   * cálculo de la V.I. efectiva es `b.immediateCoverage ?? sale.immediate_coverage`.
+   */
+  immediateCoverage: boolean | null;
+}
+
+/** Una fila de la tabla de INTEGRANTES del Formulario de Solicitud de Cambio. */
+export interface PlanChangeMemberContext {
+  nombre: string;
+  planAnterior: string;
+  montoAnterior: number;
+  montoAnteriorFormateado: string;
+  montoNuevo: number;
+  montoNuevoFormateado: string;
 }
 
 export interface EnhancedTemplateContext {
@@ -186,7 +203,32 @@ export interface EnhancedTemplateContext {
     dia: string;
   };
   beneficiarios: BeneficiaryContext[];
+  /**
+   * Subconjunto de `beneficiarios` cuya VIGENCIA INMEDIATA EFECTIVA es true
+   * (`beneficiario.immediate_coverage ?? venta.immediate_coverage`).
+   * Es la lista que imprime el "Anexo Especial de Vigencia Inmediata".
+   */
+  beneficiariosVigenciaInmediata: BeneficiaryContext[];
   beneficiarioPrincipal: BeneficiaryContext | null;
+  /**
+   * Datos del Cambio de Plan (los adosa `attachPlanChangeContext`).
+   * Para cualquier venta que NO sea un cambio de plan queda en vacíos/0, así
+   * que ninguna plantilla existente se rompe.
+   */
+  cambio: {
+    planAnterior: string;
+    planNuevo: string;
+    montoAnterior: number;
+    montoAnteriorFormateado: string;
+    montoNuevo: number;
+    montoNuevoFormateado: string;
+    /** Etiqueta legible en español, no el código de la base. */
+    motivo: string;
+    fechaInicioNuevoContrato: string;
+    observaciones: string;
+  };
+  /** Foto de los integrantes al momento de la solicitud (members_snapshot). */
+  integrantesAnteriores: PlanChangeMemberContext[];
   respuestas: Record<string, any>;
   representante: {
     nombre: string;
@@ -325,8 +367,25 @@ function createBeneficiaryContext(beneficiary: any): BeneficiaryContext {
       beneficiary.immediate_coverage === true ? 'Sí'
       : beneficiary.immediate_coverage === false ? 'No'
       : '',
+    // Crudo, sin normalizar: null = "hereda de la venta".
+    immediateCoverage:
+      beneficiary.immediate_coverage === true ? true
+      : beneficiary.immediate_coverage === false ? false
+      : null,
   };
 }
+
+/**
+ * Motivos del Cambio de Plan → etiqueta del formulario en papel.
+ * Se replica acá (en vez de importar `usePlanChanges`) para que el motor de
+ * plantillas no dependa de un hook de React. Si se agrega un motivo nuevo hay
+ * que sumarlo en los dos lados.
+ */
+const PLAN_CHANGE_REASON_LABELS: Record<string, string> = {
+  separacion: 'Separación del contrato actual a uno independiente',
+  mayor_cobertura: 'Pasar a plan de mayor cobertura',
+  menor_cobertura: 'Pasar a plan de menor cobertura',
+};
 
 /**
  * Create enhanced template context from sale data
@@ -403,6 +462,51 @@ export function createEnhancedTemplateContext(
   const primaryBeneficiary = sortedBeneficiaryContexts.find((b) => (b.parentesco || '').toLowerCase() === 'titular')
     || sortedBeneficiaryContexts[0]
     || null;
+
+  // V.I. EFECTIVA por persona: el adherente manda si tiene un valor propio
+  // (true/false); si es null hereda la vigencia de la VENTA. Misma semántica
+  // que SaleAdherentsTab y que el alias {{vigencia_inmediata_adherente}}.
+  // El titular no se agrega aparte: cuando corresponde imprimirlo ya viene en
+  // sortedBeneficiaryContexts (fila is_primary o el fallback armado arriba),
+  // así que filtrar la lista alcanza y no lo duplica.
+  const ventaVigenciaInmediata = sale?.immediate_coverage === true;
+  const beneficiariosVigenciaInmediata = sortedBeneficiaryContexts.filter(
+    (b) => (b.immediateCoverage ?? ventaVigenciaInmediata) === true,
+  );
+
+  // Datos del Cambio de Plan que adosa `attachPlanChangeContext`.
+  const planChange = (sale as any)?.plan_change || null;
+  const planChangeMembers: PlanChangeMemberContext[] = Array.isArray(planChange?.members)
+    ? planChange.members.map((m: any) => ({
+        nombre: m?.name || '',
+        planAnterior: m?.previous_plan || '',
+        montoAnterior: Number(m?.previous_amount) || 0,
+        montoAnteriorFormateado: formatCurrency(Number(m?.previous_amount) || 0),
+        montoNuevo: Number(m?.new_amount) || 0,
+        montoNuevoFormateado: formatCurrency(Number(m?.new_amount) || 0),
+      }))
+    : [];
+
+  const cambioContext = {
+    planAnterior: planChange?.previous_plan_name || '',
+    planNuevo: planChange?.new_plan_name || '',
+    montoAnterior: Number(planChange?.previous_total_amount) || 0,
+    montoAnteriorFormateado: planChange
+      ? formatCurrency(Number(planChange.previous_total_amount) || 0)
+      : '',
+    montoNuevo: Number(planChange?.new_total_amount) || 0,
+    montoNuevoFormateado: planChange
+      ? formatCurrency(Number(planChange.new_total_amount) || 0)
+      : '',
+    motivo: planChange
+      ? (PLAN_CHANGE_REASON_LABELS[planChange.reason] || planChange.reason_label || planChange.reason || '')
+      : '',
+    // formatDate le agrega T00:00:00 a las fechas de calendario: sin eso
+    // new Date('2026-09-01') es medianoche UTC y en Paraguay muestra el día
+    // anterior (bug conocido #1).
+    fechaInicioNuevoContrato: formatDate(planChange?.new_contract_start_date || null, 'dd/MM/yyyy'),
+    observaciones: planChange?.observations || '',
+  };
 
   // Compute effective total from beneficiary amounts (source of truth)
   const effectiveTotal = sortedBeneficiaryContexts.length > 0
@@ -507,7 +611,10 @@ export function createEnhancedTemplateContext(
       dia: formatDate(now, 'd'),
     },
     beneficiarios: sortedBeneficiaryContexts,
+    beneficiariosVigenciaInmediata,
     beneficiarioPrincipal: primaryBeneficiary,
+    cambio: cambioContext,
+    integrantesAnteriores: planChangeMembers,
     respuestas: responses || {},
     representante: {
       nombre: companySettings?.contratada_signer_name || company?.name || '',
@@ -640,6 +747,26 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     return out;
   };
 
+  // Cuerpo del loop, una vez por beneficiario. Lo comparten
+  // {{#beneficiarios}} y {{#beneficiarios_vi}}: MISMAS variables por fila y
+  // mismo índice, para que una tabla se pueda copiar de una plantilla a otra.
+  const renderBeneficiaryLoop = (content: string, list: BeneficiaryContext[]): string =>
+    list.map((beneficiary, index) => {
+      let itemResult = content;
+      // Replace beneficiary-specific placeholders (Spanish names from BeneficiaryContext)
+      Object.keys(beneficiary).forEach(key => {
+        const value = (beneficiary as any)[key];
+        const placeholder = `{{${key}}}`;
+        const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+        if (value !== null && value !== undefined && typeof value !== 'object') {
+          itemResult = itemResult.replace(regex, String(value));
+        }
+      });
+      // English aliases
+      itemResult = applyBenAliases(itemResult, buildBenAliases(beneficiary, index));
+      return itemResult;
+    }).join('');
+
   // Handle explicit {{#beneficiarios}}...{{/beneficiarios}} loop
   let beneficiaryLoopMatched = false;
   let beneficiaryLoopHadContent = false;
@@ -653,19 +780,49 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
       return '';
     }
     beneficiaryLoopHadContent = true;
-    return context.beneficiarios.map((beneficiary, index) => {
+    return renderBeneficiaryLoop(content, context.beneficiarios);
+  });
+
+  // {{#beneficiarios_vi}}...{{/beneficiarios_vi}}: Anexo Especial de Vigencia
+  // Inmediata. Sólo las personas con V.I. EFECTIVA (el adherente manda; si no
+  // tiene valor propio, hereda la de la venta).
+  const beneficiariosViLoopRegex = /\{\{#beneficiarios_vi\}\}([\s\S]*?)\{\{\/beneficiarios_vi\}\}/gi;
+  result = result.replace(beneficiariosViLoopRegex, (_, content) => {
+    const trimmedContent = content.replace(/<[^>]*>/g, '').trim();
+    if (!trimmedContent) return '';
+    // Marca el loop como resuelto para que la auto-expansión de <tr> no vuelva
+    // a repetir las filas que este loop ya expandió.
+    beneficiaryLoopMatched = true;
+    beneficiaryLoopHadContent = true;
+    return renderBeneficiaryLoop(content, context.beneficiariosVigenciaInmediata);
+  });
+
+  // {{#integrantes_anteriores}}...{{/integrantes_anteriores}}: tabla de
+  // INTEGRANTES del Formulario de Solicitud de Cambio. Recorre el
+  // members_snapshot adosado (una FOTO del contrato al pedir el cambio), NO
+  // los beneficiarios actuales del contrato.
+  const integrantesLoopRegex = /\{\{#integrantes_anteriores\}\}([\s\S]*?)\{\{\/integrantes_anteriores\}\}/gi;
+  result = result.replace(integrantesLoopRegex, (_, content) => {
+    const trimmedContent = content.replace(/<[^>]*>/g, '').trim();
+    if (!trimmedContent) return '';
+    return context.integrantesAnteriores.map((member, index) => {
+      const aliases: Record<string, string> = {
+        '{{nombre}}': member.nombre,
+        '{{nombreCompleto}}': member.nombre,
+        '{{planAnterior}}': member.planAnterior,
+        '{{montoAnterior}}': String(member.montoAnterior),
+        '{{montoAnteriorFormateado}}': member.montoAnteriorFormateado,
+        '{{montoNuevo}}': String(member.montoNuevo),
+        '{{montoNuevoFormateado}}': member.montoNuevoFormateado,
+        '{{_index}}': String(index + 1),
+        '{{index}}': String(index + 1),
+        '{{indice}}': String(index + 1),
+      };
       let itemResult = content;
-      // Replace beneficiary-specific placeholders (Spanish names from BeneficiaryContext)
-      Object.keys(beneficiary).forEach(key => {
-        const value = (beneficiary as any)[key];
-        const placeholder = `{{${key}}}`;
+      Object.entries(aliases).forEach(([placeholder, value]) => {
         const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-        if (value !== null && value !== undefined && typeof value !== 'object') {
-          itemResult = itemResult.replace(regex, String(value));
-        }
+        itemResult = itemResult.replace(regex, value || '');
       });
-      // English aliases
-      itemResult = applyBenAliases(itemResult, buildBenAliases(beneficiary, index));
       return itemResult;
     }).join('');
   });
@@ -757,7 +914,10 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
   replaceNestedVariables(context.facturacion, 'facturacion');
   replaceNestedVariables(context.firma, 'firma');
   replaceNestedVariables(context.fecha, 'fecha');
-  
+  // Cambio de Plan. En una venta normal todos sus campos son '' o 0, así que
+  // una plantilla que no los use no cambia en nada.
+  replaceNestedVariables(context.cambio, 'cambio');
+
   // Replace primary beneficiary
   if (context.beneficiarioPrincipal) {
     replaceNestedVariables(context.beneficiarioPrincipal, 'beneficiarioPrincipal');
@@ -966,6 +1126,38 @@ export function getEnhancedTemplateVariables(): { category: string; variables: {
         { key: '{{barrio}}', description: 'Barrio del adherente (dentro del loop)' },
         { key: '{{fecha_ingreso}}', description: 'Fecha de ingreso del adherente (dentro del loop)' },
         { key: '{{vigencia_inmediata_adherente}}', description: 'V.I. del adherente; si no tiene, hereda la de la venta (dentro del loop)' },
+      ],
+    },
+    {
+      category: 'Vigencia Inmediata',
+      variables: [
+        {
+          key: '{{#beneficiarios_vi}}...{{/beneficiarios_vi}}',
+          description:
+            'Loop del Anexo Especial de Vigencia Inmediata: lista SOLO a las personas con V.I. efectiva (la del adherente; si no tiene, la de la venta). Adentro valen las mismas variables que en {{#beneficiarios}}.',
+        },
+        { key: '{{venta.vigenciaInmediata}}', description: 'V.I. de la venta (Sí/No)' },
+      ],
+    },
+    {
+      category: 'Cambio de Plan',
+      variables: [
+        { key: '{{cambio.motivo}}', description: 'Motivo del cambio (texto legible)' },
+        { key: '{{cambio.planAnterior}}', description: 'Plan anterior del contrato' },
+        { key: '{{cambio.planNuevo}}', description: 'Plan nuevo' },
+        { key: '{{cambio.montoAnteriorFormateado}}', description: 'Cuota anterior del grupo (Gs.)' },
+        { key: '{{cambio.montoNuevoFormateado}}', description: 'Cuota nueva del grupo (Gs.)' },
+        { key: '{{cambio.fechaInicioNuevoContrato}}', description: 'Fecha de inicio del nuevo contrato (dd/MM/yyyy)' },
+        { key: '{{cambio.observaciones}}', description: 'Observaciones del cambio' },
+        {
+          key: '{{#integrantes_anteriores}}...{{/integrantes_anteriores}}',
+          description: 'Loop de la tabla de INTEGRANTES: recorre la foto del contrato al momento de la solicitud',
+        },
+        { key: '{{nombre}}', description: 'Nombre del integrante (dentro de integrantes_anteriores)' },
+        { key: '{{planAnterior}}', description: 'Plan anterior del integrante (dentro del loop)' },
+        { key: '{{montoAnteriorFormateado}}', description: 'Monto anterior del integrante (dentro del loop)' },
+        { key: '{{montoNuevoFormateado}}', description: 'Monto nuevo del integrante (dentro del loop)' },
+        { key: '{{indice}}', description: 'Número de fila (dentro del loop)' },
       ],
     },
     {

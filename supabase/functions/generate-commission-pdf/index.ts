@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
 
     const [{ data: items, error: itemsError }, { data: company }, { data: settings }] = await Promise.all([
       admin.from("commission_items")
-        .select("item_number, group_type, sale_date, commission_amount, client_display_id, client_sequence, client_name, plan_name, percent, concept")
+        .select("item_number, group_type, sale_type, sale_date, commission_amount, client_display_id, client_sequence, client_name, plan_name, percent, concept")
         .eq("period_id", periodId)
         .order("item_number", { ascending: true }),
       admin.from("companies").select("name, address, phone").eq("id", period.company_id).single(),

@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useCommissionCatalog, useCommissionRules, useDeactivateCommissionRule, useSaveCommissionRule } from '@/hooks/useCommissions';
 import type { CommissionBase, CommissionCalcMode, CommissionGroupType, CommissionRule } from '@/types/commissions';
 import { commissionPersonName } from '@/types/commissions';
+import { SALE_TYPE_OPTIONS, saleTypeLabel } from '@/lib/saleTypes';
 
 const ALL = '__all__';
 const todayLocal = () => {
@@ -64,7 +65,7 @@ export function CommissionRulesPanel({ canManage }: { canManage: boolean }) {
         <TableHeader><TableRow><TableHead>Alcance</TableHead><TableHead>Cálculo</TableHead><TableHead>Vigencia</TableHead><TableHead>Prioridad</TableHead><TableHead>Estado</TableHead>{canManage && <TableHead />}</TableRow></TableHeader>
         <TableBody>
           {(rules.data || []).map((rule) => <TableRow key={rule.id} className={!rule.is_active ? 'opacity-50' : ''}>
-            <TableCell className="min-w-52"><div className="font-medium">{rule.plan?.name || rule.group_type || 'Todos los planes'}</div><div className="text-xs text-muted-foreground">{rule.salesperson ? commissionPersonName(rule.salesperson) : 'Todos los vendedores'} · {rule.sale_type || 'Todo tipo de venta'}</div></TableCell>
+            <TableCell className="min-w-52"><div className="font-medium">{rule.plan?.name || rule.group_type || 'Todos los planes'}</div><div className="text-xs text-muted-foreground">{rule.salesperson ? commissionPersonName(rule.salesperson) : 'Todos los vendedores'} · {saleTypeLabel(rule.sale_type) || 'Todo tipo de venta'}</div></TableCell>
             <TableCell>{rule.calc_mode === 'percent' ? `${rule.percent ?? 0}%` : `${Number(rule.fixed_amount || 0).toLocaleString('es-PY')} fijo`}<div className="text-xs text-muted-foreground">Base: {rule.base}</div></TableCell>
             <TableCell>{rule.valid_from}<div className="text-xs text-muted-foreground">hasta {rule.valid_to || 'sin límite'}</div></TableCell>
             <TableCell>{rule.priority}</TableCell><TableCell>{rule.is_active ? 'Activa' : 'Inactiva'}</TableCell>
@@ -85,7 +86,7 @@ export function CommissionRulesPanel({ canManage }: { canManage: boolean }) {
         <Field label="Prioridad" hint="Desempate manual: el número más alto gana. Dejalo igual en todas salvo que quieras que una regla general pise a una específica."><Input type="number" value={draft.priority ?? 0} onChange={(e) => set('priority', Number(e.target.value))} /></Field>
         <Field label="Válida desde" hint="La regla NO alcanza ventas anteriores a esta fecha. Para liquidar meses pasados, retrocedela hasta antes de la venta más vieja."><Input type="date" value={draft.valid_from || ''} onChange={(e) => set('valid_from', e.target.value)} /></Field>
         <Field label="Válida hasta" hint="Vacío = sin vencimiento."><Input type="date" value={draft.valid_to || ''} onChange={(e) => set('valid_to', e.target.value || null)} /></Field>
-        <Field label="Tipo de venta (opcional)"><Input value={draft.sale_type || ''} onChange={(e) => set('sale_type', e.target.value || null)} placeholder="venta_nueva" /></Field>
+        <Field label="Tipo de venta" hint="«Todo tipo de venta» hace que la regla valga para cualquiera. Elegir un tipo permite comisionar distinto una incorporación de adherente o un cambio de plan."><Select value={draft.sale_type || ALL} onValueChange={(v) => set('sale_type', v === ALL ? null : v)}><SelectTrigger><SelectValue placeholder={draft.sale_type || 'Seleccionar'} /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todo tipo de venta</SelectItem>{SALE_TYPE_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}{/* Reglas viejas cargadas a mano pueden tener un sale_type fuera del catalogo (un tipeo). Se lo agrega como opcion para que el trigger no quede EN BLANCO y el operador vea que hay un valor cargado, en vez de perderlo sin aviso al tocar el selector. */}{draft.sale_type && !SALE_TYPE_OPTIONS.some((o) => o.value === draft.sale_type) && <SelectItem value={draft.sale_type}>{draft.sale_type} (fuera del catalogo)</SelectItem>}</SelectContent></Select></Field>
         <div className="flex items-center gap-3 pt-7"><Switch checked={draft.is_active ?? true} onCheckedChange={(v) => set('is_active', v)} /><Label>Regla activa</Label></div>
       </div>
       <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button><Button onClick={submit} disabled={save.isPending}>Guardar</Button></DialogFooter>
