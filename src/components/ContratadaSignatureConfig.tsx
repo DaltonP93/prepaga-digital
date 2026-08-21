@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -126,12 +127,9 @@ function ContratadaSignatureConfigInner() {
         </div>
         <div className="space-y-2">
           <Label>Teléfono del representante</Label>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">+595</span>
-            <Input value={signerPhone} onChange={e => setSignerPhone(e.target.value)} placeholder="981123456" />
-          </div>
+          <PhoneInput value={signerPhone} onChange={setSignerPhone} placeholder="981123456" />
           <p className="text-xs text-muted-foreground">
-            Número sin el 0 inicial. Se usa para enviar OTP por WhatsApp al representante.
+            Se usa para enviar OTP por WhatsApp al representante.
           </p>
         </div>
       </div>

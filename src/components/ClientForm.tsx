@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -12,6 +12,8 @@ import { useSimpleAuthContext } from "@/components/SimpleAuthProvider";
 import { Database } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 import { normalizeDateInputValue } from "@/lib/dateOnly";
+import { PhoneInput } from "@/components/ui/phone-input";
+import { toE164 } from "@/lib/phone";
 
 type Client = Database["public"]["Tables"]["clients"]["Row"];
 
@@ -71,6 +73,7 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
     reset,
     setValue,
     watch,
+    control,
     formState: { errors },
   } = useForm<ClientFormData>();
 
@@ -257,12 +260,13 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
     });
   }, [client, open, reset]);
 
+  // Antes esta funcion solo entendia "+595" y el 0 inicial: cualquier otro pais
+  // quedaba guardado a medias (asi se perdio el "+55" de un cliente brasileno).
+  // Ahora se guarda en E.164 y, si el numero es ambiguo, se preserva tal cual
+  // en vez de mutilarlo.
   const normalizePhone = (raw: string | undefined): string => {
     if (!raw) return "";
-    let phone = raw.replace(/[\s\-()]/g, "");
-    if (phone.startsWith("+595")) phone = phone.slice(4);
-    if (phone.startsWith("0")) phone = phone.slice(1);
-    return phone;
+    return toE164(raw) ?? raw.trim();
   };
 
   const onSubmit = async (data: ClientFormData) => {
@@ -334,10 +338,19 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="phone">Telefono</Label>
-                  <div className="flex">
-                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-muted-foreground text-sm">+595</span>
-                    <Input id="phone" className="rounded-l-none" placeholder="992950125" {...register("phone")} />
-                  </div>
+                  <Controller
+                    name="phone"
+                    control={control}
+                    render={({ field }) => (
+                      <PhoneInput
+                        id="phone"
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        placeholder="992950125"
+                      />
+                    )}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="dni">C.I.</Label>

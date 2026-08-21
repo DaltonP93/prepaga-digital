@@ -1,5 +1,7 @@
 
 import React, { useState } from 'react';
+import { PhoneInput } from "@/components/ui/phone-input";
+import { formatPhoneDisplay } from "@/lib/phone";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -115,10 +117,11 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({ data, onChange, onSav
         </div>
         <div className="space-y-2">
           <Label>Teléfono *</Label>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground whitespace-nowrap">+595</span>
-            <Input value={data.phone} onChange={(e) => onChange({ ...data, phone: e.target.value.replace(/\D/g, '') })} placeholder="981123456" />
-          </div>
+          <PhoneInput
+            value={data.phone}
+            onChange={(v) => onChange({ ...data, phone: v })}
+            placeholder="981123456"
+          />
         </div>
         <div className="space-y-2">
           <Label>Monto (Gs.)</Label>
@@ -265,7 +268,7 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
                     <div className="font-medium">{b.first_name} {b.last_name}</div>
                     <div className="text-sm text-muted-foreground">
                       {b.dni && `C.I.: ${b.dni}`} {b.relationship && `• ${b.relationship}`}
-                      {b.phone && ` • Tel: +595${b.phone}`}
+                      {b.phone && ` • Tel: ${formatPhoneDisplay(b.phone)}`}
                       {b.amount ? ` • ${formatCurrency(Number(b.amount) || 0)}` : ''}
                     </div>
                   </div>

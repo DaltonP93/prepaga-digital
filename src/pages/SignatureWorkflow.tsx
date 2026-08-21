@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { toE164, toWaDigits } from '@/lib/phone';
 import DOMPurify from 'dompurify';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -52,8 +53,11 @@ interface PhoneVerificationState {
   phone: string;
 }
 
+// Antes: (phone || '').replace(/[^0-9]/g, '') — borraba el '+', y su salida no
+// solo iba a wa.me sino que se ESCRIBIA en signature_links.recipient_phone,
+// dejando el numero sin codigo de pais guardado en la base.
 const normalizePhoneForSending = (phone: string | null | undefined) => {
-  return (phone || '').replace(/[^0-9]/g, '');
+  return toE164(phone) ?? (phone || '').trim();
 };
 
 const SignatureWorkflow = () => {
@@ -227,7 +231,7 @@ const SignatureWorkflow = () => {
       const message = encodeURIComponent(
         `Hola ${recipientName}, le enviamos el enlace para firmar los documentos de su contrato:\n\n${url}\n\nPor favor ingrese al enlace para revisar y firmar los documentos. Gracias.`
       );
-      window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
+      window.open(`https://wa.me/${toWaDigits(cleanPhone)}?text=${message}`, '_blank');
       return;
     }
 
@@ -278,7 +282,7 @@ const SignatureWorkflow = () => {
       const message = encodeURIComponent(
         `Hola ${recipientName}, le enviamos el enlace para firmar los documentos de su contrato:\n\n${url}\n\nPor favor ingrese al enlace para revisar y firmar los documentos. Gracias.`
       );
-      window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
+      window.open(`https://wa.me/${toWaDigits(cleanPhone)}?text=${message}`, '_blank');
     }
   };
 

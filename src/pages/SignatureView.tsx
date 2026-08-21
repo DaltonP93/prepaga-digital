@@ -1,4 +1,5 @@
 import { useParams, Link } from "react-router-dom";
+import { toE164 } from '@/lib/phone';
 import { useSignatureLinkByToken, useSubmitSignatureLink, useSignatureLinkDocuments, useAllSignatureLinksPublic } from "@/hooks/useSignatureLinkPublic";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -889,7 +890,7 @@ const SignatureView = () => {
                                   ? (linkData as any).recipient_phone || ''
                                   : isTitular ? (client as any)?.phone : 
                                     (sale?.beneficiaries?.find((b: any) => b.id === linkData.recipient_id) as any)?.phone || '';
-                                const normalizedPhone = phone && !phone.startsWith('+') ? `+595${phone}` : phone;
+                                const normalizedPhone = toE164(phone) ?? phone;
                                 const effectiveChannel = verification.otpPolicy?.allowed_channels?.includes(selectedChannel)
                                   ? selectedChannel
                                   : verification.otpPolicy?.default_channel || selectedChannel;
@@ -965,7 +966,7 @@ const SignatureView = () => {
                                     ? (linkData as any).recipient_phone || ''
                                     : isTitular ? (client as any)?.phone :
                                       (sale?.beneficiaries?.find((b: any) => b.id === linkData.recipient_id) as any)?.phone || '';
-                                  const normalizedPhone = phone && !phone.startsWith('+') ? `+595${phone}` : phone;
+                                  const normalizedPhone = toE164(phone) ?? phone;
                                   const effectiveChannel = verification.otpPolicy?.allowed_channels?.includes(selectedChannel)
                                     ? selectedChannel
                                     : verification.otpPolicy?.default_channel || selectedChannel;

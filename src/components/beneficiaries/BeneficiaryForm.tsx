@@ -1,6 +1,7 @@
 
 import React from 'react';
-import { useForm } from 'react-hook-form';
+import { PhoneInput } from '@/components/ui/phone-input';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -59,6 +60,7 @@ export const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
     handleSubmit,
     setValue,
     watch,
+    control,
     formState: { errors },
   } = useForm<BeneficiaryFormData>({
     resolver: zodResolver(beneficiarySchema),
@@ -149,10 +151,18 @@ export const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({
         </div>
         <div>
           <Label htmlFor="phone">Teléfono</Label>
-          <Input
-            id="phone"
-            {...register('phone')}
-            placeholder="981123456"
+          <Controller
+            name="phone"
+            control={control}
+            render={({ field }) => (
+              <PhoneInput
+                id="phone"
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                placeholder="981123456"
+              />
+            )}
           />
         </div>
         <div>

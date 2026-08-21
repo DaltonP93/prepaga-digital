@@ -1,5 +1,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -286,11 +287,10 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
               </div>
               <div className="space-y-1">
                 <Label>Teléfono / WhatsApp</Label>
-                <Input
-                  type="tel"
+                <PhoneInput
                   value={formData.signer_phone || ''}
-                  onChange={(e) => onChange('signer_phone', e.target.value)}
-                  placeholder="Ej: 0981000000"
+                  onChange={(v) => onChange('signer_phone', v)}
+                  placeholder="981000000"
                 />
                 <p className="text-xs text-muted-foreground">Recibirá el código OTP por WhatsApp.</p>
               </div>
@@ -330,10 +330,10 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
           </div>
           <div className="space-y-1">
             <Label>Celular</Label>
-            <Input
+            <PhoneInput
               value={formData.billing_phone || ''}
-              onChange={(e) => onChange('billing_phone', e.target.value)}
-              placeholder="Número de celular"
+              onChange={(v) => onChange('billing_phone', v)}
+              placeholder="981000000"
             />
           </div>
           <div className="space-y-1">

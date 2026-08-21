@@ -165,7 +165,13 @@ export const useUpdateClient = () => {
       if (error) throw error;
 
       // Si se actualizó el teléfono, sincronizar en signature_links pendientes.
-      // Esto soluciona el caso donde el link se crea sin teléfono y luego se agrega.
+      //
+      // Antes este UPDATE filtraba `.is('recipient_phone', null)`, o sea que solo
+      // completaba los links SIN teléfono: si el link ya tenía un número mal
+      // cargado, corregir el cliente NO lo arreglaba nunca. Ese fue exactamente
+      // el caso del cliente brasileño — el link quedó congelado con el número
+      // mutilado y el OTP siguió saliendo ahí (signature-otp usa el del link,
+      // nunca el del body).
       if (updates.phone !== undefined && data?.phone) {
         try {
           // Obtener las ventas del cliente
@@ -176,14 +182,15 @@ export const useUpdateClient = () => {
 
           if (salesData && salesData.length > 0) {
             const saleIds = salesData.map((s: any) => s.id);
-            // Actualizar recipient_phone en todos los links pendientes del titular
+            // Actualizar recipient_phone en todos los links pendientes del titular.
+            // Se excluyen los completados/revocados a propósito: son evidencia de
+            // una firma real y no se tocan.
             await supabase
               .from('signature_links')
               .update({ recipient_phone: data.phone })
               .in('sale_id', saleIds)
               .eq('recipient_type', 'titular')
-              .in('status', ['pendiente', 'visto'])
-              .is('recipient_phone', null); // Solo los que no tienen teléfono
+              .in('status', ['pendiente', 'visto']);
           }
         } catch (syncError) {
           // No bloquear la actualización del cliente si falla la sincronización
