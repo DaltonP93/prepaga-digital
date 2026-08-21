@@ -1,6 +1,102 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { checkRateLimitPersistent, rateLimitResponse, getClientIdentifier } from '../_shared/rate-limiter.ts'
-import { toE164, toWaDigits, toWahaChatId, toTwilioWhatsApp, maskPhone } from '../_shared/phone.ts'
+// --- Inlined: _shared/phone.ts (COPIA LITERAL, editar en el original) ---
+// Va inline, igual que en finalize-signature-link, para que esta funcion se
+// pueda desplegar pegando UN solo archivo (el rate-limiter ya esta desplegado
+// como archivo hermano). La logica DEBE quedar identica a
+// supabase/functions/_shared/phone.ts, a src/lib/phone.ts y a la funcion
+// public.normalize_phone_e164() de la base.
+const PHONE_COUNTRY_CODES = new Set([
+  "1", "7",
+  "20", "27", "30", "31", "32", "33", "34", "36", "39",
+  "40", "41", "43", "44", "45", "46", "47", "48", "49",
+  "51", "52", "53", "54", "55", "56", "57", "58",
+  "60", "61", "62", "63", "64", "65", "66",
+  "81", "82", "84", "86", "90", "91", "92", "93", "94", "95", "98",
+  "211", "212", "213", "216", "218",
+  "220", "221", "222", "223", "224", "225", "226", "227", "228", "229",
+  "230", "231", "232", "233", "234", "235", "236", "237", "238", "239",
+  "240", "241", "242", "243", "244", "245", "246", "248", "249",
+  "250", "251", "252", "253", "254", "255", "256", "257", "258",
+  "260", "261", "262", "263", "264", "265", "266", "267", "268", "269",
+  "290", "291", "297", "298", "299",
+  "350", "351", "352", "353", "354", "355", "356", "357", "358", "359",
+  "370", "371", "372", "373", "374", "375", "376", "377", "378", "379",
+  "380", "381", "382", "383", "385", "386", "387", "389",
+  "420", "421", "423",
+  "500", "501", "502", "503", "504", "505", "506", "507", "508", "509",
+  "590", "591", "592", "593", "594", "595", "596", "597", "598", "599",
+  "670", "672", "673", "674", "675", "676", "677", "678", "679",
+  "680", "681", "682", "683", "685", "686", "687", "688", "689",
+  "690", "691", "692",
+  "850", "852", "853", "855", "856", "870", "880", "886",
+  "960", "961", "962", "963", "964", "965", "966", "967", "968",
+  "970", "971", "972", "973", "974", "975", "976", "977", "979",
+  "992", "993", "994", "995", "996", "998",
+]);
+
+function phoneHasCountryCode(digits: string): boolean {
+  return (
+    PHONE_COUNTRY_CODES.has(digits.slice(0, 1)) ||
+    PHONE_COUNTRY_CODES.has(digits.slice(0, 2)) ||
+    PHONE_COUNTRY_CODES.has(digits.slice(0, 3))
+  );
+}
+
+/** Normaliza a E.164. Devuelve null si no puede determinarlo - nunca inventa pais. */
+function toE164(raw: string | null | undefined, defaultCc = "595"): string | null {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  if (/[A-Za-z]/.test(s)) return null;
+
+  let hadPlus = s.startsWith("+");
+  let digits = s.replace(/\D/g, "");
+  if (!digits) return null;
+
+  if (!hadPlus && digits.startsWith("00")) {
+    digits = digits.replace(/^0+/, "");
+    hadPlus = true;
+  }
+  if (hadPlus) {
+    if (digits.length >= 7 && digits.length <= 15 && !digits.startsWith("0")) {
+      return `+${digits}`;
+    }
+    return null;
+  }
+
+  const cc = (defaultCc || "595").replace(/\D/g, "") || "595";
+
+  if (digits.startsWith("0")) {
+    digits = digits.replace(/^0+/, "");
+    if (digits.length === 9) return `+${cc}${digits}`;
+    return null;
+  }
+  if (digits.length === 9) return `+${cc}${digits}`;
+  if (digits.length >= 11 && digits.length <= 15 && phoneHasCountryCode(digits)) {
+    return `+${digits}`;
+  }
+  return null;
+}
+
+function toWaDigits(e164: string): string {
+  return e164.replace(/^\+/, "");
+}
+
+function toWahaChatId(e164: string): string {
+  if (e164.includes("@")) return e164;
+  return `${toWaDigits(e164)}@c.us`;
+}
+
+function toTwilioWhatsApp(e164: string): string {
+  return `whatsapp:${e164.startsWith("+") ? e164 : `+${e164}`}`;
+}
+
+function maskPhone(value: string): string {
+  if (!value) return "****";
+  if (value.length <= 4) return "****";
+  return value.slice(0, -4).replace(/[0-9]/g, "*") + value.slice(-4);
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
