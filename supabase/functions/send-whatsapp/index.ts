@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { checkRateLimit, rateLimitResponse, getClientIdentifier } from "../_shared/rate-limiter.ts"
+import { toE164, toWaDigits, toWahaChatId, toTwilioWhatsApp } from "../_shared/phone.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -90,6 +91,26 @@ serve(async (req) => {
       })
     }
 
+    // Formato canónico E.164 una sola vez, acá. De acá para abajo `phoneE164`
+    // es la única fuente de verdad y cada proveedor lo adapta a su formato.
+    // Tolera el formato legacy (9 dígitos sin país, con 0 inicial), así que
+    // funciona igual con la base sin migrar.
+    const phoneE164 = toE164(to)
+    if (!phoneE164) {
+      // Antes se armaba un chatId/wa.me con el número crudo y el mensaje no
+      // llegaba nunca, sin que nadie se enterara. Ahora falla visible.
+      console.error(`Teléfono inválido, no se envía: ${JSON.stringify(to)}`)
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'invalid_phone',
+        detail: 'El número de teléfono no es válido. Verificá el código de país.',
+        raw: to,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
+    }
+
     // Get company WhatsApp settings including provider + WAHA fields
     const { data: companySettings, error: settingsError } = await supabase
       .from('company_settings')
@@ -153,13 +174,12 @@ serve(async (req) => {
     // Route by provider
     if (provider === 'wame_fallback' || (!companySettings && provider !== 'meta' && provider !== 'twilio')) {
       // wa.me fallback: return URL for frontend to open
-      const formattedPhone = to.replace(/[\s+\-()]/g, '')
-      const wameUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`
+      const wameUrl = `https://wa.me/${toWaDigits(phoneE164)}?text=${encodeURIComponent(message)}`
 
       // Log the message attempt
       await supabase.from('whatsapp_messages').insert({
         sale_id: saleId,
-        phone_number: to,
+        phone_number: phoneE164,
         message_type: messageType,
         message_body: message,
         status: 'manual',
@@ -182,7 +202,7 @@ serve(async (req) => {
       if (!companySettings?.twilio_account_sid || !companySettings?.twilio_auth_token || !companySettings?.twilio_whatsapp_number) {
         await supabase.from('whatsapp_messages').insert({
           sale_id: saleId,
-          phone_number: to,
+          phone_number: phoneE164,
           message_type: messageType,
           message_body: message,
           status: 'failed',
@@ -203,13 +223,13 @@ serve(async (req) => {
         companySettings.twilio_account_sid,
         companySettings.twilio_auth_token,
         companySettings.twilio_whatsapp_number,
-        to,
+        phoneE164,
         message
       )
 
       await supabase.from('whatsapp_messages').insert({
         sale_id: saleId,
-        phone_number: to,
+        phone_number: phoneE164,
         message_type: messageType,
         message_body: message,
         status: twilioResult.success ? 'sent' : 'failed',
@@ -253,7 +273,7 @@ serve(async (req) => {
       if (!gatewayUrl) {
         await supabase.from('whatsapp_messages').insert({
           sale_id: saleId,
-          phone_number: to,
+          phone_number: phoneE164,
           message_type: messageType,
           message_body: message,
           status: 'failed',
@@ -270,11 +290,11 @@ serve(async (req) => {
         })
       }
 
-      const wahaResult = await sendViaWAHA(gatewayUrl, apiToken || '', to, message)
+      const wahaResult = await sendViaWAHA(gatewayUrl, apiToken || "", phoneE164, message)
 
       await supabase.from('whatsapp_messages').insert({
         sale_id: saleId,
-        phone_number: to,
+        phone_number: phoneE164,
         message_type: messageType,
         message_body: message,
         status: wahaResult.success ? 'sent' : 'failed',
@@ -313,12 +333,11 @@ serve(async (req) => {
     // Default: Meta Business API
     if (!companySettings?.whatsapp_api_key || !companySettings?.whatsapp_phone_id) {
       // Fallback to wa.me link instead of failing
-      const formattedPhone = to.replace(/[\s+\-()]/g, '')
-      const wameUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`
+      const wameUrl = `https://wa.me/${toWaDigits(phoneE164)}?text=${encodeURIComponent(message)}`
 
       await supabase.from('whatsapp_messages').insert({
         sale_id: saleId,
-        phone_number: to,
+        phone_number: phoneE164,
         message_type: messageType,
         message_body: message,
         status: 'manual',
@@ -354,7 +373,7 @@ serve(async (req) => {
     const whatsappResponse = await sendViaMetaAPI(
       companySettings.whatsapp_api_key,
       companySettings.whatsapp_phone_id,
-      to,
+      phoneE164,
       message
     )
 
@@ -362,7 +381,7 @@ serve(async (req) => {
       .from('whatsapp_messages')
       .insert({
         sale_id: saleId,
-        phone_number: to,
+        phone_number: phoneE164,
         message_type: messageType,
         message_body: message,
         status: whatsappResponse.success ? 'sent' : 'failed',
@@ -440,11 +459,11 @@ function buildMessageFromTemplate(templateName: string, data: Record<string, str
 async function sendViaMetaAPI(
   apiKey: string,
   phoneId: string,
-  to: string,
+  to: string, // E.164
   message: string
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
-    const formattedPhone = to.replace(/[\s+\-()]/g, '')
+    const formattedPhone = toWaDigits(to) // Meta espera los dígitos sin '+'
 
     const response = await fetch(
       `https://graph.facebook.com/v18.0/${phoneId}/messages`,
@@ -491,15 +510,14 @@ async function sendViaTwilio(
   accountSid: string,
   authToken: string,
   fromNumber: string,
-  to: string,
+  to: string, // E.164
   message: string
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
-    const formattedTo = to.replace(/[\s\-()]/g, '')
     const formattedFrom = fromNumber.replace(/[\s\-()]/g, '')
 
     const body = new URLSearchParams({
-      To: `whatsapp:${formattedTo}`,
+      To: toTwilioWhatsApp(to), // Twilio sí quiere el '+'
       From: `whatsapp:${formattedFrom}`,
       Body: message,
     })
@@ -543,18 +561,14 @@ async function sendViaTwilio(
 async function sendViaWAHA(
   gatewayUrl: string,
   apiToken: string,
-  to: string,
+  to: string, // E.164
   message: string
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
-    let formattedPhone = to.replace(/[\s+\-()]/g, '')
-    // Remove leading '0' and prepend country code if number looks local (no country code)
-    if (formattedPhone.startsWith('0')) {
-      formattedPhone = '595' + formattedPhone.substring(1)
-    } else if (formattedPhone.length <= 10 && !formattedPhone.startsWith('595')) {
-      formattedPhone = '595' + formattedPhone
-    }
-    const chatId = formattedPhone.includes('@') ? formattedPhone : `${formattedPhone}@c.us`
+    // Antes acá se anteponía '595' a cualquier número de <=10 dígitos. Un número
+    // extranjero de 11+ dígitos no entraba en ninguna rama y se enviaba a un
+    // chatId inexistente, en silencio. El país ahora viene en el E.164.
+    const chatId = toWahaChatId(to)
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',

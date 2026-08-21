@@ -10,6 +10,93 @@ function getSignatureLinkUrl(token: string): string {
   return `${getPublicAppUrl()}/firmar/${token}`;
 }
 
+// --- Inlined: _shared/phone.ts (COPIA LITERAL, editar en el original) ---
+// Esta función se despliega por MCP, que no sube archivos hermanos, por eso va
+// inline igual que public-app-url. La lógica DEBE quedar idéntica a
+// supabase/functions/_shared/phone.ts, a src/lib/phone.ts y a la función
+// public.normalize_phone_e164() de la base.
+const PHONE_COUNTRY_CODES = new Set([
+  "1", "7",
+  "20", "27", "30", "31", "32", "33", "34", "36", "39",
+  "40", "41", "43", "44", "45", "46", "47", "48", "49",
+  "51", "52", "53", "54", "55", "56", "57", "58",
+  "60", "61", "62", "63", "64", "65", "66",
+  "81", "82", "84", "86", "90", "91", "92", "93", "94", "95", "98",
+  "211", "212", "213", "216", "218",
+  "220", "221", "222", "223", "224", "225", "226", "227", "228", "229",
+  "230", "231", "232", "233", "234", "235", "236", "237", "238", "239",
+  "240", "241", "242", "243", "244", "245", "246", "248", "249",
+  "250", "251", "252", "253", "254", "255", "256", "257", "258",
+  "260", "261", "262", "263", "264", "265", "266", "267", "268", "269",
+  "290", "291", "297", "298", "299",
+  "350", "351", "352", "353", "354", "355", "356", "357", "358", "359",
+  "370", "371", "372", "373", "374", "375", "376", "377", "378", "379",
+  "380", "381", "382", "383", "385", "386", "387", "389",
+  "420", "421", "423",
+  "500", "501", "502", "503", "504", "505", "506", "507", "508", "509",
+  "590", "591", "592", "593", "594", "595", "596", "597", "598", "599",
+  "670", "672", "673", "674", "675", "676", "677", "678", "679",
+  "680", "681", "682", "683", "685", "686", "687", "688", "689",
+  "690", "691", "692",
+  "850", "852", "853", "855", "856", "870", "880", "886",
+  "960", "961", "962", "963", "964", "965", "966", "967", "968",
+  "970", "971", "972", "973", "974", "975", "976", "977", "979",
+  "992", "993", "994", "995", "996", "998",
+]);
+
+function phoneHasCountryCode(digits: string): boolean {
+  return (
+    PHONE_COUNTRY_CODES.has(digits.slice(0, 1)) ||
+    PHONE_COUNTRY_CODES.has(digits.slice(0, 2)) ||
+    PHONE_COUNTRY_CODES.has(digits.slice(0, 3))
+  );
+}
+
+/** Normaliza a E.164. Devuelve null si no puede determinarlo — nunca inventa país. */
+function toE164(raw: string | null | undefined, defaultCc = "595"): string | null {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  if (/[A-Za-z]/.test(s)) return null;
+
+  let hadPlus = s.startsWith("+");
+  let digits = s.replace(/\D/g, "");
+  if (!digits) return null;
+
+  if (!hadPlus && digits.startsWith("00")) {
+    digits = digits.replace(/^0+/, "");
+    hadPlus = true;
+  }
+  if (hadPlus) {
+    if (digits.length >= 7 && digits.length <= 15 && !digits.startsWith("0")) {
+      return `+${digits}`;
+    }
+    return null;
+  }
+
+  const cc = (defaultCc || "595").replace(/\D/g, "") || "595";
+
+  if (digits.startsWith("0")) {
+    digits = digits.replace(/^0+/, "");
+    if (digits.length === 9) return `+${cc}${digits}`;
+    return null;
+  }
+  if (digits.length === 9) return `+${cc}${digits}`;
+  if (digits.length >= 11 && digits.length <= 15 && phoneHasCountryCode(digits)) {
+    return `+${digits}`;
+  }
+  return null;
+}
+
+function toWaDigits(e164: string): string {
+  return e164.replace(/^\+/, "");
+}
+
+function toWahaChatId(e164: string): string {
+  if (e164.includes("@")) return e164;
+  return `${toWaDigits(e164)}@c.us`;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -382,6 +469,14 @@ async function activateNextStep(
         const companyName = (sale?.companies as any)?.name || 'La empresa'
         const signerName = s2Link.recipient_name || 'Representante Legal'
 
+        // Antes acá se concatenaba '595' sin ninguna condición: con un número que
+        // ya traía código de país salía '5955521995126800' y no llegaba nunca.
+        const contratadaPhone = toE164(s2Link.recipient_phone)
+        if (!contratadaPhone) {
+          console.error(`Teléfono inválido de la contratada, no se notifica: ${JSON.stringify(s2Link.recipient_phone)}`)
+          continue
+        }
+
         await fetch(`${supabaseUrl}/functions/v1/send-whatsapp`, {
           method: 'POST',
           headers: {
@@ -389,7 +484,7 @@ async function activateNextStep(
             'Authorization': `Bearer ${serviceKey}`,
           },
           body: JSON.stringify({
-            to: `595${s2Link.recipient_phone}`,
+            to: contratadaPhone,
             templateName: 'signature_link',
             templateData: {
               clientName: signerName,
@@ -488,10 +583,14 @@ async function sendSignedDocumentsToClient(
         const apiToken = cs.whatsapp_api_key || Deno.env.get('WAHA_API_KEY') || ''
         if (!gatewayUrl) continue
 
-        let formattedPhone = recipientPhone.replace(/[\s+\-()]/g, '')
-        if (formattedPhone.startsWith('0')) formattedPhone = '595' + formattedPhone.substring(1)
-        else if (formattedPhone.length <= 10 && !formattedPhone.startsWith('595')) formattedPhone = '595' + formattedPhone
-        const chatId = `${formattedPhone}@c.us`
+        // Copia literal de la heurística '595' que estaba en send-whatsapp:
+        // ninguna de las dos cubría números de 11+ dígitos.
+        const clientE164 = toE164(recipientPhone)
+        if (!clientE164) {
+          console.error(`Teléfono inválido del titular, no se envían los documentos: ${JSON.stringify(recipientPhone)}`)
+          continue
+        }
+        const chatId = toWahaChatId(clientE164)
 
         const headers: Record<string, string> = { 'Content-Type': 'application/json' }
         if (apiToken) headers['X-Api-Key'] = apiToken
@@ -530,11 +629,18 @@ async function sendSignedDocumentsToClient(
         // For other providers (Meta, Twilio, fallback): send a text message with the download URL
         const message = `Hola ${clientName}, tu documentación está completamente firmada. ✅\n\nPodés descargar tu contrato aquí:\n${fileUrl}\n\n(El enlace expira en 24 horas)`
 
+        // Segunda concatenación ciega de '595' que había en este archivo.
+        const clientE164Fallback = toE164(recipientPhone)
+        if (!clientE164Fallback) {
+          console.error(`Teléfono inválido del titular, no se notifica la descarga: ${JSON.stringify(recipientPhone)}`)
+          continue
+        }
+
         await fetch(`${supabaseUrl}/functions/v1/send-whatsapp`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceKey}` },
           body: JSON.stringify({
-            to: `595${recipientPhone}`,
+            to: clientE164Fallback,
             templateName: 'general',
             templateData: { clientName, message },
             companyId: sale.company_id,

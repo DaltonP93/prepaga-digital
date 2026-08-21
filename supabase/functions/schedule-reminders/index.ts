@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getSignatureLinkUrl } from "../_shared/public-app-url.ts"
+import { toE164 } from "../_shared/phone.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -89,7 +90,9 @@ serve(async (req) => {
         continue
       }
 
-      const clientPhone = link.recipient_phone || link.sales?.clients?.phone
+      // Normalizado a E.164 antes de delegar: el link puede tener un numero
+      // legacy (9 digitos sin pais) o mutilado.
+      const clientPhone = toE164(link.recipient_phone) || toE164(link.sales?.clients?.phone)
       const clientName = link.recipient_name || 
         `${link.sales?.clients?.first_name || ''} ${link.sales?.clients?.last_name || ''}`.trim()
       const companyName = link.sales?.companies?.name || 'La empresa'

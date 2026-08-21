@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { checkRateLimitPersistent, rateLimitResponse, getClientIdentifier } from '../_shared/rate-limiter.ts'
+import { toE164, toWaDigits, toWahaChatId, toTwilioWhatsApp, maskPhone } from '../_shared/phone.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,11 +26,6 @@ function maskEmail(email: string): string {
   if (!user || !domain) return '***@***';
   const visible = user.slice(0, 2);
   return `${visible}${'*'.repeat(Math.max(user.length - 2, 3))}@${domain}`;
-}
-
-function maskPhone(phone: string): string {
-  if (phone.length <= 4) return '****';
-  return phone.slice(0, -4).replace(/./g, '*') + phone.slice(-4);
 }
 
 // Send OTP via SMTP Relay (HTTP-based, since Edge Functions can't do native SMTP)
@@ -112,7 +108,13 @@ async function sendViaWhatsApp(
     }
 
     const message = `🔐 Tu código de verificación para firma electrónica es: *${otp}*\n\nEste código es válido por 5 minutos.\nNo compartas este código con nadie.`;
-    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    // Antes: phone.replace(/[^0-9]/g, '') — nunca agregaba el codigo de pais,
+    // asi que un numero extranjero se enviaba a un destinatario inexistente.
+    const e164 = toE164(phone);
+    if (!e164) {
+      return { sent: false, provider_used: provider, reason: 'invalid_phone' };
+    }
+    const cleanPhone = toWaDigits(e164);
 
     if (provider === 'meta') {
       // Need settings for meta API keys
@@ -167,7 +169,7 @@ async function sendViaWhatsApp(
       const auth = btoa(`${settings.twilio_account_sid}:${settings.twilio_auth_token}`);
       const formData = new URLSearchParams();
       formData.append('From', `whatsapp:${settings.twilio_whatsapp_number}`);
-      formData.append('To', `whatsapp:+${cleanPhone}`);
+      formData.append('To', toTwilioWhatsApp(e164));
       formData.append('Body', message);
 
       const res = await fetch(twilioUrl, {
@@ -191,7 +193,7 @@ async function sendViaWhatsApp(
         return { sent: false, provider_used: 'qr_session', reason: 'Gateway URL no configurada' };
       }
       const cleanGatewayUrl = gatewayUrl.replace(/\/$/, '');
-      const chatId = cleanPhone.includes('@') ? cleanPhone : `${cleanPhone}@c.us`;
+      const chatId = toWahaChatId(e164);
       const wahaApiKey = Deno.env.get('WAHA_API_KEY');
       const wahaHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
       if (wahaApiKey) {
@@ -301,7 +303,26 @@ Deno.serve(async (req) => {
 
       // Use only DB-stored recipients, never from request body
       const recipient_email = linkData.recipient_email;
-      const recipient_phone = linkData.recipient_phone;
+      let recipient_phone = linkData.recipient_phone;
+
+      // Rescate de links viejos: el telefono se copiaba al link al crearlo y no
+      // se volvia a actualizar, asi que hay links congelados con un numero
+      // mutilado (ej. sin el codigo de pais). Si el del link no es utilizable,
+      // se cae al de la venta / del cliente, que si esta corregido.
+      if (!toE164(recipient_phone)) {
+        const { data: fallbackSource } = await supabase
+          .from('sales')
+          .select('signer_phone, clients:client_id(phone)')
+          .eq('id', sale_id)
+          .maybeSingle();
+        const rescued =
+          toE164(fallbackSource?.signer_phone) ||
+          toE164((fallbackSource?.clients as any)?.phone);
+        if (rescued) {
+          console.log(`OTP: telefono del link no utilizable (${JSON.stringify(recipient_phone)}), se usa el de la venta`);
+          recipient_phone = rescued;
+        }
+      }
 
       // Get company ID from sale
       const { data: saleData } = await supabase
@@ -626,7 +647,8 @@ Deno.serve(async (req) => {
 
     } else if (action === 'test_whatsapp') {
       // Test WhatsApp sending
-      const { test_phone, company_id: testCompanyId } = body;
+      const { test_phone: rawTestPhone, company_id: testCompanyId } = body;
+      const test_phone = toE164(rawTestPhone) || rawTestPhone;
       if (!test_phone || !testCompanyId) {
         return new Response(JSON.stringify({ success: false, error: 'Falta número de prueba o company_id' }), {
           status: 400,
