@@ -1,5 +1,6 @@
 
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,7 +30,7 @@ export function CompanyForm({ open, onOpenChange, company }: CompanyFormProps) {
   const updateCompany = useUpdateCompany();
   const isEditing = !!company;
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<CompanyFormData>({
+  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<CompanyFormData>({
     defaultValues: {
       name: company?.name || "",
       address: company?.address || "",
@@ -93,9 +94,17 @@ export function CompanyForm({ open, onOpenChange, company }: CompanyFormProps) {
 
           <div className="space-y-2">
             <Label htmlFor="phone">Teléfono</Label>
-            <Input
-              id="phone"
-              {...register("phone")}
+            <Controller
+              name="phone"
+              control={control}
+              render={({ field }) => (
+                <PhoneInput
+                  id="phone"
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                />
+              )}
             />
           </div>
 

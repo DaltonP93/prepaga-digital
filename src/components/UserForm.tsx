@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { PhoneInput } from "@/components/ui/phone-input";
+import { Controller, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,7 +54,7 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
   const [newPassword, setNewPassword] = useState("");
   const [showPasswordReset, setShowPasswordReset] = useState(false);
 
-  const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<UserFormData>({
+  const { register, handleSubmit, setValue, watch, reset, control, formState: { errors } } = useForm<UserFormData>({
     defaultValues: {
       email: user?.email || "",
       first_name: user?.first_name || "",
@@ -225,10 +226,17 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
 
               <div className="space-y-2">
                 <Label htmlFor="phone">Teléfono</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  {...register("phone")}
+                <Controller
+                  name="phone"
+                  control={control}
+                  render={({ field }) => (
+                    <PhoneInput
+                      id="phone"
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                    />
+                  )}
                 />
               </div>
 

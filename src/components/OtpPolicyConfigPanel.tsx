@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -345,12 +346,14 @@ export const OtpPolicyConfigPanel: React.FC = () => {
                         Probar envio OTP por Sesion QR
                       </Label>
                       <div className="flex gap-2">
-                        <Input
-                          className="h-9"
-                          value={whatsappTestPhone}
-                          onChange={(e) => setWhatsappTestPhone(e.target.value)}
-                          placeholder="+5959XXXXXXX"
-                        />
+                        <div className="flex-1">
+                          <PhoneInput
+                            value={whatsappTestPhone}
+                            onChange={setWhatsappTestPhone}
+                            placeholder="981234567"
+                            showValidation={false}
+                          />
+                        </div>
                         <Button
                           type="button"
                           variant="outline"

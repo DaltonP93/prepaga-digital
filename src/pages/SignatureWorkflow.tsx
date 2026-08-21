@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { PhoneInput } from '@/components/ui/phone-input';
 import { toE164, toWaDigits } from '@/lib/phone';
 import DOMPurify from 'dompurify';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -1381,14 +1382,13 @@ const SignatureWorkflow = () => {
 
               <div className="space-y-2">
                 <Label htmlFor="signature-recipient-phone">Número de WhatsApp</Label>
-                <Input
+                <PhoneInput
                   id="signature-recipient-phone"
                   value={phoneVerification.phone}
-                  onChange={(event) => {
-                    const value = event.target.value.replace(/[^\d+()\-\s]/g, '');
+                  onChange={(value) => {
                     setPhoneVerification((current) => current ? { ...current, phone: value } : current);
                   }}
-                  placeholder="Ej: 0981234567 o 595981234567"
+                  placeholder="981234567"
                 />
                 <p className="text-xs text-muted-foreground">
                   Se usará este número para este envío. Si reenvías, el nuevo enlace quedará con este número.

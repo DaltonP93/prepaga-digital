@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -191,11 +192,10 @@ export const CombinedRequestForm = ({ onComplete }: { onComplete?: () => void })
               </div>
               <div>
                 <Label htmlFor="phone">Teléfono</Label>
-                <Input
+                <PhoneInput
                   id="phone"
-                  type="tel"
                   value={formData.personal.phone}
-                  onChange={(e) => handlePersonalChange('phone', e.target.value)}
+                  onChange={(v) => handlePersonalChange('phone', v)}
                 />
               </div>
               <div className="md:col-span-2">

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
+import { PhoneInput } from "@/components/ui/phone-input";
+import { phoneSchema } from "@/lib/phone";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,7 +40,7 @@ interface Profile {
 const profileSchema = z.object({
   first_name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
   last_name: z.string().min(2, { message: "El apellido debe tener al menos 2 caracteres." }),
-  phone: z.string().min(9, { message: "El teléfono debe tener al menos 9 caracteres." }),
+  phone: phoneSchema({ required: true }),
 });
 
 const Profile = () => {
@@ -51,6 +53,7 @@ const Profile = () => {
     register,
     handleSubmit,
     setValue,
+    control,
     formState: { errors },
   } = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema),
@@ -193,11 +196,17 @@ const Profile = () => {
 
                   <div>
                     <Label htmlFor="phone">Teléfono</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="Tu número de teléfono"
-                      {...register("phone")}
+                    <Controller
+                      name="phone"
+                      control={control}
+                      render={({ field }) => (
+                        <PhoneInput
+                          id="phone"
+                          value={field.value}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                        />
+                      )}
                     />
                     {errors.phone && (
                       <p className="text-destructive text-sm">

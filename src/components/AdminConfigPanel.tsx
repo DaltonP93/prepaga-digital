@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
+import { PhoneInput } from "@/components/ui/phone-input";
 import { ContratadaSignatureConfigInner } from '@/components/ContratadaSignatureConfig';
 import { SignatureBlockStyleCard } from '@/components/SignatureBlockStyleCard';
 import { WahaConnectPanel } from '@/components/WahaConnectPanel';
@@ -553,11 +554,11 @@ export const AdminConfigPanel: React.FC = () => {
                   </div>
                   <div>
                     <Label htmlFor="waha_phone">Número vinculado</Label>
-                    <Input
+                    <PhoneInput
                       id="waha_phone"
                       value={apiFormData.whatsapp_linked_phone}
-                      onChange={(e) => handleApiInputChange('whatsapp_linked_phone', e.target.value)}
-                      placeholder="+595981234567"
+                      onChange={(v) => handleApiInputChange('whatsapp_linked_phone', v)}
+                      placeholder="981234567"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
                       Número de WhatsApp vinculado a la sesión WAHA
@@ -610,11 +611,14 @@ export const AdminConfigPanel: React.FC = () => {
                     Probar WhatsApp
                   </h4>
                   <div className="flex gap-2">
-                    <Input
-                      placeholder="+5959XXXXXXX (número de prueba)"
-                      value={whatsappTestPhone}
-                      onChange={(e) => setWhatsappTestPhone(e.target.value)}
-                    />
+                    <div className="flex-1">
+                      <PhoneInput
+                        placeholder="981234567 (número de prueba)"
+                        value={whatsappTestPhone}
+                        onChange={setWhatsappTestPhone}
+                        showValidation={false}
+                      />
+                    </div>
                     <Button
                       variant="outline"
                       disabled={whatsappTesting || !whatsappTestPhone}

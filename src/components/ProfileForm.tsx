@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { PhoneInput } from "@/components/ui/phone-input";
+import { Controller, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +24,7 @@ export function ProfileForm() {
   const { profile, updateProfile, isUpdating } = useProfile();
   const [loading, setLoading] = useState(false);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<ProfileFormData>({
+  const { register, handleSubmit, reset, control, formState: { errors } } = useForm<ProfileFormData>({
     defaultValues: {
       first_name: "",
       last_name: "",
@@ -101,10 +102,17 @@ export function ProfileForm() {
 
           <div className="space-y-2">
             <Label htmlFor="phone">Teléfono</Label>
-            <Input
-              id="phone"
-              type="tel"
-              {...register("phone")}
+            <Controller
+              name="phone"
+              control={control}
+              render={({ field }) => (
+                <PhoneInput
+                  id="phone"
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                />
+              )}
             />
           </div>
 
