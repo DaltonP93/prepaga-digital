@@ -379,7 +379,8 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
             *,
             clients:client_id(*),
             plans:plan_id(*),
-            companies:company_id(*)
+            companies:company_id(*),
+            salesperson:salesperson_id(first_name, last_name)
           `)
           .eq('id', saleId)
           .single(),
@@ -860,7 +861,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         deleteUnsignedGeneratedDocuments(saleId),
         supabase
           .from('sales')
-          .select(`*, clients:client_id(*), plans:plan_id(*), companies:company_id(*)`)
+          .select(`*, clients:client_id(*), plans:plan_id(*), companies:company_id(*), salesperson:salesperson_id(first_name, last_name)`)
           .eq('id', saleId)
           .single(),
         supabase
