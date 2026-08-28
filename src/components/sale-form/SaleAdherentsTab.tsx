@@ -121,6 +121,10 @@ const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({ data, onChange, onSav
           </div>
         </div>
         <div className="space-y-2">
+          <Label>Email</Label>
+          <Input type="email" value={data.email} onChange={(e) => onChange({ ...data, email: e.target.value })} placeholder="email@ejemplo.com" />
+        </div>
+        <div className="space-y-2">
           <Label>Monto (Gs.)</Label>
           <Input inputMode="numeric" value={formatAmountInput(data.amount)} onChange={(e) => onChange({ ...data, amount: parseAmountInput(e.target.value) })} placeholder="0" />
         </div>
