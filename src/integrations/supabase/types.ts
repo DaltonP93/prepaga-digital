@@ -754,6 +754,7 @@ export type Database = {
           rule_snapshot: Json
           sale_date: string
           sale_id: string
+          sale_type: string | null
           salesperson_id: string
         }
         Insert: {
@@ -776,6 +777,7 @@ export type Database = {
           rule_snapshot: Json
           sale_date: string
           sale_id: string
+          sale_type?: string | null
           salesperson_id: string
         }
         Update: {
@@ -798,6 +800,7 @@ export type Database = {
           rule_snapshot?: Json
           sale_date?: string
           sale_id?: string
+          sale_type?: string | null
           salesperson_id?: string
         }
         Relationships: [
@@ -2696,6 +2699,172 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_changes: {
+        Row: {
+          client_id: string
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          document_id: string | null
+          id: string
+          members_snapshot: Json
+          new_contract_start_date: string | null
+          new_plan_id: string | null
+          new_total_amount: number | null
+          notes: string | null
+          observations: string | null
+          operation_sale_id: string
+          parent_sale_id: string | null
+          previous_plan_id: string | null
+          previous_total_amount: number | null
+          reason: string
+          signature_link_id: string | null
+          source: string
+          status: string
+          titular_document: string | null
+          titular_name: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          document_id?: string | null
+          id?: string
+          members_snapshot?: Json
+          new_contract_start_date?: string | null
+          new_plan_id?: string | null
+          new_total_amount?: number | null
+          notes?: string | null
+          observations?: string | null
+          operation_sale_id: string
+          parent_sale_id?: string | null
+          previous_plan_id?: string | null
+          previous_total_amount?: number | null
+          reason: string
+          signature_link_id?: string | null
+          source?: string
+          status?: string
+          titular_document?: string | null
+          titular_name: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          document_id?: string | null
+          id?: string
+          members_snapshot?: Json
+          new_contract_start_date?: string | null
+          new_plan_id?: string | null
+          new_total_amount?: number | null
+          notes?: string | null
+          observations?: string | null
+          operation_sale_id?: string
+          parent_sale_id?: string | null
+          previous_plan_id?: string | null
+          previous_total_amount?: number | null
+          reason?: string
+          signature_link_id?: string | null
+          source?: string
+          status?: string
+          titular_document?: string | null
+          titular_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_changes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_changes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_changes_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_changes_new_plan_id_fkey"
+            columns: ["new_plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_changes_operation_sale_id_fkey"
+            columns: ["operation_sale_id"]
+            isOneToOne: false
+            referencedRelation: "auditor_sales_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_changes_operation_sale_id_fkey"
+            columns: ["operation_sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_changes_operation_sale_id_fkey"
+            columns: ["operation_sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales_completed_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_changes_parent_sale_id_fkey"
+            columns: ["parent_sale_id"]
+            isOneToOne: false
+            referencedRelation: "auditor_sales_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_changes_parent_sale_id_fkey"
+            columns: ["parent_sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_changes_parent_sale_id_fkey"
+            columns: ["parent_sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales_completed_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_changes_previous_plan_id_fkey"
+            columns: ["previous_plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_changes_signature_link_id_fkey"
+            columns: ["signature_link_id"]
+            isOneToOne: false
+            referencedRelation: "signature_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plans: {
         Row: {
           company_id: string
@@ -3334,6 +3503,7 @@ export type Database = {
           employee_signature_mode: string
           id: string
           immediate_coverage: boolean | null
+          maternity_bonus: boolean
           notes: string | null
           parent_sale_id: string | null
           plan_id: string | null
@@ -3381,6 +3551,7 @@ export type Database = {
           employee_signature_mode?: string
           id?: string
           immediate_coverage?: boolean | null
+          maternity_bonus?: boolean
           notes?: string | null
           parent_sale_id?: string | null
           plan_id?: string | null
@@ -3428,6 +3599,7 @@ export type Database = {
           employee_signature_mode?: string
           id?: string
           immediate_coverage?: boolean | null
+          maternity_bonus?: boolean
           notes?: string | null
           parent_sale_id?: string | null
           plan_id?: string | null
@@ -5752,6 +5924,7 @@ export type Database = {
           rule_id: string
           sale_date: string
           sale_id: string
+          sale_type: string
         }[]
       }
       commission_can_read_company: {
@@ -5872,6 +6045,7 @@ export type Database = {
           rule_id: string
           sale_date: string
           sale_id: string
+          sale_type: string
         }[]
       }
       commission_resolve_rule: {

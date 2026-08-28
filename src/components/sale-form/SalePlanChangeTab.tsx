@@ -7,7 +7,18 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Repeat, ExternalLink, AlertCircle, Ban } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Plus, Repeat, ExternalLink, AlertCircle, Ban, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 import { useSale } from '@/hooks/useSale';
@@ -17,6 +28,7 @@ import { getClientDisplayName } from '@/lib/clientUtils';
 import {
   usePlanChanges,
   useCreatePlanChange,
+  useUpdatePlanChange,
   useCancelPlanChange,
   planChangeReasonLabel,
   PLAN_CHANGE_REASONS,
@@ -38,6 +50,34 @@ const showAmount = (v: number) => (v ? v.toLocaleString('es-PY', { maximumFracti
 
 /** Cancelable mientras la operación no se aplicó al contrato. */
 const CANCELABLE = ['draft', 'sent'];
+/** Único estado desde el que la base deja editar (trigger `plan_changes_guard_lifecycle`). */
+const EDITABLE = 'draft';
+
+/**
+ * Estados de la VENTA-OPERACIÓN en los que el formulario todavía se puede tocar.
+ *
+ * No alcanza con `c.status`: nadie escribe nunca 'sent' ni 'signed', así que se
+ * queda en 'draft' incluso después de que el titular firmó (ahí la
+ * venta-operación ya está en 'firmado'). Y acá no hay ningún guard de base que
+ * frene el update, así que sin esto se reescribe el snapshot de un formulario
+ * ya firmado en silencio. Los hooks repiten la guarda.
+ */
+const OP_EDITABLE = ['borrador'];
+const OP_CANCELABLE = ['borrador', 'enviado', 'pendiente'];
+
+/**
+ * Fila de `plan_changes` (y de su `members_snapshot`). La tabla todavía no está
+ * en types.ts, así que se tipa suelta como en el hook.
+ */
+type CambioPlan = Record<string, any>;
+
+/**
+ * Clave de fila de un integrante. Tiene que ser la misma al armar la tabla desde
+ * el contrato madre y al rearmarla desde el snapshot, porque es la que indexa
+ * los montos nuevos que se están tipeando.
+ */
+const memberKey = (m: { beneficiary_id?: string | null; is_primary?: boolean }, i: number) =>
+  m.beneficiary_id || (m.is_primary ? 'titular' : `integrante-${i}`);
 
 /**
  * "Cambio de Plan" sobre un contrato ya firmado.
@@ -55,9 +95,12 @@ const SalePlanChangeTab: React.FC<SalePlanChangeTabProps> = ({ saleId, saleStatu
   const { data: plans = [] } = usePlans();
   const { data: beneficiarios = [] } = useBeneficiaries(saleId || '');
   const crear = useCreatePlanChange();
+  const actualizar = useUpdatePlanChange();
   const cancelar = useCancelPlanChange();
 
   const [showForm, setShowForm] = useState(false);
+  /** Cambio de plan que se está corrigiendo; null = alta nueva. */
+  const [editandoId, setEditandoId] = useState<string | null>(null);
   const [reason, setReason] = useState<PlanChangeReason | ''>('');
   const [newPlanId, setNewPlanId] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -66,6 +109,11 @@ const SalePlanChangeTab: React.FC<SalePlanChangeTabProps> = ({ saleId, saleStatu
   const [nuevosMontos, setNuevosMontos] = useState<Record<string, number>>({});
 
   const habilitado = saleStatus === 'firmado' || saleStatus === 'completado';
+
+  const editando = useMemo(
+    () => (cambios as CambioPlan[]).find((c) => c.id === editandoId) || null,
+    [cambios, editandoId],
+  );
 
   const planActual = (sale as any)?.plans?.name || '';
 
@@ -79,6 +127,22 @@ const SalePlanChangeTab: React.FC<SalePlanChangeTabProps> = ({ saleId, saleStatu
    * null y el trigger de activación escribe sólo en `sales.titular_amount`.
    */
   const integrantes = useMemo(() => {
+    // Al corregir, la tabla se rearma desde el snapshot y NO desde el contrato
+    // madre: el snapshot es la foto del momento de la solicitud, y el formulario
+    // tiene que seguir describiendo esa foto aunque los adherentes hayan cambiado.
+    if (editando) {
+      const snapshot = Array.isArray(editando.members_snapshot) ? editando.members_snapshot : [];
+      return snapshot.map((m: CambioPlan, i: number) => ({
+        key: memberKey(m, i),
+        beneficiary_id: m.beneficiary_id || null,
+        is_primary: !!m.is_primary,
+        name: m.name || '',
+        previous_plan: m.previous_plan || '',
+        previous_amount: Number(m.previous_amount) || 0,
+        new_amount: Number(m.new_amount) || 0,
+      })) as (PlanChangeMemberInput & { key: string })[];
+    }
+
     if (!sale) return [] as (PlanChangeMemberInput & { key: string })[];
 
     const filaPrimary = (beneficiarios as any[])?.find((b) => b.is_primary);
@@ -107,7 +171,7 @@ const SalePlanChangeTab: React.FC<SalePlanChangeTabProps> = ({ saleId, saleStatu
       }));
 
     return [titular, ...adherentes];
-  }, [sale, beneficiarios, planActual]);
+  }, [sale, beneficiarios, planActual, editando]);
 
   const totalNuevo = integrantes.reduce((s, m) => s + (nuevosMontos[m.key] || 0), 0);
   const totalAnterior = integrantes.reduce((s, m) => s + m.previous_amount, 0);
@@ -120,7 +184,33 @@ const SalePlanChangeTab: React.FC<SalePlanChangeTabProps> = ({ saleId, saleStatu
     );
   }
 
-  const handleCrear = async () => {
+  const cerrarForm = () => {
+    setShowForm(false);
+    setEditandoId(null);
+    setReason('');
+    setNewPlanId('');
+    setStartDate('');
+    setObservations('');
+    setNuevosMontos({});
+  };
+
+  const abrirEdicion = (c: CambioPlan) => {
+    const snapshot = Array.isArray(c.members_snapshot) ? c.members_snapshot : [];
+    setEditandoId(c.id);
+    setReason((c.reason as PlanChangeReason) || '');
+    setNewPlanId(c.new_plan_id || '');
+    setStartDate(c.new_contract_start_date || '');
+    setObservations(c.observations || '');
+    setNuevosMontos(
+      snapshot.reduce((acc: Record<string, number>, m: CambioPlan, i: number) => {
+        acc[memberKey(m, i)] = Number(m.new_amount) || 0;
+        return acc;
+      }, {}),
+    );
+    setShowForm(true);
+  };
+
+  const handleGuardar = async () => {
     if (!reason) {
       toast.error('Elegí el motivo del cambio.');
       return;
@@ -144,6 +234,19 @@ const SalePlanChangeTab: React.FC<SalePlanChangeTabProps> = ({ saleId, saleStatu
     }));
 
     try {
+      if (editandoId) {
+        await actualizar.mutateAsync({
+          id: editandoId,
+          reason,
+          newPlanId,
+          newContractStartDate: startDate || null,
+          observations: observations || null,
+          members,
+        });
+        cerrarForm();
+        return;
+      }
+
       const res = await crear.mutateAsync({
         parentSaleId: saleId,
         reason,
@@ -152,12 +255,7 @@ const SalePlanChangeTab: React.FC<SalePlanChangeTabProps> = ({ saleId, saleStatu
         observations: observations || null,
         members,
       });
-      setShowForm(false);
-      setReason('');
-      setNewPlanId('');
-      setStartDate('');
-      setObservations('');
-      setNuevosMontos({});
+      cerrarForm();
       // Se abre la operación para generar y enviar a firmar el formulario.
       if (res?.operationSale?.id) navigate(`/sales/${res.operationSale.id}/edit`);
     } catch {
@@ -194,7 +292,9 @@ const SalePlanChangeTab: React.FC<SalePlanChangeTabProps> = ({ saleId, saleStatu
       {showForm && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Nuevo Cambio de Plan</CardTitle>
+            <CardTitle className="text-base">
+              {editandoId ? 'Editar Cambio de Plan' : 'Nuevo Cambio de Plan'}
+            </CardTitle>
             <p className="text-sm text-muted-foreground">
               Se genera un Formulario de Solicitud de Cambio con estos datos. El contrato
               original no se modifica: el plan y los montos se aplican recién cuando el
@@ -333,18 +433,21 @@ const SalePlanChangeTab: React.FC<SalePlanChangeTabProps> = ({ saleId, saleStatu
             </div>
 
             <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setShowForm(false);
-                  setNuevosMontos({});
-                }}
-              >
+              <Button type="button" variant="outline" onClick={cerrarForm}>
                 Cancelar
               </Button>
-              <Button type="button" onClick={handleCrear} disabled={crear.isPending}>
-                {crear.isPending ? 'Creando...' : 'Crear Cambio de Plan'}
+              <Button
+                type="button"
+                onClick={handleGuardar}
+                disabled={crear.isPending || actualizar.isPending}
+              >
+                {editandoId
+                  ? actualizar.isPending
+                    ? 'Guardando...'
+                    : 'Guardar cambios'
+                  : crear.isPending
+                    ? 'Creando...'
+                    : 'Crear Cambio de Plan'}
               </Button>
             </div>
           </CardContent>
@@ -361,7 +464,7 @@ const SalePlanChangeTab: React.FC<SalePlanChangeTabProps> = ({ saleId, saleStatu
         )
       ) : (
         <div className="space-y-2">
-          {cambios.map((c: any) => {
+          {cambios.map((c: CambioPlan) => {
             const op = c.operation_sale;
             return (
               <Card key={c.id}>
@@ -381,17 +484,53 @@ const SalePlanChangeTab: React.FC<SalePlanChangeTabProps> = ({ saleId, saleStatu
                     </p>
                   </div>
                   <div className="flex shrink-0 gap-2">
-                    {CANCELABLE.includes(c.status) && (
+                    {/* Editar/cancelar según el estado de la VENTA-OPERACIÓN:
+                        `c.status` se queda en 'draft' hasta la activación, así
+                        que no distingue un formulario sin emitir de uno firmado. */}
+                    {c.status === EDITABLE &&
+                      (!op?.status || OP_EDITABLE.includes(op.status as string)) && (
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        disabled={cancelar.isPending}
-                        onClick={() => cancelar.mutate({ id: c.id })}
+                        disabled={actualizar.isPending}
+                        onClick={() => abrirEdicion(c)}
                       >
-                        <Ban className="h-4 w-4 mr-1" />
-                        Cancelar
+                        <Pencil className="h-4 w-4 mr-1" />
+                        Editar
                       </Button>
+                    )}
+                    {CANCELABLE.includes(c.status) &&
+                      (!op?.status || OP_CANCELABLE.includes(op.status as string)) && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={cancelar.isPending}
+                          >
+                            <Ban className="h-4 w-4 mr-1" />
+                            Cancelar
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>¿Cancelar el cambio de plan?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              No se borra nada: la solicitud y su formulario quedan registrados
+                              como cancelados. Para cambiar el plan habrá que crear una solicitud
+                              nueva.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Volver</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => cancelar.mutate({ id: c.id })}>
+                              Cancelar cambio de plan
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     )}
                     {c.operation_sale_id && (
                       <Button

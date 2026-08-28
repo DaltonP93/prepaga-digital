@@ -122,6 +122,143 @@ Hay triggers automáticos en `signature_links`, `beneficiaries` y `clients` que 
 
 ---
 
+## Tipos de Venta y Anexos (`sales.sale_type`)
+
+`sale_type` es **texto libre** (sin enum ni CHECK). El catálogo canónico vive en
+`src/lib/saleTypes.ts` y hay dos familias:
+
+| Familia | Valores | Quién los pone |
+|---|---|---|
+| **Manuales** | `venta_nueva`, `reingreso` | El vendedor, en el selector de Tipo de Venta |
+| **De operación** | `alta_adherente`, `cambio_plan` | El SISTEMA, al crear una venta-operación sobre un contrato ya firmado |
+
+Una **venta-operación** no es una venta comercial: es el vehículo para poder
+firmar un anexo sobre un contrato existente y liquidar su comisión aparte.
+Nunca deben aparecer en el selector ni inflar métricas — de eso se encarga
+`excludeOperationSales` en `src/lib/saleFilters.ts`. Sí entran en comisiones.
+
+### Los 3 formularios
+
+Los originales en papel están en `Tipo_ventas/`. Cada uno tiene su plantilla HTML
+en `docs/`, sembrada en `templates` por `20260822000002_seed_plantillas_tipos_venta.sql`:
+
+| Formulario | `sale_type` | `template_type` | Plantilla |
+|---|---|---|---|
+| Anexo de Incorporación de Adherente | `alta_adherente` | `anexo_incorporacion` | `docs/plantilla-anexo-incorporacion.html` |
+| Solicitud de Cambio de Plan | `cambio_plan` | `solicitud_cambio_plan` | `docs/plantilla-solicitud-cambio-plan.html` |
+| Anexo Especial de Vigencia Inmediata | *(ninguno)* | `anexo_vigencia_inmediata` | `docs/plantilla-anexo-vigencia-inmediata.html` |
+
+Vigencia Inmediata **no tiene tipo ni tabla propia**: se adjunta a cualquier venta
+y lista los beneficiarios con `immediate_coverage`, vía el loop
+`{{#beneficiarios_vi}}` de `src/lib/enhancedTemplateEngine.ts`.
+
+Las tres llevan `{{firma_contratante}}`, así que `SaleTemplatesTab` las clasifica
+como **`document_type = 'contrato'`**, NO `'anexo'`. **Es a propósito y no hay que
+"corregirlo"**: `finalize-signature-link` saltea los documentos `'anexo'` y nunca
+les generaría el PDF firmado — pasarlas a `'anexo'` haría que dejen de firmarse.
+Que se muestren como "Anexo" es sólo una etiqueta de `normalizeDocumentType` en
+`src/pages/Documents.tsx`.
+
+### Cadena de activación (es automática, no hay click manual)
+
+```
+firma del último signature_link  →  status='completado'
+   → trigger auto_advance_sale_status (ON signature_links)
+   → sales.status='completado' de la venta-operación
+      → trg_activate_adherent_incorporation  → suma los adherentes al contrato madre
+      → trg_activate_plan_change             → aplica plan/fecha/montos al contrato madre
+         → recalculate_sale_total_amount(parent_sale_id)
+```
+
+Está en la base y no en el front a propósito: el navegador puede no estar abierto
+cuando se completa la última firma.
+
+Las ventas-operación se crean con `audit_status = 'aprobado_para_templates'`: el
+contrato madre ya pasó auditoría, y sin eso `SaleTemplatesTab` bloquearía adjuntar
+la plantilla y el anexo no se podría emitir nunca.
+
+### Estado por entorno
+
+| | US test (`ykducvvcjzdpoojxlsig`) | BR prod (`ejiycfqxgtrzaysgpzmx`) |
+|---|---|---|
+| `adherent_incorporations`, `plan_changes` | ✅ | ❌ **no existen** |
+| `beneficiaries.entry_date` / `.immediate_coverage` | ✅ | ❌ |
+| `clients.external_id`, `sales.employee_signature_mode` | ✅ | ❌ |
+| Plantillas de los 3 formularios | ✅ | ❌ |
+
+> ⚠️ **El módulo NO está en producción.** Llevarlo requiere las migraciones
+> `20260813*`, `20260817*`, `20260818*`, `20260819*` y `20260822*`, más las
+> columnas de arriba. Es un trabajo aparte, con su propio runbook.
+
+### ⚠️ Editar/cancelar un anexo: gatear por la VENTA-OPERACIÓN, nunca por el anexo
+
+`adherent_incorporations.status` y `plan_changes.status` **nunca pasan por
+`sent` ni `signed`**: nadie los escribe. El único salto real es
+`draft → completed`, y lo hace el trigger recién cuando la venta-operación
+llega a `completado`. O sea que mientras el titular ya firmó y falta la
+contratada, la venta-operación está en `firmado` pero el anexo sigue en `draft`.
+
+Gatear los botones Editar/Cancelar por el status del anexo deja esa ventana
+abierta, y ahí:
+
+- **Incorporación**: el UPDATE de `adherent_incorporations` pasa (el guard de
+  `20260818000003` sólo mira `OLD.status <> 'draft'`) y después explota con
+  **42501** al tocar el beneficiario del contrato firmado. Sin transacción:
+  queda el snapshot editado y el beneficiario sin tocar.
+- **Cambio de plan**: peor — el update sólo toca `plan_changes` y `sales`, no
+  hay guard de base, así que **reescribe el `members_snapshot` de un formulario
+  ya firmado en silencio**.
+
+En ambos casos el PDF firmado no se regenera y queda diciendo otra cosa que la base.
+
+**Se gatea por `operation_sale.status`** (`OP_EDITABLE = ['borrador']`,
+`OP_CANCELABLE = ['borrador','enviado','pendiente']`), en los hooks Y en la UI.
+Si algún día se escriben de verdad los estados `sent`/`signed` del anexo, esta
+guarda puede simplificarse — hasta entonces, no sacarla.
+
+### ⚠️ La RLS de `templates` no aísla por empresa
+
+La política **"Gestors can manage templates"** es `FOR ALL` con
+`USING (has_role(super_admin) OR has_role(admin) OR has_role(gestor))` —
+**sin `company_id`**. Como las políticas permisivas se combinan con OR, esa
+sola alcanza: cualquier admin o gestor ve (y puede editar) las plantillas de
+**todas** las empresas, aunque exista también "Users can view company templates".
+
+No se notaba porque las 9 plantillas históricas eran todas de la misma empresa.
+Al sembrar las plantillas de los tipos de venta para cada empresa, el selector
+de la venta pasó a mostrarlas **duplicadas**.
+
+**Mitigado en el front**: `SaleTemplatesTab` recibe `companyId` (la empresa de
+la venta) y filtra `availableTemplates` por ella. Es lo correcto para todos los
+roles, super_admin incluido: el selector de UNA venta debe ofrecer sólo las
+plantillas de SU empresa.
+
+> La RLS sigue permisiva. Arreglarla es un cambio de seguridad aparte: habría
+> que scopear esa política por `company_id` y verificar que no rompa al
+> super_admin ni al diseñador de plantillas.
+
+### Deuda conocida de este módulo
+
+- **`auto_advance_sale_status` tiene DOS triggers** sobre `signature_links`
+  (`auto_advance_sale_status_trigger` y `trg_auto_advance_sale_status`, misma
+  función). Es idempotente y no rompe, pero es redundante.
+- **`sale_addendums` / `sale_addendum_beneficiaries`**: flujo legado anterior a
+  `adherent_incorporations`. Ningún componente los usa (sólo aparecen en
+  `types.ts`), pero las funciones `approve_sale_addendum` y
+  `try_complete_sale_addendum_for_link` sí los tocan y están **exentas** del guard
+  `trg_beneficiaries_block_when_sale_signed`. **No borrar.**
+- **`complete_adherent_incorporation(uuid)`** es legado: versión de UN solo
+  adherente, sin recálculo del total. No la llama nadie; la activación real la
+  hace el trigger. Versionada en `20260822000003` sólo porque `20260818000002`
+  la exime por nombre y su preflight aborta si falta.
+- **El historial de migraciones de test está divergente del repo**: hay 12
+  versiones del repo sin registrar en `supabase_migrations.schema_migrations`
+  (sus objetos SÍ existen, se aplicaron por SQL directo) y 5 versiones en test
+  que el repo no tiene. Por eso las migraciones se aplican con scripts de `sql/`
+  y no con `db push`.
+
+---
+
 ## Storage — Estructura de Paths
 
 ```

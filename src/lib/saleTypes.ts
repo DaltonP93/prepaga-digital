@@ -71,3 +71,25 @@ export const saleTypeLabel = (value?: string | null): string => {
   if (!value) return '';
   return LABELS[value as SaleType] ?? value;
 };
+
+/**
+ * Plantilla que corresponde a cada venta-operación, por `templates.template_type`.
+ *
+ * Con las 3 plantillas nuevas del anexo la lista pasa a tener 12 entradas, y
+ * todas las viejas son `template_type='contrato'`: el vendedor abre el selector
+ * y no tiene forma de saber cuál es la que va con la operación que acaba de
+ * crear. Esto sirve para SUGERIR (ordenar primero + badge), nunca para filtrar:
+ * hay casos legítimos de adjuntar otra plantilla al anexo, como la DDJJ.
+ *
+ * `anexo_vigencia_inmediata` no está en el mapa a propósito: no depende del tipo
+ * de venta sino de si la operación tiene vigencia inmediata, y eso se decide
+ * caso por caso.
+ */
+export const TEMPLATE_TYPE_BY_SALE_TYPE: Partial<Record<SaleType, string>> = {
+  [SALE_TYPES.ALTA_ADHERENTE]: 'anexo_incorporacion',
+  [SALE_TYPES.CAMBIO_PLAN]: 'solicitud_cambio_plan',
+};
+
+/** `undefined` para las ventas comerciales: ahí no hay nada que sugerir. */
+export const recommendedTemplateType = (saleType?: string | null): string | undefined =>
+  saleType ? TEMPLATE_TYPE_BY_SALE_TYPE[saleType as SaleType] : undefined;

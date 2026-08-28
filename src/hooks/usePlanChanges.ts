@@ -59,17 +59,13 @@ export interface PlanChangeMemberInput {
   new_amount: number;
 }
 
-// `plan_changes` todavía no está en types.ts (hay que regenerarlo después de
-// aplicar las migraciones), así que se accede sin tipar.
-const db = supabase as any;
-
 /** Cambios de plan de un contrato madre, con su venta-operación. */
 export const usePlanChanges = (parentSaleId?: string) => {
   return useQuery({
     queryKey: ['plan-changes', parentSaleId],
     queryFn: async () => {
       if (!parentSaleId) return [];
-      const { data, error } = await db
+      const { data, error } = await supabase
         .from('plan_changes')
         .select(
           '*, operation_sale:operation_sale_id (id, contract_number, status, total_amount, sale_date)',
@@ -146,6 +142,12 @@ export const useCreatePlanChange = () => {
           total_amount: nuevoTotalGrupo,
           sale_date: new Date().toISOString().slice(0, 10),
           immediate_coverage: (parent as any).immediate_coverage ?? false,
+          // La venta-operación no es una venta comercial: es el vehículo para
+          // firmar el formulario sobre un contrato que YA pasó auditoría. Con el
+          // default 'pendiente', SaleTemplatesTab bloquea el alta de plantillas
+          // y el cambio queda creado pero sin poder emitir el formulario.
+          // Solo afecta a ventas-operación; ninguna venta real cambia.
+          audit_status: 'aprobado_para_templates',
         } as any)
         .select()
         .single();
@@ -159,7 +161,7 @@ export const useCreatePlanChange = () => {
         //    snapshot, que es una FOTO del contrato al momento de la solicitud:
         //    si después se editan los adherentes, el formulario firmado no
         //    tiene que cambiar.
-        const { data: planChange, error: pcError } = await db
+        const { data: planChange, error: pcError } = await supabase
           .from('plan_changes')
           .insert({
             company_id: (parent as any).company_id,
@@ -226,6 +228,25 @@ const EDITABLE_STATUS = 'draft';
 const CANCELABLE_STATUSES = ['draft', 'sent'];
 
 /**
+ * Estados de la VENTA-OPERACIÓN en los que el formulario todavía se puede tocar.
+ *
+ * `plan_changes.status` NO alcanza como guarda: nadie escribe nunca 'sent' ni
+ * 'signed' —el único salto real es draft → completed, y lo hace el trigger
+ * recién cuando la venta-operación llega a 'completado'—. Mientras el titular
+ * ya firmó y falta la contratada, la venta-operación está en 'firmado' pero el
+ * cambio de plan sigue en 'draft'.
+ *
+ * Acá es peor que en la incorporación: el update sólo toca `plan_changes` y
+ * `sales`, no hay ningún guard de base que lo frene, así que sin esta guarda se
+ * reescribe el `members_snapshot` de un formulario YA FIRMADO en silencio, y el
+ * PDF firmado queda diciendo otra cosa que la base.
+ */
+const OPERATION_EDITABLE_STATUSES = ['borrador'];
+
+/** Cancelar se admite hasta que alguien haya firmado. */
+const OPERATION_CANCELABLE_STATUSES = ['borrador', 'enviado', 'pendiente'];
+
+/**
  * Corrige los datos de un cambio de plan que todavía está en borrador
  * (típicamente un monto mal tipeado, detectado antes de enviar a firmar).
  *
@@ -258,9 +279,11 @@ export const useUpdatePlanChange = () => {
       observations?: string | null;
       members?: PlanChangeMemberInput[];
     }) => {
-      const { data: actual, error: readError } = await db
+      const { data: actual, error: readError } = await supabase
         .from('plan_changes')
-        .select('id, status, operation_sale_id, parent_sale_id')
+        .select(
+          'id, status, operation_sale_id, parent_sale_id, operation_sale:operation_sale_id (status)',
+        )
         .eq('id', id)
         .maybeSingle();
 
@@ -269,6 +292,12 @@ export const useUpdatePlanChange = () => {
       if (actual.status !== EDITABLE_STATUS) {
         throw new Error(
           'El cambio de plan ya fue enviado a firmar y no se puede editar. Cancelalo y creá uno nuevo.',
+        );
+      }
+      const estadoOperacion = (actual.operation_sale as { status?: string } | null)?.status;
+      if (estadoOperacion && !OPERATION_EDITABLE_STATUSES.includes(estadoOperacion)) {
+        throw new Error(
+          'El formulario ya se emitió o se está firmando: editarlo dejaría el PDF firmado diciendo una cosa y la base otra. Cancelalo y creá uno nuevo.',
         );
       }
 
@@ -295,7 +324,7 @@ export const useUpdatePlanChange = () => {
         patch.new_total_amount = nuevoTotalGrupo;
       }
 
-      const { error: pcError } = await db.from('plan_changes').update(patch).eq('id', id);
+      const { error: pcError } = await supabase.from('plan_changes').update(patch).eq('id', id);
       if (pcError) throw pcError;
 
       if (actual.operation_sale_id && (nuevoTotalGrupo !== null || newPlanId)) {
@@ -342,9 +371,11 @@ export const useCancelPlanChange = () => {
 
   return useMutation({
     mutationFn: async ({ id }: { id: string }) => {
-      const { data: actual, error: readError } = await db
+      const { data: actual, error: readError } = await supabase
         .from('plan_changes')
-        .select('id, status, operation_sale_id, parent_sale_id')
+        .select(
+          'id, status, operation_sale_id, parent_sale_id, operation_sale:operation_sale_id (status)',
+        )
         .eq('id', id)
         .maybeSingle();
 
@@ -358,8 +389,14 @@ export const useCancelPlanChange = () => {
       if (!CANCELABLE_STATUSES.includes(actual.status)) {
         throw new Error(`No se puede cancelar un cambio de plan en estado "${actual.status}".`);
       }
+      const estadoOperacion = (actual.operation_sale as { status?: string } | null)?.status;
+      if (estadoOperacion && !OPERATION_CANCELABLE_STATUSES.includes(estadoOperacion)) {
+        throw new Error(
+          `No se puede cancelar: el formulario ya está en estado "${estadoOperacion}". Si alguien firmó, hay que anularlo por el circuito de la venta.`,
+        );
+      }
 
-      const { error: pcError } = await db
+      const { error: pcError } = await supabase
         .from('plan_changes')
         .update({ status: 'cancelled', updated_at: new Date().toISOString() })
         .eq('id', id);
@@ -410,7 +447,7 @@ export const useCancelPlanChange = () => {
 export const attachPlanChangeContext = async (sale: any): Promise<any> => {
   if (!sale || sale.sale_type !== SALE_TYPE_CAMBIO_PLAN) return sale;
 
-  const { data: pc } = await db
+  const { data: pc } = await supabase
     .from('plan_changes')
     .select('*')
     .eq('operation_sale_id', sale.id)

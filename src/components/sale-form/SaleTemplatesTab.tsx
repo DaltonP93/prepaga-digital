@@ -18,11 +18,26 @@ import { DocumentPreviewDialog } from '@/components/documents/DocumentPreviewDia
 import { useRolePermissions } from '@/hooks/useRolePermissions';
 import { attachGroupMonthlyTotal } from '@/hooks/useAdherentIncorporations';
 import { attachPlanChangeContext } from '@/hooks/usePlanChanges';
+import { recommendedTemplateType } from '@/lib/saleTypes';
 
 interface SaleTemplatesTabProps {
   saleId?: string;
   auditStatus?: string;
   saleStatus?: string;
+  /** Tipo de la venta: decide qué plantilla se sugiere primero en el selector. */
+  saleType?: string | null;
+  /**
+   * Empresa de la venta. El selector muestra SÓLO sus plantillas.
+   *
+   * Hace falta filtrar acá porque la RLS de `templates` no alcanza: la política
+   * "Gestors can manage templates" es ALL con USING sobre el rol solamente
+   * (super_admin/admin/gestor), sin company_id, y las políticas permisivas se
+   * suman con OR. O sea que un admin ve las plantillas de TODAS las empresas.
+   * Antes no se notaba porque todas eran de una sola empresa; al sembrar las
+   * plantillas de los tipos de venta para cada empresa, el selector pasó a
+   * mostrarlas duplicadas.
+   */
+  companyId?: string | null;
   disabled?: boolean;
 }
 
@@ -150,7 +165,7 @@ const buildSignatureLinkPayload = ({
   };
 };
 
-const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus, saleStatus, disabled }) => {
+const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus, saleStatus, saleType, companyId, disabled }) => {
   const navigate = useNavigate();
   const { templates } = useTemplates();
   const queryClient = useQueryClient();
@@ -1118,9 +1133,21 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
     );
   }
 
-  const availableTemplates = templates?.filter(
-    t => t.is_active !== false && !saleTemplates?.some(st => (st as any).templates?.id === t.id)
-  ) || [];
+  // La plantilla que corresponde al tipo de venta va PRIMERA y con badge, pero
+  // el resto sigue disponible: filtrar rompería casos legítimos (p. ej. adjuntar
+  // la DDJJ al anexo de incorporación).
+  const templateTypeSugerido = recommendedTemplateType(saleType);
+  const availableTemplates = (templates?.filter(
+    t =>
+      t.is_active !== false &&
+      // Sólo las de la empresa de esta venta (ver companyId en las props).
+      (!companyId || (t as any).company_id === companyId) &&
+      !saleTemplates?.some(st => (st as any).templates?.id === t.id)
+  ) || []).slice().sort((a, b) => {
+    if (!templateTypeSugerido) return 0;
+    const rank = (t: typeof a) => (t.template_type === templateTypeSugerido ? 0 : 1);
+    return rank(a) - rank(b);
+  });
 
   // Group generated docs
   const titularDocs = generatedDocs?.filter(d => !d.beneficiary_id) || [];
@@ -1166,7 +1193,16 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
             </SelectTrigger>
             <SelectContent>
               {availableTemplates.map(t => (
-                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                <SelectItem key={t.id} value={t.id}>
+                  <span className="flex items-center gap-2">
+                    {t.name}
+                    {!!templateTypeSugerido && t.template_type === templateTypeSugerido && (
+                      <Badge variant="outline" className="text-emerald-600 border-emerald-300 bg-emerald-50 text-[10px]">
+                        Recomendada
+                      </Badge>
+                    )}
+                  </span>
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>

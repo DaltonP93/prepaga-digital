@@ -46,10 +46,6 @@ export interface IncorporationAdherentInput {
   immediate_coverage?: boolean | null;
 }
 
-// `adherent_incorporations` todavía no está en types.ts (hay que regenerarlo
-// después de aplicar las migraciones), así que se accede sin tipar.
-const db = supabase as any;
-
 /**
  * Devuelve la venta enriquecida con `group_monthly_total`: la cuota mensual
  * del GRUPO COMPLETO una vez incorporadas las personas del anexo.
@@ -67,7 +63,7 @@ const db = supabase as any;
 export const attachGroupMonthlyTotal = async (sale: any): Promise<any> => {
   if (!sale || sale.sale_type !== SALE_TYPE_INCORPORACION) return sale;
 
-  const { data: inc } = await db
+  const { data: inc } = await supabase
     .from('adherent_incorporations')
     .select('parent_sale_id')
     .eq('operation_sale_id', sale.id)
@@ -95,7 +91,7 @@ export const useAdherentIncorporations = (parentSaleId?: string) => {
     queryKey: ['adherent-incorporations', parentSaleId],
     queryFn: async () => {
       if (!parentSaleId) return [];
-      const { data, error } = await db
+      const { data, error } = await supabase
         .from('adherent_incorporations')
         .select('*, operation_sale:operation_sale_id (id, contract_number, status, total_amount, sale_date)')
         .eq('parent_sale_id', parentSaleId)
@@ -155,6 +151,12 @@ export const useCreateAdherentIncorporation = () => {
           total_amount: totalAdherentes,
           sale_date: new Date().toISOString().slice(0, 10),
           immediate_coverage: (parent as any).immediate_coverage ?? false,
+          // La venta-operación no es una venta comercial: es el vehículo para
+          // firmar un anexo sobre un contrato que YA pasó auditoría. Con el
+          // default 'pendiente', SaleTemplatesTab bloquea el alta de plantillas
+          // y la incorporación queda creada pero sin poder emitir el anexo.
+          // Solo afecta a ventas-operación; ninguna venta real cambia.
+          audit_status: 'aprobado_para_templates',
         } as any)
         .select()
         .single();
@@ -195,7 +197,7 @@ export const useCreateAdherentIncorporation = () => {
         if (benError) throw benError;
 
         // 4. Una fila de incorporación por adherente.
-        const { error: incError } = await db.from('adherent_incorporations').insert(
+        const { error: incError } = await supabase.from('adherent_incorporations').insert(
           adherents.map((a, i) => ({
             company_id: (parent as any).company_id,
             client_id: (parent as any).client_id,
@@ -258,6 +260,26 @@ export const useCreateAdherentIncorporation = () => {
 };
 
 /** Estados desde los que todavía se puede tocar una incorporación. */
+/**
+ * Estados de la VENTA-OPERACIÓN en los que el anexo todavía se puede tocar.
+ *
+ * `adherent_incorporations.status` NO alcanza como guarda: nadie escribe nunca
+ * 'sent' ni 'signed' —el único salto real es draft → completed, y lo hace el
+ * trigger recién cuando la venta-operación llega a 'completado'—. O sea que
+ * mientras el titular ya firmó y falta la contratada, la venta-operación está
+ * en 'firmado' pero la incorporación sigue en 'draft'.
+ *
+ * Sin esta guarda, en esa ventana la edición pasa el guard de lifecycle (que
+ * sólo mira OLD.status <> 'draft') y después revienta con 42501 al tocar el
+ * beneficiario del contrato firmado, dejando el snapshot editado y el
+ * beneficiario sin tocar: justo la divergencia que se quería evitar. Y el PDF
+ * ya firmado no se regenera.
+ */
+const OPERATION_EDITABLE_STATUSES = ['borrador'];
+
+/** Cancelar se admite hasta que alguien haya firmado. */
+const OPERATION_CANCELABLE_STATUSES = ['borrador', 'enviado', 'pendiente'];
+
 const EDITABLE_STATUS = 'draft';
 const CANCELABLE_STATUSES = ['draft', 'sent'];
 
@@ -285,9 +307,11 @@ export const useUpdateAdherentIncorporation = () => {
       id: string;
       adherent: IncorporationAdherentInput;
     }) => {
-      const { data: actual, error: readError } = await db
+      const { data: actual, error: readError } = await supabase
         .from('adherent_incorporations')
-        .select('id, status, operation_beneficiary_id, parent_sale_id')
+        .select(
+          'id, status, operation_beneficiary_id, parent_sale_id, operation_sale:operation_sale_id (status)',
+        )
         .eq('id', id)
         .maybeSingle();
 
@@ -298,8 +322,14 @@ export const useUpdateAdherentIncorporation = () => {
           'La incorporación ya fue enviada a firmar y no se puede editar. Cancelala y creá una nueva.',
         );
       }
+      const estadoOperacion = (actual.operation_sale as { status?: string } | null)?.status;
+      if (estadoOperacion && !OPERATION_EDITABLE_STATUSES.includes(estadoOperacion)) {
+        throw new Error(
+          'El anexo ya se emitió o se está firmando: editarlo dejaría el PDF firmado diciendo una cosa y la base otra. Cancelalo y creá uno nuevo.',
+        );
+      }
 
-      const { error: incError } = await db
+      const { error: incError } = await supabase
         .from('adherent_incorporations')
         .update({
           adherent_first_name: adherent.first_name,
@@ -374,9 +404,11 @@ export const useCancelAdherentIncorporation = () => {
 
   return useMutation({
     mutationFn: async ({ id }: { id: string }) => {
-      const { data: actual, error: readError } = await db
+      const { data: actual, error: readError } = await supabase
         .from('adherent_incorporations')
-        .select('id, status, operation_sale_id, parent_sale_id, activated_beneficiary_id')
+        .select(
+          'id, status, operation_sale_id, parent_sale_id, activated_beneficiary_id, operation_sale:operation_sale_id (status)',
+        )
         .eq('id', id)
         .maybeSingle();
 
@@ -387,11 +419,17 @@ export const useCancelAdherentIncorporation = () => {
           'La incorporación ya fue activada: el adherente está en el contrato. No se puede cancelar.',
         );
       }
+      const estadoOperacion = (actual.operation_sale as { status?: string } | null)?.status;
+      if (estadoOperacion && !OPERATION_CANCELABLE_STATUSES.includes(estadoOperacion)) {
+        throw new Error(
+          `No se puede cancelar: el anexo ya está en estado "${estadoOperacion}". Si alguien firmó, hay que anularlo por el circuito de la venta.`,
+        );
+      }
       if (!CANCELABLE_STATUSES.includes(actual.status)) {
         throw new Error(`No se puede cancelar una incorporación en estado "${actual.status}".`);
       }
 
-      const { error: incError } = await db
+      const { error: incError } = await supabase
         .from('adherent_incorporations')
         .update({ status: 'cancelled' })
         .eq('id', id);

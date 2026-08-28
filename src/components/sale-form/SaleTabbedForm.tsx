@@ -617,6 +617,8 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                   saleId={sale?.id}
                   auditStatus={sale?.audit_status}
                   saleStatus={sale?.status}
+                  saleType={sale?.sale_type}
+                  companyId={sale?.company_id}
                   disabled={isTemplatesLocked}
                 />
               </TabsContent>
