@@ -497,6 +497,7 @@ export const useSubmitSignatureLink = () => {
               } // fin del loop sobre los contratos finales
 
               // Update original doc status
+              // Mismo cuidado que en docsQuery: is_final puede venir NULL en vez de false.
               await signatureClient
                 .from('documents')
                 .update({
@@ -505,7 +506,7 @@ export const useSubmitSignatureLink = () => {
                   signature_data: signatureData,
                 } as any)
                 .eq('sale_id', data.sale_id)
-                .eq('is_final', false)
+                .or('is_final.eq.false,is_final.is.null')
                 .is('beneficiary_id', null)
                 .eq('document_type', 'contrato');
 
@@ -596,16 +597,18 @@ export const useSubmitSignatureLink = () => {
 
         // Query documents to sign — filtered by role
         // IMPORTANT: always filter requires_signature = true to exclude annexes
-        // BUG FIX: Use 'neq(is_final, true)' instead of 'eq(is_final, false)'
-        // because some documents are created with is_final: null (not set),
-        // and null != false in PostgreSQL, causing them to be missed.
+        // is_final puede ser false o NULL (no seteado) para un documento pendiente de firma.
+        // OJO: 'neq(is_final, true)' NO alcanza para el caso NULL -- en Postgres,
+        // 'NULL <> true' evalúa a NULL (no a TRUE), así que el WHERE descarta esas filas
+        // igual que con 'eq(is_final, false)'. Verificado en producción (venta 2026-000230).
+        // Se usa OR explícito para cubrir ambos casos.
         let docsQuery = signatureClient
           .from('documents')
           .select('*')
           .eq('sale_id', data.sale_id)
           .neq('document_type', 'firma')
           .neq('document_type', 'anexo')
-          .neq('is_final', true)
+          .or('is_final.eq.false,is_final.is.null')
           .eq('requires_signature', true);
 
         if (recipientType === 'adherente' && recipientId) {
