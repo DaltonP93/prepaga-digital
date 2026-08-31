@@ -445,6 +445,7 @@ const SignatureWorkflow = () => {
     const recipientDocs = signedDocs.filter((doc: any) => {
       if (doc.document_type === 'firma') return false;
       if (!doc.is_final) return false;
+      if (doc.status !== 'firmado') return false; // solo documentos realmente firmados
       if (link.recipient_type === 'adherente' && link.recipient_id) {
         return doc.beneficiary_id === link.recipient_id;
       }
@@ -459,7 +460,25 @@ const SignatureWorkflow = () => {
       return;
     }
 
-    for (const doc of recipientDocs) {
+    // Si hay varios documentos del mismo tipo (duplicados por regeneración),
+    // quedarse solo con el más reciente que tenga signed_pdf_url, o el más reciente.
+    const deduplicated = Object.values(
+      recipientDocs.reduce((acc: Record<string, any>, doc: any) => {
+        const key = doc.document_type;
+        const existing = acc[key];
+        if (!existing) { acc[key] = doc; return acc; }
+        // Preferir el que tiene signed_pdf_url, luego el más reciente
+        const existingHasPdf = !!existing.signed_pdf_url;
+        const docHasPdf = !!doc.signed_pdf_url;
+        const docIsNewer = new Date(doc.created_at) > new Date(existing.created_at);
+        if ((!existingHasPdf && docHasPdf) || (existingHasPdf === docHasPdf && docIsNewer)) {
+          acc[key] = doc;
+        }
+        return acc;
+      }, {})
+    ) as any[];
+
+    for (const doc of deduplicated) {
       // Try signed PDF via edge function first
       if (doc.signed_pdf_url) {
         try {
@@ -619,6 +638,11 @@ const SignatureWorkflow = () => {
   const getActiveLinks = (links: any[]) => {
     const byRecipient = new Map<string, any>();
     for (const link of links) {
+      // Los links revocados con is_active=false son fantasmas — se crearon por error
+      // (p. ej. el is_primary confundido con adherente) y fueron desactivados.
+      // No deben aparecer en la UI aunque sean el único link del recipient.
+      if (link.status === 'revocado' && link.is_active === false) continue;
+
       const key = link.recipient_type === 'titular' ? 'titular'
         : link.recipient_type === 'contratada' ? 'contratada'
         : `adherente-${link.recipient_id}`;
