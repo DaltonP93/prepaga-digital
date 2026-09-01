@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Manual de Usuario — Entrega A · SAMAP Prepaga Digital</title>
+<style>
+  :root{
+    --tinta:#1a1f2b; --tinta-suave:#4a5568; --linea:#d9dee7;
+    --azul:#1e4fd8; --azul-suave:#eef2ff; --coral:#c0392b;
+    --verde:#1f7a4d; --gris:#f4f6fa;
+  }
+  *{box-sizing:border-box;}
+  html{font-size:15px;}
+  body{
+    font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--tinta); line-height:1.55; margin:0; background:#fff;
+  }
+  .page{
+    max-width:820px; margin:0 auto; padding:28mm 22mm;
+  }
+  h1,h2,h3{line-height:1.2; color:var(--tinta); font-weight:700;}
+  h1{font-size:2.1rem; margin:0 0 .3em;}
+  h2{font-size:1.5rem; margin:2.4em 0 .6em; padding-bottom:.25em; border-bottom:2px solid var(--azul);}
+  h3{font-size:1.12rem; margin:1.6em 0 .4em; color:var(--azul);}
+  p{margin:.5em 0 .9em;}
+  ul,ol{margin:.4em 0 1em; padding-left:1.4em;}
+  li{margin:.3em 0;}
+  code{background:var(--gris); padding:.08em .35em; border-radius:3px; font-size:.86em;}
+  figure{margin:1.1em 0 1.4em; page-break-inside:avoid;}
+  figure img{width:100%; border:1px solid var(--linea); border-radius:6px; display:block;}
+  figcaption{font-size:.82rem; color:var(--tinta-suave); margin-top:.4em; font-style:italic;}
+  .nota{
+    background:var(--azul-suave); border-left:4px solid var(--azul);
+    padding:.7em 1em; border-radius:0 6px 6px 0; margin:1.1em 0; font-size:.92rem;
+  }
+  .alerta{
+    background:#fdecea; border-left:4px solid var(--coral);
+    padding:.7em 1em; border-radius:0 6px 6px 0; margin:1.1em 0; font-size:.92rem;
+  }
+  .chip{
+    display:inline-block; background:var(--azul); color:#fff; font-size:.72rem;
+    font-weight:700; padding:.12em .6em; border-radius:999px; vertical-align:middle;
+  }
+  table{border-collapse:collapse; width:100%; margin:1em 0; font-size:.9rem;}
+  th,td{border:1px solid var(--linea); padding:.5em .7em; text-align:left; vertical-align:top;}
+  th{background:var(--gris);}
+  .portada{
+    min-height:70vh; display:flex; flex-direction:column; justify-content:center;
+    border-bottom:none;
+  }
+  .portada .sub{font-size:1.15rem; color:var(--tinta-suave); margin-top:.2em;}
+  .portada .meta{margin-top:3em; font-size:.9rem; color:var(--tinta-suave);}
+  .toc a{color:var(--tinta); text-decoration:none;}
+  .toc ol{list-style:decimal; padding-left:1.6em;}
+  .toc li{margin:.45em 0;}
+  .cap{page-break-before:always;}
+  @media print{
+    .page{max-width:none; margin:0; padding:16mm 14mm;}
+    h2{margin-top:0;}
+    a{color:var(--tinta); text-decoration:none;}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ============ PORTADA ============ -->
+  <section class="portada">
+    <h1>Manual de Usuario — Entrega A</h1>
+    <div class="sub">Operaciones sobre contratos firmados y captura de datos ampliada<br>
+    SAMAP Prepaga Digital</div>
+    <div class="sub" style="margin-top:1.4em; font-size:1rem;">
+      Incorporación de Adherentes &middot; Solicitud de Cambio de Plan &middot;
+      Anexo de Vigencia Inmediata &middot; Plan Materno &middot;
+      Titular Persona Jurídica &middot; Generación de Comisiones
+    </div>
+    <div class="meta">
+      Versión 1 &middot; Septiembre 2026<br>
+      Casos de uso y capturas tomados en el <strong>entorno de PRUEBA</strong>
+      (base US test <code>ykducvvcjzdpoojxlsig</code>). Ningún dato de este manual
+      proviene de producción.
+    </div>
+  </section>
+
+  <!-- ============ ÍNDICE ============ -->
+  <section class="cap toc">
+    <h2>Índice</h2>
+    <ol>
+      <li><a href="#que-agrega">¿Qué agrega Entrega A?</a></li>
+      <li><a href="#venta-normal">Venta / contrato normal (flujo base)</a></li>
+      <li><a href="#empresa">Titular persona jurídica (empresa)</a></li>
+      <li><a href="#plan-materno">Plan Materno como adicional</a></li>
+      <li><a href="#vigencia-inmediata">Vigencia Inmediata (V.I.)</a></li>
+      <li><a href="#incorporacion">Anexo de Incorporación de Adherente</a></li>
+      <li><a href="#cambio-plan">Solicitud de Cambio de Plan</a></li>
+      <li><a href="#documentos">Documentos generados</a></li>
+      <li><a href="#comisiones">Generación de Comisiones (liquidación)</a></li>
+      <li><a href="#activacion">Anexo — La cadena de activación automática</a></li>
+    </ol>
+  </section>
+
+  <!-- ============ 1. QUÉ AGREGA ============ -->
+  <section class="cap" id="que-agrega">
+    <h2>1. ¿Qué agrega Entrega A?</h2>
+
+    <p>Hasta ahora el sistema sólo sabía crear <strong>ventas nuevas</strong>: un
+    titular, sus adherentes, un plan, y una ceremonia de firma. Entrega A agrega
+    dos cosas:</p>
+
+    <h3>a) Operaciones sobre un contrato que <em>ya está firmado</em></h3>
+    <p>Cuando un contrato ya se firmó, no se puede "editar y volver a firmar": el
+    PDF firmado quedaría diciendo una cosa y la base otra. Para cambiar algo hay que
+    firmar un <strong>anexo</strong>. Entrega A incorpora tres formularios para eso:</p>
+    <table>
+      <tr><th>Formulario</th><th>Para qué</th><th>Tipo de venta que crea el sistema</th></tr>
+      <tr>
+        <td>Anexo de Incorporación de Adherente</td>
+        <td>Sumar personas a un contrato firmado</td>
+        <td><code>alta_adherente</code></td>
+      </tr>
+      <tr>
+        <td>Solicitud de Cambio de Plan</td>
+        <td>Cambiar el plan / las cuotas de un contrato firmado</td>
+        <td><code>cambio_plan</code></td>
+      </tr>
+      <tr>
+        <td>Anexo Especial de Vigencia Inmediata</td>
+        <td>Dejar constancia de las personas con cobertura inmediata</td>
+        <td>— (se adjunta a cualquier venta)</td>
+      </tr>
+    </table>
+
+    <div class="nota">
+      <strong>Venta manual vs. venta-operación.</strong> El vendedor sólo elige
+      entre <code>venta_nueva</code> y <code>reingreso</code>. Los tipos
+      <code>alta_adherente</code> y <code>cambio_plan</code> los pone el
+      <strong>sistema solo</strong> al crear la operación sobre un contrato madre.
+      Una venta-operación no es una venta comercial: es el vehículo para poder
+      firmar el anexo y liquidar su comisión aparte. No aparece en el selector de
+      Tipo de Venta ni infla las métricas del tablero, pero <strong>sí entra en
+      comisiones</strong>.
+    </div>
+
+    <h3>b) Captura de datos ampliada en la venta</h3>
+    <ul>
+      <li><strong>Titular persona jurídica</strong>: el cliente puede ser una
+      empresa (Razón Social + RUC) en vez de una persona física.</li>
+      <li><strong>Plan Materno como adicional</strong>: se contrata <em>junto</em>
+      al plan elegido, no en lugar de él, y habilita una pestaña con sus campos
+      propios.</li>
+      <li><strong>Vigencia Inmediata (V.I.)</strong>: marca a nivel de la venta y
+      por cada adherente, y alimenta el Anexo de Vigencia Inmediata.</li>
+    </ul>
+
+    <h3>c) Generación de comisiones</h3>
+    <p>Un módulo para liquidar la comisión de cada venta y cada operación:
+    calcular, generar el borrador, congelar el detalle y emitir el PDF de la
+    liquidación.</p>
+  </section>
+
+  <!-- ============ 2. VENTA NORMAL ============ -->
+  <section class="cap" id="venta-normal">
+    <h2>2. Venta / contrato normal <span class="chip">flujo base</span></h2>
+    <p>Es el prerrequisito de todo lo demás: las operaciones (capítulos 6 y 7) se
+    hacen <em>sobre</em> un contrato que salió de este flujo y quedó firmado.</p>
+
+    <figure>
+      <img src="capturas/00-dashboard.jpg" alt="Dashboard ejecutivo">
+      <figcaption>Dashboard. El acceso rápido "Nueva venta" y el menú lateral
+      <em>Ventas</em> llevan al listado de contratos.</figcaption>
+    </figure>
+
+    <figure>
+      <img src="capturas/10-ventas-lista.jpg" alt="Listado de ventas">
+      <figcaption>Menú <em>Ventas</em> → listado de contratos con su estado
+      (Borrador, Completado, etc.). Botón <strong>Nuevo Contrato</strong> arriba a
+      la derecha.</figcaption>
+    </figure>
+
+    <h3>2.1 Cargar la venta</h3>
+    <p>El formulario tiene pestañas: <strong>Básico → Adherentes → Documentos →
+    DDJJ Salud → Templates</strong> (y <em>Campos del Plan</em> aparece sólo si se
+    marca Plan Materno).</p>
+
+    <figure>
+      <img src="capturas/11-nueva-venta-basico.jpg" alt="Nueva venta, pestaña Básico">
+      <figcaption>Pestaña <strong>Básico</strong>: Cliente, Plan, "¿Requiere
+      adherentes/grupo familiar?", el recuadro <em>Adicionales</em> con "Incluye
+      Plan Materno", el selector <em>Vigencia Inmediata (V.I.)</em>, el
+      <em>Tipo de Venta</em>, el Monto Titular y "¿Quién firmará el contrato?".</figcaption>
+    </figure>
+
+    <h3>2.2 Enviar a auditoría y aprobar</h3>
+    <p>Con la venta cargada se usa <strong>Enviar a Auditoría</strong>. El auditor
+    la revisa y la aprueba; recién con
+    <code>audit_status = 'aprobado_para_templates'</code> la pestaña
+    <em>Templates</em> deja adjuntar plantillas y emitir documentos.</p>
+
+    <figure>
+      <img src="capturas/15-panel-auditoria.jpg" alt="Panel de Auditoría">
+      <figcaption>Menú <em>Auditoría</em>: contadores Pendientes / Aprobados /
+      Rechazados y la lista "Ventas para Auditar" con el botón
+      <strong>Revisar</strong>.</figcaption>
+    </figure>
+
+    <h3>2.3 Emitir documentos</h3>
+    <figure>
+      <img src="capturas/13-templates-documentos.jpg" alt="Pestaña Templates">
+      <figcaption>Pestaña <strong>Templates</strong>: arriba "Templates de Firma"
+      (Contrato, DDJJ, Anexos) con <strong>Enviar Documentos</strong> (o
+      <strong>Regenerar Documentos</strong> si la venta ya está firmada); abajo
+      "Documentos Generados" con su estado (Pendiente / Firmado) y
+      <em>Versiones de Impresión</em>.</figcaption>
+    </figure>
+
+    <div class="nota">
+      <strong>"Enviar Documentos" es idempotente.</strong> Apretarlo dos veces no
+      duplica contratos ni enlaces de firma: valida, arma todo en memoria, borra
+      los documentos <em>no firmados</em> anteriores y recién inserta.</div>
+
+    <h3>2.4 Gestionar la firma</h3>
+    <figure>
+      <img src="capturas/14-signature-workflow.jpg" alt="Flujo de Firma">
+      <figcaption>Menú <em>Flujo de Firmas</em> → <strong>Gestionar Firma</strong>.
+      Una tarjeta por firmante (Titular, cada Adherente y la Contratada) con el
+      estado y las acciones <strong>Copiar Enlace</strong> / <strong>Enviar por
+      WhatsApp</strong> / <strong>Reenviar</strong> / <strong>Ver Detalles</strong>
+      / <strong>Descargar Documento Firmado</strong>.</figcaption>
+    </figure>
+
+    <div class="nota">
+      <strong>Orden de firma.</strong> Primero firma el titular (y su DDJJ),
+      después cada adherente su propia DDJJ. Cuando <em>todos</em> terminaron, el
+      sistema activa <strong>solo</strong> el enlace de la Contratada y le manda el
+      WhatsApp automático. Recién cuando la Contratada firma se genera el
+      <strong>contrato final</strong> (con su bloque de firma) y se avisa al titular
+      con el link de descarga.</div>
+  </section>
+
+  <!-- ============ 3. EMPRESA ============ -->
+  <section class="cap" id="empresa">
+    <h2>3. Titular persona jurídica (empresa)</h2>
+    <p>El titular de un contrato puede ser una empresa. Se define al crear o editar
+    el cliente.</p>
+
+    <figure>
+      <img src="capturas/61-clientform-empresa.jpg" alt="Formulario de cliente tipo Empresa">
+      <figcaption>Menú <em>Clientes</em> → <strong>Agregar Cliente</strong> (o el
+      "+" junto a <em>Cliente</em> en la venta) → pestaña <em>Datos</em> →
+      <strong>Tipo de cliente = Empresa</strong>. El formulario reemplaza
+      Nombre / Apellido / C.I. por <strong>Razón Social</strong> y <strong>RUC</strong>
+      (formato <code>80012345-6</code>).</figcaption>
+    </figure>
+
+    <figure>
+      <img src="capturas/62-clientes-lista-empresa.jpg" alt="Listado de clientes con RUC">
+      <figcaption>El listado de <em>Clientes</em> muestra la columna
+      <strong>RUC/C.I.</strong> y se puede buscar por razón social o RUC. En el
+      contrato, el campo <code>{{razon_social}}</code> se reemplaza por la razón
+      social de la empresa y firma como CONTRATANTE con su RUC.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ============ 4. PLAN MATERNO ============ -->
+  <section class="cap" id="plan-materno">
+    <h2>4. Plan Materno como adicional</h2>
+    <p>El Plan Materno no es un plan que reemplaza al del contrato: es un
+    <strong>adicional</strong> que se contrata junto al plan elegido.</p>
+
+    <figure>
+      <img src="capturas/50-plan-materno-check.jpg" alt="Checkbox Incluye Plan Materno">
+      <figcaption>Pestaña <strong>Básico</strong> → recuadro <em>Adicionales</em> →
+      <strong>Incluye Plan Materno</strong>. Al marcarlo aparece una pestaña nueva,
+      <strong>Campos del Plan</strong>, en la fila de pestañas.</figcaption>
+    </figure>
+
+    <figure>
+      <img src="capturas/51-plan-materno-habilita-tab.jpg" alt="Plan Materno habilita la pestaña Campos del Plan">
+      <figcaption>Con "Incluye Plan Materno" marcado, la pestaña <em>Campos del
+      Plan</em> queda habilitada entre <em>DDJJ Salud</em> y <em>Templates</em>.</figcaption>
+    </figure>
+
+    <figure>
+      <img src="capturas/52-campos-del-plan.jpg" alt="Pestaña Campos del Plan">
+      <figcaption>Pestaña <strong>Campos del Plan</strong>: los datos propios del
+      Plan Materno (Id de Cliente SAMAP, Fecha probable de parto, Ginecólogo /
+      Pediatra, Cantidad de cuotas). Todos obligatorios.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ============ 5. VIGENCIA INMEDIATA ============ -->
+  <section class="cap" id="vigencia-inmediata">
+    <h2>5. Vigencia Inmediata (V.I.)</h2>
+    <p>La V.I. se define en dos niveles y se refleja en un anexo propio.</p>
+
+    <h3>5.1 A nivel de la venta</h3>
+    <figure>
+      <img src="capturas/40-vi-nivel-venta.jpg" alt="Selector Vigencia Inmediata en la pestaña Básico">
+      <figcaption>Pestaña <strong>Básico</strong> → selector <strong>Vigencia
+      Inmediata (V.I.)</strong> (Sí / No). Es el valor por defecto para todo el
+      grupo.</figcaption>
+    </figure>
+
+    <h3>5.2 Por cada adherente</h3>
+    <figure>
+      <img src="capturas/41-vi-por-adherente.jpg" alt="Selector V.I. en el formulario de adherente">
+      <figcaption>Pestaña <strong>Adherentes</strong> → editar un adherente →
+      selector <strong>Vigencia Inmediata (V.I.)</strong> con tres opciones:
+      <em>Según la venta</em> / <em>Sí</em> / <em>No</em>. Permite excepciones
+      individuales.</figcaption>
+    </figure>
+
+    <h3>5.3 El anexo</h3>
+    <p>El <strong>Anexo Especial de Vigencia Inmediata</strong> es una plantilla
+    (<code>template_type = 'anexo_vigencia_inmediata'</code>) que se agrega en la
+    pestaña <em>Templates</em> de cualquier venta. El motor lista automáticamente a
+    las personas con V.I. efectiva mediante el bloque
+    <code>{{#beneficiarios_vi}}</code>.</p>
+
+    <figure>
+      <img src="capturas/42-plantillas-tipos-venta.jpg" alt="Gestión de Templates con las 3 plantillas de Entrega A">
+      <figcaption>Menú <em>Templates</em>: las tres plantillas sembradas de Entrega
+      A — <strong>Anexo de Incorporación de Adherente</strong>, <strong>Anexo
+      Especial de Vigencia Inmediata</strong> y <strong>Formulario de Solicitud de
+      Cambio de Plan</strong> — cada una con su descripción y el tipo de venta al
+      que aplica.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ============ 6. INCORPORACIÓN ============ -->
+  <section class="cap" id="incorporacion">
+    <h2>6. Anexo de Incorporación de Adherente</h2>
+    <p>Sumar una o más personas a un contrato que <strong>ya está firmado</strong>.
+    Se trabaja desde la venta madre.</p>
+
+    <figure>
+      <img src="capturas/21-incorporaciones-tab.jpg" alt="Pestaña Incorporaciones">
+      <figcaption>Contrato firmado → <em>Editar Venta</em> → pestaña
+      <strong>Incorporaciones</strong>. Lista las incorporaciones existentes
+      (código <code>ANX-2026-…</code>, estado, cantidad de personas y monto) con las
+      acciones <strong>Abrir anexo</strong> / <strong>Cancelar</strong>, y por cada
+      persona un botón <strong>Editar</strong>. Botón <strong>Incorporar
+      Adherente</strong> arriba a la derecha.</figcaption>
+    </figure>
+
+    <figure>
+      <img src="capturas/22-incorporar-form.jpg" alt="Formulario Nueva Incorporación">
+      <figcaption><strong>Incorporar Adherente</strong> abre el formulario "Nueva
+      Incorporación". Se cargan los datos de cada persona (Nombre, Apellido, C.I.,
+      Parentesco, Fecha de Ingreso, Precio, <em>V.I.</em>, Teléfono, domicilio) y
+      con <strong>Agregar otra persona</strong> se suman más. El texto lo aclara:
+      <em>"El contrato original no se modifica; los adherentes se suman recién
+      cuando el anexo queda firmado."</em></figcaption>
+    </figure>
+
+    <figure>
+      <img src="capturas/23-venta-operacion-basico.jpg" alt="Venta-operación de tipo Incorporación de Adherente">
+      <figcaption><strong>Crear Incorporación</strong> genera una
+      <strong>venta-operación</strong> (contrato <code>ANX-2026-000001</code>) y
+      navega a su edición. El campo <em>Tipo de Venta</em> queda fijo en
+      "Incorporación de Adherente" — lo puso el sistema, no se edita.</figcaption>
+    </figure>
+
+    <figure>
+      <img src="capturas/24-anexo-templates.jpg" alt="Templates de la venta-operación">
+      <figcaption>En la venta-operación, pestaña <strong>Templates</strong>: viene
+      con la plantilla <strong>Anexo de Incorporación de Adherente</strong> y el
+      resumen "se generarán enlaces de firma individuales para el titular y N
+      adherente(s)". <strong>Enviar Documentos para Firma</strong> arranca la
+      ceremonia.</figcaption>
+    </figure>
+
+    <figure>
+      <img src="capturas/25-incorporacion-fila-acciones.jpg" alt="Incorporación en borrador con sus acciones">
+      <figcaption>De vuelta en la venta madre, la incorporación aparece en
+      <em>borrador</em> con sus personas y las acciones
+      <strong>Cancelar</strong> / <strong>Abrir anexo</strong> / <strong>Editar</strong>.</figcaption>
+    </figure>
+
+    <div class="alerta">
+      <strong>Editar / cancelar sólo mientras la operación está abierta.</strong>
+      Los botones Editar y Cancelar se habilitan según el estado de la
+      <em>venta-operación</em> (borrador / enviado / pendiente), no del anexo.
+      Una vez que el titular firmó, ya no se puede tocar: hay que cancelar y rehacer.</div>
+
+    <p>Cuando se completa la última firma de la operación, el sistema
+    <strong>copia los adherentes al contrato madre</strong> y recalcula la cuota
+    mensual (ver capítulo 10).</p>
+  </section>
+
+  <!-- ============ 7. CAMBIO DE PLAN ============ -->
+  <section class="cap" id="cambio-plan">
+    <h2>7. Solicitud de Cambio de Plan</h2>
+    <p>Cambiar el plan y/o las cuotas de un contrato firmado.</p>
+
+    <figure>
+      <img src="capturas/30-cambio-plan-tab.jpg" alt="Pestaña Cambio de Plan">
+      <figcaption>Contrato firmado → <em>Editar Venta</em> → pestaña <strong>Cambio
+      de Plan</strong>. Botón <strong>Solicitar Cambio de Plan</strong>.</figcaption>
+    </figure>
+
+    <figure>
+      <img src="capturas/31-cambio-plan-form.jpg" alt="Formulario Nuevo Cambio de Plan">
+      <figcaption>Formulario "Nuevo Cambio de Plan": <strong>Motivo</strong>,
+      <strong>Plan nuevo</strong>, <strong>Fecha de inicio</strong> del nuevo
+      contrato, <strong>Observaciones</strong> y la tabla de <strong>Integrantes</strong>
+      con <em>Plan anterior</em>, <em>Monto anterior</em> y <em>Monto nuevo</em> por
+      persona. La "Cuota mensual del grupo" es la base de cálculo de la comisión de
+      esta operación.</figcaption>
+    </figure>
+
+    <figure>
+      <img src="capturas/32-cambio-plan-creado.jpg" alt="Cambio de plan en borrador">
+      <figcaption><strong>Crear Cambio de Plan</strong> genera la venta-operación
+      (contrato <code>CMB-2026-000001</code>). Aparece en <em>borrador</em> con las
+      acciones <strong>Editar</strong> / <strong>Cancelar</strong> / <strong>Abrir
+      formulario</strong>. Su pestaña <em>Templates</em> trae la plantilla
+      <em>Solicitud de Cambio de Plan</em>.</figcaption>
+    </figure>
+
+    <p>Al completarse la firma, el sistema <strong>aplica el plan, la fecha y los
+    montos al contrato madre</strong> y recalcula su total.</p>
+  </section>
+
+  <!-- ============ 8. DOCUMENTOS ============ -->
+  <section class="cap" id="documentos">
+    <h2>8. Documentos generados</h2>
+    <figure>
+      <img src="capturas/70-documentos-lista.jpg" alt="Módulo Documentos">
+      <figcaption>Menú <em>Documentos</em>: los documentos se agrupan por venta.
+      Al expandir una venta se ven sus documentos con la etiqueta
+      <strong>Contrato</strong> / <strong>DDJJ Salud</strong> /
+      <strong>Anexo</strong> y su estado.</figcaption>
+    </figure>
+
+    <figure>
+      <img src="capturas/71-documento-preview.jpg" alt="Vista previa de un documento">
+      <figcaption>Al seleccionar un documento se abre el panel <strong>Vista
+      previa</strong> con el <em>Generador de PDF</em> (Vista Previa / Descargar
+      PDF) y el contenido renderizado con los campos dinámicos resueltos.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ============ 9. COMISIONES ============ -->
+  <section class="cap" id="comisiones">
+    <h2>9. Generación de Comisiones (liquidación)</h2>
+    <p>Menú <strong>Comisiones</strong>. El módulo liquida la comisión de las ventas
+    y de las operaciones de un vendedor en un período. Roles con acceso:
+    <code>super_admin</code>, <code>admin</code>, <code>financiero</code>,
+    <code>supervisor</code>, <code>auditor</code> (generar y cerrar:
+    <code>super_admin</code> / <code>admin</code> / <code>financiero</code>).</p>
+
+    <figure>
+      <img src="capturas/80-comisiones-vacio.jpg" alt="Comisiones, pestaña Liquidaciones vacía">
+      <figcaption>Pestaña <strong>Liquidaciones</strong> — estado inicial sin
+      liquidaciones.</figcaption>
+    </figure>
+
+    <h3>9.1 Calcular</h3>
+    <figure>
+      <img src="capturas/81-nueva-liquidacion.jpg" alt="Nueva liquidación">
+      <figcaption>Pestaña <strong>Nueva liquidación</strong>: se elige
+      <em>Vendedor</em>, <em>Desde</em> y <em>Hasta</em>.</figcaption>
+    </figure>
+    <figure>
+      <img src="capturas/82-preview-calculo.jpg" alt="Preview del cálculo">
+      <figcaption><strong>Calcular</strong> muestra la tabla Fecha / Cliente / Plan
+      / Tipo de venta / Regla / Base / Comisión y el <em>Total estimado</em>.</figcaption>
+    </figure>
+    <figure>
+      <img src="capturas/83-preview-total-generar.jpg" alt="Total estimado y botón Generar borrador">
+      <figcaption>Con el cálculo resuelto se habilita <strong>Generar
+      borrador</strong>.</figcaption>
+    </figure>
+
+    <div class="alerta">
+      <strong>Sin regla no se genera.</strong> Si algún plan de las ventas del
+      período no tiene regla de comisión aplicable, la celda sale en rojo
+      ("Sin regla"), aparece la alerta "Hay N venta(s) sin regla" y
+      <em>Generar borrador</em> queda deshabilitado
+      (<code>error_code = 'no_rule'</code>). Nunca se asume 0&nbsp;%.</div>
+
+    <h3>9.2 Generar el borrador y revisarlo</h3>
+    <figure>
+      <img src="capturas/84-preview-ok.jpg" alt="Preview correcto">
+      <figcaption>Cálculo sin ventas sin regla — listo para generar.</figcaption>
+    </figure>
+    <figure>
+      <img src="capturas/85-liquidacion-creada.jpg" alt="Liquidación en borrador en el listado">
+      <figcaption>La liquidación aparece en la pestaña <em>Liquidaciones</em> en
+      estado <strong>borrador</strong> (prefijo <code>LIQ-PRUEBA</code> en el
+      entorno de prueba).</figcaption>
+    </figure>
+    <figure>
+      <img src="capturas/86-liquidacion-detalle.jpg" alt="Detalle de la liquidación en borrador">
+      <figcaption><strong>Ver detalle</strong>: tarjetas Concepto / Ventas / Total
+      y la tabla <em>Detalle congelado</em> (Ítem, Tipo, Fecha, Cliente, Plan, Tipo
+      de venta, %, Base, Comisión). En borrador se ve el botón <strong>Cerrar
+      liquidación</strong>.</figcaption>
+    </figure>
+
+    <h3>9.3 Cerrar y emitir el PDF</h3>
+    <figure>
+      <img src="capturas/87-cerrar-confirmacion.jpg" alt="Confirmación de cierre">
+      <figcaption><strong>Cerrar liquidación</strong> pide confirmación. El cierre
+      es irreversible (después sólo se puede <em>Anular</em> con motivo).</figcaption>
+    </figure>
+    <figure>
+      <img src="capturas/88-liquidacion-cerrada.jpg" alt="Liquidación cerrada en el listado">
+      <figcaption>La liquidación pasa a estado <strong>cerrada</strong>.</figcaption>
+    </figure>
+    <figure>
+      <img src="capturas/89-liquidacion-cerrada-detalle.jpg" alt="Detalle de liquidación cerrada con Descargar PDF">
+      <figcaption>Ya cerrada, se habilita <strong>Descargar PDF</strong>
+      (genera <code>liquidacion-&lt;id&gt;.pdf</code>). También quedan
+      <strong>Marcar pagado</strong> y <strong>Anular</strong>.</figcaption>
+    </figure>
+
+    <h3>9.4 Configuración (sólo lectura para el operador)</h3>
+    <p>Las pestañas <strong>Reglas</strong> ("Vendedores que comisionan" +
+    "Reglas de comisión") y <strong>Configuración</strong> (evento de devengo,
+    prefijo de liquidación, switch "Habilitar comisiones") definen cómo calcula el
+    módulo. La resolución de reglas es determinista:
+    <code>prioridad DESC → especificidad → valid_from DESC → id</code>.</p>
+  </section>
+
+  <!-- ============ 10. ACTIVACIÓN ============ -->
+  <section class="cap" id="activacion">
+    <h2>10. Anexo — La cadena de activación automática</h2>
+    <p>Las operaciones (capítulos 6 y 7) <strong>no</strong> tienen un botón
+    "aplicar al contrato". El impacto sobre el contrato madre lo hace la base de
+    datos sola, apenas se completa la última firma de la operación. El navegador
+    puede estar cerrado: pasa igual.</p>
+
+    <table>
+      <tr><th>Paso</th><th>Qué ocurre</th></tr>
+      <tr><td>1</td><td>Firma el último enlace de la venta-operación →
+        <code>signature_links.status = 'completado'</code>.</td></tr>
+      <tr><td>2</td><td>El trigger <code>auto_advance_sale_status</code> pone la
+        <strong>venta-operación</strong> en <code>status = 'completado'</code>.</td></tr>
+      <tr><td>3</td><td>Según el tipo:
+        <ul>
+          <li><strong>Incorporación</strong> → se copian los adherentes al contrato
+          madre.</li>
+          <li><strong>Cambio de plan</strong> → se aplican plan, fecha y montos al
+          contrato madre.</li>
+        </ul></td></tr>
+      <tr><td>4</td><td>Se llama a <code>recalculate_sale_total_amount(parent_sale_id)</code>
+        y el total del contrato madre queda actualizado.</td></tr>
+    </table>
+
+    <div class="nota">
+      El total del contrato lo calcula <strong>una sola fuente</strong>: la función
+      de base <code>recalculate_sale_total_amount</code>. Contempla el monto del
+      titular más el de cada adherente no primario.</div>
+
+    <div class="alerta">
+      Mientras el titular ya firmó pero falta la Contratada, la venta-operación
+      está en <em>firmado</em> y el anexo sigue en <em>borrador</em>: todavía
+      <strong>no</strong> se aplicó nada al contrato madre. La aplicación ocurre
+      recién en el paso&nbsp;2 de arriba.</div>
+  </section>
+
+  <hr style="margin:3em 0 1em; border:none; border-top:1px solid var(--linea);">
+  <p style="font-size:.8rem; color:var(--tinta-suave);">
+    SAMAP Prepaga Digital — Manual de Usuario Entrega A · v1 · Septiembre 2026.
+    Capturas del entorno de prueba (US test). Para regenerar este PDF ver
+    <code>docs/manual-entrega-a/README.md</code>.
+  </p>
+
+</div>
+</body>
+</html>
