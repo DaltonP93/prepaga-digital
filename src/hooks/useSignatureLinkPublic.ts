@@ -636,7 +636,7 @@ export const useSubmitSignatureLink = () => {
           try {
             const { data: saleInfo } = await signatureClient
               .from('sales')
-              .select('company_id, signer_type, signer_name, signer_dni, signer_phone, signer_email, signer_relationship, companies:company_id(name, tax_id, address, phone, email), clients:client_id(first_name, last_name, dni), beneficiaries(id, first_name, last_name, dni)')
+              .select('company_id, signer_type, signer_name, signer_dni, signer_phone, signer_email, signer_relationship, companies:company_id(name, tax_id, address, phone, email), clients:client_id(first_name, last_name, dni, birth_date), beneficiaries(id, first_name, last_name, dni, birth_date)')
               .eq('id', data.sale_id)
               .single();
             companyInfo = (saleInfo as any)?.companies || null;
@@ -739,25 +739,57 @@ export const useSubmitSignatureLink = () => {
               let signerCI = '';
               let roleLabel = 'CONTRATANTE';
 
+              // Función auxiliar: determina si una persona es menor de edad
+              // Usa solo el año para evitar el bug de new Date("YYYY-MM-DD") con timezone.
+              const isMinorAge = (birthDate: string | null | undefined): boolean => {
+                if (!birthDate) return false;
+                const parts = birthDate.split('-');
+                if (parts.length < 1) return false;
+                const birthYear = parseInt(parts[0], 10);
+                const birthMonth = parseInt(parts[1] || '1', 10);
+                const birthDay = parseInt(parts[2] || '1', 10);
+                const today = new Date();
+                let age = today.getFullYear() - birthYear;
+                if (
+                  today.getMonth() + 1 < birthMonth ||
+                  (today.getMonth() + 1 === birthMonth && today.getDate() < birthDay)
+                ) {
+                  age--;
+                }
+                return age < 18;
+              };
+
               if (recipientType === 'adherente' && recipientId && saleBeneficiaries.length > 0) {
                 const ben = saleBeneficiaries.find((b: any) => b.id === recipientId);
                 if (ben) {
-                  signerName = `${ben.first_name || ''} ${ben.last_name || ''}`.trim();
-                  signerCI = ben.dni || '';
+                  const benIsMinor = isMinorAge(ben.birth_date);
+                  if (benIsMinor && saleSignerInfo) {
+                    // Adherente menor: responsable de pago firma su DDJJ
+                    signerName = saleSignerInfo.nombre;
+                    signerCI = saleSignerInfo.ci;
+                  } else {
+                    // Adherente adulto: firma con sus propios datos
+                    signerName = `${ben.first_name || ''} ${ben.last_name || ''}`.trim();
+                    signerCI = ben.dni || '';
+                  }
                 }
                 roleLabel = 'ADHERENTE';
               } else if (recipientType === 'contratada') {
                 signerName = companySettings?.contratada_signer_name || (data as any)?.recipient_name || 'Representante Legal';
                 signerCI = companySettings?.contratada_signer_dni || '';
                 roleLabel = 'CONTRATADA';
-              } else if (saleSignerInfo) {
-                // Responsable de pago firma en lugar del titular
-                signerName = saleSignerInfo.nombre;
-                signerCI = saleSignerInfo.ci;
-                roleLabel = 'CONTRATANTE';
-              } else if (saleClientInfo) {
-                signerName = `${saleClientInfo.first_name || ''} ${saleClientInfo.last_name || ''}`.trim();
-                signerCI = saleClientInfo.dni || '';
+              } else {
+                // Titular
+                const titularIsMinor = isMinorAge(saleClientInfo?.birth_date);
+                if (titularIsMinor && saleSignerInfo) {
+                  // Titular menor de edad: responsable de pago firma contrato Y DDJJ
+                  signerName = saleSignerInfo.nombre;
+                  signerCI = saleSignerInfo.ci;
+                } else if (saleClientInfo) {
+                  // Titular adulto (aunque tenga responsable de pago): firma con sus propios datos
+                  signerName = `${saleClientInfo.first_name || ''} ${saleClientInfo.last_name || ''}`.trim();
+                  signerCI = saleClientInfo.dni || '';
+                }
                 roleLabel = 'CONTRATANTE';
               }
 
