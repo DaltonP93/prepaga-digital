@@ -213,6 +213,25 @@ export const useSubmitSignatureLink = () => {
       } catch {
       }
 
+      // Estado previo del enlace. Se captura ANTES del CAS para poder compensarlo (rollback)
+      // si más abajo salta la invariante de la contratada: sin esto el link quedaba
+      // 'completado' y cualquier reintento entraba por la rama `alreadyCompleted`, dejando a
+      // la contratada bloqueada para siempre.
+      let prevLinkState: { status: string | null; completed_at: string | null } | null = null;
+      try {
+        const { data: prevLink } = await signatureClient
+          .from('signature_links')
+          .select('status,completed_at')
+          .eq('id', linkId)
+          .maybeSingle();
+        if (prevLink) {
+          prevLinkState = {
+            status: (prevLink as any).status ?? null,
+            completed_at: (prevLink as any).completed_at ?? null,
+          };
+        }
+      } catch { /* best-effort: si falla, el rollback usa 'pendiente' */ }
+
       // CAS (compare-and-swap) atómico: solo marca 'completado' si AÚN NO lo está.
       // Si el titular hace doble/triple clic (o hay submits concurrentes), solo el
       // PRIMERO obtiene la fila; los demás reciben 0 filas y se cortan abajo, evitando
@@ -311,8 +330,11 @@ export const useSubmitSignatureLink = () => {
       } catch { /* not JSON, so it's canvas data */ }
 
       // Store signature in documents table for the sale
+      // Guardamos el id para poder borrar este documento si después salta la invariante
+      // de la contratada (si no, queda un `Firma - Contratada` huérfano por cada intento).
+      let firmaDocId: string | null = null;
       try {
-        await signatureClient
+        const { data: firmaDoc } = await signatureClient
           .from('documents')
           .insert({
             sale_id: data.sale_id,
@@ -324,7 +346,10 @@ export const useSubmitSignatureLink = () => {
             beneficiary_id: data.recipient_id || null,
             requires_signature: false,
             is_final: true,
-          });
+          })
+          .select('id')
+          .maybeSingle();
+        if (firmaDoc) firmaDocId = (firmaDoc as any).id ?? null;
       } catch (docErr) {
       }
 
@@ -335,21 +360,37 @@ export const useSubmitSignatureLink = () => {
 
         let contratadaMergedOk = false;
 
+        // Tipo de la OTRA parte del contrato (se usa en el merge y al concatenar bloques,
+        // para no duplicar el bloque de firma ya presente en el HTML).
+        const otherPartyType = recipientType === 'titular' ? 'contratada' : 'titular';
+
         // === CONTRATADA SPECIAL CASE ===
         // Merge contratada's signature into the existing titular's final contract
         // instead of creating a separate document
         if (recipientType === 'contratada') {
           try {
-            const { data: titularFinalDocs } = await signatureClient
+            // NO filtrar por is_final: si otro flujo (p. ej. reenvío del link del titular)
+            // reseteó is_final a false, la búsqueda no encontraba nada y el fallback de abajo
+            // BORRABA el contrato firmado por el titular. Traemos TODOS los contratos de la
+            // venta y elegimos en JS el que realmente tenga la firma del titular.
+            const { data: contratoDocs } = await signatureClient
               .from('documents')
               .select('*')
               .eq('sale_id', data.sale_id)
-              .eq('is_final', true)
               .is('beneficiary_id', null)
               .eq('document_type', 'contrato')
               .order('created_at', { ascending: false });
 
-            if (titularFinalDocs && titularFinalDocs.length > 0) {
+            const conFirmaTitular = (contratoDocs || []).filter(
+              (d: any) => typeof d.content === 'string' && d.content.includes('data-signer="titular"')
+            );
+            // OJO (divergencia con el repo de origen): esta venta puede tener MÁS DE UN
+            // contrato final legítimo (Contrato de prestación + Plan Materno, ver 4a5479b),
+            // así que la firma de la contratada se fusiona en TODOS los que tengan la firma
+            // del titular, no en uno solo.
+            const titularDocs = conFirmaTitular;
+
+            if (titularDocs.length > 0) {
               const nowIso = new Date().toISOString();
               const safeSignedAt = new Date().toLocaleString('es-PY');
 
@@ -402,7 +443,7 @@ export const useSubmitSignatureLink = () => {
               // Fusionar la firma de la contratada en CADA contrato final de la venta.
               // Antes se tomaba solo el más reciente (.limit(1)); con más de un documento
               // tipo "contrato" (ej. Contrato de prestación + Plan Materno) uno quedaba sin firmar.
-              for (const titularDoc of titularFinalDocs) {
+              for (const titularDoc of titularDocs) {
               let finalContent = titularDoc.content || '';
 
               // Replace "Pendiente firma de la empresa" placeholder with actual contratada signature
@@ -445,18 +486,25 @@ export const useSubmitSignatureLink = () => {
                 finalContent += contratadaBlock;
               }
 
-              // Update the existing final doc with both signatures merged
+              // Update the existing final doc with both signatures merged.
+              // `is_final: true` + `status: 'firmado'` son OBLIGATORIOS: la búsqueda de
+              // titularDoc ya no filtra por is_final, así que puede venir con false/null.
+              // Si quedara así, `finalize-signature-link` (que consulta is_final = true) no le
+              // genera el PDF ni lo firma con PAdES y el contrato correcto queda invisible.
               await signatureClient
                 .from('documents')
                 .update({
                   content: finalContent,
                   signed_at: nowIso,
                   signature_data: signatureData,
+                  is_final: true,
+                  status: 'firmado' as any,
                 } as any)
                 .eq('id', titularDoc.id);
               } // fin del loop sobre los contratos finales
 
               // Update original doc status
+              // Mismo cuidado que en docsQuery: is_final puede venir NULL en vez de false.
               await signatureClient
                 .from('documents')
                 .update({
@@ -465,14 +513,74 @@ export const useSubmitSignatureLink = () => {
                   signature_data: signatureData,
                 } as any)
                 .eq('sale_id', data.sale_id)
-                .eq('is_final', false)
+                .or('is_final.eq.false,is_final.is.null')
                 .is('beneficiary_id', null)
                 .eq('document_type', 'contrato');
+
+              // RECONCILIACIÓN: los ÚNICOS contratos finales de la venta deben ser los que
+              // acabamos de mergear (con ambas firmas). Sin esto la venta quedaba con
+              // is_final=true en copias viejas y `finalize-signature-link` generaba/enviaba
+              // un PDF por cada una.
+              // Se excluyen TODOS los mergeados (no uno solo): con Plan Materno hay 2.
+              try {
+                const mergedIds = titularDocs.map((d: any) => d.id);
+                await signatureClient
+                  .from('documents')
+                  .update({ is_final: false } as any)
+                  .eq('sale_id', data.sale_id)
+                  .is('beneficiary_id', null)
+                  .eq('document_type', 'contrato')
+                  .not('id', 'in', `(${mergedIds.join(',')})`);
+              } catch (dedupeErr) {
+                // No debe impedir que la firma se complete.
+                console.error('[firma][contratada] no se pudo desmarcar los contratos finales duplicados:', dedupeErr);
+              }
 
               contratadaMergedOk = true;
             }
           } catch (mergeErr) {
+            // Nunca silenciar: si el merge falla, abajo se lanza un error de invariante.
+            console.error('[firma][contratada] merge falló:', mergeErr);
           }
+        }
+
+        // INVARIANTE DE SEGURIDAD: el bloque `if (!contratadaMergedOk)` hace un DELETE de los
+        // documentos finales y reconstruye desde la plantilla sin firma. Para la CONTRATADA eso
+        // destruiría la firma ya capturada del titular. Preferimos fallar de forma visible.
+        if (!contratadaMergedOk && recipientType === 'contratada') {
+          // COMPENSACIÓN (rollback best-effort). Al llegar acá ya se ejecutaron dos escrituras:
+          //  1) el CAS que dejó el signature_link en 'completado' → sin revertirlo, cualquier
+          //     reintento cae en la rama `alreadyCompleted` y la contratada queda BLOQUEADA;
+          //  2) el insert del documento `Firma - Contratada` → queda huérfano.
+          // Cada paso va en su propio try/catch para que un fallo de limpieza no tape el
+          // error original de invariante, que es el que debe llegar a la UI.
+          try {
+            await signatureClient
+              .from('signature_links')
+              .update({
+                status: prevLinkState?.status ?? 'pendiente',
+                completed_at: prevLinkState?.completed_at ?? null,
+              })
+              .eq('id', linkId);
+            console.error('[firma][contratada] invariante: signature_link revertido a', prevLinkState?.status ?? 'pendiente', '(reintentable)', { linkId });
+          } catch (rbLinkErr) {
+            console.error('[firma][contratada] no se pudo revertir el signature_link:', rbLinkErr);
+          }
+
+          try {
+            if (firmaDocId) {
+              await signatureClient.from('documents').delete().eq('id', firmaDocId);
+              console.error('[firma][contratada] invariante: documento "Firma - Contratada" eliminado', { firmaDocId });
+            }
+          } catch (rbDocErr) {
+            console.error('[firma][contratada] no se pudo borrar el documento de firma huérfano:', rbDocErr);
+          }
+
+          const invariantErr: any = new Error(
+            'No se encontró el contrato firmado por el titular. No se puede firmar como contratada sin perder la firma del cliente. Contactá al administrador.'
+          );
+          invariantErr.__fatalSignature = true; // marca para que el catch exterior lo re-lance
+          throw invariantErr;
         }
 
         if (!contratadaMergedOk) {
@@ -496,16 +604,18 @@ export const useSubmitSignatureLink = () => {
 
         // Query documents to sign — filtered by role
         // IMPORTANT: always filter requires_signature = true to exclude annexes
-        // BUG FIX: Use 'neq(is_final, true)' instead of 'eq(is_final, false)'
-        // because some documents are created with is_final: null (not set),
-        // and null != false in PostgreSQL, causing them to be missed.
+        // is_final puede ser false o NULL (no seteado) para un documento pendiente de firma.
+        // OJO: 'neq(is_final, true)' NO alcanza para el caso NULL -- en Postgres,
+        // 'NULL <> true' evalúa a NULL (no a TRUE), así que el WHERE descarta esas filas
+        // igual que con 'eq(is_final, false)'. Verificado en producción (venta 2026-000230).
+        // Se usa OR explícito para cubrir ambos casos.
         let docsQuery = signatureClient
           .from('documents')
           .select('*')
           .eq('sale_id', data.sale_id)
           .neq('document_type', 'firma')
           .neq('document_type', 'anexo')
-          .neq('is_final', true)
+          .or('is_final.eq.false,is_final.is.null')
           .eq('requires_signature', true);
 
         if (recipientType === 'adherente' && recipientId) {
@@ -533,7 +643,7 @@ export const useSubmitSignatureLink = () => {
           try {
             const { data: saleInfo } = await signatureClient
               .from('sales')
-              .select('company_id, signer_type, signer_name, signer_dni, signer_phone, signer_email, signer_relationship, companies:company_id(name, tax_id, address, phone, email), clients:client_id(first_name, last_name, dni, client_type, razon_social, ruc), beneficiaries(id, first_name, last_name, dni)')
+              .select('company_id, signer_type, signer_name, signer_dni, signer_phone, signer_email, signer_relationship, companies:company_id(name, tax_id, address, phone, email), clients:client_id(first_name, last_name, dni, client_type, razon_social, ruc, birth_date), beneficiaries(id, first_name, last_name, dni, birth_date)')
               .eq('id', data.sale_id)
               .single();
             companyInfo = (saleInfo as any)?.companies || null;
@@ -569,17 +679,24 @@ export const useSubmitSignatureLink = () => {
           let existingOtherPartyBlock: string | null = null;
           if (recipientType === 'titular' || recipientType === 'contratada') {
             try {
-              const otherType = recipientType === 'titular' ? 'contratada' : 'titular';
-              const { data: otherFinalDocs } = await signatureClient
+              const otherType = otherPartyType;
+              // SIN filtro `.eq('is_final', true)`: esta consulta corre DESPUÉS del delete de
+              // arriba, que borra justamente los is_final=true. Con el filtro, al re-firmar el
+              // titular se perdía el bloque ya firmado de la contratada. Traemos todos los
+              // contratos de la venta (más nuevo primero) y elegimos en JS el que realmente
+              // contiene el bloque de la otra parte.
+              const { data: otherContractDocs } = await signatureClient
                 .from('documents')
-                .select('content')
+                .select('content,created_at')
                 .eq('sale_id', data.sale_id)
-                .eq('is_final', true)
                 .is('beneficiary_id', null)
                 .like('document_type', '%contrato%')
-                .limit(1);
-              if (otherFinalDocs && otherFinalDocs.length > 0) {
-                const otherContent = otherFinalDocs[0].content || '';
+                .order('created_at', { ascending: false });
+              const otherPartyDoc = (otherContractDocs || []).find(
+                (d: any) => typeof d.content === 'string' && d.content.includes(`data-signer="${otherType}"`)
+              );
+              if (otherPartyDoc) {
+                const otherContent = otherPartyDoc.content || '';
                 try {
                   const parser = new DOMParser();
                   const parsedDoc = parser.parseFromString(otherContent, 'text/html');
@@ -630,26 +747,63 @@ export const useSubmitSignatureLink = () => {
               let signerDocumentLabel = 'C.I.';
               let roleLabel = 'CONTRATANTE';
 
+              // Función auxiliar: determina si una persona es menor de edad
+              // Usa solo el año para evitar el bug de new Date("YYYY-MM-DD") con timezone.
+              const isMinorAge = (birthDate: string | null | undefined): boolean => {
+                if (!birthDate) return false;
+                const parts = birthDate.split('-');
+                if (parts.length < 1) return false;
+                const birthYear = parseInt(parts[0], 10);
+                const birthMonth = parseInt(parts[1] || '1', 10);
+                const birthDay = parseInt(parts[2] || '1', 10);
+                const today = new Date();
+                let age = today.getFullYear() - birthYear;
+                if (
+                  today.getMonth() + 1 < birthMonth ||
+                  (today.getMonth() + 1 === birthMonth && today.getDate() < birthDay)
+                ) {
+                  age--;
+                }
+                return age < 18;
+              };
+
               if (recipientType === 'adherente' && recipientId && saleBeneficiaries.length > 0) {
                 const ben = saleBeneficiaries.find((b: any) => b.id === recipientId);
                 if (ben) {
-                  signerName = `${ben.first_name || ''} ${ben.last_name || ''}`.trim();
-                  signerCI = ben.dni || '';
+                  const benIsMinor = isMinorAge(ben.birth_date);
+                  if (benIsMinor && saleSignerInfo) {
+                    // Adherente menor: responsable de pago firma su DDJJ
+                    signerName = saleSignerInfo.nombre;
+                    signerCI = saleSignerInfo.ci;
+                  } else {
+                    // Adherente adulto: firma con sus propios datos
+                    signerName = `${ben.first_name || ''} ${ben.last_name || ''}`.trim();
+                    signerCI = ben.dni || '';
+                  }
                 }
                 roleLabel = 'ADHERENTE';
               } else if (recipientType === 'contratada') {
                 signerName = companySettings?.contratada_signer_name || (data as any)?.recipient_name || 'Representante Legal';
                 signerCI = companySettings?.contratada_signer_dni || '';
                 roleLabel = 'CONTRATADA';
-              } else if (saleSignerInfo) {
-                // Responsable de pago firma en lugar del titular
-                signerName = saleSignerInfo.nombre;
-                signerCI = saleSignerInfo.ci;
-                roleLabel = 'CONTRATANTE';
-              } else if (saleClientInfo) {
-                signerName = getClientDisplayName(saleClientInfo);
-                signerCI = getClientDocument(saleClientInfo);
-                signerDocumentLabel = getClientDocumentLabel(saleClientInfo);
+              } else {
+                // Titular. Orden deliberado:
+                //  1) persona jurídica (empresa)  2) titular menor con responsable de pago  3) titular adulto
+                const titularIsMinor = isMinorAge(saleClientInfo?.birth_date);
+                if (saleClientInfo?.client_type === 'empresa') {
+                  // Persona jurídica: firma como CONTRATANTE con razón social + RUC
+                  signerName = getClientDisplayName(saleClientInfo);
+                  signerCI = getClientDocument(saleClientInfo);
+                  signerDocumentLabel = getClientDocumentLabel(saleClientInfo);
+                } else if (titularIsMinor && saleSignerInfo) {
+                  // Titular menor de edad: responsable de pago firma contrato Y DDJJ
+                  signerName = saleSignerInfo.nombre;
+                  signerCI = saleSignerInfo.ci;
+                } else if (saleClientInfo) {
+                  // Titular adulto (aunque tenga responsable de pago): firma con sus propios datos
+                  signerName = `${saleClientInfo.first_name || ''} ${saleClientInfo.last_name || ''}`.trim();
+                  signerCI = saleClientInfo.dni || '';
+                }
                 roleLabel = 'CONTRATANTE';
               }
 
@@ -797,9 +951,21 @@ export const useSubmitSignatureLink = () => {
               }
             }
 
-            // Clean up any raw attribute text that leaked from sanitization
-            const rawAttrRegex = /data-signature-field\s*=\s*["']true["'][^<]*/gi;
+            // Limpieza de texto de atributos que se filtró de la sanitización.
+            // Antes usaba `[^<]*`, que consumía TODO hasta el siguiente `<` — incluido el `>`
+            // que cierra la etiqueta — dejando `<div ` sin cerrar y produciendo el HTML
+            // corrupto `<div <div class="text-center...`. `[^<>]*` no puede cruzar el `>`.
+            const rawAttrRegex = /data-signature-field\s*=\s*["']true["'][^<>]*/gi;
+            const prevContent = finalContent;
             finalContent = finalContent.replace(rawAttrRegex, '');
+            // Guarda de seguridad: si aun así quedó una etiqueta sin cerrar, descartamos la limpieza.
+            if (/<\w+\s+</.test(finalContent)) {
+              console.error(
+                '[firma] limpieza de data-signature-field produjo HTML corrupto (etiqueta sin cerrar); se descarta el replace.',
+                { docId: doc.id, docName: doc.name }
+              );
+              finalContent = prevContent;
+            }
 
             // Then try placeholder patterns
             if (!placeholderFound) {
@@ -830,7 +996,15 @@ export const useSubmitSignatureLink = () => {
 
             // For contract documents: merge with existing other party block if available
             const isContractDoc = doc.document_type === 'contrato' || doc.name?.toLowerCase().includes('contrato');
-            if (isContractDoc && existingOtherPartyBlock && (recipientType === 'titular' || recipientType === 'contratada')) {
+            // Solo concatenar si el bloque de la otra parte NO está ya presente:
+            // si el merge previo lo insertó, agregarlo de nuevo duplicaba la firma.
+            const yaTieneOtraParte = finalContent.includes(`data-signer="${otherPartyType}"`);
+            if (
+              isContractDoc &&
+              existingOtherPartyBlock &&
+              !yaTieneOtraParte &&
+              (recipientType === 'titular' || recipientType === 'contratada')
+            ) {
               // Add the other party's block side by side
               finalContent = `${finalContent}${existingOtherPartyBlock}`;
             }
@@ -866,7 +1040,11 @@ export const useSubmitSignatureLink = () => {
             .in('id', docsToSign.map((d) => d.id));
         }
         } // end if (!contratadaMergedOk)
-      } catch (signedDocsErr) {
+      } catch (signedDocsErr: any) {
+        console.error('[firma] error armando documentos finales:', signedDocsErr);
+        // El error de invariante NO puede tragarse: debe llegar al onError del mutation
+        // para que la UI le muestre al usuario que no se firmó.
+        if (signedDocsErr?.__fatalSignature) throw signedDocsErr;
       }
 
       // Log in process_traces for audit trail

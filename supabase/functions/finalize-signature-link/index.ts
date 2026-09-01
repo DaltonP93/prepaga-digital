@@ -274,14 +274,32 @@ async function activateNextStep(
   const allStep1Done = step1Links.every((l: any) => l.status === 'completado')
   if (!allStep1Done) return false
 
-  // Activate step 2 links (contratada)
+  // Guarda anti-bucle: si la contratada YA firmó esta venta, no hay step 2 que activar.
+  // Sin esto, un link de contratada que quedó con step_order=1 (por regeneración) volvía
+  // a disparar este gate al firmarse y creaba OTRO link de contratada pendiente.
+  const { data: contratadaFirmada } = await supabase
+    .from('signature_links')
+    .select('id')
+    .eq('sale_id', link.sale_id)
+    .eq('recipient_type', 'contratada')
+    .eq('status', 'completado')
+    .limit(1)
+
+  if (contratadaFirmada && contratadaFirmada.length > 0) {
+    console.log('Contratada ya firmó esta venta — no se activa ni se crea otro step 2')
+    return false
+  }
+
+  // Activate step 2 links (contratada).
+  // NOTA: no filtrar por is_active=false. Un link step 2 ya activo es igualmente válido;
+  // excluirlo hacía caer el flujo en la rama "no existe → crear" y duplicaba el link.
   let { data: step2Links } = await supabase
     .from('signature_links')
     .select('id, recipient_email, recipient_phone, recipient_name, token')
     .eq('sale_id', link.sale_id)
     .eq('step_order', 2)
-    .eq('is_active', false)
     .neq('status', 'revocado')
+    .neq('status', 'completado')
 
   // If no step 2 link exists, create it from company_settings (mode=link)
   if (!step2Links || step2Links.length === 0) {

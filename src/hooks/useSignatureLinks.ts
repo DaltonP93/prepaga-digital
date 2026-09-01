@@ -270,7 +270,11 @@ export const useResendSignatureLink = () => {
       recipient_id: string | null;
       recipient_email: string;
       recipient_phone: string | null;
+      recipient_name?: string | null;
+      step_order?: number | null;
     }) => {
+      const isContratada = oldLink.recipient_type === 'contratada';
+
       // 1. Revoke old link
       await supabase
         .from('signature_links')
@@ -282,21 +286,35 @@ export const useResendSignatureLink = () => {
 
       // 2. Reset document statuses for this recipient instead of deleting them
       // This preserves the generated documents so they don't need to be regenerated
-      if (oldLink.recipient_type === 'adherente' && oldLink.recipient_id) {
+      if (isContratada) {
+        // Para contratada: NO tocar los documentos. El bloque `else` de abajo resetea
+        // los documentos del TITULAR (is_final=false, borra los 'firma'), lo que al
+        // regenerar el link de la contratada invalidaba firmas ya válidas del titular.
+      } else if (oldLink.recipient_type === 'adherente' && oldLink.recipient_id) {
         // For adherente: reset status of documents tied to this beneficiary
+        // Mismas guardas que la rama del titular: nunca resetear un documento ya finalizado
+        // ni uno con PDF sellado por PAdES (perderia la evidencia de una firma real).
         await supabase
           .from('documents')
           .update({ status: 'pendiente' as any, signature_data: null, signed_at: null, signed_by: null, is_final: false })
           .eq('sale_id', oldLink.sale_id)
-          .eq('beneficiary_id', oldLink.recipient_id);
+          .eq('beneficiary_id', oldLink.recipient_id)
+          .is('signed_pdf_url', null)
+          .or('is_final.is.null,is_final.eq.false');
       } else {
         // For titular: reset status of generated documents without beneficiary_id
+        // `.or('is_final.is.null,is_final.eq.false')`: NUNCA tocar documentos ya finalizados/
+        // firmados. Resetear is_final=false en un contrato final hacía que el flujo de la
+        // contratada no lo encontrara y terminara borrándolo, perdiendo la firma del titular.
+        // OJO: NO usar `.neq('is_final', true)` — en SQL `NULL <> true` es NULL, así que ese
+        // filtro dejaba afuera los documentos creados con `is_final: null` (existen en prod).
         await supabase
           .from('documents')
           .update({ status: 'pendiente' as any, signature_data: null, signed_at: null, signed_by: null, is_final: false })
           .eq('sale_id', oldLink.sale_id)
           .is('beneficiary_id', null)
-          .eq('generated_from_template', true);
+          .eq('generated_from_template', true)
+          .or('is_final.is.null,is_final.eq.false');
 
         // Also reset standalone firma documents
         await supabase
@@ -310,7 +328,7 @@ export const useResendSignatureLink = () => {
       // 3. Create new link with same recipient data
       const token = generateUUID();
       const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 1);
+      expiresAt.setDate(expiresAt.getDate() + (isContratada ? 3 : 1));
 
       const { data, error } = await supabase
         .from('signature_links')
@@ -321,6 +339,12 @@ export const useResendSignatureLink = () => {
           recipient_email: oldLink.recipient_email || '',
           recipient_phone: oldLink.recipient_phone || null,
           recipient_id: oldLink.recipient_id || null,
+          recipient_name: oldLink.recipient_name ?? null,
+          // step_order DEBE heredarse del link viejo: la columna tiene DEFAULT 1, y omitirlo
+          // hacía que un link de contratada regenerado naciera como step 1. Al firmarlo,
+          // finalize-signature-link lo tomaba como "terminó el step 1" y creaba OTRO link
+          // de contratada step 2 pendiente → bucle infinito de links fantasma.
+          step_order: oldLink.step_order ?? (isContratada ? 2 : 1),
           expires_at: expiresAt.toISOString(),
           status: 'pendiente',
         })

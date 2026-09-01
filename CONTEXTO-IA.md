@@ -291,3 +291,63 @@ reset de contraseña de cacosta. La fuente de verdad de estos es la BASE, no el 
 - Config contratada (company_settings): `mode='link'`, Eder Arguello,
   email `eder.arguello@sanatorioadventista.com.py`, tel `976122957`, `auto_whatsapp=true`.
 - Commit del flujo de firma: `4cf2a57`. Edge `finalize-signature-link` = **v57**. `generate-base-pdf` sigue **v82** (intacta).
+
+---
+
+## 7. Fixes de agosto 2026 (PRs #3–#6 + fixes DB)
+
+### 7.1 PRs mergeados (rama DaltonP93 → Sistemas-saa vía GitHub Action sync)
+
+| PR | Rama | Archivos | Fix |
+|---|---|---|---|
+| #3 | `fix/pdf-branding-overlap` | `SignatureView.tsx`, `SignatureWorkflow.tsx`, `DocumentsManager.tsx` | `position:fixed` → `thead/tfoot` en preview pre-firma; botón "Descargar" prioriza `base_pdf_url`/`signed_pdf_url` antes de renderizar HTML crudo |
+| #4 | `fix/adherentes-vendedor-signature-links` | `SaleAdherentsTab.tsx`, `useCreateAllSignatureLinks.ts`, `SaleTemplatesTab.tsx` | Campo Email en form de adherente; skip `is_primary` al generar links; aceptar teléfono sin email; join `salesperson_id` en queries de generación |
+| #5 | `fix/is-final-null-signature-query` | `useSignatureLinkPublic.ts` | `.neq('is_final',true)` → `.or('is_final.eq.false,is_final.is.null')` (NULL semántica Postgres) |
+| #6 | `fix/ddjj-nombre-link-revocado-doble-descarga` | `SignatureWorkflow.tsx`, `useSignatureLinkPublic.ts` | Links revocados ocultos; deduplicar descarga de DDJJ; mismo fix is_final NULL (incluye PR #5) |
+
+### 7.2 ⚠️ APRENDIZAJE CRÍTICO — FK obligatoria para joins en Supabase/PostgREST
+
+**Síntoma:** `"Could not find a relationship between 'sales' and 'salesperson_id' in the schema cache"` al enviar documentos para firma. El código del join es correcto pero PostgREST no sabe navegar la relación.
+
+**Causa:** PostgREST (la capa REST de Supabase) **solo puede hacer joins implícitos** (`.select('tabla:columna_id(campos)')`) cuando existe una **FOREIGN KEY declarada en la base de datos**. Sin FK, PostgREST no sabe que `salesperson_id` apunta a `profiles` y rechaza el query completo — bloqueando **toda** la generación de documentos.
+
+**Fix aplicado (2026-08-31):**
+```sql
+alter table sales
+  add constraint fk_sales_salesperson
+  foreign key (salesperson_id)
+  references profiles(id)
+  on delete set null;
+
+notify pgrst, 'reload schema';
+```
+
+**REGLA para la próxima IA:** Antes de agregar cualquier join `.select('alias:columna_fk(campos)')` en un query de Supabase, verificar que existe la FK:
+```sql
+select constraint_name from information_schema.table_constraints
+where constraint_type = 'FOREIGN KEY'
+  and table_name = 'tabla_origen';
+```
+Si no existe la FK → crearla ANTES de mergear el PR, o el join rompe la app en producción.
+
+### 7.3 Fixes directos en BD (ventas ya generadas con código viejo)
+
+Estos documentos se generaron antes del redeploy y necesitaron corrección manual del campo `content` en la tabla `documents`. El procedimiento fue:
+1. `UPDATE documents SET content = replace(content, '<texto_viejo>', '<texto_nuevo>') WHERE id = '...'`
+2. `set session_replication_role = replica; UPDATE documents SET signed_pdf_url=null, base_pdf_url=null WHERE id='...'; set session_replication_role = default;` (el trigger `protect_closed_sale_documents` bloquea updates directos en ventas cerradas)
+3. El PDF se regenera automáticamente en el próximo acceso a "Descargar".
+
+Ventas corregidas:
+- **2026-000230** (Sophie/Diego Santino/padre Diego Andres): encabezado DDJJ nombre declarante, link fantasma is_primary, duplicado d3bb62f1
+- **2026-000234** (Marta Bobadilla): Vendedor → Sara Lopez
+- **2026-000237** (Rossana Palacios): Vendedor → Rossana Palacios
+
+### 7.4 Flujo de deploy (no olvidar)
+
+```
+Merge PR en DaltonP93 → GitHub Action "Sync from DaltonP93" (automático c/3h o manual)
+→ Sistemas-saa sincronizado → "Pull and redeploy" en Portainer (MANUAL, ir a samap-digital-2)
+```
+
+El sync automático funciona pero el redeploy en Portainer **siempre es manual**. Los documentos generados entre el merge y el redeploy quedan con el código viejo y necesitan corrección manual en BD.
+

@@ -90,10 +90,15 @@ export const useCreateAllSignatureLinks = () => {
       // 3. Generar enlaces para adherentes que requieren firma
       if (sale.beneficiaries && Array.isArray(sale.beneficiaries) && sale.beneficiaries.length > 0) {
         for (const beneficiary of sale.beneficiaries) {
+          // Los beneficiarios is_primary representan a la titular (se crean automáticamente
+          // al cargar su DDJJ) y ya están cubiertos por el link de tipo 'titular' — no deben
+          // generar un link de tipo 'adherente' propio.
+          if (beneficiary.is_primary) continue;
+
           // Contratos de EMPRESA en modo 'representante': firma solo el
           // representante legal, no cada empleado. 'individual' = de siempre.
           const empleadosFirman = (sale as any)?.employee_signature_mode !== 'representante';
-          if (empleadosFirman && beneficiary.signature_required !== false && beneficiary.email) {
+          if (empleadosFirman && beneficiary.signature_required !== false && (beneficiary.email || beneficiary.phone)) {
             const adhToken = generateUUID();
             const adhExpiresAt = new Date();
             adhExpiresAt.setDate(adhExpiresAt.getDate() + 1);
@@ -104,7 +109,7 @@ export const useCreateAllSignatureLinks = () => {
                 sale_id: saleId,
                 token: adhToken,
                 recipient_type: 'adherente',
-                recipient_email: beneficiary.email,
+                recipient_email: beneficiary.email || null,
                 recipient_phone: beneficiary.phone || null,
                 recipient_id: beneficiary.id,
                 expires_at: adhExpiresAt.toISOString(),
