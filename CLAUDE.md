@@ -22,19 +22,31 @@
 
 ## ⚠️ REGLA CRÍTICA — NUNCA VIOLAR
 
-### `generate-base-pdf` está administrada externamente
+### `generate-base-pdf` la pisa Lovable — el repo es la copia de rescate
 
 ```
-❌ NO tocar supabase/functions/generate-base-pdf/index.ts
-❌ NO redesplegar generate-base-pdf en ningún deploy de Lovable
-❌ NO incluirla en push o CI/CD automático
+❌ NO dejar que un deploy de Lovable quede desplegado sobre generate-base-pdf
+✅ SÍ: supabase/functions/generate-base-pdf/index.ts ES la v82 y se puede redesplegar
 ```
 
-Esta función tiene una implementación específica de producción que usa **tabla HTML con `<thead>/<tfoot>`** para el branding (encabezado y zócalo). Lovable usa `displayHeaderFooter: true` de Puppeteer que **no soporta imágenes base64** en el renderer actual.
+Esta función usa **tabla HTML con `<thead>/<tfoot>`** para el branding (encabezado y
+zócalo), con `displayHeaderFooter: false` y `margin: 0`. Lovable la reescribe usando
+`displayHeaderFooter: true` de Puppeteer con `headerTemplate`/`footerTemplate`, que **no
+soporta imágenes base64** en el renderer actual: sólo renderiza texto, así que el header y
+el footer salen **vacíos**.
 
-Si el branding deja de aparecer en los PDFs, es porque Lovable sobreescribió esta función. Contactar al administrador del sistema para restaurarla.
+Si el branding deja de aparecer en los PDFs, es porque Lovable sobreescribió la función
+desplegada. Redesplegar (ver *Comandos Útiles*).
 
 **Versión correcta de producción: v82+** (estrategia `thead/tfoot`, `displayHeaderFooter: false`, `margin: 0`)
+
+> **Cambio 2026-09-07**: hasta esta fecha el archivo del repo era la versión **rota** de
+> Lovable y la v82 sólo existía como función desplegada en prod. Eso rompió TEST: el deploy
+> masivo del `2026-04-05` publicó el archivo del repo en `ykducvvcjzdpoojxlsig` (v62) y
+> **ningún** PDF de test tuvo branding hasta que se restauró (v63). Por eso ahora la v82
+> está commiteada: el repo y prod coinciden, y desplegar desde el repo es el camino seguro.
+> Si volvés a modificar este archivo, que sea con intención — no como efecto colateral de
+> un deploy de Lovable.
 
 ---
 
@@ -445,9 +457,29 @@ Al parsear fechas ISO (`"1981-05-09"`) con `new Date()`, JavaScript lo interpret
 **Fix**: Usar `dateStr.split('-')` para parsear, nunca `new Date(dateStr)`.
 
 ### 2. `generate-base-pdf` sobreescrita en cada deploy
-Cada deploy de Lovable sobreescribe la función con su versión que no funciona con el renderer.
+Cada deploy de Lovable sobreescribe la función con su versión que no funciona con el renderer
+(`displayHeaderFooter: true` + imágenes base64 → header/footer vacíos).
 
-**Fix**: El administrador del sistema debe restaurar la función v82 después de cada deploy de Lovable.
+**Síntoma**: los PDFs salen sin encabezado ni zócalo. **No es específico de una plantilla**:
+si la función está pisada, ningún PDF de ese entorno tiene branding.
+
+**Fix**: redesplegar la v82. Desde el `2026-09-07` el archivo del repo **es** la v82, así que
+alcanza con:
+
+```bash
+npx supabase@2.111.0 functions deploy generate-base-pdf --project-ref <ref> --no-verify-jwt
+```
+
+`<ref>` = `ejiycfqxgtrzaysgpzmx` (BR prod) o `ykducvvcjzdpoojxlsig` (US test). **Siempre
+explícito**: `supabase/config.toml` apunta a BR, y un deploy sin `--project-ref` va a producción.
+
+**Verificar antes de dar por hecho el diagnóstico** (no asumir que la función está bien):
+
+```
+mcp__claude_ai_Supabase__get_edge_function(project_id=..., function_slug='generate-base-pdf')
+```
+Debe contener `print-shell`, `table-header-group` y `displayHeaderFooter: false`. Si tiene
+`headerTemplate` o `displayHeaderFooter: true`, está pisada.
 
 ### 3. Nombre del firmante en minúscula
 Al escribir el bloque de firma en `documents.content`, el nombre del firmante a veces se lowercasea.
@@ -845,44 +877,42 @@ dentro de la misma transacción**.
 **Síntoma**: Los PDFs salen sin encabezado ni zócalo.
 **Causa**: Lovable usa `displayHeaderFooter: true` en el renderer, que no soporta imágenes base64. La versión correcta de producción (v82+) usa **tabla HTML con `<thead>/<tfoot>`** y `displayHeaderFooter: false`.
 
-Hay 3 caminos para restaurarla, en orden de preferencia:
-
-#### Opción A — Pedírselo a Claude (más simple)
-Decirle: **"Restaurá generate-base-pdf"**
-
-Claude tiene el código correcto guardado en contexto y lo redespliega usando la API de Supabase MCP (`mcp__supabase__deploy_edge_function`) en ~30 segundos.
-
-#### Opción B — Supabase CLI (recomendada si Claude no está disponible)
-
-Tener el código correcto guardado localmente y desplegar con:
+Desde el `2026-09-07` **el archivo del repo es la v82**, así que restaurar es un solo comando:
 
 ```bash
-supabase functions deploy generate-base-pdf \
-  --project-ref ejiycfqxgtrzaysgpzmx \
-  --no-verify-jwt
+# BR producción
+npx supabase@2.111.0 functions deploy generate-base-pdf \
+  --project-ref ejiycfqxgtrzaysgpzmx --no-verify-jwt
+
+# US test
+npx supabase@2.111.0 functions deploy generate-base-pdf \
+  --project-ref ykducvvcjzdpoojxlsig --no-verify-jwt
 ```
 
-#### Opción C — Script de restauración rápida
+> ⚠️ `--project-ref` **siempre explícito**: `supabase/config.toml` apunta a BR y un deploy
+> sin ese flag va a producción. En PowerShell usar `npx.cmd` (los `.ps1` están bloqueados).
+> No hace falta Docker: el CLI sube el archivo tal cual (avisa `WARNING: Docker is not running`
+> y despliega igual).
 
-Crear `restore-generate-pdf.sh`:
+Alternativa sin CLI: pedirle a Claude **"Restaurá generate-base-pdf"** — redespliega el
+archivo del repo, o lo baja de prod con
+`mcp__claude_ai_Supabase__get_edge_function(project_id='ejiycfqxgtrzaysgpzmx', function_slug='generate-base-pdf')`
+si el archivo local estuviera pisado.
 
-```bash
-#!/bin/bash
-echo "Restaurando generate-base-pdf v82 (thead/tfoot con branding)..."
+**Verificación post-restore**:
 
-supabase functions deploy generate-base-pdf \
-  --project-ref ejiycfqxgtrzaysgpzmx \
-  --no-verify-jwt \
-  --import-map ./supabase/functions/generate-base-pdf/deno.json
+1. `get_edge_function` sobre el proyecto → el código debe contener `print-shell`,
+   `table-header-group` y `displayHeaderFooter: false`. Si aparece `headerTemplate`, quedó
+   la versión rota.
+2. Generar un PDF de prueba y confirmar el encabezado/zócalo. En los logs de la función,
+   la v82 imprime `[header] OK …b` y `[footer] OK …b`; un `FAIL` significa que no pudo
+   descargar la imagen de branding de `company_settings`.
+3. Los PDFs **ya firmados** con la versión rota no se arreglan solos: hay que regenerarlos
+   con **"Regenerar con Encabezado"** (`admin_regeneration: true`), que crea una
+   `document_print_versions` con branding sin tocar el PDF sellado con PAdES.
 
-echo "✅ Función restaurada correctamente"
-```
-
-Ejecutar: `bash restore-generate-pdf.sh`
-
-**Verificación post-restore**: generar un PDF de prueba y confirmar que el encabezado/zócalo aparecen. Si no aparecen, la versión desplegada NO es la correcta — revisar que el archivo local tenga `displayHeaderFooter: false` y `margin: 0` con tabla `thead/tfoot`.
-
-> ⚠️ **No commitear cambios a `supabase/functions/generate-base-pdf/index.ts`** después de restaurar. La fuente de verdad es la **versión desplegada**, no el archivo del repo. Si el archivo local difiere de v82+, descartar los cambios locales con `git checkout supabase/functions/generate-base-pdf/`. Restaurar ≠ modificar.
+> ⚠️ Restaurar ≠ modificar. Si el archivo local difiere de la v82, no lo "mejores":
+> comparalo contra la función desplegada en **prod**, que es la referencia.
 
 ### Regenerar PDFs con branding
 ```
