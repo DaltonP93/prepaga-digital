@@ -15,6 +15,7 @@ import { formatCurrency } from '@/lib/utils';
 import { formatDateOnly } from '@/lib/dateOnly';
 import { getDocumentAccessUrl } from '@/lib/assetUrlHelper';
 import { getClientDisplayName, getClientDocument, getClientDocumentLabel } from '@/lib/clientUtils';
+import { invalidateSalesCaches } from '@/hooks/useSales';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   CheckCircle, XCircle, Clock, AlertCircle, Eye, Search,
@@ -165,6 +166,17 @@ export const AuditorDashboard: React.FC = () => {
   const [lightboxType, setLightboxType] = useState('');
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const canViewAllAuditSales = userRole === 'auditor' || userRole === 'admin' || userRole === 'super_admin' || userRole === 'supervisor';
+
+  // Tras una accion de auditoria hay que refrescar TODAS las vistas que muestran la venta.
+  // Incluye ['sale', saleId] (la que alimenta Editar Venta -> Templates): sin eso, el gate
+  // "Pendiente de Aprobacion" seguia bloqueado con el audit_status viejo servido desde cache.
+  const invalidateAuditCaches = (saleId?: string) => {
+    queryClient.invalidateQueries({ queryKey: ['auditor-sales-list'] });
+    if (saleId) {
+      queryClient.invalidateQueries({ queryKey: ['auditor-sale-detail', saleId] });
+    }
+    invalidateSalesCaches(queryClient, saleId);
+  };
 
   const openAttachedDocument = async (fileUrl: string | null | undefined) => {
     if (!fileUrl) {
@@ -473,9 +485,8 @@ export const AuditorDashboard: React.FC = () => {
         logBestEffortInsertError('notifications', notificationError);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['audit-sales'] });
-      queryClient.invalidateQueries({ queryKey: ['sales'] });
+    onSuccess: (_data, saleId) => {
+      invalidateAuditCaches(saleId);
       setSelectedSaleId(null);
       setAuditNotes('');
       toast({
@@ -545,9 +556,8 @@ export const AuditorDashboard: React.FC = () => {
         logBestEffortInsertError('notifications', notificationError);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['audit-sales'] });
-      queryClient.invalidateQueries({ queryKey: ['sales'] });
+    onSuccess: (_data, saleId) => {
+      invalidateAuditCaches(saleId);
       setSelectedSaleId(null);
       setAuditNotes('');
       toast({
@@ -627,9 +637,8 @@ export const AuditorDashboard: React.FC = () => {
         logBestEffortInsertError('notifications', notificationError);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['audit-sales'] });
-      queryClient.invalidateQueries({ queryKey: ['sales'] });
+    onSuccess: (_data, saleId) => {
+      invalidateAuditCaches(saleId);
       setSelectedSaleId(null);
       setAuditNotes('');
       toast({

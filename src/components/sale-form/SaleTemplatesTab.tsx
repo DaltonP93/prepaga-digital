@@ -1241,7 +1241,8 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           La venta debe ser aprobada por auditoría antes de asociar templates para firma.
         </p>
         <Badge variant="outline" className="mt-3">
-          Estado auditoría: {auditStatus || 'pendiente'}
+          {/* No decir "pendiente" cuando el valor no llego: mentir aca desvia el diagnostico. */}
+          Estado auditoría: {auditStatus || 'sin dato'}
         </Badge>
       </div>
     );

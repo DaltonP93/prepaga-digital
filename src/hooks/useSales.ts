@@ -69,7 +69,7 @@ interface PaginatedSalesResult {
   totalPages: number;
 }
 
-const invalidateSalesCaches = (queryClient: ReturnType<typeof useQueryClient>, saleId?: string) => {
+export const invalidateSalesCaches = (queryClient: ReturnType<typeof useQueryClient>, saleId?: string) => {
   queryClient.invalidateQueries({ queryKey: ['sales'] });
   queryClient.invalidateQueries({ queryKey: ['sales-list'] });
   queryClient.invalidateQueries({ queryKey: ['sales-lookup'] });
