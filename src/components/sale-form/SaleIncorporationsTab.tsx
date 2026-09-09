@@ -66,8 +66,9 @@ const OP_EDITABLE = ['borrador'];
 const OP_CANCELABLE = ['borrador', 'enviado', 'pendiente'];
 
 /**
- * Fila de `adherent_incorporations`. La tabla todavía no está en types.ts (hay
- * que regenerarlo después de aplicar las migraciones), así que se tipa suelta.
+ * Fila de `adherent_incorporations`, tipada suelta: el componente la recibe ya
+ * mezclada con el embed `operation_sale`, y enumerar las ~40 columnas acá no
+ * agregaría seguridad real.
  */
 type Movim = Record<string, any>;
 

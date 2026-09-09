@@ -88,10 +88,10 @@ export interface TerminationInput {
 export const attachGroupMonthlyTotal = async (sale: any): Promise<any> => {
   if (!sale || sale.sale_type !== SALE_TYPE_INCORPORACION) return sale;
 
-  // `select('*')` + cast a propósito: `movement_type` y compañía se agregaron en
-  // la migración 20260908000003 y `types.ts` sólo las conoce después de
-  // regenerarlo. Nombrarlas en un select tipado rompe la compilación aunque la
-  // columna exista en la base.
+  // `select('*')` + cast a propósito. Trae la fila entera y la lee suelta en vez
+  // de enumerar columnas: esta tabla ya cambió de forma tres veces (20260813*,
+  // 20260908000003) y cada vez habría que tocar todos los selects. Es barato:
+  // se lee UNA fila.
   const { data: incRow } = await supabase
     .from('adherent_incorporations')
     .select('*')
@@ -387,11 +387,11 @@ export const useCreateNominaTermination = () => {
         throw new Error('Esa persona ya está dada de baja del contrato.');
       }
 
-      // Los adherentes a cargo se filtran en memoria y no con un `.eq()` sobre
-      // `parent_beneficiary_id`: esa columna todavía no está en `types.ts`, y
-      // encadenarla con un cast hace explotar la inferencia de PostgREST
-      // ("Type instantiation is excessively deep"). La nómina de un contrato es
-      // chica, así que traerla entera no cuesta nada.
+      // Los adherentes a cargo se filtran en memoria y no con un `.eq()` más
+      // sobre `parent_beneficiary_id`: encadenar otro filtro acá hacía explotar
+      // la inferencia de tipos de PostgREST ("Type instantiation is excessively
+      // deep"). La nómina de un contrato es chica, así que traerla entera no
+      // cuesta nada.
       let dependientes: any[] = [];
       if (cascadeDependents) {
         const { data, error } = await supabase

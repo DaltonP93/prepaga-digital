@@ -359,11 +359,18 @@ después `sql/aplicar-nomina-empresa-test-PASO2.sql` (las 2 plantillas). Los dos
 son idempotentes y el PASO 1 **aborta solo** si el filtro por `status` fuera a
 cambiar el total de alguna venta existente. Después, regenerar `types.ts`.
 
-> Mientras `types.ts` no se regenere, los hooks leen estas tablas con
-> `select('*')` + cast: nombrar una columna nueva en un select tipado de
-> PostgREST **rompe la compilación** aunque la columna exista en la base, y
-> encadenar un `.eq()` con cast hace explotar la inferencia
-> (*"Type instantiation is excessively deep"*).
+> **Aplicado en US test el 2026-09-08** (las 13 filas de verificación en `OK`) y
+> `types.ts` regenerado. Para probar que las guardas de la jerarquía además
+> *funcionan* —y no sólo que existen— está
+> `sql/verificar-nomina-empresa-test.sql`, que corre entero dentro de
+> `BEGIN … ROLLBACK` y no escribe nada.
+
+> Un par de hooks leen `adherent_incorporations` con `select('*')` + cast en vez
+> de enumerar columnas. Es deliberado: esa tabla ya cambió de forma tres veces y
+> cada vez habría que tocar todos los selects. Además, encadenar un `.eq()` de
+> más sobre `beneficiaries` hacía explotar la inferencia de PostgREST
+> (*"Type instantiation is excessively deep"*), así que ese filtro se hace en
+> memoria.
 
 ---
 

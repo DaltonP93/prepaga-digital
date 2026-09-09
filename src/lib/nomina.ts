@@ -15,9 +15,9 @@
  * sale impresa en el contrato se armen con la MISMA regla.
  */
 
-/** Lo mínimo que necesita el agrupador. Deliberadamente laxo: las filas llegan
- *  desde Supabase con muchas más columnas, y `beneficiaries` todavía no tiene
- *  las columnas nuevas en `types.ts` hasta que se regenere. */
+/** Lo mínimo que necesita el agrupador. Deliberadamente laxo —con `[key: string]`—
+ *  para que sirva tanto a la fila completa que devuelve Supabase como a un
+ *  objeto armado a mano en un test, sin acoplar este archivo a `types.ts`. */
 export interface NominaMember {
   id: string;
   first_name?: string | null;
