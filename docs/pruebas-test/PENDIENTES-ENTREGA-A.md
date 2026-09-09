@@ -12,7 +12,7 @@
 | **Aplicación** | `http://localhost:8080` (`npm run dev` apuntando a US test) |
 | **Usuario con el que se ejecutó** | `cacosta.ma@gmail.com` (super_admin) |
 | **Datos de la corrida** | venta `2026-000027` · anexo `ANX-2026-000002` · cambio de plan `CMB-2026-000002` |
-| **Fecha de corte de este informe** | 2026-09-04 |
+| **Fecha de corte de este informe** | 2026-09-08 |
 
 **Leyenda de estados**
 
@@ -37,6 +37,7 @@
 | P-06 | **FK `fk_sales_salesperson` en US test.** Sin ella PostgREST no resuelve el embed del vendedor y *Enviar Documentos para Firma* **falla en silencio**. | `docs/manual-entrega-a/README.md:95-101` | Entorno — dependencia | ✅ Resuelto (verificado 2026-09-04) |
 | P-07 | **Entrega A no está en BR producción.** Falta todo el esquema: `adherent_incorporations`, `plan_changes`, `beneficiaries.entry_date` / `.immediate_coverage`, `clients.external_id`, `sales.employee_signature_mode`, las 3 plantillas y el módulo de comisiones completo. | `CLAUDE.md` — *Estado por entorno* | Deploy — runbook aparte | Abierto |
 | P-08 | **9 casos sin captura del resultado esperado**: CP-08, CP-19, CP-20, CP-21, CP-25, CP-26, CP-27, CP-28, CP-29. | conteo sobre `manual.html` | Evidencia — incompleta | Abierto |
+| P-09 | **Venta a EMPRESA con nómina: sin probar contra la base.** El módulo está implementado y commiteado (`0ea9700`), con 110 checks del motor en verde, pero **las migraciones `20260908*` todavía no se aplicaron en US test**, así que ningún caso se ejecutó end-to-end. | `CLAUDE.md` — *Venta a EMPRESA* | Deploy + prueba — pendiente | Abierto |
 
 ### Detalle
 
@@ -86,6 +87,22 @@ manual prueba existe únicamente en US test**. Llevarlo a BR requiere las migrac
 `20260817*`, `20260818*`, `20260819*` y `20260822*`, más las columnas nuevas, con su propio
 runbook. Ver `CLAUDE.md` → *Tipos de Venta y Anexos → Estado por entorno* y
 *Módulo de Comisiones*.
+
+**P-09 · Venta a EMPRESA** — el código está en la rama pero la base de test no tiene el
+esquema todavía. **Qué falta, en orden**:
+
+1. Pegar `sql/aplicar-nomina-empresa-test-PASO1.sql` en el SQL Editor de US test
+   (`ykducvvcjzdpoojxlsig`, **nunca** BR). Aborta solo si el filtro por `status` fuera a cambiar
+   el total de alguna de las 28 ventas existentes; las 11 filas de VERIFICACIÓN deben decir `OK`.
+2. Pegar `sql/aplicar-nomina-empresa-test-PASO2.sql` (siembra las 2 plantillas nuevas). Sin este
+   paso no hay nada que adjuntar a la venta y el flujo queda inutilizable.
+3. Regenerar `src/integrations/supabase/types.ts` (en PowerShell, `| Out-File -Encoding utf8`).
+4. Recién ahí correr los casos nuevos: cargar una empresa con 2 empleados de planes distintos y
+   adherentes propios, firmar el contrato, y después un **alta** y una **baja** por la pestaña
+   *Movimientos*. Lo que hay que mirar en la baja: que **no** se generen DDJJ ni enlaces de firma
+   para quien sale, y que el total del contrato baje exactamente por empleado + adherentes.
+
+Los criterios de rechazo del punto 3 (bugs #12 y #13) aplican igual a estos casos.
 
 **P-08 · Evidencia faltante** — nueve casos no tienen captura del resultado esperado. Tres de
 ellos (CP-19, CP-20, CP-21) sí tienen capturas de la funcionalidad en su sección, pero no del
