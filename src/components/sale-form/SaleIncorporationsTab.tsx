@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -18,41 +20,37 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, UserPlus, ExternalLink, AlertCircle, Pencil, Ban } from 'lucide-react';
+import { Plus, Trash2, UserPlus, ExternalLink, AlertCircle, Pencil, Ban, UserMinus } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { useBeneficiaries } from '@/hooks/useBeneficiaries';
+import { usePlans } from '@/hooks/usePlans';
+import { useSaleClientType } from '@/hooks/useSaleClientType';
+import { agruparNomina, estaActivo, montoDe, type NominaMember } from '@/lib/nomina';
 import {
   useAdherentIncorporations,
   useCreateAdherentIncorporation,
+  useCreateNominaTermination,
   useUpdateAdherentIncorporation,
   useCancelAdherentIncorporation,
   type IncorporationAdherentInput,
 } from '@/hooks/useAdherentIncorporations';
+import {
+  BeneficiaryFields,
+  emptyPersonaFields,
+  type PersonaFieldsData,
+} from './BeneficiaryFields';
 
 interface SaleIncorporationsTabProps {
   saleId?: string;
-  /** Estado del contrato madre: solo se incorpora sobre contratos firmados. */
+  /** Estado del contrato madre: solo se mueve nómina sobre contratos firmados. */
   saleStatus?: string | null;
 }
 
-type Row = IncorporationAdherentInput & { immediate_coverage_ui: '' | 'si' | 'no' };
+type Movimiento = 'alta' | 'baja';
 
-const emptyRow = (): Row => ({
-  first_name: '', last_name: '', dni: '', relationship: '', birth_date: '',
-  phone: '', email: '', address: '', barrio: '', city: '', amount: 0,
-  entry_date: new Date().toISOString().slice(0, 10),
-  immediate_coverage: null,
-  immediate_coverage_ui: '',
-});
-
-const parseAmount = (v: string) => {
-  const digits = v.replace(/\D/g, '');
-  return digits ? Number(digits) : 0;
-};
-const showAmount = (v: number) => (v ? v.toLocaleString('es-PY', { maximumFractionDigits: 0 }) : '');
-
-/** Único estado desde el que la base deja tocar una incorporación. */
+/** Único estado desde el que la base deja tocar un movimiento. */
 const EDITABLE = 'draft';
 
 /**
@@ -71,9 +69,22 @@ const OP_CANCELABLE = ['borrador', 'enviado', 'pendiente'];
  * Fila de `adherent_incorporations`. La tabla todavía no está en types.ts (hay
  * que regenerarlo después de aplicar las migraciones), así que se tipa suelta.
  */
-type Incorporacion = Record<string, any>;
+type Movim = Record<string, any>;
 
-const rowFromIncorporation = (inc: Incorporacion): Row => ({
+const hoyISO = () => new Date().toISOString().slice(0, 10);
+
+/** "YYYY-MM-DD" a "dd/mm/aaaa" sin pasar por Date (timezone PY = UTC-4). */
+const formatFechaCorta = (iso?: string | null): string => {
+  if (!iso) return '';
+  const [y, m, d] = String(iso).slice(0, 10).split('-');
+  return y && m && d ? `${d}/${m}/${y}` : '';
+};
+
+const nombreDe = (p: NominaMember) =>
+  `${p.first_name || ''} ${p.last_name || ''}`.trim();
+
+const rowFromMovimiento = (inc: Movim): PersonaFieldsData => ({
+  ...emptyPersonaFields(),
   first_name: inc.adherent_first_name || '',
   last_name: inc.adherent_last_name || '',
   dni: inc.adherent_document_number || '',
@@ -81,131 +92,119 @@ const rowFromIncorporation = (inc: Incorporacion): Row => ({
   birth_date: inc.adherent_birth_date || '',
   phone: inc.adherent_phone || '',
   email: inc.adherent_email || '',
-  address: '',
-  barrio: '',
-  city: '',
   amount: Number(inc.adherent_amount) || 0,
   entry_date: inc.coverage_start_date || '',
-  immediate_coverage: null,
-  immediate_coverage_ui: '',
+  plan_id: inc.adherent_plan_id || '',
 });
 
 /**
- * Los mismos campos se cargan al crear y al corregir un borrador, así que viven
- * en un solo lugar: si se agrega un dato al alta y no a la edición, el anexo y
- * el adherente que firma dejan de coincidir.
- */
-const AdherenteFields: React.FC<{
-  value: Row;
-  onChange: (patch: Partial<Row>) => void;
-}> = ({ value, onChange }) => (
-  <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-    <div className="space-y-2">
-      <Label>Nombre *</Label>
-      <Input value={value.first_name} onChange={(e) => onChange({ first_name: e.target.value })} />
-    </div>
-    <div className="space-y-2">
-      <Label>Apellido *</Label>
-      <Input value={value.last_name} onChange={(e) => onChange({ last_name: e.target.value })} />
-    </div>
-    <div className="space-y-2">
-      <Label>C.I. Nº</Label>
-      <Input value={value.dni} onChange={(e) => onChange({ dni: e.target.value })} />
-    </div>
-    <div className="space-y-2">
-      <Label>Fecha Nac.</Label>
-      <Input type="date" value={value.birth_date || ''} onChange={(e) => onChange({ birth_date: e.target.value })} />
-    </div>
-    <div className="space-y-2">
-      <Label>Parentesco</Label>
-      <Select value={value.relationship} onValueChange={(v) => onChange({ relationship: v })}>
-        <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="conyuge">Cónyuge</SelectItem>
-          <SelectItem value="hijo">Hijo/a</SelectItem>
-          <SelectItem value="padre">Padre/Madre</SelectItem>
-          <SelectItem value="hermano">Hermano/a</SelectItem>
-          <SelectItem value="otro">Otro</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-    <div className="space-y-2">
-      <Label>Fecha de Ingreso</Label>
-      <Input type="date" value={value.entry_date || ''} onChange={(e) => onChange({ entry_date: e.target.value })} />
-    </div>
-    <div className="space-y-2">
-      <Label>Precio (Gs.)</Label>
-      <Input inputMode="numeric" value={showAmount(value.amount)} onChange={(e) => onChange({ amount: parseAmount(e.target.value) })} placeholder="0" />
-    </div>
-    <div className="space-y-2">
-      <Label>V.I.</Label>
-      <Select
-        value={value.immediate_coverage_ui || 'heredar'}
-        onValueChange={(v) => onChange({ immediate_coverage_ui: v === 'heredar' ? '' : (v as 'si' | 'no') })}
-      >
-        <SelectTrigger><SelectValue /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="heredar">Según el contrato</SelectItem>
-          <SelectItem value="si">Sí</SelectItem>
-          <SelectItem value="no">No</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-    <div className="space-y-2">
-      <Label>Teléfono *</Label>
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground whitespace-nowrap">+595</span>
-        <Input value={value.phone} onChange={(e) => onChange({ phone: e.target.value.replace(/\D/g, '') })} placeholder="981123456" />
-      </div>
-    </div>
-    <div className="space-y-2">
-      <Label>Domicilio</Label>
-      <Input value={value.address} onChange={(e) => onChange({ address: e.target.value })} />
-    </div>
-    <div className="space-y-2">
-      <Label>Barrio</Label>
-      <Input value={value.barrio} onChange={(e) => onChange({ barrio: e.target.value })} />
-    </div>
-  </div>
-);
-
-/**
- * "Incorporar Adherente" sobre un contrato ya firmado.
+ * MOVIMIENTOS DE NÓMINA sobre un contrato ya firmado.
  *
- * No modifica el contrato madre: crea una VENTA-OPERACIÓN aparte con los
- * adherentes nuevos. Desde ahí se genera y se firma el Anexo de Incorporación
- * con el circuito de firma de siempre, y recién cuando termina se suman los
- * adherentes al contrato original.
+ * Dos operaciones, un solo documento: incorporar a alguien (alta) o
+ * desvincularlo (baja). Las dos crean una VENTA-OPERACIÓN aparte con su anexo y
+ * su ceremonia de firma; el contrato madre no se toca hasta que el anexo queda
+ * firmado, y ahí lo actualiza el trigger `trg_activate_adherent_incorporation`.
  */
 const SaleIncorporationsTab: React.FC<SaleIncorporationsTabProps> = ({ saleId, saleStatus }) => {
   const navigate = useNavigate();
-  const { data: incorporaciones = [], isLoading } = useAdherentIncorporations(saleId);
+  const { data: movimientos = [], isLoading } = useAdherentIncorporations(saleId);
+  const { data: miembros = [] } = useBeneficiaries(saleId || '');
+  const { data: plans } = usePlans();
+  const { isCompany } = useSaleClientType(saleId);
   const crear = useCreateAdherentIncorporation();
+  const darDeBaja = useCreateNominaTermination();
   const actualizar = useUpdateAdherentIncorporation();
   const cancelar = useCancelAdherentIncorporation();
 
+  const [movimiento, setMovimiento] = useState<Movimiento>('alta');
   const [showForm, setShowForm] = useState(false);
-  const [rows, setRows] = useState<Row[]>([emptyRow()]);
-  /** Incorporación en edición (una persona a la vez). */
-  const [editando, setEditando] = useState<{ id: string; row: Row } | null>(null);
+
+  // ── Alta ────────────────────────────────────────────────────────────────
+  const [rows, setRows] = useState<PersonaFieldsData[]>([emptyPersonaFields()]);
+  /** Contratos de empresa: qué se incorpora y de quién cuelga. */
+  const [rolAlta, setRolAlta] = useState<'empleado' | 'adherente'>('empleado');
+  const [empleadoDestino, setEmpleadoDestino] = useState('');
+
+  // ── Baja ────────────────────────────────────────────────────────────────
+  const [bajaTargetId, setBajaTargetId] = useState('');
+  const [bajaFecha, setBajaFecha] = useState(hoyISO());
+  const [bajaMotivo, setBajaMotivo] = useState('');
+  const [bajaCascada, setBajaCascada] = useState(true);
+  const [buscarPersona, setBuscarPersona] = useState('');
+
+  /** Movimiento en edición (una persona a la vez). */
+  const [editando, setEditando] = useState<{ id: string; row: PersonaFieldsData } | null>(null);
 
   const habilitado = saleStatus === 'firmado' || saleStatus === 'completado';
+
+  const planOptions = useMemo(
+    () => (plans || []).map((p: any) => ({ id: p.id, name: p.name, price: p.price })),
+    [plans],
+  );
+
+  const nomina = useMemo(
+    () => agruparNomina((miembros || []) as unknown as NominaMember[]),
+    [miembros],
+  );
+
+  const empleadosActivos = useMemo(
+    () => nomina.empleados.filter((g) => estaActivo(g.empleado)).map((g) => g.empleado),
+    [nomina],
+  );
+
+  /** Todas las personas del contrato que todavía están cubiertas. */
+  const personasActivas = useMemo(
+    () =>
+      ((miembros || []) as unknown as NominaMember[])
+        .filter((m) => !m.is_primary && estaActivo(m))
+        .sort((a, b) => nombreDe(a).localeCompare(nombreDe(b))),
+    [miembros],
+  );
+
+  const personasFiltradas = useMemo(() => {
+    const q = buscarPersona.trim().toLowerCase();
+    if (!q) return personasActivas;
+    // Se busca por nombre Y por documento: en una nómina grande el dato que el
+    // área de RR.HH. tiene a mano es la cédula, no la ortografía del apellido.
+    return personasActivas.filter(
+      (p) =>
+        nombreDe(p).toLowerCase().includes(q) ||
+        String(p.dni || p.document_number || '').toLowerCase().includes(q),
+    );
+  }, [personasActivas, buscarPersona]);
+
+  const personaElegida = personasActivas.find((p) => p.id === bajaTargetId);
+  const dependientesDeLaBaja = useMemo(() => {
+    if (!personaElegida || personaElegida.member_role !== 'empleado') return [];
+    const grupo = nomina.empleados.find((g) => g.empleado.id === personaElegida.id);
+    return (grupo?.adherentes || []).filter(estaActivo);
+  }, [personaElegida, nomina]);
 
   if (!saleId) {
     return (
       <p className="text-sm text-muted-foreground">
-        Guardá la venta primero para poder incorporar adherentes.
+        Guardá la venta primero para poder mover la nómina.
       </p>
     );
   }
 
-  const updateRow = (i: number, patch: Partial<Row>) =>
+  const updateRow = (i: number, patch: Partial<PersonaFieldsData>) =>
     setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
 
-  const handleCrear = async () => {
+  const cerrarForm = () => {
+    setShowForm(false);
+    setRows([emptyPersonaFields()]);
+    setBajaTargetId('');
+    setBajaMotivo('');
+    setBajaFecha(hoyISO());
+    setBajaCascada(true);
+    setBuscarPersona('');
+  };
+
+  const handleCrearAlta = async () => {
     const validas = rows.filter((r) => r.first_name.trim() && r.last_name.trim());
     if (!validas.length) {
-      toast.error('Cargá al menos un adherente con nombre y apellido.');
+      toast.error('Cargá al menos una persona con nombre y apellido.');
       return;
     }
     const sinTelefono = validas.find((r) => !r.phone?.trim());
@@ -213,20 +212,69 @@ const SaleIncorporationsTab: React.FC<SaleIncorporationsTabProps> = ({ saleId, s
       toast.error('El teléfono es obligatorio: es por donde le llega el enlace de firma.');
       return;
     }
+    if (isCompany && rolAlta === 'adherente' && !empleadoDestino) {
+      toast.error('Elegí de qué empleado depende esta persona.');
+      return;
+    }
+    if (isCompany) {
+      const sinPlan = validas.find((r) => !r.plan_id);
+      if (sinPlan) {
+        toast.error('En un contrato de empresa cada persona necesita su plan.');
+        return;
+      }
+    }
 
-    const adherentes: IncorporationAdherentInput[] = validas.map(({ immediate_coverage_ui, ...r }) => ({
-      ...r,
+    const adherentes: IncorporationAdherentInput[] = validas.map((r) => ({
+      first_name: r.first_name,
+      last_name: r.last_name,
+      dni: r.dni,
+      relationship: r.relationship,
+      gender: r.gender,
+      phone: r.phone,
+      email: r.email,
+      address: r.address,
+      barrio: r.barrio,
+      city: r.city,
+      amount: r.amount,
       birth_date: r.birth_date || null,
       entry_date: r.entry_date || null,
-      immediate_coverage:
-        immediate_coverage_ui === 'si' ? true : immediate_coverage_ui === 'no' ? false : null,
+      immediate_coverage: r.vi === 'si' ? true : r.vi === 'no' ? false : null,
+      member_role: isCompany ? rolAlta : 'adherente',
+      plan_id: r.plan_id || null,
+      parent_target_beneficiary_id:
+        isCompany && rolAlta === 'adherente' ? empleadoDestino : null,
     }));
 
     try {
       const res = await crear.mutateAsync({ parentSaleId: saleId, adherents: adherentes });
-      setRows([emptyRow()]);
-      setShowForm(false);
+      cerrarForm();
       // Se abre la operación para generar y enviar a firmar el anexo.
+      if (res?.operationSale?.id) navigate(`/sales/${res.operationSale.id}/edit`);
+    } catch {
+      // El hook ya muestra el error.
+    }
+  };
+
+  const handleCrearBaja = async () => {
+    if (!bajaTargetId) {
+      toast.error('Elegí a quién dar de baja.');
+      return;
+    }
+    if (!bajaFecha) {
+      toast.error('Indicá la fecha de baja.');
+      return;
+    }
+    try {
+      const res = await darDeBaja.mutateAsync({
+        parentSaleId: saleId,
+        termination: {
+          targetBeneficiaryId: bajaTargetId,
+          terminationDate: bajaFecha,
+          reason: bajaMotivo || undefined,
+          cascadeDependents: bajaCascada,
+        },
+      });
+      cerrarForm();
       if (res?.operationSale?.id) navigate(`/sales/${res.operationSale.id}/edit`);
     } catch {
       // El hook ya muestra el error.
@@ -239,12 +287,12 @@ const SaleIncorporationsTab: React.FC<SaleIncorporationsTabProps> = ({ saleId, s
    * traerlos antes de abrir el editor porque el hook de update reescribe el
    * beneficiario COMPLETO; si se enviaran vacíos se borrarían en silencio.
    */
-  const abrirEdicion = async (inc: Incorporacion) => {
-    const row = rowFromIncorporation(inc);
+  const abrirEdicion = async (inc: Movim) => {
+    const row = rowFromMovimiento(inc);
     if (inc.operation_beneficiary_id) {
       const { data: ben, error } = await supabase
         .from('beneficiaries')
-        .select('gender, address, barrio, city, immediate_coverage')
+        .select('*')
         .eq('id', inc.operation_beneficiary_id)
         .maybeSingle();
 
@@ -252,22 +300,21 @@ const SaleIncorporationsTab: React.FC<SaleIncorporationsTabProps> = ({ saleId, s
       // estos campos vacíos sería peor que no editar: el hook de update
       // reescribe el beneficiario completo, así que guardar borraría domicilio,
       // barrio, ciudad y género en silencio —y esos datos se copian al contrato
-      // madre en la activación, o sea que el adherente terminaría sin domicilio
-      // en el contrato definitivo—. Ciudad y género ni siquiera tienen input en
-      // el formulario: dependen 100% de este precargado.
+      // madre en la activación—.
       if (error || !ben) {
         toast.error(
-          'No se pudieron leer los datos del adherente. No se abre la edición para no borrar domicilio, barrio, ciudad ni género.',
+          'No se pudieron leer los datos de la persona. No se abre la edición para no borrar domicilio, barrio, ciudad ni género.',
         );
         return;
       }
 
-      row.gender = ben.gender || '';
-      row.address = ben.address || '';
-      row.barrio = ben.barrio || '';
-      row.city = ben.city || '';
-      row.immediate_coverage_ui =
-        ben.immediate_coverage === true ? 'si' : ben.immediate_coverage === false ? 'no' : '';
+      const b = ben as Record<string, any>;
+      row.gender = b.gender || '';
+      row.address = b.address || '';
+      row.barrio = b.barrio || '';
+      row.city = b.city || '';
+      row.plan_id = b.plan_id || row.plan_id;
+      row.vi = b.immediate_coverage === true ? 'si' : b.immediate_coverage === false ? 'no' : '';
     }
     setEditando({ id: inc.id, row });
   };
@@ -284,16 +331,25 @@ const SaleIncorporationsTab: React.FC<SaleIncorporationsTabProps> = ({ saleId, s
       return;
     }
 
-    const { immediate_coverage_ui, ...resto } = row;
     try {
       await actualizar.mutateAsync({
         id: editando.id,
         adherent: {
-          ...resto,
+          first_name: row.first_name,
+          last_name: row.last_name,
+          dni: row.dni,
+          relationship: row.relationship,
+          gender: row.gender,
+          phone: row.phone,
+          email: row.email,
+          address: row.address,
+          barrio: row.barrio,
+          city: row.city,
+          amount: row.amount,
           birth_date: row.birth_date || null,
           entry_date: row.entry_date || null,
-          immediate_coverage:
-            immediate_coverage_ui === 'si' ? true : immediate_coverage_ui === 'no' ? false : null,
+          immediate_coverage: row.vi === 'si' ? true : row.vi === 'no' ? false : null,
+          plan_id: row.plan_id || null,
         },
       });
       setEditando(null);
@@ -304,7 +360,7 @@ const SaleIncorporationsTab: React.FC<SaleIncorporationsTabProps> = ({ saleId, s
 
   // Cancelar una operación cancela TODAS sus personas: la venta-operación es
   // una sola y el anexo se firma completo o no se firma.
-  const handleCancelarOperacion = async (personas: Incorporacion[]) => {
+  const handleCancelarOperacion = async (personas: Movim[]) => {
     let canceladas = 0;
     try {
       for (const p of personas) {
@@ -324,11 +380,13 @@ const SaleIncorporationsTab: React.FC<SaleIncorporationsTabProps> = ({ saleId, s
     }
   };
 
-  // Una operación puede incorporar varias personas: se agrupan para mostrarlas juntas.
-  const porOperacion = incorporaciones.reduce((acc: Record<string, Incorporacion[]>, inc: Incorporacion) => {
+  // Una operación puede mover varias personas: se agrupan para mostrarlas juntas.
+  const porOperacion = movimientos.reduce((acc: Record<string, Movim[]>, inc: Movim) => {
     (acc[inc.operation_sale_id] ||= []).push(inc);
     return acc;
   }, {});
+
+  const creando = crear.isPending || darDeBaja.isPending;
 
   return (
     <div className="space-y-4">
@@ -336,13 +394,13 @@ const SaleIncorporationsTab: React.FC<SaleIncorporationsTabProps> = ({ saleId, s
         <div className="flex items-center gap-2">
           <UserPlus className="h-5 w-5" />
           <h3 className="text-lg font-semibold">
-            Incorporaciones ({Object.keys(porOperacion).length})
+            Movimientos ({Object.keys(porOperacion).length})
           </h3>
         </div>
         {habilitado && !showForm && (
           <Button type="button" size="sm" onClick={() => setShowForm(true)}>
             <Plus className="h-4 w-4 mr-1" />
-            Incorporar Adherente
+            Nuevo movimiento
           </Button>
         )}
       </div>
@@ -351,9 +409,9 @@ const SaleIncorporationsTab: React.FC<SaleIncorporationsTabProps> = ({ saleId, s
         <div className="flex items-start gap-2 rounded-md border border-dashed p-4 text-sm text-muted-foreground">
           <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
           <span>
-            La incorporación de adherentes está disponible una vez que el contrato está{' '}
-            <strong>firmado</strong>. Mientras tanto, agregá los adherentes desde la pestaña
-            "Adherentes".
+            Los movimientos de nómina están disponibles una vez que el contrato está{' '}
+            <strong>firmado</strong>. Mientras tanto, cargá o quitá personas desde la pestaña{' '}
+            "{isCompany ? 'Nómina' : 'Adherentes'}".
           </span>
         </div>
       )}
@@ -361,82 +419,246 @@ const SaleIncorporationsTab: React.FC<SaleIncorporationsTabProps> = ({ saleId, s
       {showForm && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Nueva Incorporación</CardTitle>
+            <CardTitle className="text-base">Nuevo movimiento</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Se genera un Anexo de Incorporación con estas personas. El contrato original no se
-              modifica: los adherentes se suman recién cuando el anexo queda firmado.
+              Se genera un anexo con este movimiento. El contrato original no se modifica:
+              se actualiza recién cuando el anexo queda firmado.
             </p>
           </CardHeader>
           <CardContent className="space-y-6">
-            {rows.map((row, i) => (
-              <div key={i} className="rounded-md border p-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Adherente {i + 1}</span>
-                  {rows.length > 1 && (
-                    <Button
-                      type="button" variant="ghost" size="sm"
-                      onClick={() => setRows((p) => p.filter((_, idx) => idx !== i))}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-                <AdherenteFields value={row} onChange={(patch) => updateRow(i, patch)} />
+            {/* Alta y baja usan el MISMO anexo y la misma serie: lo único que
+                cambia es qué hace la activación al firmarse. */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Tipo de movimiento *</Label>
+                <Select value={movimiento} onValueChange={(v) => setMovimiento(v as Movimiento)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="alta">Alta — incorporar</SelectItem>
+                    <SelectItem value="baja">Baja — desvincular</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            ))}
 
-            <div className="flex items-center justify-between">
-              <Button type="button" variant="outline" size="sm" onClick={() => setRows((p) => [...p, emptyRow()])}>
-                <Plus className="h-4 w-4 mr-1" />
-                Agregar otra persona
-              </Button>
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => { setShowForm(false); setRows([emptyRow()]); }}>
-                  Cancelar
-                </Button>
-                <Button type="button" onClick={handleCrear} disabled={crear.isPending}>
-                  {crear.isPending ? 'Creando...' : 'Crear Incorporación'}
-                </Button>
-              </div>
+              {movimiento === 'alta' && isCompany && (
+                <>
+                  <div className="space-y-2">
+                    <Label>¿Qué se incorpora? *</Label>
+                    <Select value={rolAlta} onValueChange={(v) => setRolAlta(v as 'empleado' | 'adherente')}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="empleado">Un empleado</SelectItem>
+                        <SelectItem value="adherente">Un adherente de un empleado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {rolAlta === 'adherente' && (
+                    <div className="space-y-2">
+                      <Label>Depende de *</Label>
+                      <Select value={empleadoDestino} onValueChange={setEmpleadoDestino}>
+                        <SelectTrigger><SelectValue placeholder="Elegir empleado" /></SelectTrigger>
+                        <SelectContent>
+                          {empleadosActivos.map((e) => (
+                            <SelectItem key={e.id} value={e.id}>
+                              {nombreDe(e)}{e.dni ? ` — C.I. ${e.dni}` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
+
+            {movimiento === 'alta' ? (
+              <>
+                {rows.map((row, i) => (
+                  <div key={i} className="rounded-md border p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">
+                        {isCompany && rolAlta === 'empleado' ? 'Empleado' : 'Adherente'} {i + 1}
+                      </span>
+                      {rows.length > 1 && (
+                        <Button
+                          type="button" variant="ghost" size="sm"
+                          onClick={() => setRows((p) => p.filter((_, idx) => idx !== i))}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    <BeneficiaryFields
+                      value={row}
+                      onChange={(patch) => updateRow(i, patch)}
+                      isCompany={isCompany}
+                      vinculoCon={isCompany && rolAlta === 'adherente' ? 'empleado' : 'titular'}
+                      plans={isCompany ? planOptions : undefined}
+                      hidden={['gender', 'city']}
+                    />
+                  </div>
+                ))}
+
+                <div className="flex items-center justify-between">
+                  <Button
+                    type="button" variant="outline" size="sm"
+                    onClick={() => setRows((p) => [...p, emptyPersonaFields()])}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Agregar otra persona
+                  </Button>
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" onClick={cerrarForm}>Cancelar</Button>
+                    <Button type="button" onClick={handleCrearAlta} disabled={creando}>
+                      {creando ? 'Creando...' : 'Crear alta'}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>¿A quién se da de baja? *</Label>
+                    <Select value={bajaTargetId} onValueChange={setBajaTargetId}>
+                      <SelectTrigger><SelectValue placeholder="Buscar por nombre o documento" /></SelectTrigger>
+                      <SelectContent>
+                        <div className="p-2">
+                          <Input
+                            placeholder="Nombre o C.I..."
+                            value={buscarPersona}
+                            onChange={(e) => setBuscarPersona(e.target.value)}
+                            className="mb-2"
+                          />
+                        </div>
+                        {personasFiltradas.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {nombreDe(p)}
+                            {p.dni ? ` — C.I. ${p.dni}` : ''}
+                            {p.member_role === 'empleado' ? ' (empleado)' : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {personasActivas.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Este contrato no tiene personas activas para dar de baja.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Fecha de baja *</Label>
+                    <Input type="date" value={bajaFecha} onChange={(e) => setBajaFecha(e.target.value)} />
+                    <p className="text-xs text-muted-foreground">
+                      Queda como fin de cobertura de quien sale.
+                    </p>
+                  </div>
+                </div>
+
+                {dependientesDeLaBaja.length > 0 && (
+                  <div className="flex items-start gap-3 rounded-md border p-4">
+                    <Switch checked={bajaCascada} onCheckedChange={setBajaCascada} className="mt-0.5" />
+                    <div className="space-y-1">
+                      <Label className="cursor-pointer">
+                        Dar de baja también a sus {dependientesDeLaBaja.length} adherente(s)
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        {dependientesDeLaBaja.map(nombreDe).join(', ')}
+                      </p>
+                      {!bajaCascada && (
+                        <p className="text-xs text-amber-600">
+                          Sin esto, sus adherentes siguen cubiertos y facturando aunque el
+                          empleado ya no esté en el contrato.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label>Motivo</Label>
+                  <Textarea
+                    value={bajaMotivo}
+                    onChange={(e) => setBajaMotivo(e.target.value)}
+                    placeholder="Ej: desvinculación laboral"
+                    rows={2}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    {personaElegida
+                      ? `La cuota del contrato baja ${formatCurrency(
+                          montoDe(personaElegida) +
+                            (bajaCascada
+                              ? dependientesDeLaBaja.reduce((s, d) => s + montoDe(d), 0)
+                              : 0),
+                        )} cuando se firme el anexo.`
+                      : ''}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" onClick={cerrarForm}>Cancelar</Button>
+                    <Button type="button" onClick={handleCrearBaja} disabled={creando}>
+                      {creando ? 'Creando...' : 'Crear baja'}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}
 
       {isLoading ? (
-        <div className="py-8 text-center text-muted-foreground">Cargando incorporaciones...</div>
+        <div className="py-8 text-center text-muted-foreground">Cargando movimientos...</div>
       ) : Object.keys(porOperacion).length === 0 ? (
         !showForm && (
           <div className="py-8 text-center text-muted-foreground">
-            Este contrato todavía no tiene incorporaciones.
+            Este contrato todavía no tiene movimientos de nómina.
           </div>
         )
       ) : (
         <div className="space-y-2">
           {Object.entries(porOperacion).map(([operationSaleId, personas]) => {
-            const op = (personas as Incorporacion[])[0]?.operation_sale;
-            const total = (personas as Incorporacion[]).reduce((s: number, p: Incorporacion) => s + (Number(p.adherent_amount) || 0), 0);
-            // Editar/cancelar según el estado de la VENTA-OPERACIÓN, no el de la
-            // incorporación: ese se queda en 'draft' hasta la activación, así que
+            const lista = personas as Movim[];
+            const op = lista[0]?.operation_sale;
+            const esBaja = lista.every((p) => p.movement_type === 'baja');
+            const total = lista.reduce((s, p) => s + (Number(p.adherent_amount) || 0), 0);
+            // Editar/cancelar según el estado de la VENTA-OPERACIÓN, no el del
+            // movimiento: ese se queda en 'draft' hasta la activación, así que
             // no distingue un anexo sin emitir de uno ya firmado.
             const estadoOp = op?.status as string | undefined;
             const sePuedeEditar =
-              (personas as Incorporacion[]).every((p) => p.status === EDITABLE) &&
+              !esBaja &&
+              lista.every((p) => p.status === EDITABLE) &&
               (!estadoOp || OP_EDITABLE.includes(estadoOp));
             const sePuedeCancelar =
-              (personas as Incorporacion[]).every((p) => p.status === EDITABLE) &&
+              lista.every((p) => p.status === EDITABLE) &&
               (!estadoOp || OP_CANCELABLE.includes(estadoOp));
+
             return (
               <Card key={operationSaleId}>
                 <CardContent className="space-y-3 py-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium">{op?.contract_number || 'Anexo'}</span>
+                        <Badge variant={esBaja ? 'destructive' : 'default'}>
+                          {esBaja ? (
+                            <><UserMinus className="h-3 w-3 mr-1" />Baja</>
+                          ) : (
+                            <><UserPlus className="h-3 w-3 mr-1" />Alta</>
+                          )}
+                        </Badge>
                         <Badge variant="outline">{op?.status || 'borrador'}</Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {(personas as Incorporacion[]).length} persona(s) · {formatCurrency(total)}
+                        {lista.length} persona(s) · {esBaja ? '−' : ''}{formatCurrency(total)}
+                        {esBaja && lista[0]?.termination_date
+                          ? ` · desde ${formatFechaCorta(lista[0].termination_date)}`
+                          : ''}
                       </p>
                     </div>
                     <div className="flex shrink-0 gap-2">
@@ -450,17 +672,18 @@ const SaleIncorporationsTab: React.FC<SaleIncorporationsTabProps> = ({ saleId, s
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>¿Cancelar la incorporación?</AlertDialogTitle>
+                              <AlertDialogTitle>
+                                ¿Cancelar {esBaja ? 'la baja' : 'la incorporación'}?
+                              </AlertDialogTitle>
                               <AlertDialogDescription>
-                                No se borra nada: la incorporación y su anexo quedan registrados
-                                como cancelados. Para incorporar a estas personas habrá que crear
-                                una nueva.
+                                No se borra nada: el movimiento y su anexo quedan registrados
+                                como cancelados. Para volver a hacerlo habrá que crear uno nuevo.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Volver</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleCancelarOperacion(personas as Incorporacion[])}>
-                                Cancelar incorporación
+                              <AlertDialogAction onClick={() => handleCancelarOperacion(lista)}>
+                                Cancelar movimiento
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
@@ -477,12 +700,15 @@ const SaleIncorporationsTab: React.FC<SaleIncorporationsTabProps> = ({ saleId, s
                   </div>
 
                   <div className="divide-y rounded-md border">
-                    {(personas as Incorporacion[]).map((p) => (
+                    {lista.map((p) => (
                       <div key={p.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
                         <span className="min-w-0 truncate">
                           {`${p.adherent_first_name || ''} ${p.adherent_last_name || ''}`.trim() || '(sin nombre)'}
                           <span className="text-muted-foreground">
                             {' · '}{formatCurrency(Number(p.adherent_amount) || 0)}
+                            {p.movement_type === 'baja' && p.cascade_dependents
+                              ? ' · incluye a sus adherentes'
+                              : ''}
                           </span>
                         </span>
                         {sePuedeEditar && (
@@ -504,19 +730,24 @@ const SaleIncorporationsTab: React.FC<SaleIncorporationsTabProps> = ({ saleId, s
         </div>
       )}
 
-      {/* Corrección de un adherente todavía en borrador (típicamente un tipeo
-          detectado antes de enviar el anexo a firmar). */}
+      {/* Corrección de un alta todavía en borrador (típicamente un tipeo
+          detectado antes de enviar el anexo a firmar). Una baja no se edita: sus
+          datos son un snapshot de alguien que ya está en el contrato; si están
+          mal, se cancela y se crea otra. */}
       <Dialog open={!!editando} onOpenChange={(open) => !open && setEditando(null)}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Editar adherente</DialogTitle>
+            <DialogTitle>Editar persona</DialogTitle>
           </DialogHeader>
           {editando && (
-            <AdherenteFields
+            <BeneficiaryFields
               value={editando.row}
               onChange={(patch) =>
                 setEditando((prev) => (prev ? { ...prev, row: { ...prev.row, ...patch } } : prev))
               }
+              isCompany={isCompany}
+              plans={isCompany ? planOptions : undefined}
+              hidden={['gender', 'city']}
             />
           )}
           <DialogFooter>

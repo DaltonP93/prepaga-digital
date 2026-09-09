@@ -42,9 +42,21 @@ interface SaleBasicTabProps {
   onChange: (field: string, value: any) => void;
   companyId?: string;
   errors?: Record<string, string>;
+  /**
+   * Tipo de contratante elegido en el selector de arriba.
+   *
+   * No es una columna de `sales`: la fuente de verdad sigue siendo
+   * `clients.client_type`. Vive como estado del formulario porque hace falta
+   * ANTES de elegir el cliente, para filtrar la lista y para saber qué campos
+   * pedir. Al abrir una venta existente se deriva del cliente que ya tiene.
+   */
+  contractorType: 'persona' | 'empresa';
+  onContractorTypeChange: (value: 'persona' | 'empresa') => void;
 }
 
-const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, companyId, errors }) => {
+const SaleBasicTab: React.FC<SaleBasicTabProps> = ({
+  formData, onChange, companyId, errors, contractorType, onContractorTypeChange,
+}) => {
   const { data: clients } = useClients();
   const { data: plans } = usePlans();
   const { settings } = useCurrencySettings();
@@ -57,8 +69,22 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
   const decimalSeparator = settings?.decimal_separator || ',';
   const decimalPlaces = settings?.decimal_places ?? 0;
 
-  const titularEsEmpresa = isCompanyClient(
-    clients?.find((c: any) => c.id === formData.client_id),
+  const clienteElegido = clients?.find((c: any) => c.id === formData.client_id);
+
+  // El selector manda mientras no haya cliente elegido; una vez elegido, manda
+  // el cliente (es la fuente de verdad y puede no coincidir con el selector si
+  // alguien lo cambió a mano).
+  const titularEsEmpresa = clienteElegido
+    ? isCompanyClient(clienteElegido)
+    : contractorType === 'empresa';
+
+  // Sólo se ofrecen clientes del tipo elegido: mezclarlos era la principal
+  // forma de terminar con una venta de empresa apuntando a una persona.
+  const clientesDelTipo = useMemo(
+    () => (clients || []).filter((c: any) =>
+      isCompanyClient(c) === (contractorType === 'empresa'),
+    ),
+    [clients, contractorType],
   );
 
   // Auto-set company from logged-in user (always)
@@ -78,6 +104,20 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
     }
   }, [titularEsEmpresa, formData.employee_signature_mode]);
 
+  // Cambiar el tipo de contratante deja sin efecto al cliente ya elegido si es
+  // del otro tipo. Sin esto quedaba una venta marcada como Empresa apuntando a
+  // una persona física: el selector filtraba pero el `client_id` viejo seguía
+  // guardado, y el resto del formulario decidía por el cliente, no por el
+  // selector. Se exige que la lista ya haya cargado para no borrar la selección
+  // mientras el query está en vuelo.
+  useEffect(() => {
+    if (!formData.client_id || !clients?.length) return;
+    const actual = clients.find((c: any) => c.id === formData.client_id);
+    if (actual && isCompanyClient(actual) !== (contractorType === 'empresa')) {
+      onChange('client_id', '');
+    }
+  }, [contractorType, clients, formData.client_id]);
+
   // Auto-select newly created client when modal closes
   useEffect(() => {
     if (prevClientCount !== null && clients && clients.length > prevClientCount) {
@@ -90,12 +130,12 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
   }, [clients, prevClientCount, onChange]);
 
   const filteredClients = useMemo(() => (
-    clients?.filter(client =>
+    clientesDelTipo.filter(client =>
       getClientDisplayName(client).toLowerCase().includes(searchClient.toLowerCase()) ||
       getClientDocument(client).toLowerCase().includes(searchClient.toLowerCase()) ||
       client.email?.toLowerCase().includes(searchClient.toLowerCase())
-    ) || []
-  ), [clients, searchClient]);
+    )
+  ), [clientesDelTipo, searchClient]);
 
   const filteredPlans = useMemo(() => (
     plans?.filter(plan =>
@@ -131,6 +171,33 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
 
   return (
     <div className="space-y-6">
+      {/* Tipo de contratante.
+          No es una columna de `sales`: la fuente de verdad es
+          `clients.client_type`. Está acá arriba porque decide qué clientes se
+          ofrecen y qué campos pide el resto del formulario, y eso hay que
+          saberlo ANTES de elegir el cliente. */}
+      <div className="space-y-2">
+        <Label>Tipo de contratante *</Label>
+        <Select
+          value={contractorType}
+          onValueChange={(v) => onContractorTypeChange(v as 'persona' | 'empresa')}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="persona">Persona física</SelectItem>
+            <SelectItem value="empresa">Empresa</SelectItem>
+          </SelectContent>
+        </Select>
+        {contractorType === 'empresa' && (
+          <p className="text-xs text-muted-foreground">
+            El contrato lo firma la empresa. Los empleados, con su plan y sus adherentes,
+            se cargan en la pestaña <strong>Nómina</strong>.
+          </p>
+        )}
+      </div>
+
       {/* Client Selection */}
       <div className="space-y-2">
         <Label>Cliente *</Label>
@@ -170,9 +237,13 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
         </div>
       </div>
 
-      {/* Plan Selection */}
+      {/* Plan Selection.
+          En un contrato de empresa el plan de la venta NO es el que se factura
+          —cada empleado tiene el suyo— pero se sigue pidiendo: es el que se
+          precarga en la nómina, el que hereda cada venta-operación de anexo y el
+          que usa la resolución de reglas de comisiones. */}
       <div className="space-y-2">
-        <Label>Plan *</Label>
+        <Label>{titularEsEmpresa ? 'Plan de referencia *' : 'Plan *'}</Label>
         <Select value={formData.plan_id} onValueChange={(v) => onChange('plan_id', v)}>
           <SelectTrigger>
             <SelectValue placeholder="Seleccionar plan" />
@@ -193,6 +264,11 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
             ))}
           </SelectContent>
         </Select>
+        {titularEsEmpresa && (
+          <p className="text-xs text-muted-foreground">
+            Precarga el plan de cada empleado nuevo. Cada uno puede tener el suyo.
+          </p>
+        )}
       </div>
 
       {/* Requires Adherents */}
@@ -296,26 +372,41 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
         )}
       </div>
 
-      {/* Total Amount */}
-      <div className="space-y-2">
-        <Label htmlFor="titular_amount">Monto Titular / Plan (Gs.) *</Label>
-        <Input
-          id="titular_amount"
-          inputMode="decimal"
-          value={formatAmountInput(Number(formData.titular_amount) || 0)}
-          onChange={(e) => onChange('titular_amount', parseAmountInput(e.target.value))}
-          placeholder="0"
-          aria-invalid={(Number(formData.titular_amount) || 0) <= 0 || !!errors?.basico}
-          className={
-            (Number(formData.titular_amount) || 0) <= 0
-              ? 'border-red-500 focus-visible:ring-red-500'
-              : ''
-          }
-        />
-        {(Number(formData.titular_amount) || 0) <= 0 && (
-          <p className="text-sm text-red-500">El monto debe ser mayor a 0</p>
-        )}
-      </div>
+      {/* Total Amount.
+          En un contrato de empresa no hay "monto del titular": la empresa no es
+          beneficiaria de sí misma. El total sale de la suma de la nómina y lo
+          calcula la base (trigger trg_recalculate_sale_total sobre
+          beneficiaries). Mostrar el campo pidiendo un monto > 0 obligaba a
+          inventar un número que después quedaba sumado de más. */}
+      {titularEsEmpresa ? (
+        <div className="space-y-2">
+          <Label>Cuota mensual del contrato</Label>
+          <p className="text-sm text-muted-foreground">
+            Se calcula sola: es la suma de los empleados y sus adherentes activos,
+            que se cargan en la pestaña <strong>Nómina</strong>.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <Label htmlFor="titular_amount">Monto Titular / Plan (Gs.) *</Label>
+          <Input
+            id="titular_amount"
+            inputMode="decimal"
+            value={formatAmountInput(Number(formData.titular_amount) || 0)}
+            onChange={(e) => onChange('titular_amount', parseAmountInput(e.target.value))}
+            placeholder="0"
+            aria-invalid={(Number(formData.titular_amount) || 0) <= 0 || !!errors?.basico}
+            className={
+              (Number(formData.titular_amount) || 0) <= 0
+                ? 'border-red-500 focus-visible:ring-red-500'
+                : ''
+            }
+          />
+          {(Number(formData.titular_amount) || 0) <= 0 && (
+            <p className="text-sm text-red-500">El monto debe ser mayor a 0</p>
+          )}
+        </div>
+      )}
 
       {/* Signer Selection */}
       <div className="space-y-4 border border-border/70 rounded-xl p-4 sm:p-5 bg-muted/20">
@@ -444,6 +535,7 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({ formData, onChange, company
       <ClientForm
         open={showClientModal}
         onOpenChange={setShowClientModal}
+        defaultClientType={contractorType}
       />
     </div>
   );

@@ -18,9 +18,11 @@ import type { SaleStatus } from '@/types/workflow';
 import { toast } from 'sonner';
 import { isSaleLocked, isPrivilegedRole } from '@/lib/saleUtils';
 import { resolvePlanFieldsTemplateName } from '@/lib/saleFilters';
+import { useClientIsCompany } from '@/hooks/useSaleClientType';
 import { ChangeStatusModal } from './ChangeStatusModal';
 import SaleBasicTab from './SaleBasicTab';
 import SaleAdherentsTab from './SaleAdherentsTab';
+import SaleEmployeesTab from './SaleEmployeesTab';
 import SaleDocumentsTab from './SaleDocumentsTab';
 import SaleDDJJTab from './SaleDDJJTab';
 import SaleTemplatesTab from './SaleTemplatesTab';
@@ -112,6 +114,27 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
     // Clear tab errors when user makes changes
     setTabErrors({});
   };
+
+  // ── Persona física o empresa ─────────────────────────────────────────────
+  // La fuente de verdad es `clients.client_type`; este estado sólo cubre el
+  // hueco en que todavía no hay cliente elegido (una venta nueva), porque el
+  // formulario necesita saberlo ANTES para filtrar la lista y decidir qué pedir.
+  const { isCompany: clienteEsEmpresa } = useClientIsCompany(formData.client_id);
+  const [contractorType, setContractorType] = useState<'persona' | 'empresa'>(
+    (sale as any)?.clients?.client_type === 'empresa' ? 'empresa' : 'persona',
+  );
+
+  // Al abrir una venta existente, el cliente manda: si es una empresa, el
+  // formulario tiene que mostrarse como tal aunque el estado local arrancara en
+  // 'persona' (el embed del cliente llega después del primer render).
+  React.useEffect(() => {
+    if (!clienteEsEmpresa) return;
+    // Setter funcional: así el efecto no depende de `contractorType` y no puede
+    // quedarse con un valor viejo en la clausura.
+    setContractorType((prev) => (prev === 'empresa' ? prev : 'empresa'));
+  }, [clienteEsEmpresa]);
+
+  const isCompanySale = contractorType === 'empresa' || clienteEsEmpresa;
 
   // ── Campos personalizados del plan ───────────────────────────────────────
   // Dos caminos para habilitar la pestaña "Campos del Plan":
@@ -207,7 +230,10 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
   const validateBasicTab = (): string | null => {
     if (!formData.client_id) return 'Debe seleccionar un cliente';
     if (!formData.plan_id) return 'Debe seleccionar un plan';
-    if (!formData.titular_amount || Number(formData.titular_amount) <= 0) {
+    // En un contrato de empresa no hay monto del titular: la empresa no es
+    // beneficiaria de sí misma y el total lo arma la nómina. Exigirlo obligaba
+    // a inventar un número que después quedaba sumado de más.
+    if (!isCompanySale && (!formData.titular_amount || Number(formData.titular_amount) <= 0)) {
       return 'El Monto Titular / Plan debe ser mayor a 0';
     }
     return null;
@@ -248,7 +274,9 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           client_id: formData.client_id,
           plan_id: formData.plan_id,
           company_id: formData.company_id,
-          titular_amount: formData.titular_amount,
+          // Contrato de empresa: el titular no aporta monto propio, todo sale de
+          // la nómina. Ver validateBasicTab.
+          titular_amount: isCompanySale ? 0 : formData.titular_amount,
           notes: formData.notes,
           requires_adherents: formData.requires_adherents,
           signer_type: formData.signer_type,
@@ -281,8 +309,8 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           client_id: formData.client_id,
           plan_id: formData.plan_id,
           company_id: formData.company_id,
-          total_amount: formData.titular_amount,
-          titular_amount: formData.titular_amount,
+          total_amount: isCompanySale ? 0 : formData.titular_amount,
+          titular_amount: isCompanySale ? 0 : formData.titular_amount,
           notes: formData.notes,
           requires_adherents: formData.requires_adherents,
           salesperson_id: profile?.id,
@@ -359,7 +387,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                     client_id: formData.client_id,
                     plan_id: formData.plan_id,
                     company_id: formData.company_id,
-                    titular_amount: formData.titular_amount,
+                    titular_amount: isCompanySale ? 0 : formData.titular_amount,
                     notes: formData.notes,
                     requires_adherents: formData.requires_adherents,
                     status: 'pendiente' as any,
@@ -369,18 +397,13 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                     billing_phone: formData.billing_phone || null,
                     contract_start_date: formData.contract_start_date || null,
                   } as any);
-                  // Recalculate total_amount = titular_amount + sum(adherentes) after save
-                  const { data: adherentesAudit } = await supabase
-                    .from('beneficiaries')
-                    .select('amount, is_primary')
-                    .eq('sale_id', sale.id);
-                  const adherentesSumAudit = (adherentesAudit || [])
-                    .filter((b: any) => !b.is_primary)
-                    .reduce((sum: number, b: any) => sum + (Number(b.amount) || 0), 0);
-                  await supabase
-                    .from('sales')
-                    .update({ total_amount: formData.titular_amount + adherentesSumAudit })
-                    .eq('id', sale.id);
+                  // El total lo calcula EXCLUSIVAMENTE la base (migración
+                  // 20260818000001). Acá había una quinta fórmula propia
+                  // —`titular_amount + Σ(no primarios)`— que además de repetir
+                  // el bug #10 sumaba a los dados de baja y no contemplaba la
+                  // nómina de un contrato de empresa: el total quedaba mal justo
+                  // al enviar a auditoría.
+                  await supabase.rpc('recalculate_sale_total_amount', { p_sale_id: sale.id });
                   // Auxiliary workflow tracking is best-effort because production RLS may block direct inserts.
                   const { error: workflowError } = await supabase.from('sale_workflow_states').insert({
                     sale_id: sale.id,
@@ -544,7 +567,13 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList className="grid w-full grid-cols-2 gap-1.5 h-auto sm:h-11 sm:grid-cols-4 lg:grid-cols-9">
               <TabsTrigger value="basico">Básico</TabsTrigger>
-              <TabsTrigger value="adherentes" disabled={!isEditing}>Adherentes</TabsTrigger>
+              {/* Mismo `value` para las dos: es la misma ranura del formulario y
+                  así no hay que tocar `tabOrder` ni los enlaces existentes. Lo
+                  que cambia es qué se carga ahí — una nómina de empleados con
+                  plan propio, o la lista de adherentes de siempre. */}
+              <TabsTrigger value="adherentes" disabled={!isEditing}>
+                {isCompanySale ? 'Nómina' : 'Adherentes'}
+              </TabsTrigger>
               <TabsTrigger value="documentos" disabled={!isEditing}>Documentos</TabsTrigger>
               <TabsTrigger value="ddjj" disabled={!isEditing}>DDJJ Salud</TabsTrigger>
               {hasPlanFields && (
@@ -558,7 +587,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
               <TabsTrigger value="templates" disabled={!isEditing}>Templates</TabsTrigger>
               {/* Solo tiene sentido incorporar adherentes a un contrato ya firmado. */}
               {isEditing && (currentStatus === 'firmado' || currentStatus === 'completado') && (
-                <TabsTrigger value="incorporaciones">Incorporaciones</TabsTrigger>
+                <TabsTrigger value="incorporaciones">Movimientos</TabsTrigger>
               )}
               {/* Mismo criterio que incorporaciones: solo se cambia el plan de
                   un contrato ya firmado. */}
@@ -579,12 +608,22 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                     onChange={handleChange}
                     companyId={profile?.company_id || undefined}
                     errors={tabErrors}
+                    contractorType={contractorType}
+                    onContractorTypeChange={setContractorType}
                   />
                 </fieldset>
               </TabsContent>
 
               <TabsContent value="adherentes">
-                <SaleAdherentsTab saleId={sale?.id} disabled={isAuditLocked} />
+                {isCompanySale ? (
+                  <SaleEmployeesTab
+                    saleId={sale?.id}
+                    disabled={isAuditLocked}
+                    defaultPlanId={formData.plan_id}
+                  />
+                ) : (
+                  <SaleAdherentsTab saleId={sale?.id} disabled={isAuditLocked} />
+                )}
               </TabsContent>
 
               <TabsContent value="documentos">

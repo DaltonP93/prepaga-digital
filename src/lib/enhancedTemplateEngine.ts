@@ -4,6 +4,7 @@ import { es } from 'date-fns/locale';
 import { formatCurrency as formatPygCurrency } from '@/lib/utils';
 import { getSignatureLinkUrl } from '@/lib/appUrls';
 import { getClientDisplayName, getClientDocument, getClientDocumentLabel, isCompanyClient } from '@/lib/clientUtils';
+import { agruparNomina, aplanarNomina, estaActivo, tieneNomina } from '@/lib/nomina';
 
 /**
  * Convert a number to words in Spanish (Guaranies)
@@ -95,6 +96,29 @@ export interface BeneficiaryContext {
    * cálculo de la V.I. efectiva es `b.immediateCoverage ?? sale.immediate_coverage`.
    */
   immediateCoverage: boolean | null;
+  /**
+   * NÓMINA de un contrato de empresa. Vacíos en una venta a persona física, así
+   * que las plantillas de siempre no cambian.
+   *
+   * `rol`        → "Empleado" | "Adherente"
+   * `dependeDe`  → nombre del empleado del que depende; vacío en la fila del
+   *                propio empleado
+   * `plan`       → plan de ESTA persona (en una empresa cada uno tiene el suyo)
+   */
+  rol: string;
+  dependeDe: string;
+  plan: string;
+}
+
+/**
+ * Un EMPLEADO con su grupo, para el loop `{{#empleados}}` del contrato de
+ * empresa.
+ */
+export interface EmpleadoContext extends BeneficiaryContext {
+  adherentes: BeneficiaryContext[];
+  cantidadAdherentes: number;
+  subtotal: number;
+  subtotalFormateado: string;
 }
 
 /** Una fila de la tabla de INTEGRANTES del Formulario de Solicitud de Cambio. */
@@ -181,6 +205,10 @@ export interface EnhancedTemplateContext {
     fechaInicioContratoFormateada: string;
     vigenciaInmediata: string;
     tipoVenta: string;
+    /** "ALTA" | "BAJA" | "" — sólo en un anexo de movimiento de nómina. */
+    movimiento: string;
+    /** Fecha de baja, dd/MM/yyyy. Vacía en un alta. */
+    movimientoFecha: string;
   };
   facturacion: {
     razonSocial: string;
@@ -203,6 +231,12 @@ export interface EnhancedTemplateContext {
     dia: string;
   };
   beneficiarios: BeneficiaryContext[];
+  /**
+   * NÓMINA de un contrato de empresa: los empleados ACTIVOS con su grupo.
+   * Vacío en una venta a persona física, así que el loop `{{#empleados}}` no
+   * imprime nada y las plantillas de siempre no cambian.
+   */
+  empleados: EmpleadoContext[];
   /**
    * Subconjunto de `beneficiarios` cuya VIGENCIA INMEDIATA EFECTIVA es true
    * (`beneficiario.immediate_coverage ?? venta.immediate_coverage`).
@@ -330,7 +364,14 @@ function normalizeContractHeaderHtml(html: string): string {
 /**
  * Create beneficiary context from database record
  */
-function createBeneficiaryContext(beneficiary: any): BeneficiaryContext {
+/**
+ * @param opts.planName  nombre del plan de ESTA persona (contratos de empresa)
+ * @param opts.dependeDe nombre del empleado del que depende
+ */
+function createBeneficiaryContext(
+  beneficiary: any,
+  opts?: { planName?: string; dependeDe?: string },
+): BeneficiaryContext {
   return {
     nombre: beneficiary.first_name || '',
     apellido: beneficiary.last_name || '',
@@ -372,6 +413,13 @@ function createBeneficiaryContext(beneficiary: any): BeneficiaryContext {
       beneficiary.immediate_coverage === true ? true
       : beneficiary.immediate_coverage === false ? false
       : null,
+    // Nómina de empresa. En una venta a persona física `member_role` no existe
+    // (o es 'adherente' por default) y los tres quedan vacíos.
+    rol: beneficiary.member_role === 'empleado' ? 'Empleado'
+      : beneficiary.member_role === 'adherente' ? 'Adherente'
+      : '',
+    dependeDe: opts?.dependeDe || '',
+    plan: opts?.planName || '',
   };
 }
 
@@ -398,9 +446,18 @@ export function createEnhancedTemplateContext(
   beneficiaries: any[] = [],
   signatureLink?: any,
   responses?: Record<string, any>,
-  companySettings?: any
+  companySettings?: any,
+  /**
+   * Catálogo de planes, para poder imprimir el plan de CADA persona en un
+   * contrato de empresa. Va al final y es opcional a propósito: así los 6 call
+   * sites que ya existen siguen compilando y comportándose igual sin tocarlos.
+   */
+  plans?: any[]
 ): EnhancedTemplateContext {
   const now = new Date();
+  const nombrePlanPorId = new Map<string, string>(
+    (plans || []).map((p: any) => [p.id, p.name]),
+  );
   
   // Create beneficiary contexts (always include titular first for contract tables)
   const normalizedBeneficiaries = Array.isArray(beneficiaries) ? beneficiaries : [];
@@ -419,7 +476,16 @@ export function createEnhancedTemplateContext(
   // se sigue anteponiendo el titular, como siempre.
   const esIncorporacionDeAdherente = (sale as any)?.sale_type === 'alta_adherente';
 
-  const titularFallback = !hasPrimaryBeneficiary && client && !esIncorporacionDeAdherente
+  // Un contrato de EMPRESA tampoco lleva fila de titular: la razón social no es
+  // beneficiaria de sí misma, no tiene edad ni parentesco, y su `titular_amount`
+  // es 0 —así que `effectiveTitularAmount` caía al fallback `sale.total_amount`
+  // e imprimía a la empresa cobrando la cuota entera del grupo, duplicada
+  // encima de la nómina—. Los beneficiarios de una venta de empresa son sus
+  // empleados y los adherentes de ellos.
+  const esContratoDeEmpresa = isCompanyClient(client);
+
+  const titularFallback =
+    !hasPrimaryBeneficiary && client && !esIncorporacionDeAdherente && !esContratoDeEmpresa
     ? {
         first_name: client?.first_name || '',
         last_name: client?.last_name || '',
@@ -445,19 +511,56 @@ export function createEnhancedTemplateContext(
     ? [titularFallback, ...normalizedBeneficiaries]
     : normalizedBeneficiaries;
 
+  // NÓMINA: cada empleado con los adherentes a su cargo. Se arma con el MISMO
+  // agrupador que usa la pantalla (`src/lib/nomina.ts`), para que lo que se ve
+  // al cargar y lo que sale impreso no puedan discrepar.
+  const nomina = agruparNomina(normalizedBeneficiaries as any[]);
+  const nombreDeMiembro = (b: any) =>
+    `${b?.first_name || ''} ${b?.last_name || ''}`.trim();
+  const planDeMiembro = (b: any) =>
+    (b?.plan_id && nombrePlanPorId.get(b.plan_id)) || '';
+
+  const contextoDe = (b: any, dependeDe?: string) =>
+    createBeneficiaryContext(b, { planName: planDeMiembro(b), dependeDe });
+
+  const empleados: EmpleadoContext[] = nomina.empleados
+    .filter((g) => estaActivo(g.empleado))
+    .map((g) => {
+      const adherentesActivos = g.adherentes.filter(estaActivo);
+      return {
+        ...contextoDe(g.empleado),
+        adherentes: adherentesActivos.map((a) => contextoDe(a, nombreDeMiembro(g.empleado))),
+        cantidadAdherentes: adherentesActivos.length,
+        subtotal: g.subtotal,
+        subtotalFormateado: formatCurrency(g.subtotal),
+      };
+    });
+
   const beneficiaryContexts = mergedBeneficiaries.map((b) => {
     // Titular: always use calculated share (total - adherent sum) for accuracy
     if (b.is_primary || b.relationship?.toLowerCase() === 'titular') {
       return createBeneficiaryContext({ ...b, amount: effectiveTitularAmount });
     }
-    return createBeneficiaryContext(b);
+    // El empleado del que depende sólo existe en un contrato de empresa.
+    const padre = b.parent_beneficiary_id
+      ? normalizedBeneficiaries.find((x: any) => x?.id === b.parent_beneficiary_id)
+      : null;
+    return contextoDe(b, padre ? nombreDeMiembro(padre) : undefined);
   });
-  const sortedBeneficiaryContexts = [...beneficiaryContexts].sort((a, b) => {
-    const aIsPrimary = (a.parentesco || '').toLowerCase() === 'titular';
-    const bIsPrimary = (b.parentesco || '').toLowerCase() === 'titular';
-    if (aIsPrimary === bIsPrimary) return 0;
-    return aIsPrimary ? -1 : 1;
-  });
+
+  const sortedBeneficiaryContexts = tieneNomina(normalizedBeneficiaries as any[])
+    // Con nómina, el orden ES la información: cada empleado seguido de su
+    // grupo. Ordenar por "titular primero" dejaría la tabla ilegible.
+    ? aplanarNomina(nomina).map((m) => {
+        const idx = mergedBeneficiaries.findIndex((b: any) => b?.id === (m as any).id);
+        return idx >= 0 ? beneficiaryContexts[idx] : contextoDe(m);
+      })
+    : [...beneficiaryContexts].sort((a, b) => {
+        const aIsPrimary = (a.parentesco || '').toLowerCase() === 'titular';
+        const bIsPrimary = (b.parentesco || '').toLowerCase() === 'titular';
+        if (aIsPrimary === bIsPrimary) return 0;
+        return aIsPrimary ? -1 : 1;
+      });
 
   const primaryBeneficiary = sortedBeneficiaryContexts.find((b) => (b.parentesco || '').toLowerCase() === 'titular')
     || sortedBeneficiaryContexts[0]
@@ -582,6 +685,16 @@ export function createEnhancedTemplateContext(
       fechaInicioContratoFormateada: sale?.contract_start_date ? formatDate(sale.contract_start_date, "d 'de' MMMM 'de' yyyy") : '',
       vigenciaInmediata: sale?.immediate_coverage ? 'Sí' : 'No',
       tipoVenta: sale?.sale_type === 'reingreso' ? 'Reingreso' : 'Venta Nueva',
+      // Movimiento de nómina, adosado por `attachGroupMonthlyTotal`. Vacío en
+      // cualquier venta que no sea un anexo, así que `{{movimiento}}` no ensucia
+      // ninguna plantilla existente.
+      movimiento:
+        (sale as any)?.movimiento_nomina === 'baja' ? 'BAJA'
+        : (sale as any)?.movimiento_nomina === 'alta' ? 'ALTA'
+        : '',
+      movimientoFecha: (sale as any)?.movimiento_fecha
+        ? formatDate((sale as any).movimiento_fecha, 'dd/MM/yyyy')
+        : '',
     },
     facturacion: {
       razonSocial: sale?.billing_razon_social || '',
@@ -611,6 +724,7 @@ export function createEnhancedTemplateContext(
       dia: formatDate(now, 'd'),
     },
     beneficiarios: sortedBeneficiaryContexts,
+    empleados,
     beneficiariosVigenciaInmediata,
     beneficiarioPrincipal: primaryBeneficiary,
     cambio: cambioContext,
@@ -686,7 +800,10 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
   // (vigencia_inmediata_adherente antes que vigencia_inmediata).
   // OJO: `address` estaba en los alias pero NO acá, así que una fila que solo
   // usara {{address}} no auto-expandía. Corregido.
-  const beneficiaryPlaceholderNames = 'first_name|last_name|_index|index|indice|birth_date|dni|ci|gender|amount|relationship|edad|titular\\.edad|age|formatted_amount|email|phone|document_number|vigencia_inmediata_adherente|vigencia_inmediata|tipo_venta|venta\\.vigenciaInmediata|venta\\.tipoVenta|nombre|apellido|nombreCompleto|fechaNacimiento|genero|parentesco|montoFormateado|monto|ocupacion|estadoCivil|barrio|address|telefono|direccion|domicilio|fecha_ingreso|fechaIngreso';
+  // `plan_nombre` y `depende_de` van ANTES que sus prefijos por la misma razón
+  // que `vigencia_inmediata_adherente`: el patrón está anclado, pero mantener el
+  // orden hace obvio cuál gana si algún día se desancla.
+  const beneficiaryPlaceholderNames = 'first_name|last_name|_index|index|indice|birth_date|dni|ci|gender|amount|relationship|edad|titular\\.edad|age|formatted_amount|email|phone|document_number|vigencia_inmediata_adherente|vigencia_inmediata|tipo_venta|venta\\.vigenciaInmediata|venta\\.tipoVenta|nombre|apellido|nombreCompleto|fechaNacimiento|genero|parentesco|montoFormateado|monto|ocupacion|estadoCivil|barrio|address|telefono|direccion|domicilio|fecha_ingreso|fechaIngreso|plan_nombre|plan_persona|depende_de|dependeDe|rol';
 
   const buildBenAliases = (beneficiary: BeneficiaryContext, index: number): Record<string, string> => ({
     '{{first_name}}': beneficiary.nombre,
@@ -736,6 +853,14 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     '{{tipo_venta}}': context.venta.tipoVenta,
     '{{venta.vigenciaInmediata}}': context.venta.vigenciaInmediata,
     '{{venta.tipoVenta}}': context.venta.tipoVenta,
+    // Nómina de empresa. En una venta a persona física los tres son cadena
+    // vacía, así que una plantilla que los use no rompe: sólo deja la celda en
+    // blanco.
+    '{{plan_nombre}}': beneficiary.plan,
+    '{{plan_persona}}': beneficiary.plan,
+    '{{depende_de}}': beneficiary.dependeDe,
+    '{{dependeDe}}': beneficiary.dependeDe,
+    '{{rol}}': beneficiary.rol,
   });
 
   const applyBenAliases = (text: string, aliases: Record<string, string>): string => {
@@ -781,6 +906,51 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     }
     beneficiaryLoopHadContent = true;
     return renderBeneficiaryLoop(content, context.beneficiarios);
+  });
+
+  // {{#empleados}}...{{/empleados}}: NÓMINA de un contrato de empresa, con un
+  // sub-loop {{#sus_adherentes}} por empleado.
+  //
+  // POR QUÉ UN LOOP APARTE Y NO {{#beneficiarios}}
+  // Ese loop es PLANO: no sabe agrupar, así que no puede imprimir un subtotal
+  // por empleado ni anidar a su grupo debajo. La nómina completa igual se puede
+  // imprimir con {{#beneficiarios}} usando las columnas {{rol}} y
+  // {{depende_de}} — este loop es para cuando el documento necesita el corte
+  // por empleado.
+  //
+  // El sub-loop se resuelve PRIMERO, con `renderBeneficiaryLoop`, y recién
+  // después se aplican los alias del empleado sobre el resto de la fila: al
+  // revés, los `{{nombreCompleto}}` de los adherentes se reemplazarían todos
+  // por el del empleado.
+  const empleadosLoopRegex = /\{\{#empleados\}\}([\s\S]*?)\{\{\/empleados\}\}/gi;
+  const susAdherentesLoopRegex = /\{\{#sus_adherentes\}\}([\s\S]*?)\{\{\/sus_adherentes\}\}/gi;
+  result = result.replace(empleadosLoopRegex, (_, content) => {
+    const trimmedContent = content.replace(/<[^>]*>/g, '').trim();
+    if (!trimmedContent) return '';
+    // La nómina ya se imprimió acá: la auto-expansión de <tr> no debe volver a
+    // repetir las filas.
+    beneficiaryLoopMatched = true;
+    beneficiaryLoopHadContent = true;
+
+    return context.empleados
+      .map((empleado, index) => {
+        let itemResult = String(content).replace(
+          susAdherentesLoopRegex,
+          (__: string, subContent: string) =>
+            renderBeneficiaryLoop(subContent, empleado.adherentes),
+        );
+
+        itemResult = applyBenAliases(itemResult, {
+          ...buildBenAliases(empleado, index),
+          '{{cantidadAdherentes}}': String(empleado.cantidadAdherentes),
+          '{{cantidad_adherentes}}': String(empleado.cantidadAdherentes),
+          '{{subtotal}}': String(empleado.subtotal),
+          '{{subtotalFormateado}}': empleado.subtotalFormateado,
+          '{{subtotal_formateado}}': empleado.subtotalFormateado,
+        });
+        return itemResult;
+      })
+      .join('');
   });
 
   // {{#beneficiarios_vi}}...{{/beneficiarios_vi}}: Anexo Especial de Vigencia
@@ -933,6 +1103,13 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     '{{titular_email}}': context.contratante.email,
     '{{titular_telefono}}': context.contratante.telefono,
     '{{titular_ci}}': context.contratante.ci,
+    // Documento del contratante CON su etiqueta: en una empresa es "RUC", no
+    // "C.I.". `{{titular_ci}}` ya traía el valor correcto (getClientDocument
+    // devuelve el RUC para una empresa), pero las plantillas rotulaban "C. I.
+    // Nº" a mano y quedaba mal en un contrato corporativo. La rama del
+    // responsable de pago siempre es una persona, de ahí el default.
+    '{{titular_documento}}': context.contratante.ci,
+    '{{titular_documento_label}}': (context.contratante as any).documentoLabel || 'C.I.',
     '{{titular_dni}}': context.contratante.ci,
     '{{titular_direccion}}': context.cliente.direccion,
     '{{titular_ciudad}}': context.cliente.ciudad,
@@ -956,6 +1133,10 @@ export function interpolateEnhancedTemplate(template: string, context: EnhancedT
     '{{vendedor_nombre}}': context.venta.vendedor,
     '{{vigencia_inmediata}}': context.venta.vigenciaInmediata,
     '{{tipo_venta}}': context.venta.tipoVenta,
+    // Movimiento de nómina. La plantilla del anexo es la MISMA para alta y para
+    // baja, así que sin esto el documento no tendría cómo decir cuál es.
+    '{{movimiento}}': context.venta.movimiento,
+    '{{movimiento_fecha}}': context.venta.movimientoFecha,
     // Company aliases for contracts
     '{{company_name}}': context.empresa.nombre,
     '{{company_cuit}}': context.facturacion.ruc,

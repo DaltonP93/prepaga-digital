@@ -44,6 +44,31 @@ export interface IncorporationAdherentInput {
   entry_date?: string | null;
   /** null = hereda la vigencia inmediata de la venta. */
   immediate_coverage?: boolean | null;
+  /**
+   * Contratos de EMPRESA: qué se incorpora. Un 'empleado' trae su propio plan y
+   * no depende de nadie; un 'adherente' cuelga de un empleado del contrato
+   * madre (`parent_target_beneficiary_id`). En una venta a persona física
+   * ninguno de los tres campos se usa y quedan en su default.
+   */
+  member_role?: 'empleado' | 'adherente';
+  plan_id?: string | null;
+  parent_target_beneficiary_id?: string | null;
+}
+
+/**
+ * BAJA de nómina: desvincular a alguien de un contrato ya firmado.
+ *
+ * Usa el MISMO anexo y la MISMA serie (ANX-YYYY-NNNNNN) que el alta, que es lo
+ * que se pidió: un solo documento para los dos movimientos de personal.
+ */
+export interface TerminationInput {
+  /** Beneficiario del CONTRATO MADRE que se desvincula. */
+  targetBeneficiaryId: string;
+  /** Fin de cobertura. Formato "YYYY-MM-DD", sin pasar por Date. */
+  terminationDate: string;
+  reason?: string;
+  /** Si el que sale es un empleado, ¿salen también sus adherentes? */
+  cascadeDependents: boolean;
 }
 
 /**
@@ -63,14 +88,19 @@ export interface IncorporationAdherentInput {
 export const attachGroupMonthlyTotal = async (sale: any): Promise<any> => {
   if (!sale || sale.sale_type !== SALE_TYPE_INCORPORACION) return sale;
 
-  const { data: inc } = await supabase
+  // `select('*')` + cast a propósito: `movement_type` y compañía se agregaron en
+  // la migración 20260908000003 y `types.ts` sólo las conoce después de
+  // regenerarlo. Nombrarlas en un select tipado rompe la compilación aunque la
+  // columna exista en la base.
+  const { data: incRow } = await supabase
     .from('adherent_incorporations')
-    .select('parent_sale_id')
+    .select('*')
     .eq('operation_sale_id', sale.id)
     .not('parent_sale_id', 'is', null)
     .limit(1)
     .maybeSingle();
 
+  const inc = incRow as Record<string, any> | null;
   if (!inc?.parent_sale_id) return sale;
 
   const { data: parent } = await supabase
@@ -79,9 +109,22 @@ export const attachGroupMonthlyTotal = async (sale: any): Promise<any> => {
     .eq('id', inc.parent_sale_id)
     .maybeSingle();
 
+  // En una BAJA el grupo queda MÁS chico, y la venta-operación vale 0 (no
+  // factura), así que sumar su total daría la cuota de antes. Se resta lo que
+  // sale, que es lo que el anexo tiene que anunciar como cuota nueva.
+  const esBaja = inc.movement_type === 'baja';
+  const delta = esBaja
+    ? -Number(inc.adherent_amount || 0)
+    : Number(sale.total_amount || 0);
+
   return {
     ...sale,
-    group_monthly_total: Number(parent?.total_amount || 0) + Number(sale.total_amount || 0),
+    group_monthly_total: Math.max(Number(parent?.total_amount || 0) + delta, 0),
+    // Lo consume `{{movimiento}}` de la plantilla del anexo, que es la MISMA
+    // para alta y para baja: sin esto el documento no tendría cómo decir cuál
+    // de los dos es.
+    movimiento_nomina: esBaja ? 'baja' : 'alta',
+    movimiento_fecha: esBaja ? inc.termination_date || null : null,
   };
 };
 
@@ -190,6 +233,13 @@ export const useCreateAdherentIncorporation = () => {
               entry_date: a.entry_date || null,
               immediate_coverage: a.immediate_coverage ?? null,
               is_primary: false,
+              // Nómina de empresa. `parent_beneficiary_id` NO se copia acá: el
+              // empleado del que va a colgar vive en el CONTRATO MADRE, y la FK
+              // compuesta (parent, sale_id) exige que padre e hijo estén en la
+              // misma venta. El vínculo se resuelve al activar, desde
+              // `parent_target_beneficiary_id`.
+              member_role: a.member_role || 'adherente',
+              plan_id: a.plan_id || (parent as any).plan_id || null,
             })) as any
           )
           .select();
@@ -224,6 +274,12 @@ export const useCreateAdherentIncorporation = () => {
             // acá revienta con 23514 (adherent_incorporations_status_check).
             status: 'draft',
             source: 'existing_sale',
+            // Movimiento de nómina. 'alta' es el default de la columna, pero se
+            // escribe explícito para que la fila se lea sola.
+            movement_type: 'alta',
+            member_role: a.member_role || 'adherente',
+            adherent_plan_id: a.plan_id || (parent as any).plan_id || null,
+            parent_target_beneficiary_id: a.parent_target_beneficiary_id || null,
             // Adherente que vive en la venta-operación mientras se firma.
             operation_beneficiary_id: createdBeneficiaries?.[i]?.id || null,
             // Se llena recién al activar (por trigger), con el adherente
@@ -253,6 +309,243 @@ export const useCreateAdherentIncorporation = () => {
       toast({
         title: 'Error',
         description: error.message || 'No se pudo crear la incorporación.',
+        variant: 'destructive',
+      });
+    },
+  });
+};
+
+/**
+ * BAJA de nómina: desvincula a alguien de un contrato ya firmado.
+ *
+ * MISMO vehículo que el alta —una venta-operación con `sale_type='alta_adherente'`,
+ * su anexo y su ceremonia de firma— porque es lo que se pidió: un solo documento
+ * para los dos movimientos. Lo que cambia es qué hace la activación
+ * (`activate_adherent_incorporation`, migración 20260908000005): en vez de
+ * copiar a la persona al contrato madre, la pasa a `status='inactive'` con su
+ * `coverage_end_date`, y el total del contrato baja solo.
+ *
+ * DOS DECISIONES QUE PARECEN RARAS Y SON DELIBERADAS:
+ *
+ * 1. `total_amount: 0` en la venta-operación. Ese campo es la base de cálculo de
+ *    la comisión: una baja no factura, así que no puede llevar el monto de quien
+ *    sale.
+ *
+ * 2. Los que salen SÍ se insertan como beneficiarios de la venta-operación, pero
+ *    con `signature_required=false` y `status='inactive'`. Esa combinación es la
+ *    que hace que el anexo funcione sin motor de plantillas nuevo:
+ *      · `useCreateAllSignatureLinks` y `SaleTemplatesTab` saltean a quien tiene
+ *        `signature_required === false`, así que NO se les genera DDJJ ni enlace
+ *        de firma —firman sólo el representante de la empresa y la contratada—;
+ *      · pero el loop `{{#beneficiarios}}` de la plantilla los imprime igual, que
+ *        es justo lo que el anexo tiene que decir;
+ *      · y `status='inactive'` hace que `recalculate_sale_total_amount` los
+ *        ignore, dejando la venta-operación en total 0 sin pisarlo a mano.
+ */
+export const useCreateNominaTermination = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      parentSaleId,
+      termination,
+    }: {
+      parentSaleId: string;
+      termination: TerminationInput;
+    }) => {
+      const { targetBeneficiaryId, terminationDate, reason, cascadeDependents } = termination;
+      if (!targetBeneficiaryId) throw new Error('Elegí a quién dar de baja.');
+      if (!terminationDate) throw new Error('Indicá la fecha de baja.');
+
+      // 1. Contrato madre + titular (snapshot para el documento)
+      const { data: parent, error: parentError } = await supabase
+        .from('sales')
+        .select(`
+          id, company_id, client_id, plan_id, salesperson_id, immediate_coverage,
+          clients:client_id ( first_name, last_name, dni, client_type, razon_social, ruc, email, phone )
+        `)
+        .eq('id', parentSaleId)
+        .maybeSingle();
+
+      if (parentError) throw parentError;
+      if (!parent) throw new Error('No se encontró el contrato de origen.');
+
+      const cliente: any = (parent as any).clients || {};
+      const titularName = getClientDisplayName(cliente);
+
+      // 2. Quién sale: la persona elegida y, si corresponde, sus adherentes.
+      const { data: objetivo, error: objetivoError } = await supabase
+        .from('beneficiaries')
+        .select('*')
+        .eq('id', targetBeneficiaryId)
+        .maybeSingle();
+
+      if (objetivoError) throw objetivoError;
+      if (!objetivo) throw new Error('No se encontró a la persona que se quiere dar de baja.');
+      if (((objetivo as any).status ?? 'active') !== 'active') {
+        throw new Error('Esa persona ya está dada de baja del contrato.');
+      }
+
+      // Los adherentes a cargo se filtran en memoria y no con un `.eq()` sobre
+      // `parent_beneficiary_id`: esa columna todavía no está en `types.ts`, y
+      // encadenarla con un cast hace explotar la inferencia de PostgREST
+      // ("Type instantiation is excessively deep"). La nómina de un contrato es
+      // chica, así que traerla entera no cuesta nada.
+      let dependientes: any[] = [];
+      if (cascadeDependents) {
+        const { data, error } = await supabase
+          .from('beneficiaries')
+          .select('*')
+          .eq('sale_id', parentSaleId);
+        if (error) throw error;
+        dependientes = ((data || []) as any[]).filter(
+          (d) =>
+            d.parent_beneficiary_id === targetBeneficiaryId &&
+            (d.status ?? 'active') === 'active',
+        );
+      }
+
+      const montoQueSale =
+        (Number((objetivo as any).amount) || 0) +
+        dependientes.reduce((s, d) => s + (Number(d.amount) || 0), 0);
+
+      // 3. Venta-operación. El trigger le asigna un número de la serie ANX.
+      const { data: operationSale, error: saleError } = await supabase
+        .from('sales')
+        .insert({
+          company_id: (parent as any).company_id,
+          client_id: (parent as any).client_id,
+          plan_id: (parent as any).plan_id,
+          salesperson_id: (parent as any).salesperson_id,
+          sale_type: SALE_TYPE_INCORPORACION,
+          status: 'borrador',
+          // Una baja no factura: ver el encabezado del hook.
+          total_amount: 0,
+          titular_amount: 0,
+          sale_date: new Date().toISOString().slice(0, 10),
+          immediate_coverage: false,
+          audit_status: 'aprobado_para_templates',
+        } as any)
+        .select()
+        .single();
+
+      if (saleError) throw saleError;
+
+      try {
+        // 4. Snapshot de quienes salen, dentro de la venta-operación.
+        //    El empleado primero, para poder colgarle sus adherentes: la FK
+        //    compuesta exige que padre e hijo compartan `sale_id`, así que el
+        //    padre del snapshot es el snapshot, no el del contrato madre.
+        const snapshotBase = (b: any, extra: Record<string, unknown>) => ({
+          sale_id: operationSale.id,
+          first_name: b.first_name,
+          last_name: b.last_name,
+          dni: b.dni || null,
+          document_number: b.document_number || b.dni || null,
+          relationship: b.relationship || null,
+          birth_date: b.birth_date || null,
+          gender: b.gender || null,
+          phone: b.phone || null,
+          email: b.email || null,
+          address: b.address || null,
+          barrio: b.barrio || null,
+          city: b.city || null,
+          amount: Number(b.amount) || 0,
+          entry_date: b.entry_date || null,
+          plan_id: b.plan_id || null,
+          is_primary: false,
+          // Las dos marcas que hacen que esto funcione sin motor nuevo.
+          signature_required: false,
+          status: 'inactive',
+          coverage_end_date: terminationDate,
+          ...extra,
+        });
+
+        const { data: snapObjetivo, error: snapError } = await supabase
+          .from('beneficiaries')
+          .insert(
+            snapshotBase(objetivo, {
+              member_role: (objetivo as any).member_role || 'adherente',
+              parent_beneficiary_id: null,
+            }) as any,
+          )
+          .select()
+          .single();
+
+        if (snapError) throw snapError;
+
+        if (dependientes.length > 0) {
+          const { error: depError } = await supabase.from('beneficiaries').insert(
+            dependientes.map((d) =>
+              snapshotBase(d, {
+                member_role: 'adherente',
+                // Sólo se puede colgar de un 'empleado' (trg_beneficiaries_validate_nomina).
+                parent_beneficiary_id:
+                  (objetivo as any).member_role === 'empleado' ? snapObjetivo.id : null,
+              }),
+            ) as any,
+          );
+          if (depError) throw depError;
+        }
+
+        // 5. La fila del movimiento. UNA sola: la cascada la resuelve la
+        //    activación, que además deja registrado en
+        //    `deactivated_beneficiary_ids` a quiénes desactivó de verdad.
+        const { error: movError } = await supabase.from('adherent_incorporations').insert({
+          company_id: (parent as any).company_id,
+          client_id: (parent as any).client_id,
+          operation_sale_id: operationSale.id,
+          parent_sale_id: parentSaleId,
+          plan_id: (parent as any).plan_id,
+          titular_name: titularName,
+          titular_document: getClientDocument(cliente) || null,
+          titular_email: cliente.email || null,
+          titular_phone: cliente.phone || null,
+          // Snapshot de quien sale: `adherent_first_name`/`last_name` son NOT NULL
+          // y son lo que el anexo imprime.
+          adherent_first_name: (objetivo as any).first_name,
+          adherent_last_name: (objetivo as any).last_name,
+          adherent_document_number: (objetivo as any).dni || (objetivo as any).document_number || null,
+          adherent_birth_date: (objetivo as any).birth_date || null,
+          adherent_relationship: (objetivo as any).relationship || null,
+          adherent_email: (objetivo as any).email || null,
+          adherent_phone: (objetivo as any).phone || null,
+          adherent_amount: montoQueSale,
+          status: 'draft',
+          source: 'existing_sale',
+          movement_type: 'baja',
+          member_role: (objetivo as any).member_role || 'adherente',
+          target_beneficiary_id: targetBeneficiaryId,
+          termination_date: terminationDate,
+          termination_reason: reason || null,
+          cascade_dependents: cascadeDependents,
+          coverage_end_date: terminationDate,
+          operation_beneficiary_id: snapObjetivo.id,
+          activated_beneficiary_id: null,
+        } as any);
+
+        if (movError) throw movError;
+
+        return { operationSale, dadosDeBaja: 1 + dependientes.length };
+      } catch (err) {
+        // Rollback manual: no hay transacción entre llamadas REST.
+        await supabase.from('sales').delete().eq('id', operationSale.id);
+        throw err;
+      }
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['adherent-incorporations', variables.parentSaleId] });
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      toast({
+        title: 'Baja creada',
+        description: `Ya podés generar y enviar a firmar el anexo (${data.dadosDeBaja} persona(s)). El contrato se actualiza recién cuando el anexo queda firmado.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'No se pudo crear la baja.',
         variant: 'destructive',
       });
     },
@@ -341,7 +634,8 @@ export const useUpdateAdherentIncorporation = () => {
           adherent_phone: adherent.phone || null,
           adherent_amount: Number(adherent.amount) || 0,
           coverage_start_date: adherent.entry_date || null,
-        })
+          adherent_plan_id: adherent.plan_id || null,
+        } as any)
         .eq('id', id);
 
       if (incError) throw incError;
@@ -367,6 +661,7 @@ export const useUpdateAdherentIncorporation = () => {
             amount: Number(adherent.amount) || 0,
             entry_date: adherent.entry_date || null,
             immediate_coverage: adherent.immediate_coverage ?? null,
+            plan_id: adherent.plan_id || null,
           } as any)
           .eq('id', actual.operation_beneficiary_id);
 
@@ -404,19 +699,29 @@ export const useCancelAdherentIncorporation = () => {
 
   return useMutation({
     mutationFn: async ({ id }: { id: string }) => {
-      const { data: actual, error: readError } = await supabase
+      // `select('*')` + cast: ver la nota de `attachGroupMonthlyTotal`.
+      const { data: actualRow, error: readError } = await supabase
         .from('adherent_incorporations')
-        .select(
-          'id, status, operation_sale_id, parent_sale_id, activated_beneficiary_id, operation_sale:operation_sale_id (status)',
-        )
+        .select('*, operation_sale:operation_sale_id (status)')
         .eq('id', id)
         .maybeSingle();
 
+      const actual = actualRow as Record<string, any> | null;
       if (readError) throw readError;
       if (!actual) throw new Error('No se encontró la incorporación.');
-      if (actual.activated_beneficiary_id || actual.status === 'completed') {
+      // `deactivated_beneficiary_ids` es la marca de una BAJA ya aplicada: ahí
+      // `activated_beneficiary_id` apunta a quien SALIÓ, no a alguien recién
+      // creado, así que mirar sólo esa columna alcanzaría — pero si un día se
+      // dejara de escribir, una baja firmada quedaría cancelable.
+      if (
+        actual.activated_beneficiary_id ||
+        actual.status === 'completed' ||
+        actual.deactivated_beneficiary_ids?.length
+      ) {
         throw new Error(
-          'La incorporación ya fue activada: el adherente está en el contrato. No se puede cancelar.',
+          actual.movement_type === 'baja'
+            ? 'La baja ya fue aplicada al contrato. No se puede cancelar.'
+            : 'La incorporación ya fue activada: el adherente está en el contrato. No se puede cancelar.',
         );
       }
       const estadoOperacion = (actual.operation_sale as { status?: string } | null)?.status;

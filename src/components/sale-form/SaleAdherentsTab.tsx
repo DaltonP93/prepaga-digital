@@ -1,75 +1,77 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, Users, AlertCircle, Pencil } from 'lucide-react';
 import { useBeneficiaries, useCreateBeneficiary, useDeleteBeneficiary, useUpdateBeneficiary } from '@/hooks/useBeneficiaries';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
-import { getRelationshipLabel, isRelationshipRequired, validateBeneficiary } from '@/lib/beneficiaryValidation';
+import { validateBeneficiary } from '@/lib/beneficiaryValidation';
 import { useSaleClientType } from '@/hooks/useSaleClientType';
+import {
+  BeneficiaryFields,
+  emptyPersonaFields,
+  type PersonaFieldsData,
+} from './BeneficiaryFields';
+import { esEmpleado } from '@/lib/nomina';
 
 interface SaleAdherentsTabProps {
   saleId?: string;
   disabled?: boolean;
 }
 
-type BeneficiaryFormData = {
-  first_name: string;
-  last_name: string;
-  dni: string;
-  relationship: string;
-  birth_date: string;
-  gender: string;
-  phone: string;
-  email: string;
-  address: string;
-  barrio: string;
-  city: string;
-  amount: number;
-  /** "Fecha de Ingreso": columna del Anexo de Incorporación de Adherente. */
-  entry_date: string;
-  /**
-   * "V.I." del anexo. Vacío = heredar la vigencia de la venta (se guarda
-   * como NULL), que es como se comportaron siempre los adherentes.
-   */
-  immediate_coverage: '' | 'si' | 'no';
-};
-
-const emptyForm: BeneficiaryFormData = {
-  first_name: '', last_name: '', dni: '', relationship: '', birth_date: '',
-  gender: '', phone: '', email: '', address: '', barrio: '', city: '', amount: 0,
-  entry_date: '', immediate_coverage: '',
-};
+/**
+ * Los campos los pinta `BeneficiaryFields`, compartido con la nómina de empresa
+ * y con los movimientos. Acá sólo queda la lógica de esta pantalla: qué se
+ * guarda, cuándo y con qué mensaje.
+ */
 
 /**
  * Las columnas `date` de Postgres no aceptan cadena vacía (da
  * "invalid input syntax for type date"), así que se mandan como NULL.
  */
-const toPayload = (data: BeneficiaryFormData) => ({
-  ...data,
+const toPayload = (data: PersonaFieldsData) => ({
+  first_name: data.first_name,
+  last_name: data.last_name,
+  dni: data.dni,
+  relationship: data.relationship,
+  gender: data.gender,
+  phone: data.phone,
+  email: data.email,
+  address: data.address,
+  barrio: data.barrio,
+  city: data.city,
+  amount: data.amount,
   birth_date: data.birth_date || null,
   entry_date: data.entry_date || null,
   immediate_coverage:
-    data.immediate_coverage === 'si' ? true
-    : data.immediate_coverage === 'no' ? false
+    data.vi === 'si' ? true
+    : data.vi === 'no' ? false
     : null,
 });
 
-const formatAmountInput = (value: number) => {
-  if (!value) return '';
-  return value.toLocaleString('es-PY', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-};
+const fromBeneficiary = (b: any): PersonaFieldsData => ({
+  ...emptyPersonaFields(),
+  first_name: b.first_name || '',
+  last_name: b.last_name || '',
+  dni: b.dni || '',
+  relationship: b.relationship || '',
+  birth_date: b.birth_date || '',
+  gender: b.gender || '',
+  phone: b.phone || '',
+  email: b.email || '',
+  address: b.address || '',
+  barrio: b.barrio || '',
+  city: b.city || '',
+  amount: b.amount || 0,
+  entry_date: b.entry_date || '',
+  vi:
+    b.immediate_coverage === true ? 'si'
+    : b.immediate_coverage === false ? 'no'
+    : '',
+});
 
-const parseAmountInput = (value: string) => {
-  const digitsOnly = value.replace(/\D/g, '');
-  return digitsOnly ? Number(digitsOnly) : 0;
-};
-
-const validateForm = (data: BeneficiaryFormData, isCompany: boolean): boolean => {
+const validateForm = (data: PersonaFieldsData, isCompany: boolean): boolean => {
   const error = validateBeneficiary(data, { isCompany });
   if (error) {
     toast.error(error);
@@ -78,9 +80,9 @@ const validateForm = (data: BeneficiaryFormData, isCompany: boolean): boolean =>
   return true;
 };
 
-interface BeneficiaryFormProps {
-  data: BeneficiaryFormData;
-  onChange: (data: BeneficiaryFormData) => void;
+interface AdherenteFormProps {
+  data: PersonaFieldsData;
+  onChange: (patch: Partial<PersonaFieldsData>) => void;
   onSave: () => void;
   onCancel: () => void;
   saving: boolean;
@@ -89,111 +91,18 @@ interface BeneficiaryFormProps {
   isCompany: boolean;
 }
 
-const BeneficiaryForm: React.FC<BeneficiaryFormProps> = ({ data, onChange, onSave, onCancel, saving, title, saveLabel, isCompany }) => (
+const AdherenteForm: React.FC<AdherenteFormProps> = ({
+  data, onChange, onSave, onCancel, saving, title, saveLabel, isCompany,
+}) => (
   <Card>
     <CardHeader>
       <CardTitle className="text-base">{title}</CardTitle>
     </CardHeader>
     <CardContent className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Nombre *</Label>
-          <Input value={data.first_name} onChange={(e) => onChange({ ...data, first_name: e.target.value })} placeholder="Nombre" />
-        </div>
-        <div className="space-y-2">
-          <Label>Apellido *</Label>
-          <Input value={data.last_name} onChange={(e) => onChange({ ...data, last_name: e.target.value })} placeholder="Apellido" />
-        </div>
-        <div className="space-y-2">
-          <Label>C.I.</Label>
-          <Input value={data.dni} onChange={(e) => onChange({ ...data, dni: e.target.value })} placeholder="Nº Documento" />
-        </div>
-        <div className="space-y-2">
-          <Label>
-            {getRelationshipLabel({ isCompany })}
-            {isRelationshipRequired({ isCompany }) ? ' *' : ''}
-          </Label>
-          {/* En una empresa los adherentes son funcionarios: el vínculo es el
-              cargo, texto libre, y la lista de parentescos no aplica. */}
-          {isCompany ? (
-            <Input
-              value={data.relationship}
-              onChange={(e) => onChange({ ...data, relationship: e.target.value })}
-              placeholder="Ej: Gerente de Operaciones"
-            />
-          ) : (
-            <Select value={data.relationship} onValueChange={(v) => onChange({ ...data, relationship: v })}>
-              <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="conyuge">Cónyuge</SelectItem>
-                <SelectItem value="hijo">Hijo/a</SelectItem>
-                <SelectItem value="padre">Padre/Madre</SelectItem>
-                <SelectItem value="hermano">Hermano/a</SelectItem>
-                <SelectItem value="otro">Otro</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
-        </div>
-        <div className="space-y-2">
-          <Label>Fecha de Nacimiento</Label>
-          <Input type="date" value={data.birth_date} onChange={(e) => onChange({ ...data, birth_date: e.target.value })} />
-        </div>
-        <div className="space-y-2">
-          <Label>Género</Label>
-          <Select value={data.gender} onValueChange={(v) => onChange({ ...data, gender: v })}>
-            <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="masculino">Masculino</SelectItem>
-              <SelectItem value="femenino">Femenino</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Teléfono *</Label>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground whitespace-nowrap">+595</span>
-            <Input value={data.phone} onChange={(e) => onChange({ ...data, phone: e.target.value.replace(/\D/g, '') })} placeholder="981123456" />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label>Email</Label>
-          <Input type="email" value={data.email} onChange={(e) => onChange({ ...data, email: e.target.value })} placeholder="email@ejemplo.com" />
-        </div>
-        <div className="space-y-2">
-          <Label>Monto (Gs.)</Label>
-          <Input inputMode="numeric" value={formatAmountInput(data.amount)} onChange={(e) => onChange({ ...data, amount: parseAmountInput(e.target.value) })} placeholder="0" />
-        </div>
-        <div className="space-y-2">
-          <Label>Domicilio</Label>
-          <Input value={data.address} onChange={(e) => onChange({ ...data, address: e.target.value })} placeholder="Ej: Boquerón 123" />
-        </div>
-        <div className="space-y-2">
-          <Label>Barrio</Label>
-          <Input value={data.barrio} onChange={(e) => onChange({ ...data, barrio: e.target.value })} placeholder="Ej: Villa Morra" />
-        </div>
-        <div className="space-y-2">
-          <Label>Ciudad</Label>
-          <Input value={data.city} onChange={(e) => onChange({ ...data, city: e.target.value })} placeholder="Ciudad" />
-        </div>
-        <div className="space-y-2">
-          <Label>Fecha de Ingreso</Label>
-          <Input type="date" value={data.entry_date} onChange={(e) => onChange({ ...data, entry_date: e.target.value })} />
-        </div>
-        <div className="space-y-2">
-          <Label>Vigencia Inmediata (V.I.)</Label>
-          <Select
-            value={data.immediate_coverage || 'heredar'}
-            onValueChange={(v) => onChange({ ...data, immediate_coverage: v === 'heredar' ? '' : (v as 'si' | 'no') })}
-          >
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="heredar">Según la venta</SelectItem>
-              <SelectItem value="si">Sí</SelectItem>
-              <SelectItem value="no">No</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      {/* Sin selector de plan: en una venta a persona física el plan es único y
+          vive en `sales.plan_id`. El plan por persona es de los contratos de
+          empresa (ver SaleEmployeesTab). */}
+      <BeneficiaryFields value={data} onChange={onChange} isCompany={isCompany} vinculoCon="titular" />
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={onCancel}>Cancelar</Button>
         <Button type="button" onClick={onSave} disabled={saving}>{saveLabel}</Button>
@@ -210,9 +119,9 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
   const { isCompany } = useSaleClientType(saleId);
 
   const [showForm, setShowForm] = useState(false);
-  const [newBeneficiary, setNewBeneficiary] = useState<BeneficiaryFormData>({ ...emptyForm });
+  const [newBeneficiary, setNewBeneficiary] = useState<PersonaFieldsData>(emptyPersonaFields());
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editData, setEditData] = useState<BeneficiaryFormData>({ ...emptyForm });
+  const [editData, setEditData] = useState<PersonaFieldsData>(emptyPersonaFields());
 
   if (!saleId) {
     return (
@@ -226,11 +135,15 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
     );
   }
 
+  // Los empleados de un contrato de empresa se gestionan en la pestaña Nómina,
+  // con su plan y sus propios adherentes. Acá no tienen nada que hacer.
+  const adherentes = (beneficiaries || []).filter((b: any) => !b.is_primary && !esEmpleado(b));
+
   const handleAdd = async () => {
     if (!validateForm(newBeneficiary, isCompany)) return;
     try {
-      await createBeneficiary.mutateAsync({ ...toPayload(newBeneficiary), sale_id: saleId });
-      setNewBeneficiary({ ...emptyForm });
+      await createBeneficiary.mutateAsync({ ...toPayload(newBeneficiary), sale_id: saleId } as any);
+      setNewBeneficiary(emptyPersonaFields());
       setShowForm(false);
     } catch (error) {
       console.error('Error adding beneficiary:', error);
@@ -239,31 +152,13 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
 
   const handleEdit = (b: any) => {
     setEditingId(b.id);
-    setEditData({
-      first_name: b.first_name || '',
-      last_name: b.last_name || '',
-      dni: b.dni || '',
-      relationship: b.relationship || '',
-      birth_date: b.birth_date || '',
-      gender: b.gender || '',
-      phone: b.phone || '',
-      email: b.email || '',
-      address: b.address || '',
-      barrio: b.barrio || '',
-      city: b.city || '',
-      amount: b.amount || 0,
-      entry_date: b.entry_date || '',
-      immediate_coverage:
-        b.immediate_coverage === true ? 'si'
-        : b.immediate_coverage === false ? 'no'
-        : '',
-    });
+    setEditData(fromBeneficiary(b));
   };
 
   const handleSaveEdit = async () => {
     if (!editingId || !validateForm(editData, isCompany)) return;
     try {
-      await updateBeneficiary.mutateAsync({ id: editingId, ...toPayload(editData) });
+      await updateBeneficiary.mutateAsync({ id: editingId, ...toPayload(editData) } as any);
       setEditingId(null);
     } catch (error) {
       console.error('Error updating beneficiary:', error);
@@ -283,7 +178,7 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Users className="h-5 w-5" />
-          <h3 className="text-lg font-semibold">Adherentes ({beneficiaries?.filter(b => !b.is_primary).length || 0})</h3>
+          <h3 className="text-lg font-semibold">Adherentes ({adherentes.length})</h3>
         </div>
         {!disabled && (
           <Button type="button" size="sm" onClick={() => setShowForm(!showForm)}>
@@ -294,9 +189,9 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
       </div>
 
       {showForm && (
-        <BeneficiaryForm
+        <AdherenteForm
           data={newBeneficiary}
-          onChange={setNewBeneficiary}
+          onChange={(patch) => setNewBeneficiary((prev) => ({ ...prev, ...patch }))}
           onSave={handleAdd}
           onCancel={() => setShowForm(false)}
           saving={createBeneficiary.isPending}
@@ -308,14 +203,14 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
 
       {isLoading ? (
         <div className="text-center py-8 text-muted-foreground">Cargando adherentes...</div>
-      ) : beneficiaries && beneficiaries.filter(b => !b.is_primary).length > 0 ? (
+      ) : adherentes.length > 0 ? (
         <div className="space-y-2">
-          {beneficiaries.filter(b => !b.is_primary).map((b) => (
+          {adherentes.map((b: any) => (
             editingId === b.id ? (
-              <BeneficiaryForm
+              <AdherenteForm
                 key={b.id}
                 data={editData}
-                onChange={setEditData}
+                onChange={(patch) => setEditData((prev) => ({ ...prev, ...patch }))}
                 onSave={handleSaveEdit}
                 onCancel={() => setEditingId(null)}
                 saving={updateBeneficiary.isPending}

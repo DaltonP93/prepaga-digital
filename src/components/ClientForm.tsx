@@ -20,6 +20,15 @@ interface ClientFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   client?: Client | null;
+  /**
+   * Tipo con el que abre el formulario al crear un cliente nuevo.
+   *
+   * Lo usa el selector "Tipo de contratante" de la venta: si el vendedor ya
+   * eligió Empresa y aprieta "+", no tiene sentido que el diálogo abra en
+   * Persona física y le pida nombre y apellido. Al editar no aplica: ahí manda
+   * el tipo que el cliente ya tiene.
+   */
+  defaultClientType?: string;
 }
 
 interface ClientFormData {
@@ -27,6 +36,11 @@ interface ClientFormData {
   client_type: string;
   razon_social?: string;
   ruc?: string;
+  /** Contacto de RR.HH. de un cliente empresa: con quién se gestionan las
+   *  altas y bajas de nómina. No aplica a una persona física. */
+  hr_contact_name?: string;
+  hr_contact_phone?: string;
+  hr_contact_email?: string;
   first_name: string;
   last_name: string;
   email: string;
@@ -58,7 +72,7 @@ interface NominatimResult {
   };
 }
 
-export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
+export function ClientForm({ open, onOpenChange, client, defaultClientType }: ClientFormProps) {
   const { profile } = useSimpleAuthContext();
   const createClient = useCreateClient();
   const updateClient = useUpdateClient();
@@ -231,6 +245,9 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
         client_type: (client as any).client_type || "persona",
         razon_social: (client as any).razon_social || "",
         ruc: (client as any).ruc || "",
+        hr_contact_name: (client as any).hr_contact_name || "",
+        hr_contact_phone: (client as any).hr_contact_phone || "",
+        hr_contact_email: (client as any).hr_contact_email || "",
         first_name: client.first_name || "",
         last_name: client.last_name || "",
         email: client.email || "",
@@ -250,9 +267,12 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
     }
 
     reset({
-      client_type: "persona",
+      client_type: defaultClientType || "persona",
       razon_social: "",
       ruc: "",
+      hr_contact_name: "",
+      hr_contact_phone: "",
+      hr_contact_email: "",
       first_name: "",
       last_name: "",
       email: "",
@@ -268,7 +288,7 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
       latitude: "",
       longitude: "",
     });
-  }, [client, open, reset]);
+  }, [client, open, reset, defaultClientType]);
 
   const normalizePhone = (raw: string | undefined): string => {
     if (!raw) return "";
@@ -312,6 +332,15 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
         // le eligió género.
         gender: rest.gender?.trim() ? rest.gender : null,
         marital_status: rest.marital_status?.trim() ? rest.marital_status : null,
+        // Contacto de RR.HH.: sólo existe para una empresa. Se guarda NULL (no
+        // cadena vacía) para que una persona física no arrastre campos
+        // corporativos, y para que cambiar un cliente de empresa a persona los
+        // limpie en vez de dejarlos escondidos.
+        hr_contact_name: esEmpresa && rest.hr_contact_name?.trim() ? rest.hr_contact_name.trim() : null,
+        hr_contact_phone: esEmpresa && rest.hr_contact_phone?.trim()
+          ? normalizePhone(rest.hr_contact_phone)
+          : null,
+        hr_contact_email: esEmpresa && rest.hr_contact_email?.trim() ? rest.hr_contact_email.trim() : null,
       };
 
       if (isEditing && client) {
@@ -374,6 +403,31 @@ export function ClientForm({ open, onOpenChange, client }: ClientFormProps) {
                   <div className="space-y-1.5">
                     <Label htmlFor="ruc">RUC</Label>
                     <Input id="ruc" placeholder="80012345-6" {...register("ruc")} />
+                  </div>
+
+                  {/* Contacto de RR.HH.: en un contrato corporativo las altas y
+                      bajas de nómina no las gestiona la razón social sino una
+                      persona concreta. El email/teléfono generales del cliente
+                      suelen ser los de administración y no sirven para esto. */}
+                  <div className="col-span-2 space-y-1.5 rounded-lg border border-border/70 bg-muted/20 p-3">
+                    <Label className="text-sm font-semibold">Contacto de RR.HH.</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Con quién se gestionan las altas y bajas de empleados.
+                    </p>
+                    <div className="grid grid-cols-3 gap-3 pt-1">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="hr_contact_name">Nombre</Label>
+                        <Input id="hr_contact_name" {...register("hr_contact_name")} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="hr_contact_phone">Teléfono</Label>
+                        <Input id="hr_contact_phone" placeholder="981123456" {...register("hr_contact_phone")} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="hr_contact_email">Email</Label>
+                        <Input id="hr_contact_email" type="email" {...register("hr_contact_email")} />
+                      </div>
+                    </div>
                   </div>
                 </div>
               ) : (

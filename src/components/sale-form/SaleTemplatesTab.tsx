@@ -18,7 +18,9 @@ import { DocumentPreviewDialog } from '@/components/documents/DocumentPreviewDia
 import { useRolePermissions } from '@/hooks/useRolePermissions';
 import { attachGroupMonthlyTotal } from '@/hooks/useAdherentIncorporations';
 import { attachPlanChangeContext } from '@/hooks/usePlanChanges';
-import { recommendedTemplateType } from '@/lib/saleTypes';
+import { recommendedTemplateType, SALE_TYPES } from '@/lib/saleTypes';
+import { useSaleClientType } from '@/hooks/useSaleClientType';
+import { usePlans } from '@/hooks/usePlans';
 
 interface SaleTemplatesTabProps {
   saleId?: string;
@@ -234,6 +236,30 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
 
   const isPrivilegedRole = isAdmin || isSuperAdmin;
   const canViewPrintVersions = isAdmin || isSuperAdmin || role === 'supervisor';
+
+  // Qué plantilla sugerir depende de dos cosas que el `sale_type` no dice: si el
+  // titular es una empresa (necesita el contrato que imprime la nómina) y si
+  // esta venta-operación es una BAJA (comparte `sale_type` con el alta).
+  const { isCompany: titularEsEmpresa } = useSaleClientType(saleId);
+  // Catálogo de planes: en un contrato de empresa cada persona tiene el suyo, y
+  // el motor necesita la lista para poder imprimir {{plan_nombre}} por fila.
+  const { data: plansCatalog } = usePlans();
+  const { data: movimientoDeNomina } = useQuery({
+    queryKey: ['movimiento-nomina', saleId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('adherent_incorporations')
+        .select('*')
+        .eq('operation_sale_id', saleId!)
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as Record<string, any> | null)?.movement_type ?? null;
+    },
+    enabled: !!saleId && saleType === SALE_TYPES.ALTA_ADHERENTE,
+    staleTime: 5 * 60 * 1000,
+  });
+  const esBajaDeNomina = movimientoDeNomina === 'baja';
 
   const isApproved = auditStatus === 'aprobado' || auditStatus === 'aprobado_para_templates';
   const isSaleLockedStatus = saleStatus === 'completado' || saleStatus === 'cancelado';
@@ -533,7 +559,8 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         .single();
 
       const context = createEnhancedTemplateContext(
-        client, plan, company, sale, effectiveBeneficiaries || [], undefined, responsesMap, companySettings
+        client, plan, company, sale, effectiveBeneficiaries || [], undefined, responsesMap, companySettings,
+        plansCatalog || []
       );
 
       const templatesWithAttachments = new Set((allAttachments || []).map((a: any) => a.template_id));
@@ -996,7 +1023,7 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
         .eq('company_id', company.id)
         .single();
 
-      const context = createEnhancedTemplateContext(client, plan, company, sale, effectiveBeneficiaries, undefined, responsesMap, csSettings);
+      const context = createEnhancedTemplateContext(client, plan, company, sale, effectiveBeneficiaries, undefined, responsesMap, csSettings, plansCatalog || []);
       const templatesWithAttachments = new Set(allAttachments.map((a: any) => a.template_id));
       const templatePdfAttachmentMap = new Map<string, any>();
       const directAnnexTemplateIds = new Set<string>();
@@ -1251,7 +1278,14 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
   // La plantilla que corresponde al tipo de venta va PRIMERA y con badge, pero
   // el resto sigue disponible: filtrar rompería casos legítimos (p. ej. adjuntar
   // la DDJJ al anexo de incorporación).
-  const templateTypeSugerido = recommendedTemplateType(saleType);
+  // Una BAJA y un ALTA comparten `sale_type='alta_adherente'` a propósito (mismo
+  // anexo, misma serie ANX), así que el tipo por sí solo no distingue cuál
+  // plantilla sugerir: hace falta mirar el movimiento y si el titular es una
+  // empresa.
+  const templateTypeSugerido = recommendedTemplateType(saleType, {
+    isCompany: titularEsEmpresa,
+    isTermination: esBajaDeNomina,
+  });
   const availableTemplates = (templates?.filter(
     t =>
       t.is_active !== false &&

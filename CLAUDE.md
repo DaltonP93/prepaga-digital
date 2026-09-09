@@ -211,10 +211,161 @@ la plantilla y el anexo no se podría emitir nunca.
 | `beneficiaries.entry_date` / `.immediate_coverage` | ✅ | ❌ |
 | `clients.external_id`, `sales.employee_signature_mode` | ✅ | ❌ |
 | Plantillas de los 3 formularios | ✅ | ❌ |
+| Nómina de empresa (`beneficiaries.member_role` / `.parent_beneficiary_id` / `.plan_id`) | ✅ | ❌ |
+| Movimientos alta/baja (`adherent_incorporations.movement_type` y sus 8 columnas) | ✅ | ❌ |
+| `clients.hr_contact_*` y las 2 plantillas de empresa | ✅ | ❌ |
 
 > ⚠️ **El módulo NO está en producción.** Llevarlo requiere las migraciones
-> `20260813*`, `20260817*`, `20260818*`, `20260819*` y `20260822*`, más las
-> columnas de arriba. Es un trabajo aparte, con su propio runbook.
+> `20260813*`, `20260817*`, `20260818*`, `20260819*`, `20260822*` y `20260908*`,
+> más las columnas de arriba. Es un trabajo aparte, con su propio runbook.
+
+---
+
+## Venta a EMPRESA: nómina de empleados y movimientos de alta/baja
+
+> Aplicado el **2026-09-08** (migraciones `20260908000001`…`20260908000006`).
+> **Sólo en US test.** Ver *Estado por entorno*.
+
+### El modelo: UN contrato, empleados anidados
+
+Un contrato corporativo es **una sola venta** (`clients.client_type='empresa'`)
+cuyos `beneficiaries` forman **exactamente dos niveles**:
+
+```
+VENTA  titular_amount = 0 · plan_id = plan de referencia · total = suma de la nómina ACTIVA
+├─ member_role='empleado'  parent=NULL  plan_id=ORO    amount=1.200.000
+│    ├─ member_role='adherente'  parent=↑  plan_id=ORO    amount=300.000
+│    └─ member_role='adherente'  parent=↑  plan_id=PLATA  amount=250.000
+└─ member_role='empleado'  parent=NULL     plan_id=PLATA  amount=900.000
+```
+
+Una venta a **persona física no cambia en nada**: sus filas nacen con los
+defaults `member_role='adherente'`, `parent_beneficiary_id=NULL`, `plan_id=NULL`.
+
+**No hay `sale_type` nuevo.** Una venta de empresa sigue siendo `venta_nueva` o
+`reingreso`; lo que la distingue es el `client_type` del titular.
+
+**La empresa NO es beneficiaria de sí misma**: no hay fila de titular, no hay
+`is_primary`, y `titular_amount` es 0. Por eso `enhancedTemplateEngine` saltea
+el `titularFallback` cuando `isCompanyClient(client)` — sin eso imprimía una
+fila fantasma con la razón social cobrando el total entero, encima de la nómina.
+
+### Integridad de la jerarquía: una FK compuesta, no un trigger
+
+```sql
+CONSTRAINT uq_beneficiaries_id_sale UNIQUE (id, sale_id)
+CONSTRAINT fk_beneficiaries_parent
+  FOREIGN KEY (parent_beneficiary_id, sale_id)
+  REFERENCES beneficiaries (id, sale_id) ON DELETE CASCADE
+```
+
+Esa FK expresa de forma **declarativa** que el empleado del que cuelga un
+adherente pertenece a la MISMA venta, y el `ON DELETE CASCADE` hace que borrar
+un empleado se lleve a sus adherentes sin código de aplicación. El `UNIQUE`
+redundante con la PK es el requisito de Postgres para referenciar ese par.
+
+Lo único que no entra en un CHECK ni en una FK (es entre filas) es "el padre
+tiene que ser un empleado", y de eso se ocupa
+`trg_beneficiaries_validate_nomina`, que además impide degradar a un empleado
+que tiene gente a cargo. Corre **después** de
+`trg_beneficiaries_block_when_sale_signed` por orden alfabético, que es lo
+correcto.
+
+### La baja NO borra
+
+Dar de baja pone `beneficiaries.status='inactive'` + `coverage_end_date`. La
+fila se conserva: es la historia de la nómina y es a lo que apunta el anexo
+firmado. `'inactive'` ya estaba en `beneficiaries_status_check` desde antes —
+**ese CHECK no se toca**, porque también admite
+`'pending_addendum_signature'`, del flujo legado `sale_addendums`.
+
+`recalculate_sale_total_amount(uuid)` ahora filtra
+`COALESCE(status,'active')='active'` en sus dos lecturas. Sigue siendo la
+**única fuente de verdad** del total. De paso se eliminó la quinta fórmula que
+quedaba en el front: `SaleTabbedForm` → *Enviar a Auditoría* recalculaba en JS
+y hacía un `UPDATE sales` (bug #10); ahora llama a la RPC.
+
+### Movimientos: alta y baja comparten anexo, serie y `sale_type`
+
+La pestaña *Incorporaciones* pasó a llamarse **Movimientos** (el `value` de la
+tab sigue siendo `incorporaciones`, para no romper `tabOrder` ni los enlaces).
+Las dos operaciones crean una venta-operación con
+`sale_type='alta_adherente'` → serie `ANX-YYYY-NNNNNN`, y se distinguen por
+`adherent_incorporations.movement_type` (`'alta'` | `'baja'`).
+
+Al firmarse, `activate_adherent_incorporation()` bifurca:
+
+- **alta**: copia la persona al contrato madre, ahora también con `member_role`,
+  `plan_id` y el `parent_beneficiary_id` resuelto desde
+  `parent_target_beneficiary_id`.
+- **baja**: pasa a `inactive` al `target_beneficiary_id` y, si
+  `cascade_dependents`, a sus adherentes; deja la traza en
+  `deactivated_beneficiary_ids`.
+
+> ⚠️ **La trampa más peligrosa de todo el módulo.** El loop de alta filtra
+> `activated_beneficiary_id IS NULL AND parent_sale_id IS NOT NULL`, y eso
+> **también matchea las filas de baja** (que tienen poblado
+> `operation_beneficiary_id`). Sin el `AND COALESCE(movement_type,'alta')='alta'`
+> que se le agregó, firmar una baja **copiaría a la persona al contrato madre**,
+> en silencio y al revés de lo pedido. Si alguna vez se reescribe esa función,
+> ese filtro no se puede perder.
+
+> La función se reemplaza siempre con **el mismo nombre y la misma firma**: es
+> una de las 4 que `trg_beneficiaries_block_when_sale_signed` exime por
+> `PG_CONTEXT`. Por eso **no** hace falta `set_config`, y no se toca el regex.
+
+### Por qué una baja inserta beneficiarios que no firman
+
+`useCreateNominaTermination` inserta el snapshot de quienes salen como
+beneficiarios de la venta-operación, con **`signature_required=false` y
+`status='inactive'`**. Esa combinación es la que hace que el anexo funcione sin
+motor de plantillas nuevo:
+
+- `useCreateAllSignatureLinks.ts:101` y `SaleTemplatesTab.tsx` saltean a quien
+  tiene `signature_required === false` → **no** se les genera DDJJ ni enlace de
+  firma; firman sólo el representante de la empresa y la contratada;
+- el loop `{{#beneficiarios}}` los imprime igual, que es lo que el anexo debe
+  decir;
+- `status='inactive'` hace que el total de la venta-operación quede en **0** sin
+  pisarlo a mano — correcto, porque una baja no factura y `total_amount` es la
+  base de cálculo de la comisión.
+
+### Plantillas y motor
+
+| Plantilla | `template_type` | Archivo |
+|---|---|---|
+| Contrato Colectivo de Empresa | `contrato_empresa` | `docs/plantilla-contrato-empresa.html` |
+| Anexo de Movimiento de Nomina | `anexo_movimiento` | `docs/plantilla-anexo-movimiento.html` |
+
+Placeholders nuevos: `{{rol}}`, `{{depende_de}}`, `{{plan_nombre}}` (por fila),
+`{{movimiento}}` / `{{movimiento_fecha}}` (globales, los adosa
+`attachGroupMonthlyTotal`), `{{titular_documento}}` /
+`{{titular_documento_label}}` (RUC vs C.I.), y el loop anidado
+`{{#empleados}}` … `{{#sus_adherentes}}` … `{{/sus_adherentes}}` …
+`{{/empleados}}`, con `{{cantidadAdherentes}}` y `{{subtotalFormateado}}`.
+
+El agrupador vive en **`src/lib/nomina.ts`** y lo comparten la pantalla y el
+motor, para que la tabla que se ve al cargar y la que sale impresa no puedan
+discrepar.
+
+> Las dos plantillas llevan `{{firma_*}}`, así que `SaleTemplatesTab` las
+> clasifica como `document_type='contrato'`. **Es correcto y no hay que
+> "corregirlo"**: `finalize-signature-link` saltea los `'anexo'`.
+
+### Cómo aplicarlo en una base
+
+`sql/aplicar-nomina-empresa-test-PASO1.sql` (esquema, funciones y triggers) y
+después `sql/aplicar-nomina-empresa-test-PASO2.sql` (las 2 plantillas). Los dos
+son idempotentes y el PASO 1 **aborta solo** si el filtro por `status` fuera a
+cambiar el total de alguna venta existente. Después, regenerar `types.ts`.
+
+> Mientras `types.ts` no se regenere, los hooks leen estas tablas con
+> `select('*')` + cast: nombrar una columna nueva en un select tipado de
+> PostgREST **rompe la compilación** aunque la columna exista en la base, y
+> encadenar un `.eq()` con cast hace explotar la inferencia
+> (*"Type instantiation is excessively deep"*).
+
+---
 
 ### ⚠️ Editar/cancelar un anexo: gatear por la VENTA-OPERACIÓN, nunca por el anexo
 

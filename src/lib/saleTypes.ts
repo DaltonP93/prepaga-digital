@@ -90,6 +90,40 @@ export const TEMPLATE_TYPE_BY_SALE_TYPE: Partial<Record<SaleType, string>> = {
   [SALE_TYPES.CAMBIO_PLAN]: 'solicitud_cambio_plan',
 };
 
-/** `undefined` para las ventas comerciales: ahí no hay nada que sugerir. */
-export const recommendedTemplateType = (saleType?: string | null): string | undefined =>
-  saleType ? TEMPLATE_TYPE_BY_SALE_TYPE[saleType as SaleType] : undefined;
+/**
+ * Contexto que afina la sugerencia. Todo opcional: sin él, la función se
+ * comporta exactamente como antes.
+ */
+export interface TemplateSuggestionContext {
+  /** El titular de la venta es una empresa (`clients.client_type='empresa'`). */
+  isCompany?: boolean;
+  /** La venta-operación es una BAJA de nómina, no un alta. */
+  isTermination?: boolean;
+}
+
+/**
+ * `undefined` para las ventas comerciales de persona física: ahí no hay nada
+ * que sugerir, todas las plantillas son 'contrato'.
+ *
+ * Dos casos de empresa se resuelven acá y no con un `sale_type` nuevo:
+ *
+ *  · El CONTRATO de una venta a empresa es `venta_nueva`/`reingreso` como
+ *    cualquier otra —no es una venta-operación— pero necesita la plantilla que
+ *    sabe imprimir la nómina.
+ *  · Una BAJA comparte `sale_type='alta_adherente'` con el alta a propósito
+ *    (mismo anexo, misma serie ANX), así que el tipo por sí solo no alcanza
+ *    para distinguirlas.
+ */
+export const recommendedTemplateType = (
+  saleType?: string | null,
+  ctx?: TemplateSuggestionContext,
+): string | undefined => {
+  if (isOperationSaleType(saleType)) {
+    if (saleType === SALE_TYPES.ALTA_ADHERENTE && (ctx?.isTermination || ctx?.isCompany)) {
+      return 'anexo_movimiento';
+    }
+    return TEMPLATE_TYPE_BY_SALE_TYPE[saleType as SaleType];
+  }
+  if (ctx?.isCompany) return 'contrato_empresa';
+  return saleType ? TEMPLATE_TYPE_BY_SALE_TYPE[saleType as SaleType] : undefined;
+};
