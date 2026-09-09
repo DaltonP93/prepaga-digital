@@ -37,7 +37,10 @@
 --     fisica y las 3 incorporaciones existentes no cambian en nada.
 --   · El filtro por `status` del bloque 4 es diff CERO hoy: las 39 filas de
 --     `beneficiaries` estan en 'active'. El bloque incluye un control que
---     ABORTA la transaccion si alguna de las ventas cambiaria de total.
+--     ABORTA la transaccion si el filtro cambiara algun total CALCULADO.
+--     Ese control compara la formula vieja contra la nueva, NO contra
+--     `sales.total_amount`: hay ventas (las de CAMBIO DE PLAN) cuyo total
+--     guardado legitimamente no sale de esa formula.
 --   · No se borra ni se modifica ningun dato existente. La unica sentencia que
 --     escribe datos es la normalizacion defensiva de `status` (0 filas
 --     esperadas).
@@ -365,15 +368,40 @@ BEGIN
 END;
 $function$;
 
--- Control: si el filtro cambiara el total de alguna venta, se aborta TODO.
+
+-- OJO CON QUE SE COMPARA: las DOS FORMULAS entre si (la de antes, sin filtro,
+-- contra la nueva, con filtro) y NO cada una contra `sales.total_amount`.
+--
+-- La diferencia importa. Hay ventas cuyo total guardado legitimamente NO sale
+-- de esta formula: las venta-operacion de CAMBIO DE PLAN (`CMB-*`) no tienen
+-- ninguna fila en `beneficiaries` y llevan su importe directo en
+-- `total_amount`, puesto por `useCreatePlanChange`. Compararlas contra la
+-- formula las marca como diferencia y aborta una migracion que en realidad no
+-- las toca. (Paso en US test con CMB-2026-000001 y CMB-2026-000002.)
+--
+-- De paso, eso deja a la vista que `recalculate_sale_total_amount` pondria en
+-- CERO el total de un cambio de plan si alguna vez se la llamara sobre esa
+-- venta. Hoy no pasa: el trigger dispara sobre `beneficiaries` y esas ventas no
+-- tienen ninguno, y `activate_plan_change` recalcula el contrato MADRE, no la
+-- operacion. Es deuda preexistente, ajena a esta migracion.
 DO $control$
 DECLARE
   r record;
   v_n integer := 0;
 BEGIN
   FOR r IN
-    SELECT s.id, s.contract_number,
-           COALESCE(s.total_amount, 0) AS total_actual,
+    SELECT s.contract_number,
+           -- Formula ANTERIOR: suma todos los beneficiarios.
+           CASE
+             WHEN EXISTS (SELECT 1 FROM public.beneficiaries b
+                           WHERE b.sale_id = s.id AND COALESCE(b.is_primary, false))
+             THEN COALESCE((SELECT SUM(COALESCE(b.amount,0)) FROM public.beneficiaries b
+                             WHERE b.sale_id = s.id), 0)
+             ELSE COALESCE(s.titular_amount, 0)
+                  + COALESCE((SELECT SUM(COALESCE(b.amount,0)) FROM public.beneficiaries b
+                               WHERE b.sale_id = s.id), 0)
+           END AS total_viejo,
+           -- Formula NUEVA: solo los activos.
            CASE
              WHEN EXISTS (SELECT 1 FROM public.beneficiaries b
                            WHERE b.sale_id = s.id AND COALESCE(b.is_primary, false)
@@ -386,18 +414,18 @@ BEGIN
            END AS total_nuevo
     FROM public.sales s
   LOOP
-    IF r.total_actual IS DISTINCT FROM r.total_nuevo THEN
-      RAISE WARNING 'diferencia en % : % -> %', r.contract_number, r.total_actual, r.total_nuevo;
+    IF r.total_viejo IS DISTINCT FROM r.total_nuevo THEN
+      RAISE WARNING 'el filtro cambiaria % : % -> %', r.contract_number, r.total_viejo, r.total_nuevo;
       v_n := v_n + 1;
     END IF;
   END LOOP;
 
   IF v_n > 0 THEN
     RAISE EXCEPTION
-      'El filtro por status cambiaria el total de % venta(s). Revisar los WARNING antes de aplicar.', v_n;
+      'El filtro por status cambiaria el total calculado de % venta(s). Significa que ya hay beneficiarios inactivos: revisar los WARNING antes de aplicar.', v_n;
   END IF;
 
-  RAISE NOTICE 'Control OK: ninguna venta cambia de total.';
+  RAISE NOTICE 'Control OK: el filtro por status no cambia ningun total calculado.';
 END
 $control$;
 

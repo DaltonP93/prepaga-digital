@@ -428,6 +428,14 @@ plantillas de SU empresa.
   adherente, sin recálculo del total. No la llama nadie; la activación real la
   hace el trigger. Versionada en `20260822000003` sólo porque `20260818000002`
   la exime por nombre y su preflight aborta si falta.
+- **Una venta-operación de CAMBIO DE PLAN no tiene beneficiarios**: `CMB-*` lleva
+  su importe directo en `sales.total_amount`, puesto por `useCreatePlanChange`.
+  Dos consecuencias: (1) su total NO se puede validar contra la fórmula de
+  `recalculate_sale_total_amount` —un control que lo intente marca falsos
+  positivos, pasó al aplicar `20260908000004`—; y (2) llamar a esa RPC sobre una
+  de esas ventas le pondría el total en **cero**. Hoy no ocurre: el trigger
+  dispara sobre `beneficiaries` y esas ventas no tienen ninguno, y
+  `activate_plan_change` recalcula el contrato **madre**, no la operación.
 - **El historial de migraciones de test está divergente del repo**: hay 12
   versiones del repo sin registrar en `supabase_migrations.schema_migrations`
   (sus objetos SÍ existen, se aplicaron por SQL directo) y 5 versiones en test
