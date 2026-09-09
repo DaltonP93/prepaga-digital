@@ -20,6 +20,7 @@ import { attachGroupMonthlyTotal } from '@/hooks/useAdherentIncorporations';
 import { attachPlanChangeContext } from '@/hooks/usePlanChanges';
 import { recommendedTemplateType, SALE_TYPES } from '@/lib/saleTypes';
 import { useSaleClientType } from '@/hooks/useSaleClientType';
+import { isCompanyClient } from '@/lib/clientUtils';
 import { usePlans } from '@/hooks/usePlans';
 
 interface SaleTemplatesTabProps {
@@ -596,6 +597,13 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           // diga "contrato"/"ddjj" (ej: "Plan Materno").
           const isAnexo = (isAnexoPlan || (!isDDJJ && !isContrato)) && !hasSignatureFields(template.content);
 
+          // Una EMPRESA no declara salud: la DDJJ la firma cada empleado de la
+          // nómina (ver `beneficiaryDocuments`). Emitir además una a nivel venta
+          // sacaría una declaración a nombre de la razón social, interpolada con
+          // `template_responses`, que es por VENTA y quedaría con las respuestas
+          // del último empleado que guardó.
+          if (isDDJJ && isCompanyClient(client)) return null;
+
           const pdfAttachment = isAnexo ? templatePdfAttachmentMap.get(template.id) : null;
           if (isAnexo && pdfAttachment) {
             directAnnexTemplateIds.add(template.id);
@@ -1054,6 +1062,11 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
           // diga "contrato"/"ddjj" (ej: "Plan Materno").
           const isAnexo = (isAnexoPlanName(template.name) || (!isDDJJ && !isContrato))
             && !hasSignatureFields(template.content);
+
+          // Mismo criterio que en handleSendDocuments: en una venta de EMPRESA
+          // no hay DDJJ a nombre de la razón social.
+          if (isDDJJ && isCompanyClient(client)) return null;
+
           const pdfAttachment = isAnexo ? templatePdfAttachmentMap.get(template.id) : null;
 
           if (isAnexo && pdfAttachment) {
@@ -1105,9 +1118,14 @@ const SaleTemplatesTab: React.FC<SaleTemplatesTabProps> = ({ saleId, auditStatus
       // DDJJ per adherente
       const ddjiTpls = templateContents.filter(isDDJJTemplate);
       const unresolvedTraceRows: Record<string, any>[] = [];
+      // Contratos de EMPRESA con employee_signature_mode='representante': firma
+      // sólo el representante legal y no se genera DDJJ por empleado. Va IGUAL
+      // que en handleSendDocuments; sin esto, regenerar resucitaba las DDJJ que
+      // el envío deliberadamente no emitió.
+      const empleadosFirman = (sale as any)?.employee_signature_mode !== 'representante';
       const beneficiaryDocuments = (
         await Promise.all((effectiveBeneficiaries || []).flatMap((b) => {
-          if (b.signature_required === false || b.is_primary || ddjiTpls.length === 0) {
+          if (!empleadosFirman || b.signature_required === false || b.is_primary || ddjiTpls.length === 0) {
             return [];
           }
 

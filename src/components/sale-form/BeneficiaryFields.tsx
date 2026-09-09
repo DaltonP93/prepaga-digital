@@ -2,6 +2,7 @@ import React from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { getRelationshipLabel, isRelationshipRequired } from '@/lib/beneficiaryValidation';
 
 /**
@@ -39,12 +40,25 @@ export interface PersonaFieldsData {
   vi: '' | 'si' | 'no';
   /** Plan de ESTA persona. Sólo se usa en contratos de empresa. */
   plan_id: string;
+  /**
+   * Sólo EMPLEADOS de una nómina: declara que esta persona tiene grupo
+   * familiar. Es lo que habilita cargarle adherentes en la pestaña Nómina.
+   */
+  requires_adherents: boolean;
+  /**
+   * Sólo EMPLEADOS de una nómina: adicional Plan Materno de ESTA persona.
+   * Los CAMPOS del Plan Materno siguen siendo del contrato —`template_responses`
+   * es por venta, no por persona— así que basta con que un empleado lo tenga
+   * para que aparezca la pestaña "Campos del Plan".
+   */
+  maternity_bonus: boolean;
 }
 
 export const emptyPersonaFields = (): PersonaFieldsData => ({
   first_name: '', last_name: '', dni: '', relationship: '', birth_date: '',
   gender: '', phone: '', email: '', address: '', barrio: '', city: '',
   amount: 0, entry_date: '', vi: '', plan_id: '',
+  requires_adherents: false, maternity_bonus: false,
 });
 
 /** Campos que un formulario puede decidir no mostrar. */
@@ -83,6 +97,15 @@ interface BeneficiaryFieldsProps {
   plans?: PlanOption[];
   /** Campos a ocultar en este formulario en particular. */
   hidden?: PersonaFieldName[];
+  /**
+   * `true` si esta persona es un EMPLEADO de la nómina de una empresa.
+   *
+   * Sólo entonces se muestran "¿Requiere adherentes?" e "Incluye Plan Materno":
+   * son opciones del funcionario, no de su hijo ni de su cónyuge. Antes vivían
+   * en la pestaña Básico, a nivel VENTA, donde no significaban nada en un
+   * contrato corporativo (cada empleado contrata lo suyo).
+   */
+  esEmpleado?: boolean;
 }
 
 const formatAmountInput = (value: number) =>
@@ -117,6 +140,7 @@ export const BeneficiaryFields: React.FC<BeneficiaryFieldsProps> = ({
   vinculoCon = 'titular',
   plans,
   hidden = [],
+  esEmpleado = false,
 }) => {
   const oculto = (campo: PersonaFieldName) => hidden.includes(campo);
   const mostrarPlan = !!plans && !oculto('plan_id');
@@ -317,6 +341,42 @@ export const BeneficiaryFields: React.FC<BeneficiaryFieldsProps> = ({
               <SelectItem value="no">No</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+      )}
+
+      {esEmpleado && (
+        <div className="col-span-2 lg:col-span-3 space-y-2">
+          <label className="flex items-start gap-3 rounded-xl border border-input bg-background/80 p-3.5 cursor-pointer">
+            <Checkbox
+              checked={value.requires_adherents}
+              onCheckedChange={(v) => onChange({ requires_adherents: v === true })}
+              className="mt-0.5"
+            />
+            <span className="space-y-1">
+              <span className="block text-sm font-medium leading-none">
+                ¿Requiere adherentes/grupo familiar?
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                Habilita cargarle adherentes a este empleado en la nómina.
+              </span>
+            </span>
+          </label>
+
+          <label className="flex items-start gap-3 rounded-xl border border-input bg-background/80 p-3.5 cursor-pointer">
+            <Checkbox
+              checked={value.maternity_bonus}
+              onCheckedChange={(v) => onChange({ maternity_bonus: v === true })}
+              className="mt-0.5"
+            />
+            <span className="space-y-1">
+              <span className="block text-sm font-medium leading-none">Incluye Plan Materno</span>
+              <span className="block text-xs text-muted-foreground">
+                Se contrata junto al plan de este empleado. Con al menos uno marcado se
+                habilita la pestaña “Campos del Plan”, que se completa una sola vez para
+                todo el contrato.
+              </span>
+            </span>
+          </label>
         </div>
       )}
     </div>

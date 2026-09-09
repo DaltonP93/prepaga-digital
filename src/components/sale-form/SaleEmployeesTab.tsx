@@ -28,6 +28,7 @@ import {
   agruparNomina,
   estaActivo,
   montoDe,
+  ordenarNomina,
   ROL_ADHERENTE,
   ROL_EMPLEADO,
   type NominaMember,
@@ -93,6 +94,8 @@ const toPayload = (data: PersonaFieldsData) => ({
   immediate_coverage:
     data.vi === 'si' ? true : data.vi === 'no' ? false : null,
   plan_id: data.plan_id || null,
+  requires_adherents: data.requires_adherents,
+  maternity_bonus: data.maternity_bonus,
 });
 
 const fromBeneficiary = (b: any): PersonaFieldsData => ({
@@ -112,6 +115,8 @@ const fromBeneficiary = (b: any): PersonaFieldsData => ({
   entry_date: b.entry_date || '',
   vi: b.immediate_coverage === true ? 'si' : b.immediate_coverage === false ? 'no' : '',
   plan_id: b.plan_id || '',
+  requires_adherents: b.requires_adherents === true,
+  maternity_bonus: b.maternity_bonus === true,
 });
 
 type Edicion = { id: string; rol: 'empleado' | 'adherente'; data: PersonaFieldsData };
@@ -142,7 +147,16 @@ const FormularioPersona: React.FC<FormularioPersonaProps> = ({
       <CardTitle className="text-base">{titulo}</CardTitle>
     </CardHeader>
     <CardContent className="space-y-4">
-      <BeneficiaryFields value={data} onChange={onChange} isCompany vinculoCon={vinculoCon} plans={plans} />
+      {/* `vinculoCon='titular'` en una nómina es exactamente un EMPLEADO: es
+          quien se vincula con la empresa. Sus adherentes van con 'empleado'. */}
+      <BeneficiaryFields
+        value={data}
+        onChange={onChange}
+        isCompany
+        vinculoCon={vinculoCon}
+        plans={plans}
+        esEmpleado={vinculoCon === 'titular'}
+      />
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={onCancelar}>Cancelar</Button>
         <Button type="button" onClick={onGuardar} disabled={guardando}>Guardar</Button>
@@ -176,6 +190,9 @@ const FilaPersona: React.FC<FilaPersonaProps> = ({
             <Badge variant="outline" className="shrink-0">
               Baja {formatFechaCorta(persona.coverage_end_date as string)}
             </Badge>
+          )}
+          {rol === 'empleado' && persona.maternity_bonus === true && (
+            <Badge variant="secondary" className="shrink-0">Plan Materno</Badge>
           )}
         </div>
         <div className="text-sm text-muted-foreground">
@@ -247,12 +264,10 @@ const SaleEmployeesTab: React.FC<SaleEmployeesTabProps> = ({ saleId, disabled, d
   // Orden de carga: la nómina se lee como se fue cargando. `useBeneficiaries`
   // trae descendente, así que se invierte acá y no en el hook, que lo comparten
   // otras pantallas.
-  const nomina = useMemo(() => {
-    const filas = [...((beneficiaries || []) as unknown as NominaMember[])].sort((a, b) =>
-      String(a.created_at || '').localeCompare(String(b.created_at || '')),
-    );
-    return agruparNomina(filas);
-  }, [beneficiaries]);
+  const nomina = useMemo(
+    () => agruparNomina(ordenarNomina((beneficiaries || []) as unknown as NominaMember[])),
+    [beneficiaries],
+  );
 
   const totalNomina = nomina.empleados.reduce((s, g) => s + g.subtotal, 0);
   const cantidadActivos = nomina.empleados.filter((g) => estaActivo(g.empleado)).length;
@@ -365,6 +380,11 @@ const SaleEmployeesTab: React.FC<SaleEmployeesTabProps> = ({ saleId, disabled, d
   const conPlan = (actual: PersonaFieldsData, patch: Partial<PersonaFieldsData>) =>
     patch.plan_id !== undefined ? aplicarPlan(actual, patch.plan_id) : patch;
 
+  /** ¿Se le pueden cargar adherentes a este empleado? Ver el comentario del
+   *  botón, más abajo: el OR con los que ya tiene es intencional. */
+  const puedeCargarAdherentes = (grupo: { empleado: NominaMember; adherentes: NominaMember[] }) =>
+    grupo.empleado.requires_adherents === true || grupo.adherentes.length > 0;
+
   const nombrePlan = (persona: NominaMember): string | undefined =>
     persona.plan_id ? planPorId.get(persona.plan_id as string)?.name : undefined;
 
@@ -470,14 +490,26 @@ const SaleEmployeesTab: React.FC<SaleEmployeesTabProps> = ({ saleId, disabled, d
                   <span className="text-sm text-muted-foreground">
                     Subtotal del grupo: <strong className="text-foreground">{formatCurrency(grupo.subtotal)}</strong>
                   </span>
+                  {/* El grupo familiar se declara en el propio empleado. Un
+                      empleado que YA tiene adherentes conserva el botón aunque el
+                      tilde esté en false: es el caso de las nóminas cargadas antes
+                      de que existiera la columna, y esconderles el botón parecería
+                      que el sistema se rompió. Cuando no corresponde, en vez de
+                      desaparecer en silencio se dice por qué. */}
                   {!disabled && estaActivo(grupo.empleado) && nuevoAdherenteDe !== grupo.empleado.id && (
-                    <Button
-                      type="button" variant="outline" size="sm"
-                      onClick={() => abrirNuevoAdherente(grupo.empleado)}
-                    >
-                      <UserPlus className="h-4 w-4 mr-1" />
-                      Agregar adherente
-                    </Button>
+                    puedeCargarAdherentes(grupo) ? (
+                      <Button
+                        type="button" variant="outline" size="sm"
+                        onClick={() => abrirNuevoAdherente(grupo.empleado)}
+                      >
+                        <UserPlus className="h-4 w-4 mr-1" />
+                        Agregar adherente
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        Marcá “¿Requiere adherentes?” en el empleado para cargar su grupo familiar.
+                      </span>
+                    )
                   )}
                 </div>
               </CardContent>

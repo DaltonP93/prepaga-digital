@@ -13,6 +13,7 @@ import { ClientForm } from '@/components/ClientForm';
 import { useCurrencySettings } from '@/hooks/useCurrencySettings';
 import { getClientDisplayName, getClientDocument, getClientDocumentLabel, isCompanyClient } from '@/lib/clientUtils';
 import { MANUAL_SALE_TYPE_OPTIONS, isOperationSaleType, saleTypeLabel } from '@/lib/saleTypes';
+import { addMonthsToDateOnly } from '@/lib/vigencia';
 interface SaleBasicTabProps {
   formData: {
     client_id: string;
@@ -32,6 +33,7 @@ interface SaleBasicTabProps {
     billing_email: string;
     billing_phone: string;
     contract_start_date: string;
+    contract_end_date: string;
     immediate_coverage: boolean;
     sale_type: string;
     /** Adicional Plan Materno. Habilita la pestaña "Campos del Plan". */
@@ -70,6 +72,19 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({
   const decimalPlaces = settings?.decimal_places ?? 0;
 
   const clienteElegido = clients?.find((c: any) => c.id === formData.client_id);
+
+  // El fin de vigencia se sugiere a 12 meses del inicio, pero SÓLO cuando está
+  // vacío: una vez que alguien escribió una fecha, mueva o no el inicio, la que
+  // manda es la suya. Se autocompleta acá y no en la base a propósito — así la
+  // persona la ve y la puede corregir antes de guardar, en vez de descubrirla
+  // recién cuando le llega el aviso de vencimiento.
+  const handleContractStartDateChange = (value: string) => {
+    onChange('contract_start_date', value);
+    if (value && !formData.contract_end_date) {
+      const sugerida = addMonthsToDateOnly(value, 12);
+      if (sugerida) onChange('contract_end_date', sugerida);
+    }
+  };
 
   // El selector manda mientras no haya cliente elegido; una vez elegido, manda
   // el cliente (es la fuente de verdad y puede no coincidir con el selector si
@@ -237,74 +252,88 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({
         </div>
       </div>
 
-      {/* Plan Selection.
-          En un contrato de empresa el plan de la venta NO es el que se factura
-          —cada empleado tiene el suyo— pero se sigue pidiendo: es el que se
-          precarga en la nómina, el que hereda cada venta-operación de anexo y el
-          que usa la resolución de reglas de comisiones. */}
-      <div className="space-y-2">
-        <Label>{titularEsEmpresa ? 'Plan de referencia *' : 'Plan *'}</Label>
-        <Select value={formData.plan_id} onValueChange={(v) => onChange('plan_id', v)}>
-          <SelectTrigger>
-            <SelectValue placeholder="Seleccionar plan" />
-          </SelectTrigger>
-          <SelectContent>
-            <div className="p-2">
-              <Input
-                placeholder="Buscar plan..."
-                value={searchPlan}
-                onChange={(e) => setSearchPlan(e.target.value)}
-                className="mb-2"
-              />
-            </div>
-            {filteredPlans.map((plan) => (
-              <SelectItem key={plan.id} value={plan.id}>
-                {plan.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {titularEsEmpresa && (
-          <p className="text-xs text-muted-foreground">
-            Precarga el plan de cada empleado nuevo. Cada uno puede tener el suyo.
+      {/* Plan, grupo familiar y adicionales.
+          En un contrato de EMPRESA nada de esto es del contrato: cada empleado
+          contrata SU plan, declara SU grupo familiar y decide SU Plan Materno,
+          y todo eso se carga en la pestaña Nómina. Pedirlo acá obligaba a
+          elegir un plan que después no se facturaba y dejaba dos tildes a nivel
+          venta que no significaban nada.
+
+          `sales.plan_id` no queda huérfano: SaleTabbedForm lo deriva del primer
+          empleado activo de la nómina, porque lo leen la condición `has_plan`
+          del workflow, la herencia de plan de la venta-operación de un anexo y
+          la resolución de reglas de comisiones. */}
+      {titularEsEmpresa ? (
+        <div className="space-y-2">
+          <Label>Plan y adicionales</Label>
+          <p className="text-sm text-muted-foreground">
+            Cada empleado elige su plan, su grupo familiar y su Plan Materno en la
+            pestaña <strong>Nómina</strong>.
           </p>
-        )}
-      </div>
+        </div>
+      ) : (
+        <>
+          {/* Plan Selection */}
+          <div className="space-y-2">
+            <Label>Plan *</Label>
+            <Select value={formData.plan_id} onValueChange={(v) => onChange('plan_id', v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar plan" />
+              </SelectTrigger>
+              <SelectContent>
+                <div className="p-2">
+                  <Input
+                    placeholder="Buscar plan..."
+                    value={searchPlan}
+                    onChange={(e) => setSearchPlan(e.target.value)}
+                    className="mb-2"
+                  />
+                </div>
+                {filteredPlans.map((plan) => (
+                  <SelectItem key={plan.id} value={plan.id}>
+                    {plan.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-      {/* Requires Adherents */}
-      <div className="flex items-center gap-3">
-        <input
-          type="checkbox"
-          id="requires_adherents"
-          checked={formData.requires_adherents}
-          onChange={(e) => onChange('requires_adherents', e.target.checked)}
-          className="h-4 w-4"
-        />
-        <Label htmlFor="requires_adherents">¿Requiere adherentes/grupo familiar?</Label>
-      </div>
+          {/* Requires Adherents */}
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="requires_adherents"
+              checked={formData.requires_adherents}
+              onChange={(e) => onChange('requires_adherents', e.target.checked)}
+              className="h-4 w-4"
+            />
+            <Label htmlFor="requires_adherents">¿Requiere adherentes/grupo familiar?</Label>
+          </div>
 
-      {/* Adicional Plan Materno.
-          Va acá, al inicio de la venta, porque el Plan Materno NO es un plan
-          por si mismo: se contrata SOBRE otro plan. Al tildarlo se habilita la
-          pestaña "Campos del Plan" con las preguntas del template homonimo,
-          sea cual sea el plan elegido. */}
-      <div className="space-y-2">
-        <Label>Adicionales</Label>
-        <label className="flex items-start gap-3 rounded-xl border border-input bg-background/80 p-3.5 cursor-pointer">
-          <Checkbox
-            checked={!!formData.maternity_bonus}
-            onCheckedChange={(v) => onChange('maternity_bonus', v === true)}
-            className="mt-0.5"
-          />
-          <span className="space-y-1">
-            <span className="block text-sm font-medium leading-none">Incluye Plan Materno</span>
-            <span className="block text-xs text-muted-foreground">
-              Se contrata junto al plan elegido. Al marcarlo se habilita la pestaña
-              “Campos del Plan” para completar los datos que exige el Plan Materno.
-            </span>
-          </span>
-        </label>
-      </div>
+          {/* Adicional Plan Materno.
+              Va acá, al inicio de la venta, porque el Plan Materno NO es un plan
+              por si mismo: se contrata SOBRE otro plan. Al tildarlo se habilita la
+              pestaña "Campos del Plan" con las preguntas del template homonimo,
+              sea cual sea el plan elegido. */}
+          <div className="space-y-2">
+            <Label>Adicionales</Label>
+            <label className="flex items-start gap-3 rounded-xl border border-input bg-background/80 p-3.5 cursor-pointer">
+              <Checkbox
+                checked={!!formData.maternity_bonus}
+                onCheckedChange={(v) => onChange('maternity_bonus', v === true)}
+                className="mt-0.5"
+              />
+              <span className="space-y-1">
+                <span className="block text-sm font-medium leading-none">Incluye Plan Materno</span>
+                <span className="block text-xs text-muted-foreground">
+                  Se contrata junto al plan elegido. Al marcarlo se habilita la pestaña
+                  “Campos del Plan” para completar los datos que exige el Plan Materno.
+                </span>
+              </span>
+            </label>
+          </div>
+        </>
+      )}
 
       {/* Vigencia Inmediata & Tipo de Venta */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -515,8 +544,20 @@ const SaleBasicTab: React.FC<SaleBasicTabProps> = ({
             <Input
               type="date"
               value={formData.contract_start_date || ''}
-              onChange={(e) => onChange('contract_start_date', e.target.value)}
+              onChange={(e) => handleContractStartDateChange(e.target.value)}
             />
+          </div>
+          <div className="space-y-1">
+            <Label>Fecha de fin de vigencia</Label>
+            <Input
+              type="date"
+              value={formData.contract_end_date || ''}
+              onChange={(e) => onChange('contract_end_date', e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Se autocompleta con 12 meses desde el inicio. Es la fecha que avisa
+              el vencimiento al vendedor.
+            </p>
           </div>
         </div>
       </div>

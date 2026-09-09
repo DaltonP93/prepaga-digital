@@ -19,6 +19,14 @@ import { toast } from 'sonner';
 import { isSaleLocked, isPrivilegedRole } from '@/lib/saleUtils';
 import { resolvePlanFieldsTemplateName } from '@/lib/saleFilters';
 import { useClientIsCompany } from '@/hooks/useSaleClientType';
+import { useBeneficiaries } from '@/hooks/useBeneficiaries';
+import {
+  agruparNomina,
+  nominaTieneMaternidad,
+  ordenarNomina,
+  planDeReferenciaDeNomina,
+  type NominaMember,
+} from '@/lib/nomina';
 import { ChangeStatusModal } from './ChangeStatusModal';
 import SaleBasicTab from './SaleBasicTab';
 import SaleAdherentsTab from './SaleAdherentsTab';
@@ -72,6 +80,9 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
   const contractStartDate = typeof sale?.contract_start_date === 'string'
     ? sale.contract_start_date.slice(0, 10)
     : '';
+  const contractEndDate = typeof (sale as any)?.contract_end_date === 'string'
+    ? (sale as any).contract_end_date.slice(0, 10)
+    : '';
 
   const TEMPLATE_LOCKED_STATUSES: SaleStatus[] = [
     'listo_para_enviar',
@@ -103,6 +114,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
     billing_email: (sale as any)?.billing_email || '',
     billing_phone: (sale as any)?.billing_phone || '',
     contract_start_date: contractStartDate,
+    contract_end_date: contractEndDate,
     immediate_coverage: (sale as any)?.immediate_coverage || false,
     maternity_bonus: Boolean((sale as { maternity_bonus?: boolean } | null)?.maternity_bonus),
     sale_type: (sale as any)?.sale_type || 'venta_nueva',
@@ -136,6 +148,85 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
 
   const isCompanySale = contractorType === 'empresa' || clienteEsEmpresa;
 
+  // -- Lo que en un contrato de EMPRESA se deriva de la nomina ---------------
+  // El plan, el grupo familiar y el Plan Materno son de cada empleado, asi que
+  // la pestana Basico ya no los pide (ver SaleBasicTab). Pero dos columnas de
+  // `sales` no pueden quedar huerfanas:
+  //
+  //   - `plan_id`         lo leen la condicion `has_plan` del workflow
+  //                       configurable (useStateTransition), la herencia de plan
+  //                       de la venta-operacion de un anexo
+  //                       (useAdherentIncorporations, usePlanChanges) y la
+  //                       resolucion de reglas de comisiones, que NUNCA asume
+  //                       0%: sin plan devolveria `no_rule` y bloquearia la
+  //                       liquidacion.
+  //   - `maternity_bonus` es lo que habilita la pestana "Campos del Plan", que
+  //                       se completa una sola vez para todo el contrato porque
+  //                       `template_responses` es por venta, no por persona.
+  //
+  // Se derivan del primer empleado ACTIVO / de que alguno tenga el adicional.
+  // Es el mismo query que usa SaleEmployeesTab (react-query comparte la cache),
+  // no una lectura de mas.
+  const { data: nominaRows } = useBeneficiaries(isCompanySale ? (sale?.id || '') : '');
+  const nomina = React.useMemo(
+    () => agruparNomina(ordenarNomina((nominaRows || []) as unknown as NominaMember[])),
+    [nominaRows],
+  );
+  // OJO con el fallback: `planDeReferenciaDeNomina` devuelve null tanto cuando la
+  // nomina esta vacia como mientras el query esta EN VUELO (primer render). Sin
+  // caer al plan que ya tiene la venta, guardar apenas se abre una venta de
+  // empresa vieja le borraba el `plan_id` que ya estaba cargado — justo la
+  // columna que este bloque existe para no perder.
+  const planDerivado = isCompanySale
+    ? planDeReferenciaDeNomina(nomina) || formData.plan_id || null
+    : null;
+  const maternidadDerivada = isCompanySale
+    ? nominaTieneMaternidad(nomina)
+    : !!formData.maternity_bonus;
+
+  /** Lo que se persiste en `sales` para estas tres columnas. En una venta a
+   *  persona fisica es exactamente lo que hay en el formulario. */
+  const camposDerivados = isCompanySale
+    ? {
+        plan_id: planDerivado,
+        maternity_bonus: maternidadDerivada,
+        // El dato real vive por empleado (`beneficiaries.requires_adherents`).
+        // El de la venta no se pisa: nadie lo lee, y ponerlo en false seria
+        // cambiarle el dato en silencio a las ventas ya cargadas.
+        requires_adherents: formData.requires_adherents,
+      }
+    : {
+        plan_id: formData.plan_id,
+        maternity_bonus: formData.maternity_bonus,
+        requires_adherents: formData.requires_adherents,
+      };
+
+  // La nomina se guarda sola, contra `beneficiaries`: si el vendedor tilda Plan
+  // Materno en un empleado y no vuelve a la pestaña Basico, `sales` se quedaria
+  // con los valores viejos. Eso no es cosmetico: `AuditSaleDetails` mostraria
+  // "No" y `resolvePlanFieldsTemplateName`, que en otros caminos lee la fila de
+  // `sales` y no este formulario, resolveria el template equivocado. Por eso lo
+  // derivado se persiste apenas cambia. Converge solo: al refrescarse la venta
+  // los valores coinciden y el efecto no vuelve a escribir.
+  const sincronizando = React.useRef(false);
+  React.useEffect(() => {
+    if (!isCompanySale || !sale?.id || isAuditLocked) return;
+    // Sin nomina cargada no hay nada que derivar (y `planDerivado` seria el
+    // fallback, que es justamente lo que ya esta guardado).
+    if (!nominaRows) return;
+    const patch: Record<string, unknown> = {};
+    if ((sale.plan_id || null) !== planDerivado) patch.plan_id = planDerivado;
+    if (Boolean((sale as { maternity_bonus?: boolean }).maternity_bonus) !== maternidadDerivada) {
+      patch.maternity_bonus = maternidadDerivada;
+    }
+    if (Object.keys(patch).length === 0 || sincronizando.current) return;
+    sincronizando.current = true;
+    updateSale
+      .mutateAsync({ id: sale.id, ...patch } as any)
+      .catch((e) => console.error('No se pudo sincronizar la venta con la nomina:', e))
+      .finally(() => { sincronizando.current = false; });
+  }, [isCompanySale, sale?.id, isAuditLocked, nominaRows, planDerivado, maternidadDerivada]);
+
   // ── Campos personalizados del plan ───────────────────────────────────────
   // Dos caminos para habilitar la pestaña "Campos del Plan":
   //
@@ -150,16 +241,18 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
   // Para el resto de los planes, sin adicional marcado, la pantalla queda
   // exactamente igual que antes.
   const { data: planTemplate = null } = useQuery({
-    queryKey: ['plan-custom-fields-template', formData.plan_id, formData.maternity_bonus],
+    queryKey: ['plan-custom-fields-template', camposDerivados.plan_id, maternidadDerivada],
     queryFn: async () => {
       // El adicional manda: no depende del plan elegido (ver resolvePlanFieldsTemplateName).
       let nombrePlan: string | null = null;
-      if (!formData.maternity_bonus && formData.plan_id) {
+      if (!maternidadDerivada && camposDerivados.plan_id) {
         const { data: p } = await supabase
-          .from('plans').select('name').eq('id', formData.plan_id).maybeSingle();
+          .from('plans').select('name').eq('id', camposDerivados.plan_id).maybeSingle();
         nombrePlan = p?.name ?? null;
       }
-      const nombreBuscado = resolvePlanFieldsTemplateName(formData, nombrePlan);
+      const nombreBuscado = resolvePlanFieldsTemplateName(
+        { maternity_bonus: maternidadDerivada }, nombrePlan,
+      );
       if (!nombreBuscado) return null;
       const plan = { name: nombreBuscado };
 
@@ -191,7 +284,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
     },
     // Con el adicional marcado corre aunque todavía no se eligió plan: los
     // campos del Plan Materno no dependen del plan contratado.
-    enabled: !!formData.plan_id || !!formData.maternity_bonus,
+    enabled: !!camposDerivados.plan_id || maternidadDerivada,
   });
 
   const hasPlanFields = !!planTemplate;
@@ -229,7 +322,9 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
 
   const validateBasicTab = (): string | null => {
     if (!formData.client_id) return 'Debe seleccionar un cliente';
-    if (!formData.plan_id) return 'Debe seleccionar un plan';
+    // En un contrato de empresa el plan es de cada empleado y se carga en la
+    // pestana Nomina; `sales.plan_id` se deriva de ahi (ver camposDerivados).
+    if (!isCompanySale && !formData.plan_id) return 'Debe seleccionar un plan';
     // En un contrato de empresa no hay monto del titular: la empresa no es
     // beneficiaria de sí misma y el total lo arma la nómina. Exigirlo obligaba
     // a inventar un número que después quedaba sumado de más.
@@ -272,13 +367,13 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
         await updateSale.mutateAsync({
           id: sale.id,
           client_id: formData.client_id,
-          plan_id: formData.plan_id,
+          plan_id: camposDerivados.plan_id,
           company_id: formData.company_id,
           // Contrato de empresa: el titular no aporta monto propio, todo sale de
           // la nómina. Ver validateBasicTab.
           titular_amount: isCompanySale ? 0 : formData.titular_amount,
           notes: formData.notes,
-          requires_adherents: formData.requires_adherents,
+          requires_adherents: camposDerivados.requires_adherents,
           signer_type: formData.signer_type,
           signer_name: formData.signer_type === 'responsable_pago' ? formData.signer_name : null,
           signer_dni: formData.signer_type === 'responsable_pago' ? formData.signer_dni : null,
@@ -290,8 +385,9 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           billing_email: formData.billing_email || null,
           billing_phone: formData.billing_phone || null,
           contract_start_date: formData.contract_start_date || null,
+          contract_end_date: formData.contract_end_date || null,
           immediate_coverage: formData.immediate_coverage,
-          maternity_bonus: formData.maternity_bonus,
+          maternity_bonus: camposDerivados.maternity_bonus,
           sale_type: formData.sale_type,
           employee_signature_mode: formData.employee_signature_mode,
         } as any);
@@ -307,12 +403,12 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
       } else {
         const result = await createSale.mutateAsync({
           client_id: formData.client_id,
-          plan_id: formData.plan_id,
+          plan_id: camposDerivados.plan_id,
           company_id: formData.company_id,
           total_amount: isCompanySale ? 0 : formData.titular_amount,
           titular_amount: isCompanySale ? 0 : formData.titular_amount,
           notes: formData.notes,
-          requires_adherents: formData.requires_adherents,
+          requires_adherents: camposDerivados.requires_adherents,
           salesperson_id: profile?.id,
           status: 'borrador',
           signer_type: formData.signer_type,
@@ -326,8 +422,9 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
           billing_email: formData.billing_email || null,
           billing_phone: formData.billing_phone || null,
           contract_start_date: formData.contract_start_date || null,
+          contract_end_date: formData.contract_end_date || null,
           immediate_coverage: formData.immediate_coverage,
-          maternity_bonus: formData.maternity_bonus,
+          maternity_bonus: camposDerivados.maternity_bonus,
           sale_type: formData.sale_type,
           employee_signature_mode: formData.employee_signature_mode,
         } as any);
@@ -370,8 +467,14 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
               className="bg-green-600 hover:bg-green-700"
               disabled={saving}
               onClick={async () => {
-                if (!formData.client_id || !formData.plan_id) {
-                  toast.error('Debe tener cliente y plan asignados antes de enviar a auditoría');
+                // En una venta de empresa el plan sale de la nomina: lo que hay
+                // que exigir es que haya al menos un empleado con plan cargado.
+                if (!formData.client_id || !camposDerivados.plan_id) {
+                  toast.error(
+                    isCompanySale
+                      ? 'Debe tener cliente y al menos un empleado con plan en la Nómina antes de enviar a auditoría'
+                      : 'Debe tener cliente y plan asignados antes de enviar a auditoría',
+                  );
                   return;
                 }
                 // No permitir avanzar de estado si faltan campos obligatorios del plan
@@ -385,17 +488,19 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                   await updateSale.mutateAsync({
                     id: sale.id,
                     client_id: formData.client_id,
-                    plan_id: formData.plan_id,
+                    plan_id: camposDerivados.plan_id,
                     company_id: formData.company_id,
                     titular_amount: isCompanySale ? 0 : formData.titular_amount,
                     notes: formData.notes,
-                    requires_adherents: formData.requires_adherents,
+                    requires_adherents: camposDerivados.requires_adherents,
+                    maternity_bonus: camposDerivados.maternity_bonus,
                     status: 'pendiente' as any,
                     billing_razon_social: formData.billing_razon_social || null,
                     billing_ruc: formData.billing_ruc || null,
                     billing_email: formData.billing_email || null,
                     billing_phone: formData.billing_phone || null,
                     contract_start_date: formData.contract_start_date || null,
+                    contract_end_date: formData.contract_end_date || null,
                   } as any);
                   // El total lo calcula EXCLUSIVAMENTE la base (migración
                   // 20260818000001). Acá había una quinta fórmula propia
@@ -619,7 +724,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                   <SaleEmployeesTab
                     saleId={sale?.id}
                     disabled={isAuditLocked}
-                    defaultPlanId={formData.plan_id}
+                    defaultPlanId={planDerivado || undefined}
                   />
                 ) : (
                   <SaleAdherentsTab saleId={sale?.id} disabled={isAuditLocked} />

@@ -12,6 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/utils';
+import { formatDateOnly } from '@/lib/dateOnly';
+import { getVigencia, VIGENCIA_LABELS, type EstadoVigencia } from '@/lib/vigencia';
 import RequireAuth from '@/components/RequireAuth';
 import { useEffect, useState } from 'react';
 import { useStateTransition } from '@/hooks/useStateTransition';
@@ -117,6 +119,9 @@ const Sales = () => {
     return 'bg-muted-foreground/50';
   };
 
+  // `created_at` es timestamptz: se formatea con el reloj del navegador.
+  // Las fechas date-only (contract_end_date) van por `formatDateOnly`, que las
+  // parte en componentes en vez de pasarlas por new Date() — bug conocido #1.
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('es-PY', {
@@ -124,6 +129,19 @@ const Sales = () => {
       month: '2-digit',
       year: 'numeric'
     });
+  };
+
+  const getVigenciaBadgeClass = (estado: EstadoVigencia): string => {
+    switch (estado) {
+      case 'vigente':
+        return 'bg-green-600 hover:bg-green-600/90 text-white border-transparent';
+      case 'por_vencer':
+        return 'bg-amber-500 hover:bg-amber-500/90 text-white border-transparent';
+      case 'vencido':
+        return 'bg-destructive hover:bg-destructive/90 text-destructive-foreground border-transparent';
+      default:
+        return '';
+    }
   };
 
   if (isLoading) {
@@ -193,6 +211,7 @@ const Sales = () => {
                       <TableHead className="font-semibold">CONTRATO</TableHead>
                       <TableHead className="font-semibold">CLIENTE</TableHead>
                       <TableHead className="font-semibold">ESTADO</TableHead>
+                      <TableHead className="font-semibold">VIGENCIA</TableHead>
                       <TableHead className="font-semibold">MONTO</TableHead>
                       <TableHead className="font-semibold">PROGRESO</TableHead>
                       <TableHead className="font-semibold">DOCUMENTOS</TableHead>
@@ -228,11 +247,30 @@ const Sales = () => {
 
                           <TableCell>
                             {(() => {
-                              const displayStatus = (sale as any).all_signatures_completed ? 'completado' : (sale.status || 'borrador');
+                              const displayStatus = sale.all_signatures_completed ? 'completado' : (sale.status || 'borrador');
                               return (
                                 <Badge variant={getStatusBadgeVariant(displayStatus)} className={displayStatus === 'completado' ? 'bg-green-600' : ''}>
                                   {getStatusText(displayStatus)}
                                 </Badge>
+                              );
+                            })()}
+                          </TableCell>
+
+                          <TableCell>
+                            {(() => {
+                              const vigencia = getVigencia(sale);
+                              if (vigencia.estado === 'sin_definir') {
+                                return <span className="text-muted-foreground">—</span>;
+                              }
+                              return (
+                                <div className="space-y-1">
+                                  <Badge className={getVigenciaBadgeClass(vigencia.estado)}>
+                                    {VIGENCIA_LABELS[vigencia.estado]}
+                                  </Badge>
+                                  <div className="text-sm text-muted-foreground">
+                                    {vigencia.label}
+                                  </div>
+                                </div>
                               );
                             })()}
                           </TableCell>
@@ -247,8 +285,8 @@ const Sales = () => {
                           <TableCell>
                             {(() => {
                               // Hybrid: if all signatures completed, show 100% regardless of status
-                              const progress = (sale as any).all_signatures_completed 
-                                ? 100 
+                              const progress = sale.all_signatures_completed
+                                ? 100
                                 : getProgress(sale.status || 'borrador');
                               return (
                                 <div className="space-y-2">
@@ -279,7 +317,7 @@ const Sales = () => {
                                 {formatDate(sale.created_at)}
                               </div>
                               <div className="text-sm text-muted-foreground">
-                                Vence: {sale.signature_expires_at ? formatDate(sale.signature_expires_at) : 'No definido'}
+                                Vence: {sale.contract_end_date ? formatDateOnly(sale.contract_end_date) : 'No definido'}
                               </div>
                             </div>
                           </TableCell>
@@ -345,7 +383,7 @@ const Sales = () => {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-12">
+                        <TableCell colSpan={9} className="text-center py-12">
                           <div className="space-y-4">
                             <p className="text-muted-foreground">
                               {searchTerm || statusFilter !== 'todos'

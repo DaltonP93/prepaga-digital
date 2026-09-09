@@ -506,6 +506,7 @@ export type Database = {
           is_primary: boolean | null
           last_name: string
           marital_status: string | null
+          maternity_bonus: boolean
           member_role: string
           occupation: string | null
           parent_beneficiary_id: string | null
@@ -515,6 +516,7 @@ export type Database = {
           preexisting_conditions_detail: string | null
           province: string | null
           relationship: string | null
+          requires_adherents: boolean
           sale_id: string
           signature_link_id: string | null
           signature_required: boolean | null
@@ -545,6 +547,7 @@ export type Database = {
           is_primary?: boolean | null
           last_name: string
           marital_status?: string | null
+          maternity_bonus?: boolean
           member_role?: string
           occupation?: string | null
           parent_beneficiary_id?: string | null
@@ -554,6 +557,7 @@ export type Database = {
           preexisting_conditions_detail?: string | null
           province?: string | null
           relationship?: string | null
+          requires_adherents?: boolean
           sale_id: string
           signature_link_id?: string | null
           signature_required?: boolean | null
@@ -584,6 +588,7 @@ export type Database = {
           is_primary?: boolean | null
           last_name?: string
           marital_status?: string | null
+          maternity_bonus?: boolean
           member_role?: string
           occupation?: string | null
           parent_beneficiary_id?: string | null
@@ -593,6 +598,7 @@ export type Database = {
           preexisting_conditions_detail?: string | null
           province?: string | null
           relationship?: string | null
+          requires_adherents?: boolean
           sale_id?: string
           signature_link_id?: string | null
           signature_required?: boolean | null
@@ -5962,6 +5968,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      auth_user_of_profile: { Args: { p_profile_id: string }; Returns: string }
       check_all_signatures_completed: {
         Args: { p_sale_id: string }
         Returns: boolean
@@ -6232,6 +6239,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      notify_expiring_sales: { Args: { p_dias?: number }; Returns: number }
       recalculate_sale_total_amount: {
         Args: { p_sale_id: string }
         Returns: undefined

@@ -156,3 +156,45 @@ export function aplanarNomina<T extends NominaMember>(
 export function tieneNomina(beneficiarios: NominaMember[] | null | undefined): boolean {
   return (beneficiarios || []).some(esEmpleado);
 }
+
+/**
+ * La nomina en el orden en que se cargo.
+ *
+ * `useBeneficiaries` trae DESCENDENTE por `created_at` y el arbol conserva el
+ * orden de entrada, asi que quien agrupa tiene que invertirlo. Vive aca —y no
+ * repetido en cada pantalla— porque la tabla que se ve y la que se guarda en
+ * `sales.plan_id` tienen que salir de la misma primera fila.
+ */
+export function ordenarNomina<T extends NominaMember>(
+  beneficiarios: T[] | null | undefined,
+): T[] {
+  return [...(beneficiarios || [])].sort((a, b) =>
+    String(a.created_at || '').localeCompare(String(b.created_at || '')),
+  );
+}
+
+/**
+ * El plan que representa al contrato de empresa: el del primer empleado ACTIVO.
+ *
+ * En una venta corporativa el vendedor ya no elige un "plan de referencia" —lo
+ * elige empleado por empleado— pero `sales.plan_id` no puede quedar en NULL: lo
+ * leen la condicion `has_plan` del workflow configurable
+ * (`useStateTransition.ts`), la herencia de plan de la venta-operacion de un
+ * anexo (`useAdherentIncorporations`, `usePlanChanges`) y la resolucion de
+ * reglas de comisiones, que nunca asume 0%. Se deriva en vez de pedirse.
+ */
+export function planDeReferenciaDeNomina(
+  agrupada: NominaAgrupada,
+): string | null {
+  const primero = agrupada.empleados.find((g) => estaActivo(g.empleado));
+  return (primero?.empleado.plan_id as string | null | undefined) || null;
+}
+
+/** ¿Algun empleado activo contrato el adicional Plan Materno? Es lo que habilita
+ *  la pestaña "Campos del Plan", que se completa UNA vez para todo el contrato
+ *  porque `template_responses` es por venta, no por persona. */
+export function nominaTieneMaternidad(agrupada: NominaAgrupada): boolean {
+  return agrupada.empleados.some(
+    (g) => estaActivo(g.empleado) && g.empleado.maternity_bonus === true,
+  );
+}

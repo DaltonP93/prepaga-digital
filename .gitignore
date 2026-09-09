@@ -52,3 +52,6 @@ graphify-out/
 # No se versiona porque en Docker/Lovable no existe .env.local y alli no hace falta.
 # Para recrearlo: mismas 3 variables que .env (project id, url y publishable key de BR).
 .env.production
+
+# Artefactos locales del CLI de Supabase (link al proyecto de la maquina)
+supabase/.temp/
