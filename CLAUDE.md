@@ -314,6 +314,29 @@ Al firmarse, `activate_adherent_incorporation()` bifurca:
 > una de las 4 que `trg_beneficiaries_block_when_sale_signed` exime por
 > `PG_CONTEXT`. Por eso **no** hace falta `set_config`, y no se toca el regex.
 
+#### Un alta puede traer un empleado CON su grupo familiar (2026-09-09)
+
+Antes un alta era de un solo rol, y sumar a alguien con su familia costaba dos
+movimientos y dos ceremonias de firma. Ahora el formulario de alta de empresa
+anida los adherentes bajo cada empleado (`adherentesPorFila` en
+`SaleIncorporationsTab`), y el vínculo se guarda **dentro de la venta-operación**:
+el adherente nace con `parent_beneficiary_id` apuntando al empleado de esa misma
+venta, que es lo único que la FK compuesta `fk_beneficiaries_parent` permite. Por
+eso `useCreateAdherentIncorporation` inserta en **dos pasadas** (primero los
+empleados, después sus adherentes).
+
+`activate_adherent_incorporation` lo traduce al contrato madre
+(`20260910000004`): activa los **empleados primero** (`ORDER BY`) y, si
+`parent_target_beneficiary_id` no resuelve contra la madre, sigue el
+`parent_beneficiary_id` del beneficiario de la operación hasta la fila hermana de
+`adherent_incorporations` y de ahí a su `activated_beneficiary_id`. También copia
+`requires_adherents` / `maternity_bonus`.
+
+> `parent_target_beneficiary_id` (empleado que YA vive en la madre) y
+> `parent_row_index` (empleado que entra en ESTE movimiento) son excluyentes: el
+> primero no puede usarse para el segundo porque cuando se arma el alta ese
+> empleado todavía no existe en ningún contrato.
+
 ### Por qué una baja inserta beneficiarios que no firman
 
 `useCreateNominaTermination` inserta el snapshot de quienes salen como
@@ -869,6 +892,15 @@ se eliminaron (`SaleTabbedForm` ahora llama a la RPC). Incluye backfill con `RAI
 **Fix aplicado**, en tres capas: `canMutateBeneficiaries` (`src/lib/saleUtils.ts`, **sin
 excepciones por rol**), una guarda en los hooks de `useBeneficiaries`, y el trigger
 `trg_beneficiaries_block_when_sale_signed` (`20260818000002`).
+
+> **2026-09-09** — faltaba la cuarta capa, la que se ve: `SaleTabbedForm` gateaba las
+> pestañas Nómina/Adherentes con `isSaleLocked`, que **sí exime a los 5 roles
+> privilegiados**, así que un admin llenaba el formulario entero sobre un contrato
+> firmado y recién al grabar chocaba con el guard. Y como los `catch` de esas pestañas
+> sólo hacían `console.error`, el usuario veía un botón mudo. Ahora se gatean con
+> `canMutateBeneficiaries`, hay un banner que explica el motivo y lleva a Movimientos, y
+> todos los `catch` muestran `toast.error`. Si un deploy de Lovable revierte esto, el
+> síntoma vuelve a ser "el botón Guardar no hace nada".
 
 Las 4 funciones del sistema que **deben** poder escribir en un contrato firmado
 (`activate_adherent_incorporation`, `complete_adherent_incorporation`, `approve_sale_addendum`,

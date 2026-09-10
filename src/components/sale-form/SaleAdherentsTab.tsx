@@ -18,7 +18,22 @@ import { esEmpleado } from '@/lib/nomina';
 interface SaleAdherentsTabProps {
   saleId?: string;
   disabled?: boolean;
+  /**
+   * El contrato ya esta firmado: el grupo familiar es de solo lectura para
+   * TODOS los roles, porque ya quedo sellado en un PDF con firma PAdES.
+   */
+  signedLock?: boolean;
+  /** Salta a la pestana Movimientos; `undefined` si no esta disponible. */
+  onIrAMovimientos?: () => void;
 }
+
+/**
+ * Un `catch` que solo hace `console.error` deja al usuario mirando un boton que
+ * no hace nada: el guard de contrato firmado y el trigger de la base rechazan
+ * con un mensaje que explica que hacer, y tiene que llegar a la pantalla.
+ */
+const mensajeDeError = (e: unknown, porDefecto: string): string =>
+  e instanceof Error && e.message ? e.message : porDefecto;
 
 /**
  * Los campos los pinta `BeneficiaryFields`, compartido con la nómina de empresa
@@ -111,7 +126,9 @@ const AdherenteForm: React.FC<AdherenteFormProps> = ({
   </Card>
 );
 
-const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled }) => {
+const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({
+  saleId, disabled, signedLock, onIrAMovimientos,
+}) => {
   const { data: beneficiaries, isLoading } = useBeneficiaries(saleId || '');
   const createBeneficiary = useCreateBeneficiary();
   const deleteBeneficiary = useDeleteBeneficiary();
@@ -147,6 +164,7 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
       setShowForm(false);
     } catch (error) {
       console.error('Error adding beneficiary:', error);
+      toast.error(mensajeDeError(error, 'No se pudo agregar el adherente.'));
     }
   };
 
@@ -162,6 +180,7 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
       setEditingId(null);
     } catch (error) {
       console.error('Error updating beneficiary:', error);
+      toast.error(mensajeDeError(error, 'No se pudo guardar el cambio.'));
     }
   };
 
@@ -170,11 +189,40 @@ const SaleAdherentsTab: React.FC<SaleAdherentsTabProps> = ({ saleId, disabled })
       await deleteBeneficiary.mutateAsync(id);
     } catch (error) {
       console.error('Error deleting beneficiary:', error);
+      toast.error(mensajeDeError(error, 'No se pudo eliminar al adherente.'));
     }
   };
 
   return (
     <div className="space-y-4">
+      {signedLock && (
+        <div className="flex flex-wrap items-start justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm dark:bg-amber-950/30">
+          <div className="flex gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <p>
+              Este contrato ya está firmado: el grupo familiar quedó sellado en el PDF firmado y
+              no se puede editar acá.{' '}
+              {onIrAMovimientos ? (
+                <>
+                  Para sumar o dar de baja gente usá la pestaña <strong>Movimientos</strong>, que
+                  genera su propio anexo y su propia firma.
+                </>
+              ) : (
+                <>
+                  Cuando termine de firmarlo todo el mundo se habilita la pestaña{' '}
+                  <strong>Movimientos</strong>, que es por donde se suma o se da de baja gente.
+                </>
+              )}
+            </p>
+          </div>
+          {onIrAMovimientos && (
+            <Button type="button" variant="outline" size="sm" onClick={onIrAMovimientos}>
+              Ir a Movimientos
+            </Button>
+          )}
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Users className="h-5 w-5" />

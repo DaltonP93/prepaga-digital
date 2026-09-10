@@ -16,7 +16,7 @@ import { AuditCommentsPanel } from '@/components/audit/AuditCommentsPanel';
 import { SALE_STATUS_LABELS } from '@/types/workflow';
 import type { SaleStatus } from '@/types/workflow';
 import { toast } from 'sonner';
-import { isSaleLocked, isPrivilegedRole } from '@/lib/saleUtils';
+import { isSaleLocked, isPrivilegedRole, canMutateBeneficiaries } from '@/lib/saleUtils';
 import { resolvePlanFieldsTemplateName } from '@/lib/saleFilters';
 import { useClientIsCompany } from '@/hooks/useSaleClientType';
 import { useBeneficiaries } from '@/hooks/useBeneficiaries';
@@ -73,9 +73,20 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
   const currentStatus = (sale?.status || 'borrador') as SaleStatus;
   const isEditAllowed = !isEditing || canEditState(currentStatus);
   const isAuditorOrAbove = role === 'auditor' || role === 'admin' || role === 'super_admin' || role === 'vendedor';
+  /** Movimientos y Cambio de Plan solo existen sobre un contrato ya firmado. */
+  const movimientosDisponibles =
+    isEditing && (currentStatus === 'firmado' || currentStatus === 'completado');
 
   // Centralized lock logic
   const isAuditLocked = isSaleLocked(sale, role as any);
+  /**
+   * La composicion del grupo familiar / la nomina se congela con la PRIMERA
+   * firma, y a diferencia de `isSaleLocked` esto NO tiene excepciones por rol:
+   * ya esta sellada en un PDF con firma PAdES. El hook y el trigger de la base
+   * lo rechazan igual, asi que si la UI no lo refleja el usuario llena todo el
+   * formulario y recien al grabar se entera. Ver `canMutateBeneficiaries`.
+   */
+  const beneficiariesLocked = !canMutateBeneficiaries(sale);
   const userIsPrivileged = isPrivilegedRole(role as any);
   const contractStartDate = typeof sale?.contract_start_date === 'string'
     ? sale.contract_start_date.slice(0, 10)
@@ -691,12 +702,12 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
               )}
               <TabsTrigger value="templates" disabled={!isEditing}>Templates</TabsTrigger>
               {/* Solo tiene sentido incorporar adherentes a un contrato ya firmado. */}
-              {isEditing && (currentStatus === 'firmado' || currentStatus === 'completado') && (
+              {movimientosDisponibles && (
                 <TabsTrigger value="incorporaciones">Movimientos</TabsTrigger>
               )}
               {/* Mismo criterio que incorporaciones: solo se cambia el plan de
                   un contrato ya firmado. */}
-              {isEditing && (currentStatus === 'firmado' || currentStatus === 'completado') && (
+              {movimientosDisponibles && (
                 <TabsTrigger value="cambio_plan">Cambio de Plan</TabsTrigger>
               )}
               {isEditing && isAuditorOrAbove && (
@@ -723,11 +734,18 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                 {isCompanySale ? (
                   <SaleEmployeesTab
                     saleId={sale?.id}
-                    disabled={isAuditLocked}
+                    disabled={isAuditLocked || beneficiariesLocked}
+                    signedLock={beneficiariesLocked}
+                    onIrAMovimientos={movimientosDisponibles ? () => setActiveTab('incorporaciones') : undefined}
                     defaultPlanId={planDerivado || undefined}
                   />
                 ) : (
-                  <SaleAdherentsTab saleId={sale?.id} disabled={isAuditLocked} />
+                  <SaleAdherentsTab
+                    saleId={sale?.id}
+                    disabled={isAuditLocked || beneficiariesLocked}
+                    signedLock={beneficiariesLocked}
+                    onIrAMovimientos={movimientosDisponibles ? () => setActiveTab('incorporaciones') : undefined}
+                  />
                 )}
               </TabsContent>
 
@@ -773,7 +791,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
                 adherente es una acción aparte y acotada, que no modifica la venta
                 madre sino que crea su propia operación.
               */}
-              {isEditing && (currentStatus === 'firmado' || currentStatus === 'completado') && (
+              {movimientosDisponibles && (
                 <TabsContent value="incorporaciones">
                   <SaleIncorporationsTab saleId={sale?.id} saleStatus={sale?.status} />
                 </TabsContent>
@@ -781,7 +799,7 @@ const SaleTabbedForm: React.FC<SaleTabbedFormProps> = ({ sale }) => {
 
               {/* Va FUERA del fieldset por el mismo motivo que incorporaciones:
                   el cambio de plan es su propia operación, no edita la venta madre. */}
-              {isEditing && (currentStatus === 'firmado' || currentStatus === 'completado') && (
+              {movimientosDisponibles && (
                 <TabsContent value="cambio_plan">
                   <SalePlanChangeTab saleId={sale?.id} saleStatus={sale?.status} />
                 </TabsContent>

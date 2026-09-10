@@ -63,6 +63,14 @@ import {
 interface SaleEmployeesTabProps {
   saleId?: string;
   disabled?: boolean;
+  /**
+   * El contrato ya esta firmado: la nomina es de solo lectura para TODOS los
+   * roles. Se distingue de `disabled` (que tambien lo pone la auditoria) porque
+   * el motivo, y por lo tanto el camino de salida, son otros.
+   */
+  signedLock?: boolean;
+  /** Salta a la pestana Movimientos; `undefined` si no esta disponible. */
+  onIrAMovimientos?: () => void;
   /** Plan de referencia de la venta: precarga el del primer empleado. */
   defaultPlanId?: string;
 }
@@ -74,6 +82,15 @@ const formatFechaCorta = (iso?: string | null): string => {
   const [y, m, d] = String(iso).slice(0, 10).split('-');
   return y && m && d ? `${d}/${m}/${y}` : '';
 };
+
+/**
+ * Un `catch` que solo hace `console.error` deja al usuario mirando un boton que
+ * no hace nada: el guard de contrato firmado (`useBeneficiaries`) y el trigger
+ * de la base rechazan con un mensaje que explica exactamente que hacer, y ese
+ * mensaje tiene que llegar a la pantalla.
+ */
+const mensajeDeError = (e: unknown, porDefecto: string): string =>
+  e instanceof Error && e.message ? e.message : porDefecto;
 
 const toPayload = (data: PersonaFieldsData) => ({
   first_name: data.first_name,
@@ -239,7 +256,9 @@ const FilaPersona: React.FC<FilaPersonaProps> = ({
   );
 };
 
-const SaleEmployeesTab: React.FC<SaleEmployeesTabProps> = ({ saleId, disabled, defaultPlanId }) => {
+const SaleEmployeesTab: React.FC<SaleEmployeesTabProps> = ({
+  saleId, disabled, signedLock, onIrAMovimientos, defaultPlanId,
+}) => {
   const { data: beneficiaries, isLoading } = useBeneficiaries(saleId || '');
   const { data: plans } = usePlans();
   const createBeneficiary = useCreateBeneficiary();
@@ -327,6 +346,7 @@ const SaleEmployeesTab: React.FC<SaleEmployeesTabProps> = ({ saleId, disabled, d
       setNuevoEmpleado(null);
     } catch (e) {
       console.error('Error creando empleado:', e);
+      toast.error(mensajeDeError(e, 'No se pudo crear el empleado.'));
     }
   };
 
@@ -347,6 +367,7 @@ const SaleEmployeesTab: React.FC<SaleEmployeesTabProps> = ({ saleId, disabled, d
       setNuevoAdherente(emptyPersonaFields());
     } catch (e) {
       console.error('Error creando adherente:', e);
+      toast.error(mensajeDeError(e, 'No se pudo crear el adherente.'));
     }
   };
 
@@ -363,6 +384,7 @@ const SaleEmployeesTab: React.FC<SaleEmployeesTabProps> = ({ saleId, disabled, d
       setEdicion(null);
     } catch (e) {
       console.error('Error actualizando la nómina:', e);
+      toast.error(mensajeDeError(e, 'No se pudo guardar el cambio.'));
     }
   };
 
@@ -371,6 +393,7 @@ const SaleEmployeesTab: React.FC<SaleEmployeesTabProps> = ({ saleId, disabled, d
       await deleteBeneficiary.mutateAsync(id);
     } catch (e) {
       console.error('Error eliminando de la nómina:', e);
+      toast.error(mensajeDeError(e, 'No se pudo eliminar a esta persona.'));
     }
   };
 
@@ -390,6 +413,34 @@ const SaleEmployeesTab: React.FC<SaleEmployeesTabProps> = ({ saleId, disabled, d
 
   return (
     <div className="space-y-4">
+      {signedLock && (
+        <div className="flex flex-wrap items-start justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm dark:bg-amber-950/30">
+          <div className="flex gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <p>
+              Este contrato ya está firmado: la nómina quedó sellada en el PDF firmado y no se
+              puede editar acá.{' '}
+              {onIrAMovimientos ? (
+                <>
+                  Para sumar o dar de baja gente usá la pestaña <strong>Movimientos</strong>, que
+                  genera su propio anexo y su propia firma.
+                </>
+              ) : (
+                <>
+                  Cuando termine de firmarlo todo el mundo se habilita la pestaña{' '}
+                  <strong>Movimientos</strong>, que es por donde se suma o se da de baja gente.
+                </>
+              )}
+            </p>
+          </div>
+          {onIrAMovimientos && (
+            <Button type="button" variant="outline" size="sm" onClick={onIrAMovimientos}>
+              Ir a Movimientos
+            </Button>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Building2 className="h-5 w-5" />

@@ -53,6 +53,18 @@ export interface IncorporationAdherentInput {
   member_role?: 'empleado' | 'adherente';
   plan_id?: string | null;
   parent_target_beneficiary_id?: string | null;
+  /**
+   * Adherente de un empleado que entra en ESTE MISMO movimiento: índice de ese
+   * empleado dentro del array `adherents`. Es excluyente con
+   * `parent_target_beneficiary_id`, que apunta a un empleado que ya vive en el
+   * contrato madre; acá el padre todavía no existe en ningún lado cuando se
+   * arma el alta. El vínculo se crea dentro de la venta-operación y la base lo
+   * traduce al contrato madre al activar.
+   */
+  parent_row_index?: number | null;
+  /** Empleado que declara grupo familiar (viaja al contrato madre al activar). */
+  requires_adherents?: boolean;
+  maternity_bonus?: boolean;
 }
 
 /**
@@ -212,39 +224,106 @@ export const useCreateAdherentIncorporation = () => {
         // 3. Los adherentes se crean en la VENTA-OPERACIÓN: así el motor de
         //    plantillas arma la tabla del anexo solo con ellos, y el circuito
         //    de firma les genera su DDJJ sin tocar la venta madre.
-        const { data: createdBeneficiaries, error: benError } = await supabase
-          .from('beneficiaries')
-          .insert(
-            adherents.map((a) => ({
-              sale_id: operationSale.id,
-              first_name: a.first_name,
-              last_name: a.last_name,
-              dni: a.dni || null,
-              document_number: a.dni || null,
-              relationship: a.relationship || null,
-              birth_date: a.birth_date || null,
-              gender: a.gender || null,
-              phone: a.phone || null,
-              email: a.email || null,
-              address: a.address || null,
-              barrio: a.barrio || null,
-              city: a.city || null,
-              amount: Number(a.amount) || 0,
-              entry_date: a.entry_date || null,
-              immediate_coverage: a.immediate_coverage ?? null,
-              is_primary: false,
-              // Nómina de empresa. `parent_beneficiary_id` NO se copia acá: el
-              // empleado del que va a colgar vive en el CONTRATO MADRE, y la FK
-              // compuesta (parent, sale_id) exige que padre e hijo estén en la
-              // misma venta. El vínculo se resuelve al activar, desde
-              // `parent_target_beneficiary_id`.
-              member_role: a.member_role || 'adherente',
-              plan_id: a.plan_id || (parent as any).plan_id || null,
-            })) as any
-          )
-          .select();
+        //
+        //    Se insertan en DOS PASADAS. `parent_beneficiary_id` sólo se puede
+        //    apuntar a alguien de la MISMA venta (FK compuesta
+        //    `fk_beneficiaries_parent (parent_beneficiary_id, sale_id)`), así
+        //    que el empleado que entra en este movimiento tiene que existir
+        //    antes que sus adherentes. Los adherentes de un empleado que ya
+        //    vive en el contrato MADRE no llevan padre acá: ese vínculo lo
+        //    resuelve la base al activar, desde `parent_target_beneficiary_id`.
+        const filaBase = (a: IncorporationAdherentInput) => ({
+          sale_id: operationSale.id,
+          first_name: a.first_name,
+          last_name: a.last_name,
+          dni: a.dni || null,
+          document_number: a.dni || null,
+          relationship: a.relationship || null,
+          birth_date: a.birth_date || null,
+          gender: a.gender || null,
+          phone: a.phone || null,
+          email: a.email || null,
+          address: a.address || null,
+          barrio: a.barrio || null,
+          city: a.city || null,
+          amount: Number(a.amount) || 0,
+          entry_date: a.entry_date || null,
+          immediate_coverage: a.immediate_coverage ?? null,
+          is_primary: false,
+          member_role: a.member_role || 'adherente',
+          plan_id: a.plan_id || (parent as any).plan_id || null,
+          requires_adherents: a.requires_adherents === true,
+          maternity_bonus: a.maternity_bonus === true,
+        });
 
-        if (benError) throw benError;
+        const esHijoDeEsteMovimiento = (a: IncorporationAdherentInput) =>
+          typeof a.parent_row_index === 'number' && a.parent_row_index >= 0;
+
+        /** índice en `adherents` → id del beneficiario creado en la operación. */
+        const idPorIndice = new Map<number, string>();
+
+        const insertarPasada = async (
+          indices: number[],
+          conPadre: boolean,
+        ): Promise<void> => {
+          if (!indices.length) return;
+          const { data, error } = await supabase
+            .from('beneficiaries')
+            .insert(
+              indices.map((i) => {
+                const a = adherents[i];
+                const fila: any = filaBase(a);
+                if (conPadre) {
+                  const padre = idPorIndice.get(a.parent_row_index as number);
+                  if (!padre) {
+                    throw new Error(
+                      'No se pudo vincular a ' +
+                        `${a.first_name} ${a.last_name} con su empleado.`,
+                    );
+                  }
+                  fila.parent_beneficiary_id = padre;
+                }
+                return fila;
+              }) as any,
+            )
+            .select();
+
+          if (error) throw error;
+          // `INSERT ... RETURNING` devuelve las filas en el orden en que se
+          // insertaron, así que la posición dentro de ESTA pasada alcanza para
+          // mapear cada id a su índice original.
+          if ((data || []).length !== indices.length) {
+            throw new Error('La incorporación no se pudo guardar completa.');
+          }
+          indices.forEach((i, pos) => {
+            const fila = (data as any[])[pos];
+            // Si el orden no fuera el de entrada, un adherente terminaría
+            // colgado del empleado equivocado Y eso viajaría al contrato madre
+            // al activar. Mejor romper acá, en voz alta, que dejar la nómina
+            // mal armada en silencio.
+            if (
+              fila.first_name !== adherents[i].first_name ||
+              fila.last_name !== adherents[i].last_name
+            ) {
+              throw new Error('La incorporación se guardó desordenada: reintentá la carga.');
+            }
+            idPorIndice.set(i, fila.id);
+          });
+        };
+
+        const indicesPadres = adherents
+          .map((a, i) => (esHijoDeEsteMovimiento(a) ? -1 : i))
+          .filter((i) => i >= 0);
+        const indicesHijos = adherents
+          .map((a, i) => (esHijoDeEsteMovimiento(a) ? i : -1))
+          .filter((i) => i >= 0);
+
+        await insertarPasada(indicesPadres, false);
+        await insertarPasada(indicesHijos, true);
+
+        const createdBeneficiaries = adherents.map((_a, i) => ({
+          id: idPorIndice.get(i) || null,
+        }));
 
         // 4. Una fila de incorporación por adherente.
         const { error: incError } = await supabase.from('adherent_incorporations').insert(

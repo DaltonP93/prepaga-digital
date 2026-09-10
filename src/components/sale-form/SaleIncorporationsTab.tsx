@@ -122,6 +122,16 @@ const SaleIncorporationsTab: React.FC<SaleIncorporationsTabProps> = ({ saleId, s
 
   // ── Alta ────────────────────────────────────────────────────────────────
   const [rows, setRows] = useState<PersonaFieldsData[]>([emptyPersonaFields()]);
+  /**
+   * Grupo familiar de cada fila de `rows`, alineado por índice.
+   *
+   * Un empleado que entra a la nómina suele entrar con su familia, y hasta acá
+   * eso eran DOS movimientos con DOS ceremonias de firma — y el segundo ni
+   * siquiera se podía preparar hasta que el primero estuviera firmado. Se
+   * mantiene aparte de `rows` para no cambiarle la forma a `PersonaFieldsData`,
+   * que comparten las tres pantallas.
+   */
+  const [adherentesPorFila, setAdherentesPorFila] = useState<PersonaFieldsData[][]>([[]]);
   /** Contratos de empresa: qué se incorpora y de quién cuelga. */
   const [rolAlta, setRolAlta] = useState<'empleado' | 'adherente'>('empleado');
   const [empleadoDestino, setEmpleadoDestino] = useState('');
@@ -192,9 +202,48 @@ const SaleIncorporationsTab: React.FC<SaleIncorporationsTabProps> = ({ saleId, s
   const updateRow = (i: number, patch: Partial<PersonaFieldsData>) =>
     setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
 
+  /** Alta anidada: sólo en contratos de empresa y sólo al incorporar empleados. */
+  const altaAnidada = isCompany && rolAlta === 'empleado';
+
+  const agregarFila = () => {
+    setRows((p) => [...p, emptyPersonaFields()]);
+    setAdherentesPorFila((p) => [...p, []]);
+  };
+
+  const quitarFila = (i: number) => {
+    setRows((p) => p.filter((_, idx) => idx !== i));
+    // El grupo familiar se va con su empleado: dejarlo huérfano lo mandaría al
+    // anexo sin nadie de quien colgar.
+    setAdherentesPorFila((p) => p.filter((_, idx) => idx !== i));
+  };
+
+  const agregarAdherenteDeFila = (i: number) =>
+    setAdherentesPorFila((p) =>
+      p.map((lista, idx) => {
+        if (idx !== i) return lista;
+        // El adherente hereda el plan de su empleado; se puede cambiar a mano.
+        const base = emptyPersonaFields();
+        const heredado = rows[i]?.plan_id || '';
+        return [...lista, heredado ? { ...base, plan_id: heredado } : base];
+      }),
+    );
+
+  const updateAdherenteDeFila = (i: number, j: number, patch: Partial<PersonaFieldsData>) =>
+    setAdherentesPorFila((p) =>
+      p.map((lista, idx) =>
+        idx !== i ? lista : lista.map((a, jdx) => (jdx === j ? { ...a, ...patch } : a)),
+      ),
+    );
+
+  const quitarAdherenteDeFila = (i: number, j: number) =>
+    setAdherentesPorFila((p) =>
+      p.map((lista, idx) => (idx !== i ? lista : lista.filter((_, jdx) => jdx !== j))),
+    );
+
   const cerrarForm = () => {
     setShowForm(false);
     setRows([emptyPersonaFields()]);
+    setAdherentesPorFila([[]]);
     setBajaTargetId('');
     setBajaMotivo('');
     setBajaFecha(hoyISO());
@@ -203,12 +252,43 @@ const SaleIncorporationsTab: React.FC<SaleIncorporationsTabProps> = ({ saleId, s
   };
 
   const handleCrearAlta = async () => {
-    const validas = rows.filter((r) => r.first_name.trim() && r.last_name.trim());
-    if (!validas.length) {
+    const completa = (r: PersonaFieldsData) => r.first_name.trim() && r.last_name.trim();
+
+    // El movimiento se aplana ACÁ, no en el hook: las personas viajan en un
+    // solo array y cada adherente anidado apunta a su empleado por índice.
+    const plano: { persona: PersonaFieldsData; rol: 'empleado' | 'adherente'; padre: number | null }[] = [];
+    rows.forEach((r, i) => {
+      if (!completa(r)) return;
+      const indiceEmpleado = plano.length;
+      const hijos = altaAnidada ? (adherentesPorFila[i] || []).filter(completa) : [];
+      plano.push({
+        persona: {
+          ...r,
+          // Un empleado con familia cargada declara grupo familiar aunque el
+          // tilde haya quedado en false: si no, llega al contrato madre sin el
+          // flag y pierde el boton "Agregar adherente" justo donde mas hace
+          // falta. Es el mismo criterio que usa la pestana Nomina para mostrarlo.
+          requires_adherents: r.requires_adherents === true || hijos.length > 0,
+        },
+        rol: isCompany ? rolAlta : 'adherente',
+        padre: null,
+      });
+      hijos.forEach((a) => {
+        plano.push({
+          // El plan se hereda al ENVIAR y no al agregar la fila: si el empleado
+          // eligio su plan despues, el adherente ya lo tenia vacio.
+          persona: { ...a, plan_id: a.plan_id || r.plan_id || '' },
+          rol: 'adherente',
+          padre: indiceEmpleado,
+        });
+      });
+    });
+
+    if (!plano.length) {
       toast.error('Cargá al menos una persona con nombre y apellido.');
       return;
     }
-    const sinTelefono = validas.find((r) => !r.phone?.trim());
+    const sinTelefono = plano.find((p) => !p.persona.phone?.trim());
     if (sinTelefono) {
       toast.error('El teléfono es obligatorio: es por donde le llega el enlace de firma.');
       return;
@@ -218,14 +298,14 @@ const SaleIncorporationsTab: React.FC<SaleIncorporationsTabProps> = ({ saleId, s
       return;
     }
     if (isCompany) {
-      const sinPlan = validas.find((r) => !r.plan_id);
+      const sinPlan = plano.find((p) => !p.persona.plan_id);
       if (sinPlan) {
         toast.error('En un contrato de empresa cada persona necesita su plan.');
         return;
       }
     }
 
-    const adherentes: IncorporationAdherentInput[] = validas.map((r) => ({
+    const adherentes: IncorporationAdherentInput[] = plano.map(({ persona: r, rol, padre }) => ({
       first_name: r.first_name,
       last_name: r.last_name,
       dni: r.dni,
@@ -240,10 +320,15 @@ const SaleIncorporationsTab: React.FC<SaleIncorporationsTabProps> = ({ saleId, s
       birth_date: r.birth_date || null,
       entry_date: r.entry_date || null,
       immediate_coverage: r.vi === 'si' ? true : r.vi === 'no' ? false : null,
-      member_role: isCompany ? rolAlta : 'adherente',
+      member_role: rol,
       plan_id: r.plan_id || null,
+      // Empleado que YA vive en el contrato madre (camino de siempre).
       parent_target_beneficiary_id:
-        isCompany && rolAlta === 'adherente' ? empleadoDestino : null,
+        padre === null && isCompany && rolAlta === 'adherente' ? empleadoDestino : null,
+      // Empleado que entra en ESTE mismo movimiento.
+      parent_row_index: padre,
+      requires_adherents: rol === 'empleado' ? r.requires_adherents === true : false,
+      maternity_bonus: rol === 'empleado' ? r.maternity_bonus === true : false,
     }));
 
     try {
@@ -445,7 +530,17 @@ const SaleIncorporationsTab: React.FC<SaleIncorporationsTabProps> = ({ saleId, s
                 <>
                   <div className="space-y-2">
                     <Label>¿Qué se incorpora? *</Label>
-                    <Select value={rolAlta} onValueChange={(v) => setRolAlta(v as 'empleado' | 'adherente')}>
+                    <Select
+                      value={rolAlta}
+                      onValueChange={(v) => {
+                        setRolAlta(v as 'empleado' | 'adherente');
+                        // Un grupo familiar cargado bajo "Un empleado" no tiene
+                        // de quién colgar si el movimiento pasa a ser de
+                        // adherentes sueltos: se descarta explícitamente en vez
+                        // de quedar escondido y viajar en el próximo alta.
+                        setAdherentesPorFila(rows.map(() => []));
+                      }}
+                    >
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="empleado">Un empleado</SelectItem>
@@ -484,7 +579,7 @@ const SaleIncorporationsTab: React.FC<SaleIncorporationsTabProps> = ({ saleId, s
                       {rows.length > 1 && (
                         <Button
                           type="button" variant="ghost" size="sm"
-                          onClick={() => setRows((p) => p.filter((_, idx) => idx !== i))}
+                          onClick={() => quitarFila(i)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -496,15 +591,62 @@ const SaleIncorporationsTab: React.FC<SaleIncorporationsTabProps> = ({ saleId, s
                       isCompany={isCompany}
                       vinculoCon={isCompany && rolAlta === 'adherente' ? 'empleado' : 'titular'}
                       plans={isCompany ? planOptions : undefined}
+                      esEmpleado={altaAnidada}
                       hidden={['gender', 'city']}
                     />
+
+                    {/* Grupo familiar del empleado que entra en ESTE movimiento:
+                        un solo anexo y una sola firma para toda la familia. */}
+                    {altaAnidada && (
+                      <div className="space-y-3 border-l-2 border-muted pl-4">
+                        {(adherentesPorFila[i] || []).map((adh, j) => (
+                          <div key={j} className="rounded-md border border-dashed p-4 space-y-4">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">
+                                Adherente {j + 1} de{' '}
+                                {row.first_name?.trim() || `el empleado ${i + 1}`}
+                              </span>
+                              <Button
+                                type="button" variant="ghost" size="sm"
+                                onClick={() => quitarAdherenteDeFila(i, j)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <BeneficiaryFields
+                              value={adh}
+                              onChange={(patch) => updateAdherenteDeFila(i, j, patch)}
+                              isCompany={isCompany}
+                              vinculoCon="empleado"
+                              plans={planOptions}
+                              hidden={['gender', 'city']}
+                            />
+                          </div>
+                        ))}
+
+                        {row.requires_adherents || (adherentesPorFila[i] || []).length > 0 ? (
+                          <Button
+                            type="button" variant="outline" size="sm"
+                            onClick={() => agregarAdherenteDeFila(i)}
+                          >
+                            <UserPlus className="h-4 w-4 mr-1" />
+                            Agregar adherente de este empleado
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            Marcá “¿Requiere adherentes?” para incorporar también a su grupo
+                            familiar en este mismo anexo.
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
 
                 <div className="flex items-center justify-between">
                   <Button
                     type="button" variant="outline" size="sm"
-                    onClick={() => setRows((p) => [...p, emptyPersonaFields()])}
+                    onClick={agregarFila}
                   >
                     <Plus className="h-4 w-4 mr-1" />
                     Agregar otra persona
