@@ -1224,8 +1224,14 @@ resultado, y el script aborta si cambia un solo cálculo o un período.
   preflight daban `42P01`), por eso la foto del "antes" vive en el esquema `cr_scratch`, que el
   propio script crea y borra. Para un rollback garantizado correrlo como UNA transacción
   (`psql -1` / `apply_migration`).
-- ⚠️ `generate-commission-pdf` devuelve 500 en US test desde antes de este cambio (probado
-  el 2026-10-07 y el 2026-10-08). No es del reporte; falta investigar el renderer en ese proyecto.
+- ⚠️ `generate-commission-pdf` devolvía 500 en US test (2026-10-07/08) por una **función desplegada
+  desactualizada**, no por el reporte ni por el renderer: la v2 de US test (deploy del 2026-08-04)
+  todavía hace `select ... promoter_type_code, promoter_type_name` sobre `commission_periods`, columnas
+  que `20260804210000_commission_remove_promoter_types.sql` eliminó (PostgREST 42703 → la función
+  responde 500 "Could not load commission period"). El archivo del repo ya estaba bien (commit `be889a7`).
+  **Corregido el 2026-10-08**: redesplegada (v3, por el MCP `claude_ai_Supabase`, con `verify_jwt=false` y
+  `_shared/rate-limiter.ts`) y probado el PDF de `LIQ-PRUEBA000001`. Ojo: si se vuelve a refactorizar el
+  esquema de comisiones, **hay que redesplegar esta función en US test**; nadie lo hace solo.
 - Sigue **sin estar en BR producción**.
 
 ### Deploy — nunca a producción por accidente
