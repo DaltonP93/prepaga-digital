@@ -7,6 +7,26 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Traduce los rechazos de la política de contraseñas de Supabase Auth a un mensaje
+// en español. Auth puede devolver varios motivos juntos (ej. falta un tipo de
+// carácter Y es una contraseña filtrada), por eso se acumulan. Devuelve null si
+// el error no es de contraseña.
+function passwordPolicyMessage(authMessage: string): string | null {
+  const lower = authMessage.toLowerCase();
+  const reasons: string[] = [];
+  if (lower.includes('contain at least one character') || lower.includes('should contain')) {
+    reasons.push('debe incluir al menos una minúscula (a-z), una mayúscula (A-Z), un número (0-9) y un símbolo (!@#$...)');
+  }
+  if (lower.includes('weak') || lower.includes('easy to guess') || lower.includes('pwned') || lower.includes('breached')) {
+    reasons.push('es demasiado común o aparece en filtraciones conocidas (evitá nombres, años o "123")');
+  }
+  if (reasons.length === 0 && lower.includes('password') &&
+      (lower.includes('characters') || lower.includes('too short') || lower.includes('at least'))) {
+    reasons.push('es demasiado corta (usá al menos 8 caracteres)');
+  }
+  return reasons.length ? `La contraseña ${reasons.join(' y ')}.` : null;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -263,17 +283,8 @@ serve(async (req) => {
       if (updateError) {
         console.error('updateUserById error:', JSON.stringify(updateError));
         const details = updateError.message || JSON.stringify(updateError);
-        const lower = details.toLowerCase();
-        let userMessage: string;
-        if (lower.includes('contain at least one character') || lower.includes('should contain')) {
-          userMessage = 'La contraseña debe incluir al menos: una minúscula (a-z), una mayúscula (A-Z), un número (0-9) y un símbolo (!@#$...).';
-        } else if (lower.includes('weak') || lower.includes('easy to guess') || lower.includes('pwned') || lower.includes('breached')) {
-          userMessage = 'La contraseña es demasiado común. Elegí una más segura combinando letras, números y símbolos.';
-        } else if (lower.includes('characters') || lower.includes('too short') || lower.includes('at least')) {
-          userMessage = 'La contraseña es demasiado corta. Usá al menos 8 caracteres.';
-        } else {
-          userMessage = 'Contraseña inválida. Usá letras mayúsculas, minúsculas, números y símbolos.';
-        }
+        const userMessage = passwordPolicyMessage(details) ??
+          'Contraseña inválida. Usá letras mayúsculas, minúsculas, números y símbolos.';
         return new Response(
           JSON.stringify({ error: userMessage, details }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -392,10 +403,13 @@ serve(async (req) => {
         lowerMessage.includes('already registered') ||
         lowerMessage.includes('already exists') ||
         lowerMessage.includes('duplicate');
+      const passwordMessage = duplicateEmail ? null : passwordPolicyMessage(normalizedMessage);
 
       return new Response(
         JSON.stringify({
-          error: duplicateEmail ? 'Ya existe un usuario con ese email' : 'No se pudo crear la cuenta de usuario',
+          error: duplicateEmail
+            ? 'Ya existe un usuario con ese email'
+            : passwordMessage ?? 'No se pudo crear la cuenta de usuario',
           details: normalizedMessage,
         }),
         { status: duplicateEmail ? 409 : 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

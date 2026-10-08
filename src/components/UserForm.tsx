@@ -190,11 +190,20 @@ export function UserForm({ open, onOpenChange, user }: UserFormProps) {
                     type="password"
                     {...register("password", { 
                       required: !isEditing ? "La contraseña es requerida" : false,
-                      minLength: { value: 8, message: "La contraseña debe tener al menos 8 caracteres" }
+                      minLength: { value: 8, message: "La contraseña debe tener al menos 8 caracteres" },
+                      // Misma política que Supabase Auth (la del chequeo de filtraciones solo la valida el servidor)
+                      validate: (value) =>
+                        isEditing || !value ||
+                        (/[a-z]/.test(value) && /[A-Z]/.test(value) && /\d/.test(value) && /[^A-Za-z0-9]/.test(value)) ||
+                        "Debe incluir una minúscula, una mayúscula, un número y un símbolo (!@#$...)",
                     })}
                   />
-                  {errors.password && (
+                  {errors.password ? (
                     <span className="text-sm text-red-500">{errors.password.message}</span>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Mín. 8 caracteres con mayúsculas, minúsculas, números y símbolos. Evitá nombres, años o "123".
+                    </p>
                   )}
                 </div>
               )}
