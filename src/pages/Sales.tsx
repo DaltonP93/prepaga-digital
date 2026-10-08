@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Plus, Search, Filter, MoreHorizontal, FileText, Eye, Edit, Trash2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Link } from 'react-router-dom';
-import { useSalesList, useDeleteSale } from '@/hooks/useSales';
+import { useSalesList, useDeleteSale, type SalesListFilters } from '@/hooks/useSales';
+import { useSalesFilterOptions } from '@/hooks/useSalesFilterOptions';
+import { SalesFiltersPanel } from '@/components/sales/SalesFiltersPanel';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -27,10 +29,16 @@ const Sales = () => {
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
+  const [filters, setFilters] = useState<SalesListFilters>({});
+  // La busqueda ahora se resuelve en el servidor: sin debounce, cada tecla es un query.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const { plans, salespersons, isAdminRole } = useSalesFilterOptions();
   const { data: salesPage, isLoading } = useSalesList({
     page,
     pageSize: 25,
     status: statusFilter,
+    search: debouncedSearch,
+    ...filters,
   });
   const queryClient = useQueryClient();
   const deleteSale = useDeleteSale();
@@ -40,8 +48,13 @@ const Sales = () => {
   const sales = salesPage?.sales || [];
 
   useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
     setPage(1);
-  }, [statusFilter, searchTerm]);
+  }, [statusFilter, debouncedSearch, filters]);
 
   // Fetch document counts per sale
   const saleIds = sales.map(s => s.id);
@@ -71,13 +84,11 @@ const Sales = () => {
     canViewState((sale.status || 'borrador') as SaleStatus)
   );
 
-  const filteredSales = visibleSales.filter(sale => {
-    const matchesSearch = sale.clients?.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sale.clients?.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sale.id?.includes(searchTerm);
-    const matchesStatus = statusFilter === 'todos' || sale.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  // El filtrado real (busqueda, estado y el resto de los filtros) lo hace el
+  // servidor en useSalesList: hacerlo aca, sobre la pagina de 25 ya traida,
+  // devolveria paginas semivacias y un total que no coincide con las filas.
+  // Lo unico que queda en memoria es el control de permisos por estado.
+  const filteredSales = visibleSales;
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
@@ -175,6 +186,14 @@ const Sales = () => {
             </div>
 
             <div className="flex items-center gap-3">
+              <SalesFiltersPanel
+                value={filters}
+                onChange={setFilters}
+                plans={plans}
+                salespersons={salespersons}
+                showSalesperson={isAdminRole}
+              />
+
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-40">
                   <Filter className="h-4 w-4 mr-2" />

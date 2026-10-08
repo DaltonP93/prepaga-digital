@@ -26,6 +26,9 @@ type ExtendedSale = Sale & {
     email: string;
     phone?: string;
     dni?: string;
+    client_type?: string;
+    razon_social?: string;
+    ruc?: string;
   };
   plans?: {
     name: string;
@@ -53,7 +56,19 @@ type ExtendedSale = Sale & {
   };
 };
 
-interface SalesListParams {
+export interface SalesListFilters {
+  /** `clients.client_type`: persona fisica vs empresa. Vive en el embed, no en `sales`. */
+  clientType?: string;
+  saleType?: string;
+  salespersonId?: string;
+  planId?: string;
+  auditStatus?: string;
+  /** `YYYY-MM-DD`, sobre `created_at`. */
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+interface SalesListParams extends SalesListFilters {
   page?: number;
   pageSize?: number;
   search?: string;
@@ -154,18 +169,50 @@ export function useSalesList(paramsOrEnabled: SalesListParams | boolean = {}) {
     search = '',
     status,
     enabled = true,
+    clientType,
+    saleType,
+    salespersonId,
+    planId,
+    auditStatus,
+    dateFrom,
+    dateTo,
   } = params;
   const isPaginated = typeof page === 'number';
 
   return useQuery({
-    queryKey: ['sales-list', user?.id, userRole, page ?? 'all', pageSize, search, status ?? 'all'],
+    queryKey: [
+      'sales-list',
+      user?.id,
+      userRole,
+      page ?? 'all',
+      pageSize,
+      search,
+      status ?? 'all',
+      clientType ?? 'all',
+      saleType ?? 'all',
+      salespersonId ?? 'all',
+      planId ?? 'all',
+      auditStatus ?? 'all',
+      dateFrom ?? '',
+      dateTo ?? '',
+    ],
     queryFn: async () => {
-      let salesQuery = supabase
+      // El filtro por tipo de persona vive en `clients`, no en `sales`: sólo cuando
+      // está activo el embed pasa a `!inner`. Incondicional descartaría las ventas
+      // sin `client_id`.
+      const clientsColumns = 'first_name, last_name, email, client_type, razon_social, ruc, dni';
+      const clientsEmbed = clientType
+        ? `clients:client_id!inner(${clientsColumns})`
+        : `clients:client_id(${clientsColumns})`;
+
+      let salesQuery: any = supabase
         .from('sales')
         .select(`
           id,
           contract_number,
           status,
+          sale_type,
+          audit_status,
           total_amount,
           created_at,
           signature_expires_at,
@@ -174,30 +221,60 @@ export function useSalesList(paramsOrEnabled: SalesListParams | boolean = {}) {
           all_signatures_completed,
           salesperson_id,
           company_id,
-          clients:client_id(first_name, last_name, email, client_type, razon_social, ruc, dni),
+          plan_id,
+          ${clientsEmbed},
           plans:plan_id(name)
         `)
         .order('created_at', { ascending: false });
-      let countQuery = supabase
+      let countQuery: any = supabase
         .from('sales')
-        .select('id', { count: 'exact', head: true });
+        .select(clientType ? 'id, clients:client_id!inner(id)' : 'id', {
+          count: 'exact',
+          head: true,
+        });
 
-      if (!isAdminRole && user?.id) {
-        salesQuery = salesQuery.eq('salesperson_id', user.id);
-        countQuery = countQuery.eq('salesperson_id', user.id);
-      }
-
-      if (status && status !== 'todos') {
-        salesQuery = salesQuery.eq('status', status as any);
-        countQuery = countQuery.eq('status', status as any);
-      }
-
+      // La búsqueda por nombre/documento del cliente no se puede expresar como un
+      // OR contra un embed, así que se resuelve en dos pasos: ids de clientes que
+      // matchean y después `client_id.in.(...)` en el mismo OR que el contrato.
+      let searchOr: string | null = null;
       if (search.trim()) {
-        const term = search.trim();
+        // `,` `(` `)` y `%` rompen la gramática de PostgREST dentro de un `.or()`.
+        const term = search.trim().replace(/[%,()]/g, ' ');
         const pattern = `%${term}%`;
-        salesQuery = salesQuery.ilike('contract_number', pattern);
-        countQuery = countQuery.ilike('contract_number', pattern);
+        const { data: matchedClients } = await supabase
+          .from('clients')
+          .select('id')
+          .or(
+            `first_name.ilike.${pattern},last_name.ilike.${pattern},` +
+            `razon_social.ilike.${pattern},ruc.ilike.${pattern},dni.ilike.${pattern}`
+          )
+          .limit(200);
+        const clientIds = (matchedClients || []).map((c) => c.id);
+        searchOr = clientIds.length
+          ? `contract_number.ilike.${pattern},client_id.in.(${clientIds.join(',')})`
+          : `contract_number.ilike.${pattern}`;
       }
+
+      // Los mismos filtros tienen que ir a la query de datos Y a la del count: si
+      // divergen, el paginador miente.
+      const applyFilters = (q: any) => {
+        if (!isAdminRole && user?.id) q = q.eq('salesperson_id', user.id);
+        if (status && status !== 'todos') q = q.eq('status', status as any);
+        if (clientType) q = q.eq('clients.client_type', clientType);
+        if (saleType) q = q.eq('sale_type', saleType);
+        if (salespersonId) q = q.eq('salesperson_id', salespersonId);
+        if (planId) q = q.eq('plan_id', planId);
+        if (auditStatus) q = q.eq('audit_status', auditStatus);
+        if (dateFrom) q = q.gte('created_at', dateFrom);
+        // `created_at` es timestamptz: sin el fin del día, el "hasta" deja afuera
+        // todas las ventas cargadas ese mismo día.
+        if (dateTo) q = q.lte('created_at', `${dateTo}T23:59:59.999`);
+        if (searchOr) q = q.or(searchOr);
+        return q;
+      };
+
+      salesQuery = applyFilters(salesQuery);
+      countQuery = applyFilters(countQuery);
 
       if (isPaginated) {
         const from = Math.max(((page || 1) - 1) * pageSize, 0);
