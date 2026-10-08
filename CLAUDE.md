@@ -1217,7 +1217,18 @@ resultado, y el script aborta si cambia un solo cálculo o un período.
   *Exportar Excel* en el detalle y *Exportar Resumen* (rango de fechas) en la lista. Las FILAS
   llevan los valores del **snapshot** (lo liquidado es inmutable); subtotales, pie y Resumen
   son fórmulas. La plantilla de la Fase 1 es `scripts/comisiones/build_plantilla_liquidacion.py`
-  y **comparten diseño** (celdas `B4:B9`, `E4:E11`, tabla desde la fila 13): si se cambia una, cambiar la otra.
+  y **comparten diseño**: si se cambia una, cambiar la otra.
+- **El diseño es el de la planilla original del cliente** (desde el 2026-10-08; antes era un
+  bloque fijo arriba con la tabla en la fila 13, y el cliente lo rechazó). Lleva bandas negra y
+  gris arriba, columnas A–O (`Rec N°` … `Comision`, `Adicional`, `Obs`), subtotal gris y la sección
+  `EMPRESARIALES` aparte para lo GRUPAL. Después van la franja negra y, abajo, el pie (etiqueta en
+  K, valor en M) hasta `TOTAL A COBRAR`. El Resumen lleva `Bonif 8/12/15%`, `Otros` y `Prueba`.
+  `Rec N°` sale vacío: el sistema no guarda el medio de cobro.
+- ⚠️ **No copiar las fórmulas del Resumen viejo**: tenían las referencias corridas (`#REF!`, y la
+  comisión de un vendedor se leía de la franja negra). El export apunta **directo** a la celda de
+  cada hoja, porque el generador sabe dónde cae. La plantilla usa **nombres de ámbito hoja +
+  `INDIRECT`**, porque ahí el usuario agrega filas y vendedores. `Prueba` suma los `TOTAL A COBRAR`
+  de las hojas y se pinta de rojo si no coincide con el Total.
 - Las lecturas del export **paginan de a 1000** (`max_rows` de PostgREST corta en silencio).
 - Montos escritos a mano se parsean como es-PY (`"350.000"` = 350000): `src/lib/commissions/parseAmount.ts`.
 - ⚠️ El SQL Editor del dashboard **no conserva la sesión** entre sentencias (las `TEMP TABLE` del
