@@ -14,6 +14,7 @@ const BASE_LABEL: Record<CommissionBase, string> = {
   plan_price: 'Precio del plan',
   sale_total_amount: 'Monto de la venta',
   per_adherent: 'Por adherente',
+  net_of_fee_and_tax: 'Neto de gasto adm. e IVA',
 };
 
 export function CommissionSalespeoplePanel() {

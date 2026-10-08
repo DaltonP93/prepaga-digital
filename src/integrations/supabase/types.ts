@@ -819,6 +819,53 @@ export type Database = {
           },
         ]
       }
+      commission_admin_fees: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          sale_type: string
+          updated_at: string
+          valid_from: string
+          valid_to: string | null
+        }
+        Insert: {
+          amount: number
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          sale_type: string
+          updated_at?: string
+          valid_from: string
+          valid_to?: string | null
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          sale_type?: string
+          updated_at?: string
+          valid_from?: string
+          valid_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_admin_fees_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commission_items: {
         Row: {
           base_amount: number
@@ -901,6 +948,13 @@ export type Database = {
             foreignKeyName: "commission_items_period_id_fkey"
             columns: ["period_id"]
             isOneToOne: false
+            referencedRelation: "commission_period_payable"
+            referencedColumns: ["period_id"]
+          },
+          {
+            foreignKeyName: "commission_items_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
             referencedRelation: "commission_periods"
             referencedColumns: ["id"]
           },
@@ -937,6 +991,83 @@ export type Database = {
             columns: ["salesperson_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commission_period_adjustments: {
+        Row: {
+          amount: number
+          base_amount: number | null
+          calc_mode: string
+          company_id: string
+          concept: string
+          created_at: string
+          created_by: string
+          id: string
+          item_id: string | null
+          notes: string | null
+          percent: number | null
+          period_id: string
+          sign: number
+        }
+        Insert: {
+          amount: number
+          base_amount?: number | null
+          calc_mode: string
+          company_id: string
+          concept: string
+          created_at?: string
+          created_by: string
+          id?: string
+          item_id?: string | null
+          notes?: string | null
+          percent?: number | null
+          period_id: string
+          sign: number
+        }
+        Update: {
+          amount?: number
+          base_amount?: number | null
+          calc_mode?: string
+          company_id?: string
+          concept?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          item_id?: string | null
+          notes?: string | null
+          percent?: number | null
+          period_id?: string
+          sign?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_period_adjustments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_period_adjustments_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "commission_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_period_adjustments_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "commission_period_payable"
+            referencedColumns: ["period_id"]
+          },
+          {
+            foreignKeyName: "commission_period_adjustments_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "commission_periods"
             referencedColumns: ["id"]
           },
         ]
@@ -1039,6 +1170,7 @@ export type Database = {
           id: string
           is_active: boolean
           plan_id: string
+          report_code: string | null
           updated_at: string
         }
         Insert: {
@@ -1048,6 +1180,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           plan_id: string
+          report_code?: string | null
           updated_at?: string
         }
         Update: {
@@ -1057,6 +1190,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           plan_id?: string
+          report_code?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1216,7 +1350,9 @@ export type Database = {
           created_at: string
           is_enabled: boolean
           liquidation_prefix: string
+          maternity_extra_amount: number | null
           next_liquidation_number: number
+          tax_divisor: number
           updated_at: string
         }
         Insert: {
@@ -1225,7 +1361,9 @@ export type Database = {
           created_at?: string
           is_enabled?: boolean
           liquidation_prefix?: string
+          maternity_extra_amount?: number | null
           next_liquidation_number?: number
+          tax_divisor?: number
           updated_at?: string
         }
         Update: {
@@ -1234,7 +1372,9 @@ export type Database = {
           created_at?: string
           is_enabled?: boolean
           liquidation_prefix?: string
+          maternity_extra_amount?: number | null
           next_liquidation_number?: number
+          tax_divisor?: number
           updated_at?: string
         }
         Relationships: [
@@ -5585,6 +5725,41 @@ export type Database = {
           },
         ]
       }
+      commission_period_payable: {
+        Row: {
+          adicional: number | null
+          bonificacion: number | null
+          company_id: string | null
+          currency_code: string | null
+          descuento: number | null
+          items_count: number | null
+          otro: number | null
+          period_id: string | null
+          recupero: number | null
+          salesperson_id: string | null
+          status: string | null
+          total_a_cobrar: number | null
+          total_adjustments: number | null
+          total_items: number | null
+          viatico: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_periods_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commission_periods_salesperson_id_fkey"
+            columns: ["salesperson_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_public_settings: {
         Row: {
           company_id: string | null
@@ -5978,6 +6153,44 @@ export type Database = {
         Returns: Json
       }
       cleanup_rate_limit_log: { Args: never; Returns: undefined }
+      commission_add_adjustment: {
+        Args: {
+          p_amount?: number
+          p_base_amount?: number
+          p_calc_mode: string
+          p_concept: string
+          p_item_id?: string
+          p_notes?: string
+          p_percent?: number
+          p_period_id: string
+          p_sign?: number
+        }
+        Returns: {
+          amount: number
+          base_amount: number | null
+          calc_mode: string
+          company_id: string
+          concept: string
+          created_at: string
+          created_by: string
+          id: string
+          item_id: string | null
+          notes: string | null
+          percent: number | null
+          period_id: string
+          sign: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "commission_period_adjustments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      commission_admin_fee_for: {
+        Args: { p_company_id: string; p_on: string; p_sale_type: string }
+        Returns: number
+      }
       commission_annul_period: {
         Args: { p_period_id: string; p_reason: string }
         Returns: {
@@ -6076,6 +6289,37 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      commission_delete_adjustment: {
+        Args: { p_adjustment_id: string }
+        Returns: undefined
+      }
+      commission_export_rows: {
+        Args: { p_period_ids: string[] }
+        Returns: {
+          admin_fee: number
+          base_amount: number
+          base_type: string
+          calc_mode: string
+          client_display_id: string
+          client_name: string
+          commission_amount: number
+          contract_number: string
+          gross_amount: number
+          group_type: string
+          item_id: string
+          item_number: number
+          lives: number
+          percent: number
+          period_id: string
+          plan_name: string
+          report_code: string
+          sale_date: string
+          sale_id: string
+          sale_total_amount: number
+          sale_type: string
+          tax_divisor: number
+        }[]
+      }
       commission_generate_period: {
         Args: {
           p_company_id: string
@@ -6168,6 +6412,10 @@ export type Database = {
           rule_id: string
           sale_id: string
         }[]
+      }
+      commission_suggest_maternity_adjustments: {
+        Args: { p_period_id: string }
+        Returns: number
       }
       complete_adherent_incorporation: {
         Args: { p_signature_link_id: string }

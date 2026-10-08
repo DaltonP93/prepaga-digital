@@ -1198,6 +1198,36 @@ contratada_signer_phone: 976122957
   (guaraníes enteros).
 - `rule_snapshot.source` distingue `'rule'` de `'salesperson_default'`.
 
+### Reporte de liquidación en Excel (aplicado en US test el 2026-10-08)
+
+Reproduce la planilla "Comisiones <mes>.xlsx" (una hoja por vendedor + Resumen).
+**Todo es aditivo** (`20261007000001_commission_report_additive.sql`, script
+`sql/aplicar-comisiones-reporte-test.sql`): ninguna regla existente cambia de
+resultado, y el script aborta si cambia un solo cálculo o un período.
+
+| Pieza | Qué es |
+|---|---|
+| Base `net_of_fee_and_tax` | `(total − gasto adm.) / tax_divisor`. Es una rama **nueva** del `CASE`; las otras 3 bases quedan byte a byte. Requiere una fila vigente en `commission_admin_fees` (se carga **por SQL**, no hay UI): sin ella el cálculo da `admin_fee_not_configured` |
+| `commission_period_adjustments` | viático / recupero / bonificación / adicional / descuento / otro. Sólo por RPC (`commission_add_adjustment`, `commission_delete_adjustment`, `commission_suggest_maternity_adjustments`) y **sólo con el período en `borrador`** |
+| `commission_period_payable` | Vista: `total_a_cobrar = Σ ítems + Σ ajustes`. `commission_periods.total_amount` **no cambia**: sigue siendo Σ ítems |
+| `commission_export_rows(uuid[])` | Filas del Excel (código de plan, vidas, snapshot de la base) |
+| `commission_settings.tax_divisor` / `.maternity_extra_amount`, `commission_plan_settings.report_code` | Parámetros de presentación; se cargan por SQL |
+
+- **Front**: `src/lib/commissions/exportLiquidacionXlsx.ts` (exceljs, import dinámico), botón
+  *Exportar Excel* en el detalle y *Exportar Resumen* (rango de fechas) en la lista. Las FILAS
+  llevan los valores del **snapshot** (lo liquidado es inmutable); subtotales, pie y Resumen
+  son fórmulas. La plantilla de la Fase 1 es `scripts/comisiones/build_plantilla_liquidacion.py`
+  y **comparten diseño** (celdas `B4:B9`, `E4:E11`, tabla desde la fila 13): si se cambia una, cambiar la otra.
+- Las lecturas del export **paginan de a 1000** (`max_rows` de PostgREST corta en silencio).
+- Montos escritos a mano se parsean como es-PY (`"350.000"` = 350000): `src/lib/commissions/parseAmount.ts`.
+- ⚠️ El SQL Editor del dashboard **no conserva la sesión** entre sentencias (las `TEMP TABLE` del
+  preflight daban `42P01`), por eso la foto del "antes" vive en el esquema `cr_scratch`, que el
+  propio script crea y borra. Para un rollback garantizado correrlo como UNA transacción
+  (`psql -1` / `apply_migration`).
+- ⚠️ `generate-commission-pdf` devuelve 500 en US test desde antes de este cambio (probado
+  el 2026-10-07 y el 2026-10-08). No es del reporte; falta investigar el renderer en ese proyecto.
+- Sigue **sin estar en BR producción**.
+
 ### Deploy — nunca a producción por accidente
 
 `supabase/config.toml` apunta a **BR producción**, así que cualquier `db push` o

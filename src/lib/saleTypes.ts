@@ -127,3 +127,18 @@ export const recommendedTemplateType = (
   if (ctx?.isCompany) return 'contrato_empresa';
   return saleType ? TEMPLATE_TYPE_BY_SALE_TYPE[saleType as SaleType] : undefined;
 };
+
+/**
+ * Código de "Movimiento" (columna M) de la planilla de liquidación de comisiones.
+ * Es sólo presentación: no se guarda en ninguna tabla.
+ */
+const REPORT_MOVEMENT_CODES: Record<SaleType, string> = {
+  venta_nueva: 'V',
+  reingreso: 'RI',
+  alta_adherente: 'INC',
+  cambio_plan: 'CP',
+};
+
+/** `sale_type` → código M del reporte. Valor desconocido o vacío → cadena vacía (nunca inventa uno). */
+export const saleTypeReportCode = (value?: string | null): string =>
+  value ? REPORT_MOVEMENT_CODES[value as SaleType] ?? '' : '';

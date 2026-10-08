@@ -4,8 +4,12 @@ import { useSimpleAuthContext } from '@/components/SimpleAuthProvider';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import type {
+  CommissionAdjustment,
+  CommissionAdjustmentInput,
   CommissionBase,
+  CommissionExportRow,
   CommissionItem,
+  CommissionPayable,
   CommissionPeriod,
   CommissionPlanSetting,
   CommissionPreviewItem,
@@ -39,6 +43,8 @@ const queryKeys = {
   items: (companyId: string | null | undefined, periodId: string) => ['commissions', companyId, 'items', periodId] as const,
   catalog: (companyId?: string | null) => ['commissions', companyId, 'catalog'] as const,
   salespeople: (companyId?: string | null) => ['commissions', companyId, 'salespeople'] as const,
+  adjustments: (companyId: string | null | undefined, periodId: string) => ['commissions', companyId, 'adjustments', periodId] as const,
+  payable: (companyId: string | null | undefined, periodId: string) => ['commissions', companyId, 'payable', periodId] as const,
   preview: (params?: CommissionPreviewParams | null) => ['commissions', params?.companyId, 'preview', params] as const,
 };
 
@@ -290,6 +296,141 @@ export const downloadCommissionPdf = async (periodId: string) => {
   const link = document.createElement('a');
   link.href = url;
   link.download = `liquidacion-${periodId.slice(0, 8)}.pdf`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+};
+
+// ---------------------------------------------------------------------------
+// Ajustes de la liquidación (viático, recupero, bonificación, ...) y reporte
+// ---------------------------------------------------------------------------
+
+const adjustmentsFrom = () => supabase.from('commission_period_adjustments');
+const payableFrom = () => supabase.from('commission_period_payable');
+
+export const useCommissionAdjustments = (periodId: string) => {
+  const { profile } = useSimpleAuthContext();
+  return useQuery({
+    queryKey: queryKeys.adjustments(profile?.company_id, periodId),
+    enabled: Boolean(profile?.company_id && periodId),
+    retry: false,
+    queryFn: async (): Promise<CommissionAdjustment[]> => {
+      const { data, error } = await adjustmentsFrom().select('*').eq('period_id', periodId).order('created_at');
+      if (error) throw error;
+      return (data || []) as unknown as CommissionAdjustment[];
+    },
+  });
+};
+
+export const useCommissionPayable = (periodId: string) => {
+  const { profile } = useSimpleAuthContext();
+  return useQuery({
+    queryKey: queryKeys.payable(profile?.company_id, periodId),
+    enabled: Boolean(profile?.company_id && periodId),
+    retry: false,
+    queryFn: async (): Promise<CommissionPayable | null> => {
+      const { data, error } = await payableFrom().select('*').eq('period_id', periodId).maybeSingle();
+      if (error) throw error;
+      return data as unknown as CommissionPayable | null;
+    },
+  });
+};
+
+const useInvalidateAdjustments = () => {
+  const { profile } = useSimpleAuthContext();
+  const queryClient = useQueryClient();
+  return (periodId: string) => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.adjustments(profile?.company_id, periodId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.payable(profile?.company_id, periodId) });
+  };
+};
+
+export const useAddCommissionAdjustment = () => {
+  const invalidate = useInvalidateAdjustments();
+  return useMutation({
+    mutationFn: (input: CommissionAdjustmentInput) => commissionRpc<CommissionAdjustment>('commission_add_adjustment', {
+      p_period_id: input.periodId,
+      p_concept: input.concept,
+      p_calc_mode: input.calcMode,
+      p_amount: input.calcMode === 'amount' ? input.amount ?? null : null,
+      p_base_amount: input.calcMode === 'percent' ? input.baseAmount ?? null : null,
+      p_percent: input.calcMode === 'percent' ? input.percent ?? null : null,
+      p_sign: input.concept === 'otro' ? input.sign ?? null : null,
+      p_notes: input.notes?.trim() || null,
+    }),
+    onSuccess: (_, input) => { invalidate(input.periodId); toast.success('Ajuste agregado'); },
+    onError: (error) => toast.error(`No se pudo agregar el ajuste: ${messageOf(error)}`),
+  });
+};
+
+export const useDeleteCommissionAdjustment = () => {
+  const invalidate = useInvalidateAdjustments();
+  return useMutation({
+    mutationFn: async ({ adjustmentId }: { adjustmentId: string; periodId: string }) => {
+      await commissionRpc<void>('commission_delete_adjustment', { p_adjustment_id: adjustmentId });
+    },
+    onSuccess: (_, variables) => { invalidate(variables.periodId); toast.success('Ajuste eliminado'); },
+    onError: (error) => toast.error(`No se pudo eliminar el ajuste: ${messageOf(error)}`),
+  });
+};
+
+export const useSuggestMaternityAdjustments = () => {
+  const invalidate = useInvalidateAdjustments();
+  return useMutation({
+    mutationFn: (periodId: string) => commissionRpc<number>('commission_suggest_maternity_adjustments', { p_period_id: periodId }),
+    onSuccess: (count, periodId) => {
+      invalidate(periodId);
+      toast.success(count > 0 ? `Se agregaron ${count} adicional(es) por maternidad` : 'No hay ventas con maternidad sin ajuste');
+    },
+    onError: (error) => toast.error(`No se pudo sugerir: ${messageOf(error)}`),
+  });
+};
+
+const EXPORT_PAGE_SIZE = 1000; // max_rows de PostgREST: pedir más corta en silencio
+
+/**
+ * Trae TODAS las filas de una consulta paginando de a 1000. Sin esto, un período
+ * grande o un resumen de varios vendedores se exportaría truncado y el Excel
+ * dejaría de coincidir con `commission_period_payable`.
+ */
+async function fetchAllPages<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+): Promise<T[]> {
+  const all: T[] = [];
+  for (let from = 0; ; from += EXPORT_PAGE_SIZE) {
+    const { data, error } = await page(from, from + EXPORT_PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    const chunk = (data || []) as T[];
+    all.push(...chunk);
+    if (chunk.length < EXPORT_PAGE_SIZE) return all;
+  }
+}
+
+/**
+ * Arma y descarga el `.xlsx` de una o varias liquidaciones. Se importa
+ * exceljs recién acá para que no engorde el bundle de las demás pantallas.
+ */
+export const downloadCommissionXlsx = async (periodIds: string[]) => {
+  if (!periodIds.length) throw new Error('No hay liquidaciones para exportar.');
+  const [{ data: periods, error: periodsError }, rows, adjustments, { buildLiquidacionWorkbook, liquidacionFileName }] = await Promise.all([
+    commissionFrom('commission_periods').select('*').in('id', periodIds),
+    fetchAllPages<CommissionExportRow>((from, to) => supabase.rpc('commission_export_rows', { p_period_ids: periodIds }).range(from, to)),
+    fetchAllPages<CommissionAdjustment>((from, to) => adjustmentsFrom().select('*').in('period_id', periodIds).order('created_at').order('id').range(from, to)),
+    import('@/lib/commissions/exportLiquidacionXlsx'),
+  ]);
+  if (periodsError) throw periodsError;
+  const ordered = periodIds
+    .map((id) => (periods || []).find((period) => period.id === id))
+    .filter(Boolean) as unknown as CommissionPeriod[];
+  if (!ordered.length) throw new Error('No se encontraron las liquidaciones pedidas o no tienes acceso.');
+  const buffer = await buildLiquidacionWorkbook({
+    periods: ordered,
+    rows,
+    adjustments,
+  });
+  const url = URL.createObjectURL(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = liquidacionFileName(ordered);
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 };
