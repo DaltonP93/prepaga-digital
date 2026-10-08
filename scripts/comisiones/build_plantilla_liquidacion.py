@@ -93,7 +93,7 @@ BORDER_COLS = [c for c in COLUMNS if c != "Obs"]   # Obs va sin borde
 SUBTOTAL_COLS = ["Vidas", "Total", "G Adm", "Cuota", "Cuota - IVA", "Comision"]
 SUBTOTAL_BOLD = ["Cuota - IVA", "Comision"]
 CENTER_COLS = ["Fec", "Plan", "M", "Cto N°", "Vidas"]
-WIDTHS = {"Rec N°": 8, "Fec": 10, "Nombre": 30, "Plan": 6, "M": 5, "Cto N°": 9, "Vidas": 6,
+WIDTHS = {"Rec N°": 8, "Fec": 10, "Nombre": 30, "Plan": 6, "M": 5, "Cto N°": 12, "Vidas": 6,
           "Total": 11, "G Adm": 9, "Cuota": 11, "Cuota - IVA": 12, "%": 7, "Comision": 12,
           "Adicional": 10, "Obs": 30, "G Adm manual": 11, "% manual": 9, "Adicional manual": 11}
 SECTION_LABEL = {"INDIVIDUAL": "INDIVIDUALES / FAMILIARES", "GRUPAL": "EMPRESARIALES"}

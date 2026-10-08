@@ -56,7 +56,7 @@ const COLUMNS: Array<{ key: Col; header: string; width: number; numFmt?: string;
   { key: 'nombre', header: 'Nombre', width: 30 },
   { key: 'plan', header: 'Plan', width: 6, align: 'center' },
   { key: 'm', header: 'M', width: 5, align: 'center' },
-  { key: 'cto', header: 'Cto N°', width: 9, align: 'center' },
+  { key: 'cto', header: 'Cto N°', width: 12, align: 'center' },
   { key: 'vidas', header: 'Vidas', width: 6, numFmt: '0', align: 'center' },
   { key: 'total', header: 'Total', width: 11, numFmt: FMT_GS },
   { key: 'gadm', header: 'G Adm', width: 9, numFmt: FMT_GS },
