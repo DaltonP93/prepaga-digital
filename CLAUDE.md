@@ -69,7 +69,7 @@ Si el branding deja de aparecer en los PDFs, es porque Lovable sobreescribió es
 | `generate-base-pdf` | **82** | ⚠️ ADMINISTRADA EXTERNAMENTE — no tocar |
 | `finalize-signature-link` | 56 | Activa contratada, notifica titular vía WhatsApp |
 | `generate-pdf` | 57 | Preview PDF con branding base64 |
-| `create-user` | 55 | Timeout 8s en auth.getUser, deduplicación doble-click |
+| `create-user` | 56 | Timeout 8s en auth.getUser, deduplicación doble-click; traduce rechazos de política de contraseña de Auth (falta tipo de carácter / filtrada) a mensaje en español |
 | `signature-otp` | 57 | OTP WhatsApp vía WAHA, API key desde DB |
 | `get-document-download-url` | 51 | Prioriza print_versions sobre signed_pdf_url |
 | `pades-sign-document` | 49 | Firma PAdES de documentos |
